@@ -1,0 +1,9 @@
+[Core]
+Name = Check that reports orphaned collections
+Module = OrphanedCollections
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check that reports orphaned collections
+

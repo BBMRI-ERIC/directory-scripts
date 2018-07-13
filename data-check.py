@@ -145,8 +145,12 @@ class Directory:
 		return self.getBiobankNN(self.getCollectionBiobank(collectionID))
 
 	# return the whole subgraph including the biobank itself
-	def getGraphBiobankCollections(self, biobank):
-		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, biobank).union({biobank}))
+	def getGraphBiobankCollectionsFromBiobank(self, biobankID : str):
+		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, biobankID).union({biobankID}))
+
+	# return the whole subgraph including some collection 
+	def getGraphBiobankCollectionsFromCollection(self, collectionID : str):
+		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.ancestors(self.directoryCollectionsDAG, collectionID).union(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)).union({collectionID}))
 
 # Main code
 
