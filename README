@@ -8,4 +8,7 @@ Install:
   or
   pip install --upgrade networkx
 
+* pip install validate_email
+  or similar to above
+
 * wget https://directory.bbmri-eric.eu/molgenis.py
