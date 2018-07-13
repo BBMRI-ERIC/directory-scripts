@@ -1,0 +1,9 @@
+[Core]
+Name = Check that geo coordinates of the biobank are within the given country.
+Module = BiobankGeo
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check that geo coordinates of the biobank are within the given country.
+
