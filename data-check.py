@@ -29,7 +29,7 @@ class WarningsContainer:
 				'FI' : 'TODO',
 				'FR' : 'TODO',
 				'GR' : 'TODO',
-				'IT' : 'TODO',
+				'IT' : 'marialuisa.lavitrano@unimib.it, luciano.milanesi@itb.cnr.it, barbara.parodi@hsanmartino.it, elena.bravo@iss.it',
 				'LV' : 'TODO',
 				'MT' : 'TODO',
 				'NL' : 'TODO',
@@ -69,7 +69,7 @@ class Directory:
 		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
 		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections'])
 		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
-		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact'])
+		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
 		self.contactHashmap = {}
 
 		# Graph containing only biobanks and collections
@@ -204,6 +204,7 @@ class Directory:
 		return len(self.biobanks)
 
 	def getBiobankNN(self, biobankID : str):
+		# TODO: handle IARC!
 		#data = nx.get_node_attributes(self.directoryGraph, 'data')
 		#pp.pprint(data)
 		#biobank = data[biobankID]
@@ -221,6 +222,7 @@ class Directory:
 		return collection['biobank']['id']
 
 	def getCollectionNN(self, collectionID):
+		# TODO: handle IARC!
 		return self.getBiobankNN(self.getCollectionBiobank(collectionID))
 
 	# return the whole subgraph including the biobank itself
@@ -235,7 +237,23 @@ class Directory:
 		return self.contacts
 
 	def getContactNN(self, contactID : str):
+		# TODO: handle IARC!
 		return self.contactHashmap[contactID]['country']['id']
+
+	def getNetworks(self):
+		return self.networks
+
+	def getNetworkNN(self, networkID : str):
+		# TODO: handle IARC!
+		network = self.networkGraph.nodes[networkID]['data']
+		NN = ""
+		if 'country' in network:
+			NN = network['country']['id']
+		elif 'contact' in network:
+			NN = self.getContactNN(network['contact']['id'])
+		else:
+			raise Exception('DirectoryStructure', 'Unable to determine National Node affiliation of network ' + networkID)
+		return NN
 
 # Main code
 

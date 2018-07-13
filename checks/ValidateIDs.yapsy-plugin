@@ -1,0 +1,9 @@
+[Core]
+Name = ID validator
+Module = ValidateIDs
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = ID validator
+
