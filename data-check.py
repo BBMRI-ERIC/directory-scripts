@@ -1,0 +1,172 @@
+#!/usr/bin/python3
+
+import pprint
+import re
+from enum import Enum
+
+import molgenis
+import networkx as nx
+
+pp = pprint.PrettyPrinter(indent=4)
+
+# Definition of warnings 
+
+class WarningLevel(Enum):
+	ERROR = 1
+	WARNING = 2
+	INFO = 3
+
+class Warning:
+
+	def __init__(self, recipients, NN, level : WarningLevel, message):
+		self.__recipient = recipient
+		self.__level = level
+		self.__message = message
+	
+	def dump(self):
+		print("=="+self.__level+"== "+self.__message)
+
+class WarningsContainer:
+
+	def __init__(self):
+		# TODO
+		self._NNtoEmails = {
+				'AT' : 'Philipp.Ueberbacher@aau.at, heimo.mueller@medunigraz.at',
+				'BE' : '',
+				'BG' : '',
+				'CH' : '',
+				'CY' : '',
+				'CZ' : 'dudova@ics.muni.cz, hopet@ics.muni.cz',
+				'DE' : '',
+				'EE' : '',
+				'FI' : '',
+				'FR' : '',
+				'GR' : '',
+				'IT' : '',
+				'LV' : '',
+				'MT' : '',
+				'NL' : '',
+				'NO' : '',
+				'PL' : '',
+				'SE' : '',
+				'TR' : '',
+				'UK' : '',
+				'IARC' : '',
+				}
+		self.__warnings = {}
+
+
+	def newWarning(self, recipients, NN, level : WarningLevel, message):
+		warning = Warning(recipients, NN, level, message)
+		warning_key = ""
+		if recipient != "":
+			warning_key = recipient + ", "
+		warning_key += self._NNtoEmails(NN)
+		if warning_key in self.__warnings:
+			self.__warnings[warning_key].append(warning)
+		else:
+			self.__warnings[warning_key] = list(warning)
+
+	def dumpWarnings(self):
+		for wk in self.__warnings:
+			print(wk + ":")
+			for w in self.__warnings[wk]:
+				w.dump()
+			print("")
+
+
+# Definition of Directory structure
+
+class Directory:
+
+	def __init__(self):
+		session = molgenis.Session("https://directory.bbmri-eric.eu/api/")
+		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections'])
+		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections'])
+		self.contacts = session.get("eu_bbmri_eric_persons", num=0)
+		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact'])
+
+		self.directoryGraph = nx.DiGraph()
+		self.directoryCollectionsDAG = nx.DiGraph()
+		for b in self.biobanks:
+			if self.directoryGraph.has_node(b['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found: ' + b['id'])
+			self.directoryGraph.add_node(b['id'], data=b)
+			self.directoryCollectionsDAG.add_node(b['id'], data=b)
+		for c in self.collections:
+			if self.directoryGraph.has_node(c['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found: ' + c['id'])
+			self.directoryGraph.add_node(c['id'], data=c)
+			self.directoryCollectionsDAG.add_node(c['id'], data=c)
+		# check forward pointers from biobanks
+		for b in self.biobanks:
+			for c in b['collections']['items']:
+				if not self.directoryGraph.has_node(c['id']):
+					raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
+		# now we have all the collections created and checked duplicates, so we create edges
+		for c in self.collections:
+			if 'parent_collection' in c:
+				# some child collection
+				self.directoryGraph.add_edge(c['id'], c['parent_collection']['id'])
+			else:
+				# some of root collections of a biobank
+				# we add both edges as we can't extract this information from the biobank level (it contains pointers to all the child collections)
+				self.directoryGraph.add_edge(c['id'], c['biobank']['id'])
+				self.directoryGraph.add_edge(c['biobank']['id'], c['id'])
+				self.directoryCollectionsDAG.add_edge(c['biobank']['id'], c['id'])
+			if 'sub_collections' in c:
+				# some of root collections of a biobank
+				for sb in c['sub_collections']['items']:
+					self.directoryGraph.add_edge(c['id'], sb['id'])
+					self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
+		# now we check if all the edges in the graph are in both directions
+		for e in self.directoryGraph.edges():
+			if not self.directoryGraph.has_edge(e[1],e[0]):
+				raise Exception('DirectoryStructure', 'Missing edge: ' + e[1] + ' to ' + e[0])
+		# we check that DAG is indeed DAG :-)
+		if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
+			raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
+
+
+
+	def getBiobanks(self):
+		return self.biobanks
+
+	def getBiobanksCount(self):
+		return len(self.biobanks)
+
+	def getCollections(self):
+		return self.collections
+
+	def getCollectionsCount(self):
+		return len(self.collections)
+
+	# return the whole subgraph including the biobank itself
+	def getGraphBiobankCollections(self, biobank):
+		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, biobank).union({biobank}))
+
+# Main code
+
+dir = Directory()
+WarningAccumulator = []
+
+for biobank in dir.getBiobanks():
+	if(re.search('MMCI', biobank['id'])):
+		print(biobank['id'])
+		#pp.pprint(biobank)
+print('Total biobanks: ' + str(dir.getBiobanksCount()))
+
+for collection in dir.getCollections():
+	if(re.search('MMCI', collection['id'])):
+		print(collection['id'])
+		#pp.pprint(collection)
+print('Total collections: ' + str(dir.getCollectionsCount()))
+
+print('MMCI collections: ')
+for biobank in dir.getBiobanks():
+	if(re.search('MMCI', biobank['id'])):
+		collections = dir.getGraphBiobankCollections(biobank['id'])
+		for e in collections.edges:
+			print("   "+str(e[0])+" -> "+str(e[1]))
+
+

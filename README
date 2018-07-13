@@ -1,0 +1,11 @@
+Install:
+
+* [Cygwin] python3 -m ensurepip
+
+* pip install networkx
+  or 
+  pip3 install networkx
+  or
+  pip install --upgrade networkx
+
+* wget https://directory.bbmri-eric.eu/molgenis.py
