@@ -25,4 +25,10 @@ class CheckContactFields(IPlugin):
 			#if(not validate_email(contact['email'],verify=True)):
 				#warning = Warning("", dir.getContactNN(contact['id']), WarningLevel.WARNING, "Email for contact " + contact['id'] + " is invalid")
 				#warnings.append(warning)
+			if(not 'phone' in contact or re.search('^\s*$', contact['phone'])):
+				warning = Warning("", dir.getContactNN(contact['id']), WarningLevel.WARNING, "Missing phone for contact " + contact['id'])
+				warnings.append(warning)
+			elif(not re.search('^\+(?:[0-9]??){6,14}[0-9]$', contact['phone'])):
+				warning = Warning("", dir.getContactNN(contact['id']), WarningLevel.ERROR, "Phone number for contact " + contact['id'] + " does not conform to the E.123 international standard " + contact['phone'])
+				warnings.append(warning)
 		return warnings
