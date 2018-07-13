@@ -1,4 +1,5 @@
 import re
+import urllib.request
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import WarningLevel,Warning

@@ -1,0 +1,9 @@
+[Core]
+Name = Check URLs
+Module = CheckURLs
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check URLs.
+
