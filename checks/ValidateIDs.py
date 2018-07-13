@@ -24,6 +24,10 @@ class CheckCollectionExists(IPlugin):
 			if re.search('[^A-Za-z0-9:_-]', collection['id']):
 				warning = Warning("", NN, WarningLevel.ERROR, "CollectionID contains illegal characters " + collection['id'] + ' (should be "A-Za-z0-9:_-")')
 				warnings.append(warning)
+			biobankID = collection['biobank']['id']
+			if not re.search('^'+biobankID+':collection:', collection['id']):
+				warning = Warning("", NN, WarningLevel.WARNING, "CollectionID does not contain expected biobank prefix " + collection['id'] + ' (should start with ' + '^'+biobankID+':collection:' + ')')
+				warnings.append(warning)
 
 		for contact in dir.getContacts():
 			NN = dir.getContactNN(contact['id'])
