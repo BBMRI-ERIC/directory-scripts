@@ -3,7 +3,7 @@ import re
 from yapsy.IPlugin import IPlugin
 from customwarnings import WarningLevel,Warning
 
-class CheckCollectionExists(IPlugin):
+class CheckIDs(IPlugin):
 	def check(self, dir):
 		warnings = []
 

@@ -67,7 +67,7 @@ class Directory:
 	def __init__(self):
 		session = molgenis.Session("https://directory.bbmri-eric.eu/api/")
 		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
-		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections'])
+		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories'])
 		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
 		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
 		self.contactHashmap = {}
@@ -274,6 +274,10 @@ for biobank in dir.getBiobanks():
 		collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
 		for e in collections.edges:
 			print("   "+str(e[0])+" -> "+str(e[1]))
+
+for collection in dir.getCollections():
+	if(re.search('MMCI', collection['id'])):
+		pp.pprint(collection)
 
 for pluginInfo in simplePluginManager.getAllPlugins():
    simplePluginManager.activatePluginByName(pluginInfo.name)

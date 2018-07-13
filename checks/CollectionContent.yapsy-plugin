@@ -1,0 +1,9 @@
+[Core]
+Name = Checks content advertised by the collections.
+Module = CollectionContent
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Checks content advertised by the collections.
+
