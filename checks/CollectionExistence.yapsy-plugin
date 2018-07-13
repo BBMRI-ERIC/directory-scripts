@@ -1,0 +1,9 @@
+[Core]
+Name = Check that at least one collection per biobank exists
+Module = CollectionExistence
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = This is an example plugin
+

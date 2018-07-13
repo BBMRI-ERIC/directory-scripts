@@ -7,24 +7,11 @@ from enum import Enum
 import molgenis
 import networkx as nx
 
+from yapsy.PluginManager import PluginManager
+
+from customwarnings import WarningLevel,Warning
+
 pp = pprint.PrettyPrinter(indent=4)
-
-# Definition of warnings 
-
-class WarningLevel(Enum):
-	ERROR = 1
-	WARNING = 2
-	INFO = 3
-
-class Warning:
-
-	def __init__(self, recipients, NN, level : WarningLevel, message):
-		self.__recipient = recipient
-		self.__level = level
-		self.__message = message
-	
-	def dump(self):
-		print("=="+self.__level+"== "+self.__message)
 
 class WarningsContainer:
 
@@ -55,17 +42,15 @@ class WarningsContainer:
 				}
 		self.__warnings = {}
 
-
-	def newWarning(self, recipients, NN, level : WarningLevel, message):
-		warning = Warning(recipients, NN, level, message)
+	def newWarning(self, warning : Warning):
 		warning_key = ""
-		if recipient != "":
-			warning_key = recipient + ", "
-		warning_key += self._NNtoEmails(NN)
+		if warning.recipients != "":
+			warning_key = recipients + ", "
+		warning_key += self._NNtoEmails[warning.NN]
 		if warning_key in self.__warnings:
 			self.__warnings[warning_key].append(warning)
 		else:
-			self.__warnings[warning_key] = list(warning)
+			self.__warnings[warning_key] = [warning]
 
 	def dumpWarnings(self):
 		for wk in self.__warnings:
@@ -147,19 +132,14 @@ class Directory:
 
 # Main code
 
+simplePluginManager = PluginManager()
+simplePluginManager.setPluginPlaces(["checks"])
+simplePluginManager.collectPlugins()
+
 dir = Directory()
-WarningAccumulator = []
+warningContainer = WarningsContainer()
 
-for biobank in dir.getBiobanks():
-	if(re.search('MMCI', biobank['id'])):
-		print(biobank['id'])
-		#pp.pprint(biobank)
 print('Total biobanks: ' + str(dir.getBiobanksCount()))
-
-for collection in dir.getCollections():
-	if(re.search('MMCI', collection['id'])):
-		print(collection['id'])
-		#pp.pprint(collection)
 print('Total collections: ' + str(dir.getCollectionsCount()))
 
 print('MMCI collections: ')
@@ -169,4 +149,11 @@ for biobank in dir.getBiobanks():
 		for e in collections.edges:
 			print("   "+str(e[0])+" -> "+str(e[1]))
 
+for pluginInfo in simplePluginManager.getAllPlugins():
+   simplePluginManager.activatePluginByName(pluginInfo.name)
+   warnings = pluginInfo.plugin_object.check(dir)
+   if len(warnings) > 0:
+	   for w in warnings:
+		   warningContainer.newWarning(w)
 
+warningContainer.dumpWarnings()
