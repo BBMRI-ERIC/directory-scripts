@@ -1,0 +1,9 @@
+[Core]
+Name = Check relevant fields of the biobank
+Module = BiobankFields
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check relevant fields of the biobank.
+
