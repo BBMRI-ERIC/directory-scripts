@@ -8,14 +8,16 @@ class CheckCollectionContents(IPlugin):
 		warnings = []
 		for collection in dir.getCollections():
 			OoM = collection['order_of_magnitude']['id']
+
+			materials = []
 			if 'materials' in collection:
-				materials = collection['materials']['items']
-			else:
-				materials = []
+				for m in collection['materials']['items']:
+					materials.append(m['id'])
+			
+			data_categories = []
 			if 'data_categories' in collection:
-				data_categories = collection['data_categories']['items']
-			else:
-				data_categories = []
+				for c in collection['data_categories']['items']:
+					data_categories.append(c['id'])
 
 			types = []
 			if 'type' in collection:
@@ -52,6 +54,27 @@ class CheckCollectionContents(IPlugin):
 						diagnoses.append(d['id'])
 				if len(diagnoses) < 1:
 					warning = Warning("", dir.getCollectionNN(collection['id']), WarningLevel.ERROR, "No diagnoses provide for HOSPITAL or DISEASE_SPECIFIC or RD collection" + collection['id'])
+					warnings.append(warning)
+
+			if 'BIOLOGICAL_SAMPLES' in data_categories and len(materials) == 0:
+				warning = Warning("", dir.getCollectionNN(collection['id']), WarningLevel.ERROR, "No material types are provided while biological samples are collected in " + collection['id'])
+				warnings.append(warning)
+
+			if 'IMAGING_DATA' in data_categories:
+				modalities = []
+				if 'imaging_modality' in collection:
+					for m in collection['imaging_modality']['items']:
+						modalities.append(m['id'])
+				if len(modalities) < 1:
+					warning = Warning("", dir.getCollectionNN(collection['id']), WarningLevel.ERROR, "No image modalities provided for image collection " + collection['id'])
+					warnings.append(warning)
+
+				image_dataset_types = []
+				if 'image_dataset_type' in collection:
+					for idt in collection['image_dataset_type']['items']:
+						image_dataset_types.append(idt['id'])
+				if len(image_dataset_types) < 1:
+					warning = Warning("", dir.getCollectionNN(collection['id']), WarningLevel.WARNING, "No image dataset types provided for image collection " + collection['id'])
 					warnings.append(warning)
 
 
