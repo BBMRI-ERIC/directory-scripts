@@ -1,0 +1,9 @@
+[Core]
+Name = Check that contact fields are meaningful
+Module = ContactFields
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check that contact fields are meaningful
+

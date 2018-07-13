@@ -1,7 +1,7 @@
 from yapsy.IPlugin import IPlugin
 from customwarnings import WarningLevel,Warning
 
-class CheckCollectionExists(IPlugin):
+class CheckOrphanedCollection(IPlugin):
 	def check(self, dir):
 		warnings = []
 		for collection in dir.getCollections():

@@ -37,7 +37,7 @@ class WarningsContainer:
 				'PL' : 'TODO',
 				'SE' : 'TODO',
 				'TR' : 'TODO',
-				'UK' : 'TODO',
+				'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
 				'IARC' : 'TODO',
 				}
 		self.__warnings = {}
@@ -68,26 +68,68 @@ class Directory:
 		session = molgenis.Session("https://directory.bbmri-eric.eu/api/")
 		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
 		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections'])
-		self.contacts = session.get("eu_bbmri_eric_persons", num=0)
+		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
 		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact'])
+		self.contactHashmap = {}
 
+		# Graph containing only biobanks and collections
 		self.directoryGraph = nx.DiGraph()
+		# DAG containing only biobanks and collections
 		self.directoryCollectionsDAG = nx.DiGraph()
+		# Weighted graph linking contacts to biobanks/collections/networks
+		self.contactGraph = nx.DiGraph()
+		# Graph linking networks to biobanks/collections
+		self.networkGraph = nx.DiGraph()
+		for c in self.contacts:
+			if self.contactGraph.has_node(c['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
+			# XXX temporary hack -- adding contactID prefix
+			#self.contactGraph.add_node(c['id'], data=c)
+			self.contactGraph.add_node('contactID:'+c['id'], data=c)
+			self.contactHashmap[c['id']] = c
 		for b in self.biobanks:
 			if self.directoryGraph.has_node(b['id']):
-				raise Exception('DirectoryStructure', 'Conflicting ID found: ' + b['id'])
+				raise Exception('DirectoryStructure', 'Conflicting ID found in directoryGraph: ' + b['id'])
 			self.directoryGraph.add_node(b['id'], data=b)
 			self.directoryCollectionsDAG.add_node(b['id'], data=b)
+			if self.contactGraph.has_node(b['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + b['id'])
+			self.contactGraph.add_node(b['id'], data=b)
+			if self.networkGraph.has_node(b['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + b['id'])
+			self.networkGraph.add_node(b['id'], data=b)
 		for c in self.collections:
 			if self.directoryGraph.has_node(c['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found: ' + c['id'])
 			self.directoryGraph.add_node(c['id'], data=c)
 			self.directoryCollectionsDAG.add_node(c['id'], data=c)
+			if self.contactGraph.has_node(c['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
+			self.contactGraph.add_node(c['id'], data=c)
+			if self.networkGraph.has_node(c['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + c['id'])
+			self.networkGraph.add_node(c['id'], data=c)
+		for n in self.networks:
+			if self.contactGraph.has_node(n['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + n['id'])
+			self.contactGraph.add_node(n['id'], data=n)
+			if self.networkGraph.has_node(n['id']):
+				raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + n['id'])
+			self.networkGraph.add_node(n['id'], data=n)
+
 		# check forward pointers from biobanks
 		for b in self.biobanks:
 			for c in b['collections']['items']:
 				if not self.directoryGraph.has_node(c['id']):
 					raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
+		# add biobank contact and network edges
+		for b in self.biobanks:
+			if 'contact' in b:
+				self.contactGraph.add_edge(b['id'],'contactID:'+b['contact']['id'])
+			if 'networks' in c:
+				for n in c['networks']['items']:
+					self.networkGraph.add_edge(b['id'], n['id'])
+
 		# now we have all the collections created and checked duplicates, so we create edges
 		for c in self.collections:
 			if 'parent_collection' in c:
@@ -104,18 +146,55 @@ class Directory:
 				for sb in c['sub_collections']['items']:
 					self.directoryGraph.add_edge(c['id'], sb['id'])
 					self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
+			if 'contact' in c:
+				self.contactGraph.add_edge(c['id'],'contactID:'+c['contact']['id'])
+			if 'networks' in c:
+				for n in c['networks']['items']:
+					self.networkGraph.add_edge(c['id'], n['id'])
+
+		# processing network edges
+		for n in self.networks:
+			if 'biobanks' in n:
+				for b in n['biobanks']['items']:
+					self.networkGraph.add_edge(n['id'], b['id'])
+			if 'contacts' in n:
+				for c in n['contacts']['items']:
+					self.contactGraph.add_edge(n['id'], 'contactID:'+c['id'])
+			if 'collections' in n:
+				for c in n['collections']['items']:
+					self.networkGraph.add_edge(n['id'], c['id'])
+
+		# processing edges from contacts
+		for c in self.contacts:
+			if 'biobanks' in c:
+				for b in c['biobanks']['items']:
+					self.contactGraph.add_edge('contactID:'+c['id'], b['id'])
+			if 'collections' in c:
+				for coll in c['collections']['items']:
+					self.contactGraph.add_edge('contactID:'+c['id'], coll['id'])
+			if 'networks' in c:
+				for n in c['networks']['items']:
+					self.contactGraph.add_edge('contactID:'+c['id'], n['id'])
+
 		# now make graphs immutable
 		nx.freeze(self.directoryGraph)
 		nx.freeze(self.directoryCollectionsDAG)
+		nx.freeze(self.contactGraph)
+		nx.freeze(self.networkGraph)
 
 		# now we check if all the edges in the graph are in both directions
 		for e in self.directoryGraph.edges():
 			if not self.directoryGraph.has_edge(e[1],e[0]):
-				raise Exception('DirectoryStructure', 'Missing edge: ' + e[1] + ' to ' + e[0])
+				raise Exception('DirectoryStructure', 'directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+		for e in self.contactGraph.edges():
+			if not self.contactGraph.has_edge(e[1],e[0]):
+				raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+		for e in self.networkGraph.edges():
+			if not self.networkGraph.has_edge(e[1],e[0]):
+				raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
 		# we check that DAG is indeed DAG :-)
 		if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
 			raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
-
 
 
 	def getBiobanks(self):
@@ -152,6 +231,12 @@ class Directory:
 	def getGraphBiobankCollectionsFromCollection(self, collectionID : str):
 		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.ancestors(self.directoryCollectionsDAG, collectionID).union(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)).union({collectionID}))
 
+	def getContacts(self):
+		return self.contacts
+
+	def getContactNN(self, contactID : str):
+		return self.contactHashmap[contactID]['country']['id']
+
 # Main code
 
 simplePluginManager = PluginManager()
@@ -164,13 +249,13 @@ warningContainer = WarningsContainer()
 print('Total biobanks: ' + str(dir.getBiobanksCount()))
 print('Total collections: ' + str(dir.getCollectionsCount()))
 
-#print('MMCI collections: ')
-#for biobank in dir.getBiobanks():
-#	if(re.search('MMCI', biobank['id'])):
-#		pp.pprint(biobank)
-#		collections = dir.getGraphBiobankCollections(biobank['id'])
-#		for e in collections.edges:
-#			print("   "+str(e[0])+" -> "+str(e[1]))
+print('MMCI collections: ')
+for biobank in dir.getBiobanks():
+	if(re.search('MMCI', biobank['id'])):
+		pp.pprint(biobank)
+		collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
+		for e in collections.edges:
+			print("   "+str(e[0])+" -> "+str(e[1]))
 
 for pluginInfo in simplePluginManager.getAllPlugins():
    simplePluginManager.activatePluginByName(pluginInfo.name)
