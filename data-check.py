@@ -67,7 +67,7 @@ class Directory:
 	def __init__(self):
 		session = molgenis.Session("https://directory.bbmri-eric.eu/api/")
 		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
-		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories'])
+		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available'])
 		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
 		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
 		self.contactHashmap = {}
@@ -232,6 +232,9 @@ class Directory:
 	# return the whole subgraph including some collection 
 	def getGraphBiobankCollectionsFromCollection(self, collectionID : str):
 		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.ancestors(self.directoryCollectionsDAG, collectionID).union(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)).union({collectionID}))
+
+	def getCollectionsDescendants(self, collectionID : str):
+		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID))
 
 	def getContacts(self):
 		return self.contacts
