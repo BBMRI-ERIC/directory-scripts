@@ -1,7 +1,7 @@
 import re
 
 from yapsy.IPlugin import IPlugin
-from customwarnings import WarningLevel,Warning
+from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
 from geopy.geocoders import Nominatim
 
@@ -19,17 +19,17 @@ class CheckBiobankGeo(IPlugin):
 						location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'])
 						country_code = location.raw['address']['country_code']
 						if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id']):
-							warning = Warning("", dir.getBiobankNN(biobank['id']), WarningLevel.WARNING, "Geolocation of the biobank is likely outside of its country " + biobank['id'] + " seems to be in " + country_code.upper())
+							warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, "Geolocation of the biobank is likely outside of its country " + biobank['id'] + " seems to be in " + country_code.upper())
 							warnings.append(warning)
 				else:
 					if not re.search ('^-?\d+\.\d*$', biobank['latitude']):
-						warning = Warning("", dir.getBiobankNN(biobank['id']), WarningLevel.ERROR, "Invalid biobank latitude for " + biobank['id'] + ": " + biobank['latitude'])
+						warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, "Invalid biobank latitude for " + biobank['id'] + ": " + biobank['latitude'])
 						warnings.append(warning)
 					if not re.search ('^-?\d+\.\d*$', biobank['longitude']):
-						warning = Warning("", dir.getBiobankNN(biobank['id']), WarningLevel.ERROR, "Invalid biobank longitude for " + biobank['id'] + ": " + biobank['longitude'])
+						warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, "Invalid biobank longitude for " + biobank['id'] + ": " + biobank['longitude'])
 						warnings.append(warning)
 			else:
-				warning = Warning("", dir.getBiobankNN(biobank['id']), WarningLevel.INFO, "Missing geographical coordinates for " + biobank['id'])
+				warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, "Missing geographical coordinates for " + biobank['id'])
 				warnings.append(warning)
 
 

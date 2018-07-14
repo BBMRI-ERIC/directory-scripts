@@ -9,7 +9,7 @@ import networkx as nx
 
 from yapsy.PluginManager import PluginManager
 
-from customwarnings import WarningLevel,Warning
+from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -42,7 +42,7 @@ class WarningsContainer:
 				}
 		self.__warnings = {}
 
-	def newWarning(self, warning : Warning):
+	def newWarning(self, warning : DataCheckWarning):
 		warning_key = ""
 		if warning.recipients != "":
 			warning_key = recipients + ", "
@@ -53,7 +53,7 @@ class WarningsContainer:
 			self.__warnings[warning_key] = [warning]
 
 	def dumpWarnings(self):
-		for wk in self.__warnings:
+		for wk in sorted(self.__warnings):
 			print(wk + ":")
 			for w in self.__warnings[wk]:
 				w.dump()
