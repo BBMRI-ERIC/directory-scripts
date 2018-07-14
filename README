@@ -11,4 +11,8 @@ Install:
 * pip install validate_email
   or similar to above
 
+* pip install py3dns
+  or similar to above
+  and on Cygwin create /etc/resolv.conf
+
 * wget https://directory.bbmri-eric.eu/molgenis.py
