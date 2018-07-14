@@ -51,31 +51,31 @@ class CheckURLs(IPlugin):
 		print("Testing biobank URLs")
 		for biobank in dir.getBiobanks():
 			if not 'url' in biobank or re.search('^\s*$', biobank['url']):
-				warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Missing URL for")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Missing URL for")
 				warnings.append(warning)
 			else:
 				URLwarnings = testURL(biobank['url'], 
-						DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Biobank URL for biobank")
+						DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Biobank URL for biobank")
 						)
 				warnings += URLwarnings
 
 		print("Testing collection URLs")
 		for collection in dir.getBiobanks():
 			if not 'data_access_uri' in collection or re.search('^\s*$', collection['data_access_uri']):
-				warning = DataCheckWarning("", dir.getBiobankNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], "Missing data access URL for collection")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], "Missing data access URL for collection")
 				warnings.append(warning)
 			else:
 				URLwarnings = testURL(collection['data_access_uri'],
-						DataCheckWarning("", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Data access URL for collection")
+						DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Data access URL for collection")
 						)
 				warnings += URLwarnings
 
 			if not 'sample_access_uri' in collection or re.search('^\s*$', collection['sample_access_uri']):
-				warning = DataCheckWarning("", dir.getBiobankNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], "Missing sample access URL for collection")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], "Missing sample access URL for collection")
 				warnings.append(warning)
 			else:
 				URLwarnings = testURL(collection['sample_access_uri'],
-						DataCheckWarning("", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Sample access URL for collection")
+						DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Sample access URL for collection")
 						)
 				warnings += URLwarnings
 

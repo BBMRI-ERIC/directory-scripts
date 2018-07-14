@@ -11,6 +11,10 @@ from yapsy.PluginManager import PluginManager
 
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
+disabledChecks = {
+#		"SemiemptyFields" : {"bbmri-eric:ID:NO_HUNT", "bbmri-eric:ID:NO_Janus"}
+		}
+
 pp = pprint.PrettyPrinter(indent=4)
 
 class WarningsContainer:
@@ -55,8 +59,9 @@ class WarningsContainer:
 	def dumpWarnings(self):
 		for wk in sorted(self.__warnings):
 			print(wk + ":")
-			for w in sorted(self.__warnings[wk], key=lambda x: x.ID + ":" + str(x.level.value)):
-				w.dump()
+			for w in sorted(self.__warnings[wk], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
+				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
+					w.dump()
 			print("")
 
 

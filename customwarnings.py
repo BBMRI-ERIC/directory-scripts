@@ -9,14 +9,15 @@ class DataCheckWarningLevel(Enum):
 
 class DataCheckWarning:
 
-	def __init__(self, recipients, NN, level : DataCheckWarningLevel, ID : str, message : str):
+	def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, message : str):
+		self.dataCheckID = dataCheckID
 		self.recipients = recipients
 		self.NN = NN
 		self.level = level
-		self.ID = ID
+		self.directoryEntityID = directoryEntityID
 		self.message = message
 	
 	def dump(self):
-		print("=="+str(self.level)+"== "+ self.ID + ": " + self.message)
+		print(self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message)
 
 
