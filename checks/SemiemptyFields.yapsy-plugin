@@ -1,0 +1,9 @@
+[Core]
+Name = Check relevant fields that they don't contain suspicious content, such as spaces only or N/A.
+Module = SemiemptyFields
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check relevant fields that they don't contain suspicious content, such as spaces only or N/A.
+

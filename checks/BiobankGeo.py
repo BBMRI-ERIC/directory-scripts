@@ -19,17 +19,17 @@ class CheckBiobankGeo(IPlugin):
 						location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'])
 						country_code = location.raw['address']['country_code']
 						if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id']):
-							warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, "Geolocation of the biobank is likely outside of its country " + biobank['id'] + " seems to be in " + country_code.upper())
+							warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
 							warnings.append(warning)
 				else:
 					if not re.search ('^-?\d+\.\d*$', biobank['latitude']):
-						warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, "Invalid biobank latitude for " + biobank['id'] + ": " + biobank['latitude'])
+						warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Invalid biobank latitude: " + biobank['latitude'])
 						warnings.append(warning)
 					if not re.search ('^-?\d+\.\d*$', biobank['longitude']):
-						warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, "Invalid biobank longitude for " + biobank['id'] + ": " + biobank['longitude'])
+						warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Invalid biobank longitude: " + biobank['longitude'])
 						warnings.append(warning)
 			else:
-				warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, "Missing geographical coordinates for " + biobank['id'])
+				warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], "Missing geographical coordinates")
 				warnings.append(warning)
 
 

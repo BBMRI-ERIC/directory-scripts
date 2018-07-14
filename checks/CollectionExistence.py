@@ -7,6 +7,6 @@ class CheckCollectionExists(IPlugin):
 		for biobank in dir.getBiobanks():
 			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
 			if len(collections.edges) < 1:
-				warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, "Missing at least one collection for biobank " + biobank['id'])
+				warning = DataCheckWarning("", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Missing at least one collection for biobank")
 				warnings.append(warning)
 		return warnings

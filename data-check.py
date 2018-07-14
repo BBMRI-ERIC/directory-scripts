@@ -19,23 +19,23 @@ class WarningsContainer:
 		# TODO
 		self._NNtoEmails = {
 				'AT' : 'Philipp.Ueberbacher@aau.at, heimo.mueller@medunigraz.at',
-				'BE' : 'TODO',
+				'BE' : 'annelies.debucquoy@kankerregister.org',
 				'BG' : 'TODO',
-				'CH' : 'TODO',
-				'CY' : 'TODO',
+				'CH' : 'christine.currat@chuv.ch',
+				'CY' : 'Deltas@ucy.ac.cy',
 				'CZ' : 'dudova@ics.muni.cz, hopet@ics.muni.cz',
-				'DE' : 'michael.hummel@charite.de',
-				'EE' : 'TODO',
-				'FI' : 'TODO',
-				'FR' : 'TODO',
-				'GR' : 'TODO',
+				'DE' : 'michael.hummel@charite.de, caecilia.engels@charite.de',
+				'EE' : 'kristjan.metsalu@ut.ee',
+				'FI' : 'niina.eklund@thl.fi',
+				'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
+				'GR' : 's.kolyva@pasteur.gr, thanos@bioacademy.gr',
 				'IT' : 'marialuisa.lavitrano@unimib.it, luciano.milanesi@itb.cnr.it, barbara.parodi@hsanmartino.it, elena.bravo@iss.it',
-				'LV' : 'TODO',
-				'MT' : 'TODO',
-				'NL' : 'TODO',
-				'NO' : 'TODO',
-				'PL' : 'TODO',
-				'SE' : 'TODO',
+				'LV' : 'linda.zaharenko@biomed.lu.lv',
+				'MT' : 'joanna.vella@um.edu.mt, alex.felice@um.edu.mt',
+				'NL' : 'd.van.enckevort@rug.nl, david.van.enckevort@umcg.nl',
+				'NO' : 'vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no',
+				'PL' : 'Lukasz.Kozera@eitplus.pl, dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl',
+				'SE' : 'tobias.sjoblom@igp.uu.se',
 				'TR' : 'TODO',
 				'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
 				'IARC' : 'TODO',
@@ -55,7 +55,7 @@ class WarningsContainer:
 	def dumpWarnings(self):
 		for wk in sorted(self.__warnings):
 			print(wk + ":")
-			for w in self.__warnings[wk]:
+			for w in sorted(self.__warnings[wk], key=lambda x: x.ID + ":" + str(x.level.value)):
 				w.dump()
 			print("")
 
