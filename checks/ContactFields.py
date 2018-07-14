@@ -8,7 +8,7 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning
 class CheckContactFields(IPlugin):
 	def check(self, dir):
 		warnings = []
-		ValidateEmails = False
+		ValidateEmails = True
 		for contact in dir.getContacts():
 			if(not 'first_name' in contact or re.search('^\s*$', contact['first_name'])):
 				warning = DataCheckWarning("", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], "Missing first name for contact")

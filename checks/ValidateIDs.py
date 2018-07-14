@@ -26,7 +26,7 @@ class CheckIDs(IPlugin):
 				warnings.append(warning)
 			biobankID = collection['biobank']['id']
 			if not re.search('^'+biobankID+':collection:', collection['id']):
-				warning = DataCheckWarning("", NN, DataCheckWarningLevel.WARNING, collection['id'], "CollectionID does not contain expected biobank prefix " + ' (should start with ' + '^'+biobankID+':collection:' + ')')
+				warning = DataCheckWarning("", NN, DataCheckWarningLevel.WARNING, collection['id'], "CollectionID does not contain expected biobank prefix " + ' (should start with ' + biobankID +':collection:' + ')')
 				warnings.append(warning)
 
 		for contact in dir.getContacts():

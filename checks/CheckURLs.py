@@ -11,7 +11,7 @@ pp = pprint.PrettyPrinter(indent=4)
 
 def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWarning]:
 	warnings = []
-	test_URL = False
+	test_URL = True
 	if test_URL:
 		print("Testing URL " + URL, end=' ')
 		try: 
