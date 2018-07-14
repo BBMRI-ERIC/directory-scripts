@@ -20,7 +20,8 @@ class BiobankGeo(IPlugin):
 							location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'])
 							country_code = location.raw['address']['country_code']
 							print(" -> OK")
-							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id']):
+							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id'] and 
+									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
 								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
 								warnings.append(warning)
 						except Exception as e:
