@@ -73,7 +73,7 @@ class WarningsContainer:
 			print("")
 
 	def dumpWarningsXLSX(self, filename : str):
-		workbook = xlsxwriter.Workbook('test-output.xlsx')
+		workbook = xlsxwriter.Workbook(filename[0])
 		bold = workbook.add_format({'bold': True})
 		for nn in sorted(self.__warningsNNs):
 			worksheet = workbook.add_worksheet(nn)
