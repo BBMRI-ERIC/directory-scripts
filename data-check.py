@@ -3,9 +3,12 @@
 import pprint
 import re
 from enum import Enum
+import sys
+import argparse
 
 import molgenis
 import networkx as nx
+import xlsxwriter
 
 from yapsy.PluginManager import PluginManager
 
@@ -16,6 +19,12 @@ disabledChecks = {
 		}
 
 pp = pprint.PrettyPrinter(indent=4)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output into XLSX with filename provided as parameter')
+parser.add_argument('--disable-checks-all-remote', dest='distableChecksAllRemote', action='store_true', help='disable all long remote checks (email address testing, geocoding, URLs')
+parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=['emails', 'geocoding', 'URLs'], help='disable particular long remote checks')
+args = parser.parse_args()
 
 class WarningsContainer:
 
@@ -45,16 +54,15 @@ class WarningsContainer:
 				'IARC' : 'TODO',
 				}
 		self.__warnings = {}
+		self.__warningsNNs = {}
 
 	def newWarning(self, warning : DataCheckWarning):
 		warning_key = ""
+		self.__warningsNNs.setdefault(warning.NN,[]).append(warning)
 		if warning.recipients != "":
 			warning_key = recipients + ", "
 		warning_key += self._NNtoEmails[warning.NN]
-		if warning_key in self.__warnings:
-			self.__warnings[warning_key].append(warning)
-		else:
-			self.__warnings[warning_key] = [warning]
+		self.__warnings.setdefault(warning_key,[]).append(warning)
 
 	def dumpWarnings(self):
 		for wk in sorted(self.__warnings):
@@ -64,6 +72,24 @@ class WarningsContainer:
 					w.dump()
 			print("")
 
+	def dumpWarningsXLSX(self, filename : str):
+		workbook = xlsxwriter.Workbook('test-output.xlsx')
+		bold = workbook.add_format({'bold': True})
+		for nn in sorted(self.__warningsNNs):
+			worksheet = workbook.add_worksheet(nn)
+			worksheet_row = 0
+			worksheet.write_string(worksheet_row, 0, "ID", bold)
+			worksheet.write_string(worksheet_row, 1, "Check", bold)
+			worksheet.write_string(worksheet_row, 2, "Severity", bold)
+			worksheet.write_string(worksheet_row, 3, "Message", bold)
+			for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
+				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
+					worksheet_row += 1
+					worksheet.write_string(worksheet_row, 0, w.directoryEntityID)
+					worksheet.write_string(worksheet_row, 1, w.dataCheckID)
+					worksheet.write_string(worksheet_row, 2, w.level.name)
+					worksheet.write_string(worksheet_row, 3, w.message)
+		workbook.close()
 
 # Definition of Directory structure
 
@@ -289,9 +315,11 @@ for collection in dir.getCollections():
 
 for pluginInfo in simplePluginManager.getAllPlugins():
    simplePluginManager.activatePluginByName(pluginInfo.name)
-   warnings = pluginInfo.plugin_object.check(dir)
+   warnings = pluginInfo.plugin_object.check(dir, args)
    if len(warnings) > 0:
 	   for w in warnings:
 		   warningContainer.newWarning(w)
 
 warningContainer.dumpWarnings()
+if args.outputXLSX is not None:
+	warningContainer.dumpWarningsXLSX(args.outputXLSX)

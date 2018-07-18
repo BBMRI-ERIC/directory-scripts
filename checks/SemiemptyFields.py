@@ -13,7 +13,7 @@ def descriptionTooShort(s : str) -> bool:
 		return False
 
 class SemiemptyFields(IPlugin):
-	def check(self, dir):
+	def check(self, dir, args):
 		warnings = []
 		for biobank in dir.getBiobanks():
 			if not 'description' in biobank or re.search('^\s*$', biobank['description']) or re.search('^\s*N/?A\s*$', biobank['description']):

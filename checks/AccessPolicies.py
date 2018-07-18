@@ -5,7 +5,7 @@ from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
 class AccessPolicies(IPlugin):
-	def check(self, dir):
+	def check(self, dir, args):
 		warnings = []
 		for biobank in dir.getBiobanks():
 			if((not 'collaboration_commercial' in biobank or biobank['collaboration_commercial'] == False) and

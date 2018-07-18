@@ -6,11 +6,14 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning
 from geopy.geocoders import Nominatim
 
 class BiobankGeo(IPlugin):
-	def check(self, dir):
+	def check(self, dir, args):
 		geolocator = Nominatim()
 		warnings = []
 		# This is to be enabled for real runs.
-		geoCodingEnabled = True
+		if not args.distableChecksAllRemote and not 'geocoding' in args.disableChecksRemote:
+			geoCodingEnabled = True
+		else:
+			geoCodingEnabled = False
 		for biobank in dir.getBiobanks():
 			if 'latitude' in biobank and not re.search('^\s*$', biobank['latitude']) and 'longitude' in biobank and not re.search('^\s*$', biobank['longitude']):
 				if re.search ('^-?\d+\.\d*$', biobank['latitude']) and re.search ('^-?\d+\.\d*$', biobank['longitude']):

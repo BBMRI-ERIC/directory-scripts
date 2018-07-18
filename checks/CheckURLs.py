@@ -11,43 +11,42 @@ pp = pprint.PrettyPrinter(indent=4)
 
 def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWarning]:
 	warnings = []
-	test_URL = True
-	if test_URL:
-		print("Testing URL " + URL, end=' ')
-		try: 
-			URL_ret_code = urllib.request.urlopen(URL).getcode()
-			URL_well_formatted = True
-		except urllib.error.HTTPError as e:
-			URL_ret_code = e.code
-			URL_well_formatted = True
-		except urllib.error.URLError as e:
-			URLErrorWarning.message += " access was not successful (accessing " + URL + " returns " + str(e) + ")"
-			warnings.append(URLErrorWarning)
-			URL_well_formatted = False
-			print(" -> URL not reachable (urllib.error.URLError)")
-		except ValueError as e:
-			URLErrorWarning.message += " is misformatted (" + URL + ")"
-			warnings.append(URLErrorWarning)
-			URL_well_formatted = False
-			print(" -> malformatted URL (ValueError)")
-		except Exception as e:
-			print(" -> unknown exception")
-			raise
-		if URL_well_formatted and not (URL_ret_code >= 200 and URL_ret_code < 300):
-			URLErrorWarning.message += " returns non-success code (" + URL + " returns HTTP error code " + str(URL_ret_code) + ")"
-			warnings.append(URLErrorWarning)
-			print(" -> HTTP error code " + str(URL_ret_code))
-		else:
-			if URL_well_formatted:
-				print(" -> OK")
+	print("Testing URL " + URL, end=' ')
+	try: 
+		URL_ret_code = urllib.request.urlopen(URL).getcode()
+		URL_well_formatted = True
+	except urllib.error.HTTPError as e:
+		URL_ret_code = e.code
+		URL_well_formatted = True
+	except urllib.error.URLError as e:
+		URLErrorWarning.message += " access was not successful (accessing " + URL + " returns " + str(e) + ")"
+		warnings.append(URLErrorWarning)
+		URL_well_formatted = False
+		print(" -> URL not reachable (urllib.error.URLError)")
+	except ValueError as e:
+		URLErrorWarning.message += " is misformatted (" + URL + ")"
+		warnings.append(URLErrorWarning)
+		URL_well_formatted = False
+		print(" -> malformatted URL (ValueError)")
+	except Exception as e:
+		print(" -> unknown exception")
+		raise
+	if URL_well_formatted and not (URL_ret_code >= 200 and URL_ret_code < 300):
+		URLErrorWarning.message += " returns non-success code (" + URL + " returns HTTP error code " + str(URL_ret_code) + ")"
+		warnings.append(URLErrorWarning)
+		print(" -> HTTP error code " + str(URL_ret_code))
+	else:
+		if URL_well_formatted:
+			print(" -> OK")
 
 	return warnings
 
 
 class CheckURLs(IPlugin):
-	def check(self, dir):
+	def check(self, dir, args):
 		warnings = []
-		test_URL = True
+		if args.distableChecksAllRemote or 'URLs' in args.disableChecksRemote:
+			return warnings
 		print("Testing biobank URLs")
 		for biobank in dir.getBiobanks():
 			if not 'url' in biobank or re.search('^\s*$', biobank['url']):

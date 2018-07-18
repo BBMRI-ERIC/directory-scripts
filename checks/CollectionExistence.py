@@ -2,7 +2,7 @@ from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
 class CollectionExistence(IPlugin):
-	def check(self, dir):
+	def check(self, dir, args):
 		warnings = []
 		for biobank in dir.getBiobanks():
 			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
