@@ -1,0 +1,9 @@
+[Core]
+Name = Check that access policies are correctly filled
+Module = AccessPolicies
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Check that access policies are correctly filled.
+
