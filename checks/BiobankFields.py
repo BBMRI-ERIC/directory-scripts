@@ -21,10 +21,4 @@ class BiobankFields(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], "Missing head person role")
 				warnings.append(warning)
 
-			if((not 'collaboration_commercial' in biobank or biobank['collaboration_commercial'] == False) and
-					(not 'collaboration_non_for_profit' in biobank or biobank['collaboration_non_for_profit'] == False)):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], "Biobank is available neither for commercial nor for non-for-profit collaboration")
-				warnings.append(warning)
-
-
 		return warnings

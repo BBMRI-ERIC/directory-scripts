@@ -35,18 +35,6 @@ class CollectionContent(IPlugin):
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], "Suspicious situation: large collection without subcollections")
 					warnings.append(warning)
 
-			if((not 'data_access_fee' in collection or collection['data_access_fee'] == False) and 
-					(not 'data_access_joint_project' in collection or collection['data_access_joint_project'] == False) and 
-					(not 'data_access_uri' in collection or re.search('^\s*$', collection['data_access_uri']))):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No data access mode enabled and no data access policy URI provided for collection")
-				warnings.append(warning)
-
-			if((not 'sample_access_fee' in collection or collection['sample_access_fee'] == False) and 
-					(not 'sample_access_joint_project' in collection or collection['sample_access_joint_project'] == False) and 
-					(not 'sample_access_uri' in collection or re.search('^\s*$', collection['sample_access_uri']))):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No sample access mode enabled and no sample access policy URI provided for collection")
-				warnings.append(warning)
-
 			if 'HOSPITAL' in types or 'DISEASE_SPECIFIC' in types or 'RD' in types:
 				diagnoses = []
 				if 'diagnosis_available' in collection:
