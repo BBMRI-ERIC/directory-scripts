@@ -78,7 +78,7 @@ class WarningsContainer:
 		for nn in sorted(self.__warningsNNs):
 			worksheet = workbook.add_worksheet(nn)
 			worksheet_row = 0
-			worksheet.write_string(worksheet_row, 0, "ID", bold)
+			worksheet.write_string(worksheet_row, 0, "Entity ID", bold)
 			worksheet.write_string(worksheet_row, 1, "Check", bold)
 			worksheet.write_string(worksheet_row, 2, "Severity", bold)
 			worksheet.write_string(worksheet_row, 3, "Message", bold)
