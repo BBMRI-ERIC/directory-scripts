@@ -6,6 +6,7 @@ from enum import Enum
 import sys
 import argparse
 import logging as log
+import time
 
 import molgenis
 import networkx as nx
@@ -112,13 +113,25 @@ class Directory:
 		log.info('Retrieving directory content from ' + self.__directoryURL)
 		session = molgenis.Session(self.__directoryURL)
 		log.info('   ... retrieving biobanks')
+		start_time = time.perf_counter()
 		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
+		end_time = time.perf_counter()
+		log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving collections')
+		start_time = time.perf_counter()
 		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
+		end_time = time.perf_counter()
+		log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving contacts')
+		start_time = time.perf_counter()
 		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
+		end_time = time.perf_counter()
+		log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving networks')
+		start_time = time.perf_counter()
 		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
+		end_time = time.perf_counter()
+		log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... all entities retrieved')
 		self.contactHashmap = {}
 
