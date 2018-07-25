@@ -17,14 +17,30 @@ class AccessPolicies(IPlugin):
 
 			if((not 'data_access_fee' in collection or collection['data_access_fee'] == False) and 
 					(not 'data_access_joint_project' in collection or collection['data_access_joint_project'] == False) and 
+					(not 'data_access_description' in collection or collection['data_access_description'] == False) and 
 					(not 'data_access_uri' in collection or re.search('^\s*$', collection['data_access_uri']))):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No data access mode enabled and no data access policy URI provided for collection")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No data access mode enabled and no data access policy (description nor URI) provided for collection")
 				warnings.append(warning)
 
 			if((not 'sample_access_fee' in collection or collection['sample_access_fee'] == False) and 
 					(not 'sample_access_joint_project' in collection or collection['sample_access_joint_project'] == False) and 
+					(not 'sample_access_description' in collection or collection['sample_access_description'] == False) and 
 					(not 'sample_access_uri' in collection or re.search('^\s*$', collection['sample_access_uri']))):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No sample access mode enabled and no sample access policy URI provided for collection")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No sample access mode enabled and no sample access policy (description nor URI) provided for collection")
 				warnings.append(warning)
+
+			data_categories = []
+			if 'data_categories' in collection:
+				for c in collection['data_categories']['items']:
+					data_categories.append(c['id'])
+			
+			if 'IMAGING_DATA' in data_categories:
+				if((not 'image_access_fee' in collection or collection['image_access_fee'] == False) and 
+						(not 'image_joint_project' in collection or collection['image_joint_project'] == False) and 
+						(not 'image_access_description' in collection or collection['image_access_description'] == False) and 
+						(not 'image_access_uri' in collection or re.search('^\s*$', collection['image_access_uri']))):
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No imaging access mode enabled and no sample access policy (description nor URI) provided for a collection which contains imaging data")
+					warnings.append(warning)
+							
 
 		return warnings
