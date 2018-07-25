@@ -5,6 +5,7 @@ import re
 from enum import Enum
 import sys
 import argparse
+import logging as log
 
 import molgenis
 import networkx as nx
@@ -21,10 +22,21 @@ disabledChecks = {
 pp = pprint.PrettyPrinter(indent=4)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output into XLSX with filename provided as parameter')
+parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
+parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
+parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
+parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
 parser.add_argument('--disable-checks-all-remote', dest='distableChecksAllRemote', action='store_true', help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=['emails', 'geocoding', 'URLs'], help='disable particular long remote checks')
 args = parser.parse_args()
+
+if args.debug:
+    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
+elif args.verbose:
+    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
+else:
+    log.basicConfig(format="%(levelname)s: %(message)s")
+
 
 class WarningsContainer:
 
@@ -96,13 +108,21 @@ class WarningsContainer:
 class Directory:
 
 	def __init__(self):
-		session = molgenis.Session("https://directory.bbmri-eric.eu/api/")
+		self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
+		log.info('Retrieving directory content from ' + self.__directoryURL)
+		session = molgenis.Session(self.__directoryURL)
+		log.info('   ... retrieving biobanks')
 		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
+		log.info('   ... retrieving collections')
 		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
+		log.info('   ... retrieving contacts')
 		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
+		log.info('   ... retrieving networks')
 		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
+		log.info('   ... all entities retrieved')
 		self.contactHashmap = {}
 
+		log.info('Processing directory data')
 		# Graph containing only biobanks and collections
 		self.directoryGraph = nx.DiGraph()
 		# DAG containing only biobanks and collections
@@ -213,6 +233,7 @@ class Directory:
 		nx.freeze(self.contactGraph)
 		nx.freeze(self.networkGraph)
 
+		log.info('Checks of directory data as graphs')
 		# now we check if all the edges in the graph are in both directions
 		for e in self.directoryGraph.edges():
 			if not self.directoryGraph.has_edge(e[1],e[0]):
@@ -226,6 +247,8 @@ class Directory:
 		# we check that DAG is indeed DAG :-)
 		if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
 			raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
+
+		log.info('Directory structure initialized')
 
 
 	def getBiobanks(self):
@@ -298,20 +321,21 @@ simplePluginManager.collectPlugins()
 dir = Directory()
 warningContainer = WarningsContainer()
 
-print('Total biobanks: ' + str(dir.getBiobanksCount()))
-print('Total collections: ' + str(dir.getCollectionsCount()))
+log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
+log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-print('MMCI collections: ')
-for biobank in dir.getBiobanks():
-	if(re.search('MMCI', biobank['id'])):
-		pp.pprint(biobank)
-		collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
-		for e in collections.edges:
-			print("   "+str(e[0])+" -> "+str(e[1]))
+log.info('MMCI collections: ')
+if args.debug:
+	for biobank in dir.getBiobanks():
+		if(re.search('MMCI', biobank['id'])):
+			pp.pprint(biobank)
+			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
+			for e in collections.edges:
+				print("   "+str(e[0])+" -> "+str(e[1]))
 
-for collection in dir.getCollections():
-	if(re.search('MMCI', collection['id'])):
-		pp.pprint(collection)
+	for collection in dir.getCollections():
+		if(re.search('MMCI', collection['id'])):
+			pp.pprint(collection)
 
 for pluginInfo in simplePluginManager.getAllPlugins():
    simplePluginManager.activatePluginByName(pluginInfo.name)
@@ -320,6 +344,7 @@ for pluginInfo in simplePluginManager.getAllPlugins():
 	   for w in warnings:
 		   warningContainer.newWarning(w)
 
-warningContainer.dumpWarnings()
+if not args.nostdout:
+	warningContainer.dumpWarnings()
 if args.outputXLSX is not None:
 	warningContainer.dumpWarningsXLSX(args.outputXLSX)
