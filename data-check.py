@@ -337,7 +337,7 @@ warningContainer = WarningsContainer()
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-log.info('MMCI collections: ')
+log.debug('MMCI collections: ')
 if args.debug:
 	for biobank in dir.getBiobanks():
 		if(re.search('MMCI', biobank['id'])):
