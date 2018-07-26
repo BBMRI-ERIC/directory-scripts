@@ -23,14 +23,23 @@ disabledChecks = {
 
 pp = pprint.PrettyPrinter(indent=4)
 
+class ExtendAction(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        items = getattr(namespace, self.dest) or []
+        items.extend(values)
+        setattr(namespace, self.dest, items)
+
 parser = argparse.ArgumentParser()
+parser.register('action', 'extend', ExtendAction)
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
 parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
 remoteCheckList = ['emails', 'geocoding', 'URLs']
 parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=remoteCheckList, default=[], help='disable particular long remote checks')
+parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
+parser.set_defaults(disableChecksRemote = [])
 args = parser.parse_args()
 
 if args.debug:
