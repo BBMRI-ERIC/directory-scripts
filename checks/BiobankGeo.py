@@ -11,7 +11,7 @@ from geopy.geocoders import Nominatim
 
 class BiobankGeo(IPlugin):
 	def check(self, dir, args):
-		geolocator = Nominatim()
+		geolocator = Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0')
 		warnings = []
 		log.info("Running geographical location checks (BiobankGeo)")
 		# This is to be enabled for real runs.
@@ -23,20 +23,22 @@ class BiobankGeo(IPlugin):
 		for biobank in dir.getBiobanks():
 			if 'latitude' in biobank and not re.search('^\s*$', biobank['latitude']) and 'longitude' in biobank and not re.search('^\s*$', biobank['longitude']):
 				if re.search ('^-?\d+\.\d*$', biobank['latitude']) and re.search ('^-?\d+\.\d*$', biobank['longitude']):
+					logMessage = ""
 					if geoCodingEnabled:
-						log.info("Checking reverse geocoding for " + biobank['latitude'] + ", " + biobank['longitude'], end=' ')
+						logMessage += "Checking reverse geocoding for " + biobank['latitude'] + ", " + biobank['longitude']
 						try:
 							location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'])
 							country_code = location.raw['address']['country_code']
-							log.info(" -> OK")
+							logMessage += " -> OK"
 							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
 								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
 								warnings.append(warning)
 						except Exception as e:
-							log.info(" -> failed")
+							logMessage += " -> failed (" + str(e) + ")"
 							warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Reverse geocoding of the biobank  location failed (" + str(e) + ")")
 							warnings.append(warning)
+					log.info(logMessage)
 
 				else:
 					if not re.search ('^-?\d+\.\d*$', biobank['latitude']):
