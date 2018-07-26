@@ -1,6 +1,9 @@
 import re
 import logging as log
 
+# this is ugly and only for assertive programming
+import __main__ 
+
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
@@ -12,6 +15,7 @@ class BiobankGeo(IPlugin):
 		warnings = []
 		log.info("Running geographical location checks (BiobankGeo)")
 		# This is to be enabled for real runs.
+		assert 'geocoding' in __main__.remoteCheckList
 		if 'geocoding' in args.disableChecksRemote:
 			geoCodingEnabled = False
 		else:

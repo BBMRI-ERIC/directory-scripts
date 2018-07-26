@@ -1,6 +1,9 @@
 import re
 import logging as log
 
+# this is ugly and only for assertive programming
+import __main__ 
+
 from yapsy.IPlugin import IPlugin
 from validate_email import validate_email
 
@@ -11,6 +14,7 @@ class ContactFields(IPlugin):
 		warnings = []
 		log.info("Running contact fields checks (ContactFields)")
 		ValidateEmails = True
+		assert 'emails' in __main__.remoteCheckList
 		if 'emails' in args.disableChecksRemote:
 			ValidateEmails = False
 		else:
