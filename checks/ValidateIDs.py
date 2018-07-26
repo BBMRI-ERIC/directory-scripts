@@ -1,4 +1,5 @@
 import re
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
@@ -6,6 +7,7 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning
 class ValidateIDs(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running identifier validation checks (ValidateIDs)")
 
 		for biobank in dir.getBiobanks():
 			NN = dir.getBiobankNN(biobank['id'])

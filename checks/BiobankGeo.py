@@ -1,4 +1,5 @@
 import re
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
@@ -9,6 +10,7 @@ class BiobankGeo(IPlugin):
 	def check(self, dir, args):
 		geolocator = Nominatim()
 		warnings = []
+		log.info("Running geographical location checks (BiobankGeo)")
 		# This is to be enabled for real runs.
 		if not args.distableChecksAllRemote and not 'geocoding' in args.disableChecksRemote:
 			geoCodingEnabled = True

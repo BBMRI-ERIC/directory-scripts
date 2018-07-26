@@ -3,6 +3,7 @@ import re
 import urllib
 import pprint
 import ssl
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
@@ -45,6 +46,7 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 class CheckURLs(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running URL checks (CheckURLs)")
 		if args.distableChecksAllRemote or 'URLs' in args.disableChecksRemote:
 			return warnings
 		print("Testing biobank URLs")

@@ -1,5 +1,6 @@
 import re
 import urllib.request
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
@@ -7,6 +8,7 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning
 class AccessPolicies(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running access policy checks (AccessPolicies)")
 		for biobank in dir.getBiobanks():
 			if((not 'collaboration_commercial' in biobank or biobank['collaboration_commercial'] == False) and
 					(not 'collaboration_non_for_profit' in biobank or biobank['collaboration_non_for_profit'] == False)):

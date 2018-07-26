@@ -1,4 +1,5 @@
 import re
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
@@ -6,6 +7,7 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning
 class CollectionContent(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running collection content checks (CollectionContent)")
 		for collection in dir.getCollections():
 			OoM = collection['order_of_magnitude']['id']
 

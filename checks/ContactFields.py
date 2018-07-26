@@ -1,4 +1,5 @@
 import re
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from validate_email import validate_email
@@ -8,6 +9,7 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning
 class ContactFields(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running contact fields checks (ContactFields)")
 		ValidateEmails = True
 		if not args.distableChecksAllRemote and not 'emails' in args.disableChecksRemote:
 			ValidateEmails = True

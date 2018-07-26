@@ -7,6 +7,7 @@ import sys
 import argparse
 import logging as log
 import time
+from typing import List
 
 import molgenis
 import networkx as nx
@@ -85,7 +86,7 @@ class WarningsContainer:
 					w.dump()
 			print("")
 
-	def dumpWarningsXLSX(self, filename : str):
+	def dumpWarningsXLSX(self, filename : List[str]):
 		workbook = xlsxwriter.Workbook(filename[0])
 		bold = workbook.add_format({'bold': True})
 		for nn in sorted(self.__warningsNNs):
@@ -358,6 +359,8 @@ for pluginInfo in simplePluginManager.getAllPlugins():
 		   warningContainer.newWarning(w)
 
 if not args.nostdout:
+	log.info("Outputting warnings on stdout")
 	warningContainer.dumpWarnings()
 if args.outputXLSX is not None:
+	log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
 	warningContainer.dumpWarningsXLSX(args.outputXLSX)

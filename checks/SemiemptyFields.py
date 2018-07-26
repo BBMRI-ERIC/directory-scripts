@@ -1,5 +1,6 @@
 import re
 import urllib.request
+import logging as log
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
@@ -15,6 +16,7 @@ def descriptionTooShort(s : str) -> bool:
 class SemiemptyFields(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running empty or semi-empty fields checks (SemiemptyFields)")
 		for biobank in dir.getBiobanks():
 			if not 'description' in biobank or re.search('^\s*$', biobank['description']) or re.search('^\s*N/?A\s*$', biobank['description']):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Missing description for biobank")

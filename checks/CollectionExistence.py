@@ -1,9 +1,12 @@
+import logging as log
+
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
 class CollectionExistence(IPlugin):
 	def check(self, dir, args):
 		warnings = []
+		log.info("Running collection existence checks (CollectionExistence)")
 		for biobank in dir.getBiobanks():
 			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
 			if len(collections.edges) < 1:
