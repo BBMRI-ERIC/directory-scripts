@@ -5,6 +5,9 @@ import pprint
 import ssl
 import logging as log
 
+# this is ugly and only for assertive programming
+import __main__ 
+
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
@@ -13,6 +16,7 @@ pp = pprint.PrettyPrinter(indent=4)
 def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWarning]:
 	warnings = []
 	print("Testing URL " + URL, end=' ')
+	URL_connection_reset = False
 	try: 
 		URL_ret_code = urllib.request.urlopen(URL).getcode()
 		URL_well_formatted = True
@@ -29,15 +33,22 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 		warnings.append(URLErrorWarning)
 		URL_well_formatted = False
 		print(" -> malformatted URL (ValueError)")
+	except ConnectionResetError as e:
+		URLErrorWarning.message += " connection reset by peer (" + URL + ")"
+		warnings.append(URLErrorWarning)
+		URL_well_formatted = True
+		URL_connection_reset = True
+		print(" -> connection reset by peer")
 	except Exception as e:
 		print(" -> unknown exception")
 		raise
-	if URL_well_formatted and not (URL_ret_code >= 200 and URL_ret_code < 300):
+
+	if URL_well_formatted and not URL_connection_reset and not (URL_ret_code >= 200 and URL_ret_code < 300):
 		URLErrorWarning.message += " returns non-success code (" + URL + " returns HTTP error code " + str(URL_ret_code) + ")"
 		warnings.append(URLErrorWarning)
 		print(" -> HTTP error code " + str(URL_ret_code))
 	else:
-		if URL_well_formatted:
+		if URL_well_formatted and not URL_connection_reset:
 			print(" -> OK")
 
 	return warnings
@@ -47,7 +58,8 @@ class CheckURLs(IPlugin):
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running URL checks (CheckURLs)")
-		if args.distableChecksAllRemote or 'URLs' in args.disableChecksRemote:
+		assert 'URLs' in __main__.remoteCheckList
+		if 'URLs' in args.disableChecksRemote:
 			return warnings
 		print("Testing biobank URLs")
 		for biobank in dir.getBiobanks():

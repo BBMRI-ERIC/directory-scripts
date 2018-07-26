@@ -12,7 +12,7 @@ class BiobankGeo(IPlugin):
 		warnings = []
 		log.info("Running geographical location checks (BiobankGeo)")
 		# This is to be enabled for real runs.
-		if args.distableChecksAllRemote or (args.disableChecksRemote != None and 'geocoding' in args.disableChecksRemote):
+		if 'geocoding' in args.disableChecksRemote:
 			geoCodingEnabled = False
 		else:
 			geoCodingEnabled = True

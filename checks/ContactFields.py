@@ -11,7 +11,7 @@ class ContactFields(IPlugin):
 		warnings = []
 		log.info("Running contact fields checks (ContactFields)")
 		ValidateEmails = True
-		if args.distableChecksAllRemote or (args.disableChecksRemote != None and 'emails' in args.disableChecksRemote):
+		if 'emails' in args.disableChecksRemote:
 			ValidateEmails = False
 		else:
 			ValidateEmails = True

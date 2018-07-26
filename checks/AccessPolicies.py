@@ -41,7 +41,7 @@ class AccessPolicies(IPlugin):
 						(not 'image_joint_project' in collection or collection['image_joint_project'] == False) and 
 						(not 'image_access_description' in collection or collection['image_access_description'] == False) and 
 						(not 'image_access_uri' in collection or re.search('^\s*$', collection['image_access_uri']))):
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No imaging access mode enabled and no sample access policy (description nor URI) provided for a collection which contains imaging data")
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "No imaging access mode enabled and no imaging access policy (description nor URI) provided for a collection which contains imaging data")
 					warnings.append(warning)
 							
 

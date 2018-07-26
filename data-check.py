@@ -28,8 +28,9 @@ parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
 parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
-parser.add_argument('--disable-checks-all-remote', dest='distableChecksAllRemote', action='store_true', help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=['emails', 'geocoding', 'URLs'], default=[], help='disable particular long remote checks')
+remoteCheckList = ['emails', 'geocoding', 'URLs']
+parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
+parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=remoteCheckList, default=[], help='disable particular long remote checks')
 args = parser.parse_args()
 
 if args.debug:
@@ -93,9 +94,13 @@ class WarningsContainer:
 			worksheet = workbook.add_worksheet(nn)
 			worksheet_row = 0
 			worksheet.write_string(worksheet_row, 0, "Entity ID", bold)
+			worksheet.set_column(0,0, 50)
 			worksheet.write_string(worksheet_row, 1, "Check", bold)
+			worksheet.set_column(1,1, 20)
 			worksheet.write_string(worksheet_row, 2, "Severity", bold)
+			worksheet.set_column(2,2, 10)
 			worksheet.write_string(worksheet_row, 3, "Message", bold)
+			worksheet.set_column(3,3, 120)
 			for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
 				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
 					worksheet_row += 1
