@@ -12,25 +12,25 @@ class BiobankGeo(IPlugin):
 		warnings = []
 		log.info("Running geographical location checks (BiobankGeo)")
 		# This is to be enabled for real runs.
-		if not args.distableChecksAllRemote and not 'geocoding' in args.disableChecksRemote:
-			geoCodingEnabled = True
-		else:
+		if args.distableChecksAllRemote or (args.disableChecksRemote != None and 'geocoding' in args.disableChecksRemote):
 			geoCodingEnabled = False
+		else:
+			geoCodingEnabled = True
 		for biobank in dir.getBiobanks():
 			if 'latitude' in biobank and not re.search('^\s*$', biobank['latitude']) and 'longitude' in biobank and not re.search('^\s*$', biobank['longitude']):
 				if re.search ('^-?\d+\.\d*$', biobank['latitude']) and re.search ('^-?\d+\.\d*$', biobank['longitude']):
 					if geoCodingEnabled:
-						print("Checking reverse geocoding for " + biobank['latitude'] + ", " + biobank['longitude'], end=' ')
+						log.info("Checking reverse geocoding for " + biobank['latitude'] + ", " + biobank['longitude'], end=' ')
 						try:
 							location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'])
 							country_code = location.raw['address']['country_code']
-							print(" -> OK")
+							log.info(" -> OK")
 							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
 								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
 								warnings.append(warning)
 						except Exception as e:
-							print(" -> failed")
+							log.info(" -> failed")
 							warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Reverse geocoding of the biobank  location failed (" + str(e) + ")")
 							warnings.append(warning)
 

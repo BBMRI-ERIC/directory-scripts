@@ -11,10 +11,10 @@ class ContactFields(IPlugin):
 		warnings = []
 		log.info("Running contact fields checks (ContactFields)")
 		ValidateEmails = True
-		if not args.distableChecksAllRemote and not 'emails' in args.disableChecksRemote:
-			ValidateEmails = True
-		else:
+		if args.distableChecksAllRemote or (args.disableChecksRemote != None and 'emails' in args.disableChecksRemote):
 			ValidateEmails = False
+		else:
+			ValidateEmails = True
 		for contact in dir.getContacts():
 			if(not 'first_name' in contact or re.search('^\s*$', contact['first_name'])):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], "Missing first name for contact")

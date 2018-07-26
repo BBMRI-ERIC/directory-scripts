@@ -29,7 +29,7 @@ parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='de
 parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
 parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
 parser.add_argument('--disable-checks-all-remote', dest='distableChecksAllRemote', action='store_true', help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=['emails', 'geocoding', 'URLs'], help='disable particular long remote checks')
+parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', choices=['emails', 'geocoding', 'URLs'], default=[], help='disable particular long remote checks')
 args = parser.parse_args()
 
 if args.debug:
@@ -352,9 +352,12 @@ if args.debug:
 			pp.pprint(collection)
 
 for pluginInfo in simplePluginManager.getAllPlugins():
-   simplePluginManager.activatePluginByName(pluginInfo.name)
-   warnings = pluginInfo.plugin_object.check(dir, args)
-   if len(warnings) > 0:
+	simplePluginManager.activatePluginByName(pluginInfo.name)
+	start_time = time.perf_counter()
+	warnings = pluginInfo.plugin_object.check(dir, args)
+	end_time = time.perf_counter()
+	log.info('   ... check finished in ' + "%0.3f" % (end_time-start_time) + 's')
+	if len(warnings) > 0:
 	   for w in warnings:
 		   warningContainer.newWarning(w)
 
