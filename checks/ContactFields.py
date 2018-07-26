@@ -48,6 +48,6 @@ class ContactFields(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], "Missing phone for contact")
 				warnings.append(warning)
 			elif(not re.search('^\+(?:[0-9]??){6,14}[0-9]$', contact['phone'])):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], "Phone number for contact does not conform to the E.123 international standard " + contact['phone'])
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], "Phone number for contact does not conform to the E.123 international standard (means starts with + sign, no spaces) - offending phone number " + contact['phone'])
 				warnings.append(warning)
 		return warnings
