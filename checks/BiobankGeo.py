@@ -27,7 +27,7 @@ class BiobankGeo(IPlugin):
 					if geoCodingEnabled:
 						logMessage += "Checking reverse geocoding for " + biobank['latitude'] + ", " + biobank['longitude']
 						try:
-							location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'])
+							location = geolocator.reverse(biobank['latitude'] + ", " + biobank['longitude'], language='en')
 							country_code = location.raw['address']['country_code']
 							logMessage += " -> OK"
 							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id'] and 
