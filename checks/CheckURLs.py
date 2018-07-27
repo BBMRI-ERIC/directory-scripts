@@ -74,21 +74,21 @@ class CheckURLs(IPlugin):
 
 		print("Testing collection URLs")
 		for collection in dir.getBiobanks():
-			if not 'data_access_uri' in collection or re.search('^\s*$', collection['data_access_uri']):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], "Missing data access URL for collection")
-				warnings.append(warning)
-			else:
+			# non-existence of access URIs is tested in the access policy checks - here we only check validity of the URL if it exists
+			if 'data_access_uri' in collection and not re.search('^\s*$', collection['data_access_uri']):
 				URLwarnings = testURL(collection['data_access_uri'],
 						DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Data access URL for collection")
 						)
 				warnings += URLwarnings
 
-			if not 'sample_access_uri' in collection or re.search('^\s*$', collection['sample_access_uri']):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], "Missing sample access URL for collection")
-				warnings.append(warning)
-			else:
+			if 'sample_access_uri' in collection and not re.search('^\s*$', collection['sample_access_uri']):
 				URLwarnings = testURL(collection['sample_access_uri'],
 						DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Sample access URL for collection")
+						)
+				warnings += URLwarnings
+			if 'image_access_uri' in collection and not re.search('^\s*$', collection['image_access_uri']):
+				URLwarnings = testURL(collection['image_access_uri'],
+						DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], "Image access URL for collection")
 						)
 				warnings += URLwarnings
 
