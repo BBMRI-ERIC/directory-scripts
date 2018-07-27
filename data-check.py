@@ -8,6 +8,7 @@ import argparse
 import logging as log
 import time
 from typing import List
+import os.path
 
 import molgenis
 import networkx as nx
@@ -30,16 +31,26 @@ class ExtendAction(argparse.Action):
         items.extend(values)
         setattr(namespace, self.dest, items)
 
+simplePluginManager = PluginManager()
+simplePluginManager.setPluginPlaces(["checks"])
+simplePluginManager.collectPlugins()
+
+pluginList = []
+for pluginInfo in simplePluginManager.getAllPlugins():
+	pluginList.append(os.path.basename(pluginInfo.path))
+
+remoteCheckList = ['emails', 'geocoding', 'URLs']
+
 parser = argparse.ArgumentParser()
 parser.register('action', 'extend', ExtendAction)
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
 parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
-remoteCheckList = ['emails', 'geocoding', 'URLs']
 parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote = [])
+parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular long remote checks')
+parser.set_defaults(disableChecksRemote = [], disablePlugins = [])
 args = parser.parse_args()
 
 if args.debug:
@@ -342,10 +353,6 @@ class Directory:
 
 # Main code
 
-simplePluginManager = PluginManager()
-simplePluginManager.setPluginPlaces(["checks"])
-simplePluginManager.collectPlugins()
-
 dir = Directory()
 warningContainer = WarningsContainer()
 
@@ -366,6 +373,8 @@ if args.debug:
 			pp.pprint(collection)
 
 for pluginInfo in simplePluginManager.getAllPlugins():
+	if os.path.basename(pluginInfo.path) in args.disablePlugins:
+		continue
 	simplePluginManager.activatePluginByName(pluginInfo.name)
 	start_time = time.perf_counter()
 	warnings = pluginInfo.plugin_object.check(dir, args)
