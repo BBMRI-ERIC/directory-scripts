@@ -1,7 +1,7 @@
 import logging as log
 
 from yapsy.IPlugin import IPlugin
-from customwarnings import DataCheckWarningLevel,DataCheckWarning
+from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
 
 class OrphanedCollections(IPlugin):
 	def check(self, dir, args):
@@ -10,6 +10,6 @@ class OrphanedCollections(IPlugin):
 		for collection in dir.getCollections():
 			collections = dir.getGraphBiobankCollectionsFromCollection(collection['id'])
 			if len(collections.edges) < 1:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, collection['id'], "Orphaned collection")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Orphaned collection")
 				warnings.append(warning)
 		return warnings

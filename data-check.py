@@ -115,19 +115,22 @@ class WarningsContainer:
 			worksheet_row = 0
 			worksheet.write_string(worksheet_row, 0, "Entity ID", bold)
 			worksheet.set_column(0,0, 50)
-			worksheet.write_string(worksheet_row, 1, "Check", bold)
+			worksheet.write_string(worksheet_row, 1, "Entity type", bold)
 			worksheet.set_column(1,1, 20)
+			worksheet.write_string(worksheet_row, 1, "Check", bold)
+			worksheet.set_column(2,1, 20)
 			worksheet.write_string(worksheet_row, 2, "Severity", bold)
-			worksheet.set_column(2,2, 10)
+			worksheet.set_column(3,2, 10)
 			worksheet.write_string(worksheet_row, 3, "Message", bold)
-			worksheet.set_column(3,3, 120)
+			worksheet.set_column(4,3, 120)
 			for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
 				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
 					worksheet_row += 1
 					worksheet.write_string(worksheet_row, 0, w.directoryEntityID)
-					worksheet.write_string(worksheet_row, 1, w.dataCheckID)
-					worksheet.write_string(worksheet_row, 2, w.level.name)
-					worksheet.write_string(worksheet_row, 3, w.message)
+					worksheet.write_string(worksheet_row, 1, w.directoryEntityType.value)
+					worksheet.write_string(worksheet_row, 2, w.dataCheckID)
+					worksheet.write_string(worksheet_row, 3, w.level.name)
+					worksheet.write_string(worksheet_row, 4, w.message)
 		workbook.close()
 
 # Definition of Directory structure

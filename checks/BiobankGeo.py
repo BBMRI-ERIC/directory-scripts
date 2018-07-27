@@ -5,7 +5,7 @@ import logging as log
 import __main__ 
 
 from yapsy.IPlugin import IPlugin
-from customwarnings import DataCheckWarningLevel,DataCheckWarning
+from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
 
 from geopy.geocoders import Nominatim
 
@@ -32,23 +32,23 @@ class BiobankGeo(IPlugin):
 							logMessage += " -> OK"
 							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
-								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
+								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
 								warnings.append(warning)
 						except Exception as e:
 							logMessage += " -> failed (" + str(e) + ")"
-							warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], "Reverse geocoding of the biobank  location failed (" + str(e) + ")")
+							warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Reverse geocoding of the biobank  location failed (" + str(e) + ")")
 							warnings.append(warning)
 					log.info(logMessage)
 
 				else:
 					if not re.search ('^-?\d+\.\d*$', biobank['latitude']):
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Invalid biobank latitude: " + biobank['latitude'])
+						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank latitude: " + biobank['latitude'])
 						warnings.append(warning)
 					if not re.search ('^-?\d+\.\d*$', biobank['longitude']):
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], "Invalid biobank longitude: " + biobank['longitude'])
+						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank longitude: " + biobank['longitude'])
 						warnings.append(warning)
 			else:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], "Missing geographical coordinates")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], DataCheckEntityType.BIOBANK, "Missing geographical coordinates")
 				warnings.append(warning)
 
 
