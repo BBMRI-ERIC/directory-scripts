@@ -34,7 +34,7 @@ class CollectionContent(IPlugin):
 			if OoM > 4:
 				subCollections = dir.getCollectionsDescendants(collection['id'])
 				if len(subCollections) < 1:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], "Suspicious situation: large collection (> 100,000 samples or cases) without subcollections; unless it is really homogeneous collection, it is advisable to refine such collections into sub-collections to give users better insight into what is stored inside")
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], "Suspicious situation: large collection (> 100,000 samples or cases) without subcollections; unless it is a really homogeneous collection, it is advisable to refine such a collection into sub-collections to give users better insight into what is stored there")
 					warnings.append(warning)
 
 			if 'HOSPITAL' in types or 'DISEASE_SPECIFIC' in types or 'RD' in types:
