@@ -35,15 +35,21 @@ class ContactFields(IPlugin):
 			else:
 				# This is pretty dramatic test and should be used sparingly
 				if ValidateEmails:
-					print("Validating email " + contact['email'], end=' ')
+					log_message = "Validating email " + contact['email']
 					# XXX: does not work in most cases
 					#if(not validate_email(contact['email'],verify=True)):
-					if(not validate_email(contact['email'],check_mx=True)):
-						print(" -> failed")
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Email for contact seems to be unreachable because of missing DNS MX record")
-						warnings.append(warning)
-					else:
-						print(" -> OK")
+					try:
+						if(not validate_email(contact['email'],check_mx=True)):
+							log_message += " -> failed"
+							warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Email for contact seems to be unreachable because of missing DNS MX record")
+							warnings.append(warning)
+						else:
+							log_message += " -> OK"
+						log.info(log_message)
+					except DNS.Base.TimeoutError as e:
+						log_message += " -> failed with exception (" + str(e) + ")"
+						log.error(log_message)
+
 			if(not 'phone' in contact or re.search('^\s*$', contact['phone'])):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Missing phone for contact")
 				warnings.append(warning)
