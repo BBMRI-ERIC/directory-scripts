@@ -1,5 +1,6 @@
 import re
 import logging as log
+import DNS
 
 # this is ugly and only for assertive programming
 import __main__ 
@@ -46,7 +47,7 @@ class ContactFields(IPlugin):
 						else:
 							log_message += " -> OK"
 						log.info(log_message)
-					except DNS.Base.TimeoutError as e:
+					except (DNS.Base.TimeoutError, DNS.Base.ServerError) as e:
 						log_message += " -> failed with exception (" + str(e) + ")"
 						log.error(log_message)
 
