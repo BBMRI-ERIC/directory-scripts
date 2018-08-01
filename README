@@ -18,4 +18,10 @@ Install:
   or similar to above
   and on Cygwin create /etc/resolv.conf
 
+* pip install diskcache
+  or similar to above and
+  mkdir -p data-quality-cache/directory
+  mkdir -p data-quality-cache/geolocator
+  mkdir -p data-quality-cache/emails
+
 * wget https://directory.bbmri-eric.eu/molgenis.py

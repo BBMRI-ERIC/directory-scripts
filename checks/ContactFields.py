@@ -1,12 +1,14 @@
 import re
 import logging as log
 import DNS
+import os
 
 # this is ugly and only for assertive programming
 import __main__ 
 
 from yapsy.IPlugin import IPlugin
 from validate_email import validate_email
+from diskcache import Cache
 
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
 
@@ -20,6 +22,14 @@ class ContactFields(IPlugin):
 			ValidateEmails = False
 		else:
 			ValidateEmails = True
+
+		cache_dir = 'data-check-cache/emails'
+		if not os.path.exists(cache_dir):
+			os.makedirs(cache_dir)
+		cache = Cache(cache_dir)
+		if 'emails' in args.purgeCaches:
+			cache.clear()
+			
 		for contact in dir.getContacts():
 			if(not 'first_name' in contact or re.search('^\s*$', contact['first_name'])):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Missing first name for contact")

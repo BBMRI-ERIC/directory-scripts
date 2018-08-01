@@ -15,6 +15,7 @@ import networkx as nx
 import xlsxwriter
 
 from yapsy.PluginManager import PluginManager
+from diskcache import Cache
 
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
@@ -40,6 +41,7 @@ for pluginInfo in simplePluginManager.getAllPlugins():
 	pluginList.append(os.path.basename(pluginInfo.path))
 
 remoteCheckList = ['emails', 'geocoding', 'URLs']
+cachesList = ['directory', 'emails', 'geocoding']
 
 parser = argparse.ArgumentParser()
 parser.register('action', 'extend', ExtendAction)
@@ -50,7 +52,9 @@ parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_t
 parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
 parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [])
+parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
+parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
+parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 
 if args.debug:
@@ -138,29 +142,52 @@ class WarningsContainer:
 class Directory:
 
 	def __init__(self):
+		cache_dir = 'data-check-cache/directory'
+		if not os.path.exists(cache_dir):
+			os.makedirs(cache_dir)
+		cache = Cache(cache_dir)
+		if 'directory' in args.purgeCaches:
+			cache.clear()
+
 		self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
 		log.info('Retrieving directory content from ' + self.__directoryURL)
 		session = molgenis.Session(self.__directoryURL)
 		log.info('   ... retrieving biobanks')
-		start_time = time.perf_counter()
-		self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
-		end_time = time.perf_counter()
-		log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
+		if 'biobanks' in cache:
+			self.biobanks = cache['biobanks']
+		else:
+			start_time = time.perf_counter()
+			self.biobanks = session.get("eu_bbmri_eric_biobanks", num=0, expand=['contact','collections','country'])
+			cache['biobanks'] = self.biobanks  
+			end_time = time.perf_counter()
+			log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving collections')
-		start_time = time.perf_counter()
-		self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
-		end_time = time.perf_counter()
-		log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
+		if 'collections' in cache:
+			self.collections = cache['collections']
+		else:
+			start_time = time.perf_counter()
+			self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
+			cache['collections'] = self.collections  
+			end_time = time.perf_counter()
+			log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving contacts')
-		start_time = time.perf_counter()
-		self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
-		end_time = time.perf_counter()
-		log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
+		if 'contacts' in cache:
+			self.contacts = cache['contacts']
+		else:
+			start_time = time.perf_counter()
+			self.contacts = session.get("eu_bbmri_eric_persons", num=0, expand=['biobanks','collections','networks','country'])
+			cache['contacts'] = self.contacts  
+			end_time = time.perf_counter()
+			log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving networks')
-		start_time = time.perf_counter()
-		self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
-		end_time = time.perf_counter()
-		log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
+		if 'networks' in cache:
+			self.networks = cache['networks']
+		else:
+			start_time = time.perf_counter()
+			self.networks = session.get("eu_bbmri_eric_networks", num=0, expand=['contact','country'])
+			cache['networks'] = self.networks  
+			end_time = time.perf_counter()
+			log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... all entities retrieved')
 		self.contactHashmap = {}
 
