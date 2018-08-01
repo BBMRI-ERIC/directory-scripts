@@ -46,16 +46,29 @@ class ContactFields(IPlugin):
 			else:
 				# This is pretty dramatic test and should be used sparingly
 				if ValidateEmails:
-					log_message = "Validating email " + contact['email']
+					contact_email = contact['email']
+					log_message = "Validating email " + contact_email
 					# XXX: does not work in most cases
 					#if(not validate_email(contact['email'],verify=True)):
 					try:
-						if(not validate_email(contact['email'],check_mx=True)):
-							log_message += " -> failed"
-							warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Email for contact seems to be unreachable because of missing DNS MX record")
-							warnings.append(warning)
+						if(contact_email in cache):
+							cache_result = cache[contact_email]
+							if(cache_result['valid']):
+								log_message += " -> OK"
+							else:
+								log_message += " -> failed"
+								warnings.append(cache_result['warning'])
 						else:
-							log_message += " -> OK"
+							if(not validate_email(contact_email,check_mx=True)):
+								log_message += " -> failed"
+								warning = DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Email for contact seems to be unreachable because of missing DNS MX record")
+								warnings.append(warning)
+								cache_item = { 'valid' : False, 'warning' : warning }
+								cache[contact_email] = cache_item
+							else:
+								log_message += " -> OK"
+								cache_item = { 'valid' : True, 'warning' : None }
+								cache[contact_email] = cache_item
 						log.info(log_message)
 					except (DNS.Base.TimeoutError, DNS.Base.ServerError) as e:
 						log_message += " -> failed with exception (" + str(e) + ")"
