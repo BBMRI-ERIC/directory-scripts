@@ -1,27 +1,42 @@
-Install:
+# BBMRI-ERIC Directory Validation Scripts
+## Requirements
+- Python 3.6
+- The following python packages:
+  - networkx
+  - geopy
+  - validate_email
+  - xlsxwriter
+  - py3dns
+  - requests
+  - diskcache
+  - yapsy
 
-* [Cygwin] python3 -m ensurepip
+## Installation
+- Verify installation:
+  ``
+python3 -m ensurepip
+``
+- For each of the above packages `pip3  install --upgrade <package>`
+- Ensure that file `/etc/resolve.conf` exists. If it does not exist create it with the following contents:
 
-* pip install networkx
-  or 
-  pip3 install networkx
-  or
-  pip install --upgrade networkx
+  ``
+nameserver 8.8.8.8
+``
 
-* pip install validate_email
-  or similar to above
+- Create the diskcache directories:
 
-* pip install xlsxwriter
-  or similar to above
+  ``
+mkdir -p data-quality-cache/directory
+mkdir -p data-quality-cache/geolocator
+mkdir -p data-quality-cache/emails
+``	
+- Download the MOLGENIS Python API library:
+  ``
+curl -O https://directory.bbmri-eric.eu/molgenis.py
+``
 
-* pip install py3dns
-  or similar to above
-  and on Cygwin create /etc/resolv.conf
+## Running the script
 
-* pip install diskcache
-  or similar to above and
-  mkdir -p data-quality-cache/directory
-  mkdir -p data-quality-cache/geolocator
-  mkdir -p data-quality-cache/emails
-
-* wget https://directory.bbmri-eric.eu/molgenis.py
+``
+python3 data-check.py
+``
