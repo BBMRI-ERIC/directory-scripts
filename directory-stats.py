@@ -65,78 +65,6 @@ else:
     log.basicConfig(format="%(levelname)s: %(message)s")
 
 
-class WarningsContainer:
-
-	def __init__(self):
-		# TODO
-		self._NNtoEmails = {
-				'AT' : 'Philipp.Ueberbacher@aau.at, heimo.mueller@medunigraz.at',
-				'BE' : 'annelies.debucquoy@kankerregister.org',
-				'BG' : 'TODO',
-				'CH' : 'christine.currat@chuv.ch',
-				'CY' : 'Deltas@ucy.ac.cy',
-				'CZ' : 'dudova@ics.muni.cz, hopet@ics.muni.cz',
-				'DE' : 'michael.hummel@charite.de, caecilia.engels@charite.de',
-				'EE' : 'kristjan.metsalu@ut.ee',
-				'FI' : 'niina.eklund@thl.fi',
-				'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
-				'GR' : 's.kolyva@pasteur.gr, thanos@bioacademy.gr',
-				'IT' : 'marialuisa.lavitrano@unimib.it, luciano.milanesi@itb.cnr.it, barbara.parodi@hsanmartino.it, elena.bravo@iss.it',
-				'LV' : 'linda.zaharenko@biomed.lu.lv',
-				'MT' : 'joanna.vella@um.edu.mt, alex.felice@um.edu.mt',
-				'NL' : 'd.van.enckevort@rug.nl, david.van.enckevort@umcg.nl',
-				'NO' : 'vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no',
-				'PL' : 'Lukasz.Kozera@eitplus.pl, dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl',
-				'SE' : 'tobias.sjoblom@igp.uu.se',
-				'TR' : 'TODO',
-				'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
-				'IARC' : 'TODO',
-				}
-		self.__warnings = {}
-		self.__warningsNNs = {}
-
-	def newWarning(self, warning : DataCheckWarning):
-		warning_key = ""
-		self.__warningsNNs.setdefault(warning.NN,[]).append(warning)
-		if warning.recipients != "":
-			warning_key = recipients + ", "
-		warning_key += self._NNtoEmails[warning.NN]
-		self.__warnings.setdefault(warning_key,[]).append(warning)
-
-	def dumpWarnings(self):
-		for wk in sorted(self.__warnings):
-			print(wk + ":")
-			for w in sorted(self.__warnings[wk], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
-				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
-					w.dump()
-			print("")
-
-	def dumpWarningsXLSX(self, filename : List[str]):
-		workbook = xlsxwriter.Workbook(filename[0])
-		bold = workbook.add_format({'bold': True})
-		for nn in sorted(self.__warningsNNs):
-			worksheet = workbook.add_worksheet(nn)
-			worksheet_row = 0
-			worksheet.write_string(worksheet_row, 0, "Entity ID", bold)
-			worksheet.set_column(0,0, 50)
-			worksheet.write_string(worksheet_row, 1, "Entity type", bold)
-			worksheet.set_column(1,1, 10)
-			worksheet.write_string(worksheet_row, 1, "Check", bold)
-			worksheet.set_column(2,2, 20)
-			worksheet.write_string(worksheet_row, 2, "Severity", bold)
-			worksheet.set_column(3,3, 10)
-			worksheet.write_string(worksheet_row, 3, "Message", bold)
-			worksheet.set_column(4,4, 120)
-			for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
-				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
-					worksheet_row += 1
-					worksheet.write_string(worksheet_row, 0, w.directoryEntityID)
-					worksheet.write_string(worksheet_row, 1, w.directoryEntityType.value)
-					worksheet.write_string(worksheet_row, 2, w.dataCheckID)
-					worksheet.write_string(worksheet_row, 3, w.level.name)
-					worksheet.write_string(worksheet_row, 4, w.message)
-		workbook.close()
-
 # Definition of Directory structure
 
 class Directory:
@@ -170,7 +98,7 @@ class Directory:
 			self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=[])
 			cache['collections'] = self.collections  
 			end_time = time.perf_counter()
-			log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
+			log.info('   ... retrieved %d collections in %0.3fs' % (len(self.collections), (end_time-start_time)))
 		log.info('   ... retrieving contacts')
 		if 'contacts' in cache:
 			self.contacts = cache['contacts']
@@ -202,6 +130,10 @@ class Directory:
 		# Graph linking networks to biobanks/collections
 		self.networkGraph = nx.DiGraph()
 		for c in self.contacts:
+			if re.search('BBNM', c['id']):
+				log.info("Removing contact " + c['id'])
+				self.contacts.remove(c)
+				continue
 			if self.contactGraph.has_node(c['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
 			# XXX temporary hack -- adding contactID prefix
@@ -209,6 +141,10 @@ class Directory:
 			self.contactGraph.add_node('contactID:'+c['id'], data=c)
 			self.contactHashmap[c['id']] = c
 		for b in self.biobanks:
+			if re.search('BBNM', b['id']):
+				log.info("Removing biobank " + b['id'])
+				self.biobanks.remove(b)
+				continue
 			if self.directoryGraph.has_node(b['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in directoryGraph: ' + b['id'])
 			self.directoryGraph.add_node(b['id'], data=b)
@@ -220,6 +156,12 @@ class Directory:
 				raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + b['id'])
 			self.networkGraph.add_node(b['id'], data=b)
 		for c in self.collections:
+			if re.search('mtb', c['id']):
+				log.debug("Processing " + c['id'])
+			if re.search('BBNM', c['id']) or ('id' in c['biobank'] and re.search('BBNM', c['biobank']['id'])):
+				log.info("Removing collection " + c['id'])
+				self.collections.remove(c)
+				continue
 			if self.directoryGraph.has_node(c['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found: ' + c['id'])
 			self.directoryGraph.add_node(c['id'], data=c)
@@ -230,6 +172,8 @@ class Directory:
 			if self.networkGraph.has_node(c['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + c['id'])
 			self.networkGraph.add_node(c['id'], data=c)
+			if re.search('mtb', c['id']):
+				log.debug("Finished processing " + c['id'])
 		for n in self.networks:
 			if self.contactGraph.has_node(n['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + n['id'])
@@ -242,7 +186,7 @@ class Directory:
 		for b in self.biobanks:
 			for c in b['collections']['items']:
 				if not self.directoryGraph.has_node(c['id']):
-					raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
+					raise Exception('DirectoryStructure', 'Biobank ' + b['id'] + ' refers non-existent collection ID: ' + c['id'])
 		# add biobank contact and network edges
 		for b in self.biobanks:
 			if 'contact' in b:
@@ -385,39 +329,36 @@ class Directory:
 # Main code
 
 dir = Directory()
-warningContainer = WarningsContainer()
+
+biobanks = {}
+for biobank in dir.getBiobanks():
+	collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
+	biobanks[biobank['id']]['topLevelCollections'] = collections.successors(biobank['id'])
+	biobanks[biobank['id']]['biobankOrderOfMagnitude'] = 0
+	biobanks[biobank['id']]['biobankSizeExact'] = 0
+	biobanks[biobank['id']]['biobankSizeEstimate'] = 0
+	for collection in biobanks[biobank['id']]['topLevelCollections']:
+		OoM = collection['order_of_magnitude']['id']
+		if 'size' in collection.keys:
+			size = collection['size']
+		else:
+			size = 0
+		if OoM > biobanks[biobank['id']]['biobankOrderOfMagnitude']:
+			biobanks[biobank['id']]['biobankOrderOfMagnitude'] = OoM
+		if size == 0:
+			biobanks[biobank['id']]['biobankSizeEstimate'] += 3 * 10^OoM
+		else:
+			biobanks[biobank['id']]['biobankSizeExact'] += size
+	biobanks[biobank['id']]['biobankSizeTotal'] = biobanks[biobank['id']]['biobankSizeExact'] + biobanks[biobank['id']]['biobankSizeEstimate'] 
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-log.debug('MMCI collections: ')
-if args.debug:
-	for biobank in dir.getBiobanks():
-		if(re.search('MMCI', biobank['id'])):
-			pp.pprint(biobank)
-			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
-			for e in collections.edges:
-				print("   "+str(e[0])+" -> "+str(e[1]))
-
-	for collection in dir.getCollections():
-		if(re.search('MMCI', collection['id'])):
-			pp.pprint(collection)
-
-for pluginInfo in simplePluginManager.getAllPlugins():
-	if os.path.basename(pluginInfo.path) in args.disablePlugins:
-		continue
-	simplePluginManager.activatePluginByName(pluginInfo.name)
-	start_time = time.perf_counter()
-	warnings = pluginInfo.plugin_object.check(dir, args)
-	end_time = time.perf_counter()
-	log.info('   ... check finished in ' + "%0.3f" % (end_time-start_time) + 's')
-	if len(warnings) > 0:
-	   for w in warnings:
-		   warningContainer.newWarning(w)
-
 if not args.nostdout:
 	log.info("Outputting warnings on stdout")
-	warningContainer.dumpWarnings()
+
+	for biobankID in sorted(biobanks.iteritems(), key=lambda kv: kv[1]['biobankSizeTotal']):
+		print(biobankID + "\t" + len(biobanks[biobankID]['topLevelCollections']) + "\t" + biobanks[biobankID]['biobankSizeTotal'])
+
 if args.outputXLSX is not None:
 	log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
-	warningContainer.dumpWarningsXLSX(args.outputXLSX)
