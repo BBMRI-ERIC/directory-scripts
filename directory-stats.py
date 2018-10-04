@@ -94,8 +94,8 @@ class Directory:
 			self.collections = cache['collections']
 		else:
 			start_time = time.perf_counter()
-			#self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
-			self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=[])
+			self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
+			#self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=[])
 			cache['collections'] = self.collections  
 			end_time = time.perf_counter()
 			log.info('   ... retrieved %d collections in %0.3fs' % (len(self.collections), (end_time-start_time)))
@@ -129,10 +129,12 @@ class Directory:
 		self.contactGraph = nx.DiGraph()
 		# Graph linking networks to biobanks/collections
 		self.networkGraph = nx.DiGraph()
+		contactsToBeRemoved = []
 		for c in self.contacts:
-			if re.search('BBNM', c['id']):
+			#log.debug("Processing contact " + c['id'])
+			if re.search(':DE', c['id']) or re.search('BBNM', c['id']):
 				log.info("Removing contact " + c['id'])
-				self.contacts.remove(c)
+				contactsToBeRemoved.append(c)
 				continue
 			if self.contactGraph.has_node(c['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
@@ -140,10 +142,15 @@ class Directory:
 			#self.contactGraph.add_node(c['id'], data=c)
 			self.contactGraph.add_node('contactID:'+c['id'], data=c)
 			self.contactHashmap[c['id']] = c
+		for c in contactsToBeRemoved:
+			log.info("Removing contact " + c['id'])
+			self.contacts.remove(c)
+		biobanksToBeRemoved = []
 		for b in self.biobanks:
-			if re.search('BBNM', b['id']):
+			#log.debug("Processing biobank " + c['id'])
+			if re.search(':DE', b['id']) or re.search('BBNM', b['id']):
 				log.info("Removing biobank " + b['id'])
-				self.biobanks.remove(b)
+				biobanksToBeRemoved.append(b)
 				continue
 			if self.directoryGraph.has_node(b['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in directoryGraph: ' + b['id'])
@@ -155,12 +162,17 @@ class Directory:
 			if self.networkGraph.has_node(b['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + b['id'])
 			self.networkGraph.add_node(b['id'], data=b)
+		for b in biobanksToBeRemoved:
+			log.info("Removing biobanks " + b['id'])
+			self.biobanks.remove(b)
+		log.debug('Total of %d collections will be processed' % len(self.collections))
+		collectionCounter = 0
+		collectionsToBeRemoved = []
 		for c in self.collections:
-			if re.search('mtb', c['id']):
-				log.debug("Processing " + c['id'])
-			if re.search('BBNM', c['id']) or ('id' in c['biobank'] and re.search('BBNM', c['biobank']['id'])):
-				log.info("Removing collection " + c['id'])
-				self.collections.remove(c)
+			collectionCounter += 1
+			#log.debug("Processing collection no. " + str(collectionCounter) + " ID " + c['id'])
+			if re.search(':DE', c['id']) or re.search('BBNM', c['id']) or ('id' in c['biobank'] and re.search('BBNM', c['biobank']['id'])):
+				collectionsToBeRemoved.append(c)
 				continue
 			if self.directoryGraph.has_node(c['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found: ' + c['id'])
@@ -174,6 +186,10 @@ class Directory:
 			self.networkGraph.add_node(c['id'], data=c)
 			if re.search('mtb', c['id']):
 				log.debug("Finished processing " + c['id'])
+		for c in collectionsToBeRemoved:
+			log.info("Removing collection " + c['id'])
+			self.collections.remove(c)
+		log.debug('Total of %d collections left after processing ' % len(self.collections))
 		for n in self.networks:
 			if self.contactGraph.has_node(n['id']):
 				raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + n['id'])
@@ -332,13 +348,15 @@ dir = Directory()
 
 biobanks = {}
 for biobank in dir.getBiobanks():
+	biobankID = biobank['id']
 	collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
-	biobanks[biobank['id']]['topLevelCollections'] = collections.successors(biobank['id'])
-	biobanks[biobank['id']]['biobankOrderOfMagnitude'] = 0
-	biobanks[biobank['id']]['biobankSizeExact'] = 0
-	biobanks[biobank['id']]['biobankSizeEstimate'] = 0
-	for collection in biobanks[biobank['id']]['topLevelCollections']:
-		OoM = collection['order_of_magnitude']['id']
+	biobanks[biobankID] = {}
+	biobanks[biobankID]['topLevelCollections'] = collections.successors(biobank['id'])
+	biobanks[biobankID]['biobankOrderOfMagnitude'] = 0
+	biobanks[biobankID]['biobankSizeExact'] = 0
+	biobanks[biobankID]['biobankSizeEstimate'] = 0
+	for collectionID in biobanks[biobank['id']]['topLevelCollections']:
+		OoM = dir.directoryGraph.nodes[collectionID]['data']['order_of_magnitude']['id']
 		if 'size' in collection.keys:
 			size = collection['size']
 		else:
