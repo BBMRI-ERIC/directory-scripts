@@ -61,10 +61,10 @@ class BiobankGeo(IPlugin):
 
 				else:
 					if not re.search ('^-?\d+\.\d*$', biobank['latitude']):
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank latitude: " + biobank['latitude'])
+						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank latitude (should be a decimal number without any spaces or stray characters around - the surrounding quotes are added in this report): '" + biobank['latitude'] + "'")
 						warnings.append(warning)
 					if not re.search ('^-?\d+\.\d*$', biobank['longitude']):
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank longitude: " + biobank['longitude'])
+						warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank longitude (should be a decimal number without any spaces or stray characters around - the surrounding quotes are added in this report): '" + biobank['longitude'] + "'")
 						warnings.append(warning)
 			else:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], DataCheckEntityType.BIOBANK, "Missing geographical coordinates")
