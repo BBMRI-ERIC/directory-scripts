@@ -38,7 +38,7 @@ class CollectionContent(IPlugin):
 					warnings.append(warning)
 
 			if OoM > 5:
-				if (not 'size' in collection.keys) or (collection['size'] == 0):
+				if (not 'size' in collection.keys()) or (collection['size'] == 0):
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Suspicious situation: large collection (> 1,000,000 samples or cases) without exact size specified")
 					warnings.append(warning)
 

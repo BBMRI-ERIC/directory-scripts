@@ -166,8 +166,8 @@ class Directory:
 			self.collections = cache['collections']
 		else:
 			start_time = time.perf_counter()
-			#self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
-			self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=[])
+			self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
+			#self.collections = session.get("eu_bbmri_eric_collections", num=0, expand=[])
 			cache['collections'] = self.collections  
 			end_time = time.perf_counter()
 			log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
