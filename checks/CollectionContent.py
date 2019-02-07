@@ -25,6 +25,15 @@ class CollectionContent(IPlugin):
 			if 'type' in collection:
 				for t in collection['type']['items']:
 					types.append(t['id'])
+			diags = []
+			if 'diagnosis_available' in collection:
+				for t in collection['diagnosis_available']['items']:
+					types.append(t['id'])
+					if re.search('-', t['id']):
+						warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection")
+						warnings.append(warning)
+
+
 
 			if len(types) < 1:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection type not provided")
