@@ -25,12 +25,12 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 	global cache
 
 	if(URL in cache):
-		warnings = cache[URL]
+		(warnings, logString) = cache[URL]
 	else:
-		if(not re.search('^http', URL, re.IGNORECASE)):
-			URLErrorWarning.message += ' URL does not start with http or https'
-			logString += " -> URL does not start with http or https"
+		if(not re.search('^(http|https):', URL, re.IGNORECASE)):
+			URLErrorWarning.message += ' (' + URL + ') does not start with http or https'
 			warnings.append(URLErrorWarning)
+			logString += " -> URL does not start with http or https"
 		else:
 			try: 
 				URL_ret_code = urllib.request.urlopen(URL).getcode()
@@ -39,7 +39,7 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 				URL_ret_code = e.code
 				URL_well_formatted = True
 			except urllib.error.URLError as e:
-				URLErrorWarning.message += " access was not successful (accessing " + URL + " returns " + str(e) + ")"
+				URLErrorWarning.message += " was not accessed successfully (accessing " + URL + " returns " + str(e) + ")"
 				warnings.append(URLErrorWarning)
 				URL_well_formatted = False
 				logString += " -> URL not reachable (urllib.error.URLError)"
@@ -49,7 +49,7 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 				URL_well_formatted = False
 				logString += " -> malformatted URL (ValueError)"
 			except ConnectionResetError as e:
-				URLErrorWarning.message += " connection reset by peer (" + URL + ")"
+				URLErrorWarning.message += " produced connection reset by peer (" + URL + ")"
 				warnings.append(URLErrorWarning)
 				URL_well_formatted = True
 				URL_connection_reset = True
@@ -66,7 +66,7 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 			else:
 				if URL_well_formatted and not URL_connection_reset:
 					logString += " -> OK"
-		cache[URL] = warnings
+		cache[URL] = (warnings, logString)
 
 	log.info(logString)
 	return warnings
@@ -94,7 +94,7 @@ class CheckURLs(IPlugin):
 				warnings.append(warning)
 			else:
 				URLwarnings = testURL(biobank['url'], 
-						DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank URL for biobank")
+						DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank URL")
 						)
 				warnings += URLwarnings
 
