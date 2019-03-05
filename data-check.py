@@ -41,7 +41,7 @@ for pluginInfo in simplePluginManager.getAllPlugins():
 	pluginList.append(os.path.basename(pluginInfo.path))
 
 remoteCheckList = ['emails', 'geocoding', 'URLs']
-cachesList = ['directory', 'emails', 'geocoding']
+cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
 parser = argparse.ArgumentParser()
 parser.register('action', 'extend', ExtendAction)
