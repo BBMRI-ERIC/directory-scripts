@@ -33,8 +33,7 @@ class CollectionContent(IPlugin):
 					if re.search('-', t['id']):
 						diag_ranges.append(t['id'])
 				if diag_ranges:
-					diag_ranges_text = '; '.join(diag_ranges)
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + diag_ranges_text)
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 					warnings.append(warning)
 
 
