@@ -78,6 +78,7 @@ class WarningsContainer:
 				'CZ' : 'dudova@ics.muni.cz, hopet@ics.muni.cz',
 				'DE' : 'michael.hummel@charite.de, caecilia.engels@charite.de',
 				'EE' : 'kristjan.metsalu@ut.ee',
+				'EU' : 'petr.holub@bbmri-eric.eu, d.van.enckevort@rug.nl',
 				'FI' : 'niina.eklund@thl.fi',
 				'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
 				'GR' : 's.kolyva@pasteur.gr, thanos@bioacademy.gr',
@@ -371,7 +372,7 @@ class Directory:
 		return self.networks
 
 	def getNetworkNN(self, networkID : str):
-		# TODO: handle IARC!
+		# TODO: review handling of IARC/EU/global collections
 		network = self.networkGraph.nodes[networkID]['data']
 		NN = ""
 		if 'country' in network:
@@ -379,7 +380,7 @@ class Directory:
 		elif 'contact' in network:
 			NN = self.getContactNN(network['contact']['id'])
 		else:
-			raise Exception('DirectoryStructure', 'Unable to determine National Node affiliation of network ' + networkID)
+			NN = "EU"
 		return NN
 
 # Main code

@@ -42,9 +42,13 @@ class ValidateIDs(IPlugin):
 
 		for network in dir.getNetworks():
 			NN = dir.getNetworkNN(network['id'])
-			if not re.search('^bbmri-eric:networkID:' + NN + '_', contact['id']):
-				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, "NetworkID is not compliant with the specification " + ' (should start with "bbmri-eric:networkID:' + NN + '_' + '" prefix)')
+			if not re.search('^bbmri-eric:networkID:', network['id']):
+				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, "NetworkID is not compliant with the specification " + ' (should start with "bbmri-eric:networkID: prefix)')
 				warnings.append(warning)
+			else:
+				if not re.search('^bbmri-eric:networkID:' + NN + '_', network['id']) and not re.search('^bbmri-eric:networkID:EU_', network['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.WARNING, network['id'], DataCheckEntityType.NETWORK, "NetworkID has suspicious country affiliation " + ' (should start with "bbmri-eric:networkID:' + NN + '_' + '" or "bbmri-eric:networkID:EU_" prefix)')
+					warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', network['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, "NetworkID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
 				warnings.append(warning)
