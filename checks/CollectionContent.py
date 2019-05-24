@@ -27,12 +27,15 @@ class CollectionContent(IPlugin):
 					types.append(t['id'])
 			diags = []
 			if 'diagnosis_available' in collection:
+				diag_ranges = []
 				for t in collection['diagnosis_available']['items']:
 					types.append(t['id'])
 					if re.search('-', t['id']):
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection")
-						warnings.append(warning)
-
+						diag_ranges.append(t['id'])
+				if diag_ranges:
+					diag_ranges_text = '; '.join(diag_ranges)
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + diag_ranges_text)
+					warnings.append(warning)
 
 
 			if len(types) < 1:
