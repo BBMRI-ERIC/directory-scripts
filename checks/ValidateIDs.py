@@ -17,6 +17,9 @@ class ValidateIDs(IPlugin):
 			if re.search('[^A-Za-z0-9:_-]', biobank['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "BiobankID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
 				warnings.append(warning)
+			if re.search('::', biobank['id']):
+				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "BiobankID contains :: indicating empty component in ID hierarchy")
+				warnings.append(warning)
 
 		for collection in dir.getCollections():
 			NN = dir.getCollectionNN(collection['id'])
@@ -30,6 +33,9 @@ class ValidateIDs(IPlugin):
 			if not re.search('^'+biobankID+':collection:', collection['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "CollectionID does not contain expected biobank prefix " + ' (should start with ' + biobankID +':collection:' + ')')
 				warnings.append(warning)
+			if re.search('::', collection['id']):
+				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "CollectionID contains :: indicating empty component in ID hierarchy")
+				warnings.append(warning)
 
 		for contact in dir.getContacts():
 			NN = dir.getContactNN(contact['id'])
@@ -38,6 +44,9 @@ class ValidateIDs(IPlugin):
 				warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', contact['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "ContactID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
+				warnings.append(warning)
+			if re.search('::', contact['id']):
+				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "ContactID contains :: indicating empty component in ID hierarchy")
 				warnings.append(warning)
 
 		for network in dir.getNetworks():
@@ -51,6 +60,9 @@ class ValidateIDs(IPlugin):
 					warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', network['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, "NetworkID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
+				warnings.append(warning)
+			if re.search('::', network['id']):
+				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, "NetworkID contains :: indicating empty component in ID hierarchy")
 				warnings.append(warning)
 
 		return warnings
