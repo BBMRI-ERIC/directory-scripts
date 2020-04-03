@@ -10,7 +10,7 @@ import time
 from typing import List
 import os.path
 
-import molgenis
+import molgenis.client
 import networkx as nx
 import xlsxwriter
 
@@ -152,7 +152,7 @@ class Directory:
 
 		self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
 		log.info('Retrieving directory content from ' + self.__directoryURL)
-		session = molgenis.Session(self.__directoryURL)
+		session = molgenis.client.Session(self.__directoryURL)
 		log.info('   ... retrieving biobanks')
 		if 'biobanks' in cache:
 			self.biobanks = cache['biobanks']

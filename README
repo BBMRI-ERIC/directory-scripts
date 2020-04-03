@@ -32,7 +32,7 @@ mkdir -p data-quality-cache/emails
 ``	
 - Download the MOLGENIS Python API library:
   ``
-curl -O https://directory.bbmri-eric.eu/molgenis.py
+pip install molgenis-py-client
 ``
 
 ## Running the script
