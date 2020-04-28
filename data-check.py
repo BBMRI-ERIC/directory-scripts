@@ -158,7 +158,7 @@ class Directory:
 			self.biobanks = cache['biobanks']
 		else:
 			start_time = time.perf_counter()
-			self.biobanks = session.get("eu_bbmri_eric_biobanks", num=2000, expand=['contact','collections','country'])
+			self.biobanks = session.get("eu_bbmri_eric_biobanks", num=2000, expand='contact,collections,country')
 			cache['biobanks'] = self.biobanks  
 			end_time = time.perf_counter()
 			log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -167,7 +167,7 @@ class Directory:
 			self.collections = cache['collections']
 		else:
 			start_time = time.perf_counter()
-			self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand=['biobank','contact','network','parent_collection','sub_collections','type','materials','order_of_magnitude','data_categories', 'diagnosis_available', 'imaging_modality', 'image_dataset_type'])
+			self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
 			#self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand=[])
 			cache['collections'] = self.collections  
 			end_time = time.perf_counter()
@@ -177,7 +177,7 @@ class Directory:
 			self.contacts = cache['contacts']
 		else:
 			start_time = time.perf_counter()
-			self.contacts = session.get("eu_bbmri_eric_persons", num=2000, expand=['biobanks','collections','networks','country'])
+			self.contacts = session.get("eu_bbmri_eric_persons", num=2000, expand='biobanks,collections,country')
 			cache['contacts'] = self.contacts  
 			end_time = time.perf_counter()
 			log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -186,7 +186,7 @@ class Directory:
 			self.networks = cache['networks']
 		else:
 			start_time = time.perf_counter()
-			self.networks = session.get("eu_bbmri_eric_networks", num=2000, expand=['contact','country'])
+			self.networks = session.get("eu_bbmri_eric_networks", num=2000, expand='contact')
 			cache['networks'] = self.networks  
 			end_time = time.perf_counter()
 			log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
