@@ -167,10 +167,12 @@ class Directory:
 			self.collections = cache['collections']
 		else:
 			start_time = time.perf_counter()
-			self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
+			self.collections = session.get("eu_bbmri_eric_collections", num=10000, expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
 			#self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand=[])
 			cache['collections'] = self.collections  
 			end_time = time.perf_counter()
+			for c in self.collections:
+				print(c)
 			log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving contacts')
 		if 'contacts' in cache:
@@ -241,7 +243,7 @@ class Directory:
 
 		# check forward pointers from biobanks
 		for b in self.biobanks:
-			for c in b['collections']['items']:
+			for c in b['collections']:
 				if not self.directoryGraph.has_node(c['id']):
 					raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
 		# add biobank contact and network edges
@@ -249,7 +251,7 @@ class Directory:
 			if 'contact' in b:
 				self.contactGraph.add_edge(b['id'],'contactID:'+b['contact']['id'])
 			if 'networks' in c:
-				for n in c['networks']['items']:
+				for n in c['networks']:
 					self.networkGraph.add_edge(b['id'], n['id'])
 
 		# now we have all the collections created and checked duplicates, so we create edges
@@ -265,37 +267,37 @@ class Directory:
 				self.directoryCollectionsDAG.add_edge(c['biobank']['id'], c['id'])
 			if 'sub_collections' in c:
 				# some of root collections of a biobank
-				for sb in c['sub_collections']['items']:
+				for sb in c['sub_collections']:
 					self.directoryGraph.add_edge(c['id'], sb['id'])
 					self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
 			if 'contact' in c:
 				self.contactGraph.add_edge(c['id'],'contactID:'+c['contact']['id'])
 			if 'networks' in c:
-				for n in c['networks']['items']:
+				for n in c['networks']:
 					self.networkGraph.add_edge(c['id'], n['id'])
 
 		# processing network edges
 		for n in self.networks:
 			if 'biobanks' in n:
-				for b in n['biobanks']['items']:
+				for b in n['biobanks']:
 					self.networkGraph.add_edge(n['id'], b['id'])
 			if 'contacts' in n:
-				for c in n['contacts']['items']:
+				for c in n['contacts']:
 					self.contactGraph.add_edge(n['id'], 'contactID:'+c['id'])
 			if 'collections' in n:
-				for c in n['collections']['items']:
+				for c in n['collections']:
 					self.networkGraph.add_edge(n['id'], c['id'])
 
 		# processing edges from contacts
 		for c in self.contacts:
 			if 'biobanks' in c:
-				for b in c['biobanks']['items']:
+				for b in c['biobanks']:
 					self.contactGraph.add_edge('contactID:'+c['id'], b['id'])
 			if 'collections' in c:
-				for coll in c['collections']['items']:
+				for coll in c['collections']:
 					self.contactGraph.add_edge('contactID:'+c['id'], coll['id'])
 			if 'networks' in c:
-				for n in c['networks']['items']:
+				for n in c['networks']:
 					self.contactGraph.add_edge('contactID:'+c['id'], n['id'])
 
 		# now make graphs immutable
