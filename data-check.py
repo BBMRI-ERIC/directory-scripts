@@ -171,8 +171,9 @@ class Directory:
 			#self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand=[])
 			cache['collections'] = self.collections  
 			end_time = time.perf_counter()
-			for c in self.collections:
-				print(c)
+			if args.debug:
+				for c in self.collections:
+					pp.pprint(c)
 			log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
 		log.info('   ... retrieving contacts')
 		if 'contacts' in cache:

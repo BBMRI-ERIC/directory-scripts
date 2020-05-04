@@ -20,7 +20,7 @@ class AccessPolicies(IPlugin):
 			data_categories = []
 			other_data = False
 			if 'data_categories' in collection:
-				for c in collection['data_categories']['items']:
+				for c in collection['data_categories']:
 					data_categories.append(c['id'])
 					if ('BIOLOGICAL_SAMPLES' != c['id'] and 'IMAGING_DATA' != c['id']):
 						other_data = True
