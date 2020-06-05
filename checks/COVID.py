@@ -29,7 +29,6 @@ class COVID(IPlugin):
 				for n in biobank['network']:
 					biobank_networks.append(n['id'])
 
-
 			OoM = collection['order_of_magnitude']['id']
 
 			materials = []
@@ -135,8 +134,8 @@ class COVID(IPlugin):
 				for c in biobank['covid19biobank']:
 					biobank_covid.append(c['id'])
 			biobank_networks = []
-			if 'networks' in biobank:
-				for n in biobank['networks']:
+			if 'network' in biobank:
+				for n in biobank['network']:
 					biobank_networks.append(n['id'])
 
 			if covidNetworkName in biobank_networks and not 'covid19' in biobank_covid:
