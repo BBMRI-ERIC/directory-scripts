@@ -123,11 +123,11 @@ class WarningsContainer:
 			worksheet.set_column(0,0, 50)
 			worksheet.write_string(worksheet_row, 1, "Entity type", bold)
 			worksheet.set_column(1,1, 10)
-			worksheet.write_string(worksheet_row, 1, "Check", bold)
+			worksheet.write_string(worksheet_row, 2, "Check", bold)
 			worksheet.set_column(2,2, 20)
-			worksheet.write_string(worksheet_row, 2, "Severity", bold)
+			worksheet.write_string(worksheet_row, 3, "Severity", bold)
 			worksheet.set_column(3,3, 10)
-			worksheet.write_string(worksheet_row, 3, "Message", bold)
+			worksheet.write_string(worksheet_row, 4, "Message", bold)
 			worksheet.set_column(4,4, 120)
 			for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
 				if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
