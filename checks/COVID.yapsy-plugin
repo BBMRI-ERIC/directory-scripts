@@ -1,0 +1,9 @@
+[Core]
+Name = COVID-19 related checks of the Directory
+Module = COVID
+
+[Documentation]
+Author = Petr Holub
+Version = 1.0
+Description = Checks COVID-19 related content of the Directory on both collection and biobank level
+
