@@ -329,6 +329,11 @@ class Directory:
 	def getBiobanks(self):
 		return self.biobanks
 
+	def getBiobankById(self, biobankID : str):
+		for b in self.biobanks:
+			if b['id'] == biobankID:
+				return b
+
 	def getBiobanksCount(self):
 		return len(self.biobanks)
 
