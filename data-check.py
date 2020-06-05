@@ -71,14 +71,15 @@ class WarningsContainer:
 		# TODO
 		self._NNtoEmails = {
 				'AT' : 'Philipp.Ueberbacher@aau.at, heimo.mueller@medunigraz.at',
+				'AU' : 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl',
 				'BE' : 'annelies.debucquoy@kankerregister.org',
-				'BG' : 'TODO',
+				'BG' : 'kaneva@mmcbg.org',
 				'CH' : 'christine.currat@chuv.ch',
 				'CY' : 'Deltas@ucy.ac.cy',
 				'CZ' : 'dudova@ics.muni.cz, hopet@ics.muni.cz',
 				'DE' : 'michael.hummel@charite.de, caecilia.engels@charite.de',
 				'EE' : 'kristjan.metsalu@ut.ee',
-				'EU' : 'petr.holub@bbmri-eric.eu, d.van.enckevort@rug.nl',
+				'EU' : 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl',
 				'FI' : 'niina.eklund@thl.fi',
 				'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
 				'GR' : 's.kolyva@pasteur.gr, thanos@bioacademy.gr',
@@ -89,9 +90,9 @@ class WarningsContainer:
 				'NO' : 'vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no',
 				'PL' : 'Lukasz.Kozera@eitplus.pl, dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl',
 				'SE' : 'tobias.sjoblom@igp.uu.se',
-				'TR' : 'TODO',
+				'TR' : 'nese.atabey@ibg.edu.tr',
 				'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
-				'IARC' : 'TODO',
+				'IARC' : 'kozlakidisz@iarc.fr',
 				}
 		self.__warnings = {}
 		self.__warningsNNs = {}
@@ -158,7 +159,7 @@ class Directory:
 			self.biobanks = cache['biobanks']
 		else:
 			start_time = time.perf_counter()
-			self.biobanks = session.get("eu_bbmri_eric_biobanks", num=2000, expand='contact,collections,country')
+			self.biobanks = session.get("eu_bbmri_eric_biobanks", num=2000, expand='contact,collections,country,covid19biobank')
 			cache['biobanks'] = self.biobanks  
 			end_time = time.perf_counter()
 			log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')

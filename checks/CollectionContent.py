@@ -29,7 +29,7 @@ class CollectionContent(IPlugin):
 			if 'diagnosis_available' in collection:
 				diag_ranges = []
 				for t in collection['diagnosis_available']:
-					types.append(t['id'])
+					diags.append(t['id'])
 					if re.search('-', t['id']):
 						diag_ranges.append(t['id'])
 				if diag_ranges:
