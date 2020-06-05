@@ -122,6 +122,9 @@ class COVID(IPlugin):
 				if not 'DNA' in materials and not 'PATHOGEN' in materials and not 'PERIPHERAL_BLOOD_CELLS' in materials and not 'PLASMA' in materials and not 'RNA' in materials and not 'SALIVA' in materials and not 'SERUM' in materials and not 'WHOLE_BLOOD' in materials and not 'FECES' in materials and not 'BUFFY_COAT' in materials and not 'NASAL_SWAB' in materials and not 'THROAT_SWAB' in materials:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Supect material types - please review: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB")
 					warnings.append(warning)
+				if 'NASAL_SWAB' in materials or 'THROAT_SWAB' in material or 'FECES' in material and not ('BSL2' in biobank_covid or 'BSL3' in biobank_covid):
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Suspect situation: collection contains infectious material while the parent biobank does not indicate BSL2 nor BSL3 available")
+					warnings.append(warning)
 
 
 		for biobank in dir.getBiobanks():
