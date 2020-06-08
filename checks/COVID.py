@@ -5,12 +5,14 @@ from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
 
 covidNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:COVID19'
+covidProspectiveCollectionIdPattern =  '.*:COVID19PROSPECTIVE$'
 
 class COVID(IPlugin):
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running COVID content checks (COVID)")
 		biobankHasCovidCollection = {}
+		biobankHasCovidProspectiveCollection = {}
 		biobankHasCovidControls = {}
 
 		for collection in dir.getCollections():
@@ -100,7 +102,8 @@ class COVID(IPlugin):
 				warnings.append(warning)
                         
 
-			if re.search('.*:COVID19PROSPECTIVE$', collection['id']):
+			if re.search(covidProspectiveCollectionIdPattern, collection['id']):
+				biobankHasCovidProspectiveCollection[biobank['id']] = True
 				if not 'DISEASE_SPECIFIC' in types:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types")
 					warnings.append(warning)
@@ -108,7 +111,7 @@ class COVID(IPlugin):
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have PROSPECTIVE_STUDY as one of its types")
 					warnings.append(warning)
 				if not 'ProspectiveCollections' in biobank_covid:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "ProspectiveCollections capability must be specified in covid19biobank section of biobank attributes if there is there is a COVID19PROSPECTIVE collection provided")
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "ProspectiveCollections capability must be specified in covid19biobank section of biobank attributes if there is a COVID19PROSPECTIVE collection provided")
 					warnings.append(warning)
 				if OoM > 0:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude")
@@ -162,6 +165,10 @@ class COVID(IPlugin):
 
 			if 'covid19' in biobank_covid and not (biobank['id'] in biobankHasCovidCollection or biobank['id'] in biobankHasCovidControls or other_covid_services):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has covid19 among covid19biobank but has no relevant services nor any collection of COVID-19 samples nor any collection of COVID-19 controls")
+				warnings.append(warning)
+	
+			if 'ProspectiveCollections' in biobank_covid and not biobank['id'] in biobankHasCovidProspectiveCollection:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)")
 				warnings.append(warning)
 
 		return warnings
