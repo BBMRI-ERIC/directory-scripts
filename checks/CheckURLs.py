@@ -1,3 +1,5 @@
+# vim:ts=8:sw=8:tw=0:noet
+
 from typing import List
 import re
 import urllib

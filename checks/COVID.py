@@ -1,3 +1,5 @@
+# vim:ts=8:sw=8:tw=0:noet
+
 import re
 import logging as log
 

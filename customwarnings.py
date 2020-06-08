@@ -1,3 +1,5 @@
+# vim:ts=8:sw=8:tw=0:noet
+
 from enum import Enum
 
 # Definition of warnings 
