@@ -14,6 +14,7 @@ import xlsxwriter
 from yapsy.PluginManager import PluginManager
 
 from customwarnings import DataCheckWarning
+from nncontacts import NNContacts
 from directory import Directory
 
 disabledChecks = {
@@ -61,35 +62,10 @@ elif args.verbose:
 else:
     log.basicConfig(format="%(levelname)s: %(message)s")
 
-
 class WarningsContainer:
 
 	def __init__(self):
 		# TODO
-		self._NNtoEmails = {
-				'AT' : 'Philipp.Ueberbacher@aau.at, heimo.mueller@medunigraz.at',
-				'BE' : 'annelies.debucquoy@kankerregister.org',
-				'BG' : 'kaneva@mmcbg.org',
-				'CH' : 'christine.currat@chuv.ch',
-				'CY' : 'Deltas@ucy.ac.cy',
-				'CZ' : 'dudova@ics.muni.cz, hopet@ics.muni.cz',
-				'DE' : 'michael.hummel@charite.de, caecilia.engels@charite.de',
-				'EE' : 'kristjan.metsalu@ut.ee',
-				'EU' : 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl',
-				'FI' : 'niina.eklund@thl.fi',
-				'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
-				'GR' : 's.kolyva@pasteur.gr, thanos@bioacademy.gr',
-				'IT' : 'marialuisa.lavitrano@unimib.it, luciano.milanesi@itb.cnr.it, barbara.parodi@hsanmartino.it, elena.bravo@iss.it',
-				'LV' : 'linda.zaharenko@biomed.lu.lv',
-				'MT' : 'joanna.vella@um.edu.mt, alex.felice@um.edu.mt',
-				'NL' : 'd.van.enckevort@rug.nl, david.van.enckevort@umcg.nl',
-				'NO' : 'vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no',
-				'PL' : 'Lukasz.Kozera@eitplus.pl, dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl',
-				'SE' : 'tobias.sjoblom@igp.uu.se',
-				'TR' : 'nese.atabey@ibg.edu.tr',
-				'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
-				'IARC' : 'kozlakidisz@iarc.fr',
-				}
 		self.__warnings = {}
 		self.__warningsNNs = {}
 
@@ -99,7 +75,7 @@ class WarningsContainer:
 		if warning.recipients != "":
 			warning_key = recipients + ", "
 		try: 
-			warning_key += self._NNtoEmails[warning.NN]
+			warning_key += NNContacts.NNtoEmails[warning.NN]
 		except KeyError:
 			warning_key += 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl, a.w.hodselmans@rug.nl'
 		self.__warnings.setdefault(warning_key,[]).append(warning)
