@@ -13,9 +13,14 @@ class ValidateIDs(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			NN = dir.getBiobankNN(biobank['id'])
-			if not re.search('^bbmri-eric:ID:' + NN + '_', biobank['id']):
-				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "BiobankID is not compliant with the specification " + ' (should start with "bbmri-eric:ID:' + NN + '_' + '" prefix)')
-				warnings.append(warning)
+			if re.search('^bbmri-eric:ID:EXT', biobank['id']):
+				if not re.search('^bbmri-eric:ID:EXT_', biobank['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "BiobankID is not compliant with the specification " + ' (should start with "bbmri-eric:ID:EXT_" prefix for external biobanks)')
+					warnings.append(warning)
+			else:
+				if not re.search('^bbmri-eric:ID:' + NN + '_', biobank['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "BiobankID is not compliant with the specification " + ' (should start with "bbmri-eric:ID:' + NN + '_' + '" prefix)')
+					warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', biobank['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "BiobankID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
 				warnings.append(warning)
@@ -25,9 +30,14 @@ class ValidateIDs(IPlugin):
 
 		for collection in dir.getCollections():
 			NN = dir.getCollectionNN(collection['id'])
-			if not re.search('^bbmri-eric:ID:' + NN + '_', collection['id']):
-				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "CollectionID is not compliant with the specification " + ' (should start with "bbmri-eric:ID:' + NN + '_' + '" prefix)')
-				warnings.append(warning)
+			if re.search('^bbmri-eric:ID:EXT', collection['id']):
+				if not re.search('^bbmri-eric:ID:EXT_', collection['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "CollectionID is not compliant with the specification " + ' (should start with "bbmri-eric:ID:EXT_" prefix for collections from external biobanks)')
+					warnings.append(warning)
+			else:
+				if not re.search('^bbmri-eric:ID:' + NN + '_', collection['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "CollectionID is not compliant with the specification " + ' (should start with "bbmri-eric:ID:' + NN + '_' + '" prefix)')
+					warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', collection['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "CollectionID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
 				warnings.append(warning)
@@ -41,9 +51,14 @@ class ValidateIDs(IPlugin):
 
 		for contact in dir.getContacts():
 			NN = dir.getContactNN(contact['id'])
-			if not re.search('^bbmri-eric:contactID:' + NN + '_', contact['id']):
-				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "ContactID is not compliant with the specification " +  ' (should start with "bbmri-eric:contactID:' + NN + '_' + '" prefix)')
-				warnings.append(warning)
+			if re.search('^bbmri-eric:contactID:EXT', contact['id']):
+				if not re.search('^bbmri-eric:contactID:EXT_', contact['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "ContactID is not compliant with the specification " + ' (should start with "bbmri-eric:contactID:EXT_" prefix for contacts for external biobanks)')
+					warnings.append(warning)
+			else:
+				if not re.search('^bbmri-eric:contactID:' + NN + '_', contact['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "ContactID is not compliant with the specification " +  ' (should start with "bbmri-eric:contactID:' + NN + '_' + '" prefix)')
+					warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', contact['id']):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "ContactID contains illegal characters " + ' (should be "A-Za-z0-9:_-")')
 				warnings.append(warning)
@@ -57,7 +72,7 @@ class ValidateIDs(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, "NetworkID is not compliant with the specification " + ' (should start with "bbmri-eric:networkID: prefix)')
 				warnings.append(warning)
 			else:
-				if not re.search('^bbmri-eric:networkID:' + NN + '_', network['id']) and not re.search('^bbmri-eric:networkID:EU_', network['id']):
+				if not re.search('^bbmri-eric:networkID:' + NN + '_', network['id']) and not re.search('^bbmri-eric:networkID:EU_', network['id']) and not re.search('^bbmri-eric:networkID:EXT_', network['id']):
 					warning = DataCheckWarning(self.__class__.__name__, "", NN, DataCheckWarningLevel.WARNING, network['id'], DataCheckEntityType.NETWORK, "NetworkID has suspicious country affiliation " + ' (should start with "bbmri-eric:networkID:' + NN + '_' + '" or "bbmri-eric:networkID:EU_" prefix)')
 					warnings.append(warning)
 			if re.search('[^A-Za-z0-9:_-]', network['id']):
