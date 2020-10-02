@@ -51,9 +51,9 @@ class BiobankGeo(IPlugin):
 								country_code = location.raw['address']['country_code']
 								cache[loc_string] = country_code
 							logMessage += " -> OK"
-							if (biobank['country']['id'] != "IARC" and country_code.upper() != biobank['country']['id'] and 
+							if ((biobank['country']['id'] != "IARC" and biobank['country']['id'] != "EU") and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
-								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Geolocation of the biobank is likely outside of its country; biobank seems to be in " + country_code.upper())
+								warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Geolocation of the biobank is likely outside of its country " + biobank['country']['id'] + "; biobank seems to be in " + country_code.upper())
 								warnings.append(warning)
 						except Exception as e:
 							logMessage += " -> failed (" + str(e) + ")"

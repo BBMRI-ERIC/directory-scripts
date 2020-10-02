@@ -68,7 +68,6 @@ class WarningsContainer:
 		# TODO
 		self._NNtoEmails = {
 				'AT' : 'Philipp.Ueberbacher@aau.at, heimo.mueller@medunigraz.at',
-				'AU' : 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl',
 				'BE' : 'annelies.debucquoy@kankerregister.org',
 				'BG' : 'kaneva@mmcbg.org',
 				'CH' : 'christine.currat@chuv.ch',
@@ -86,7 +85,6 @@ class WarningsContainer:
 				'NL' : 'd.van.enckevort@rug.nl, david.van.enckevort@umcg.nl',
 				'NO' : 'vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no',
 				'PL' : 'Lukasz.Kozera@eitplus.pl, dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl',
-				'PT' : 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl',
 				'SE' : 'tobias.sjoblom@igp.uu.se',
 				'TR' : 'nese.atabey@ibg.edu.tr',
 				'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
@@ -100,7 +98,10 @@ class WarningsContainer:
 		self.__warningsNNs.setdefault(warning.NN,[]).append(warning)
 		if warning.recipients != "":
 			warning_key = recipients + ", "
-		warning_key += self._NNtoEmails[warning.NN]
+		try: 
+			warning_key += self._NNtoEmails[warning.NN]
+		except KeyError:
+			warning_key += 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl, a.w.hodselmans@rug.nl'
 		self.__warnings.setdefault(warning_key,[]).append(warning)
 
 	def dumpWarnings(self):
