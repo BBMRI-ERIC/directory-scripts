@@ -43,6 +43,10 @@ class CollectionContent(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection type not provided")
 				warnings.append(warning)
 
+			if 'size' in collection and isinstance(collection['size'], int):
+				if OoM > 1 and collection['size'] < 10**OoM or collection['size'] > 10**(OoM+1):
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Size of the collection does not match its order of magnitude: size = " + str(collection['size']) + ", order of magnitude is %d (size between %d and %d)"%(OoM, 10**OoM, 10**(OoM+1)))
+					warnings.append(warning)
 
 			if OoM > 4:
 				subCollections = dir.getCollectionsDescendants(collection['id'])
