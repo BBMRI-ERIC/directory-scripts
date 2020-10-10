@@ -140,6 +140,10 @@ for collection in dir.getCollections():
 			log.warning("Prospective study by name but missing correct collection ID for collectionID " + collection['id'])
 		covid_prospective = True
 	
+	if re.search('COVID19', collection['id']) and not (covid_diag or covid_control or covid_prospective):
+		log.warning("Incorrectly types COVID collectionID - missing diagnosis " + collection['id'])
+		covid_diag = True
+	
 	if covid_diag and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has COVID-positive cases")
 		covidExistingDiagnosed.append(collection)
