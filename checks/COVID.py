@@ -54,23 +54,27 @@ class COVID(IPlugin):
 			diag_ranges = []
 			covid_diag = False
 			covid_control = False
-			if 'diagnosis_available' in collection:
+
+			for d in collection['diagnosis_available']:
+				if re.search('-', d['id']):
+					diag_ranges.append(d['id'])
+				else:
+					diags.append(d['id'])
+
+			for d in diags+diag_ranges:
 				# ICD-10
-				if re.search('U07', t['id']):
+				if re.search('U07', d):
 					covid_diag = True
 				# ICD-10
-				if re.search('Z03.818', t['id']):
+				if re.search('Z03.818', d):
 					covid_control = True
 				# ICD-11
-				if re.search('RA01', t['id']):
+				if re.search('RA01', d):
 					covid_diag = True
 				# SNOMED CT
-				if re.search('(840533007|840534001|840535000|840536004|840539006|840544004|840546002)', t['id']):
+				if re.search('(840533007|840534001|840535000|840536004|840539006|840544004|840546002)', d):
 					covid_diag = True
-				for t in collection['diagnosis_available']:
-					diags.append(t['id'])
-					if re.search('-', t['id']):
-						diag_ranges.append(t['id'])
+
                         
 			if covid_diag:
 				biobankHasCovidCollection[biobank['id']] = True
@@ -86,7 +90,7 @@ class COVID(IPlugin):
 				if not biobank['id'] in biobankHasCovidControls:
 					biobankHasCovidControls[biobank['id']] = False
 
-			if (covid_diag or covid_control) and diag_ranges > 0:
+			if (covid_diag or covid_control) and diag_ranges:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 				warnings.append(warning)
 
@@ -121,6 +125,15 @@ class COVID(IPlugin):
 				if not covid_diag and not covid_control:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "COVID19PROSPECTIVE collection misses COVID-19 diagnosis or COVID-19 controls filled in")
 					warnings.append(warning)
+
+			if re.search('^Ability to collect', collection['name']) and (covid_diag or covid_control):
+				if not re.search(covidProspectiveCollectionIdPattern, collection['id']):
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, 'Collection having "ability to collect" does not have COVID19PROSPECTIVE label')
+					warnings.append(warning)
+					# only report the following if it hasn't been reported above (hence only if the COVID19PROSPECTIVE does not match)
+					if OoM > 0:
+						warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude")
+						warnings.append(warning)
 
 
 			if re.search('.*:COVID19$', collection['id']):
