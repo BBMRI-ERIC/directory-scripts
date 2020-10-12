@@ -57,6 +57,13 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 covidExistingDiagnosed = []
 covidExistingControls = []
 covidProspective = []
+covidBiobanksExistingDiagnosed = set()
+covidBiobanksExistingControls = set()
+covidBiobanksProspective = set()
+covidBiobanks = set()
+covidCollectionSamplesExplicit = 0
+covidCollectionDonorsExplicit = 0
+covidCollectionSamplesIncOoM = 0
 
 for collection in dir.getCollections():
 	log.debug("Analyzing collection " + collection['id'])
@@ -147,12 +154,24 @@ for collection in dir.getCollections():
 	if covid_diag and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has COVID-positive cases")
 		covidExistingDiagnosed.append(collection)
+		covidBiobanksExistingDiagnosed.add(biobankId)
+		if 'size' in collection and isinstance(collection['size'], int):
+			covidCollectionSamplesExplicit += collection['size']
+			covidCollectionSamplesIncOoM += collection['size']
+		else:
+			covidCollectionSamplesIncOoM += 10**OoM
+		if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
+			covidCollectionDonorsExplicit += collection['number_of_donors']
 	if covid_control and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has control cases for COVID")
 		covidExistingControls.append(collection)
+		covidBiobanksExistingControls.add(biobankId)
 	if covid_prospective:
 		log.info("Collection " + collection['id'] + " is a prospective COVID collection")
 		covidProspective.append(collection)
+		covidBiobanksProspective.add(biobankId)
+	if covid_diag or covid_control or covid_prospective:
+		covidBiobanks.add(biobankId)
 
 pd_covidExistingDiagnosed = pd.DataFrame(covidExistingDiagnosed)
 pd_covidExistingControls = pd.DataFrame(covidExistingControls)
@@ -163,7 +182,7 @@ def printCollectionStdout(collectionList : List, headerStr : str):
 	for collection in collectionList:
 		biobankId = dir.getCollectionBiobank(collection['id'])
 		biobank = dir.getBiobankById(biobankId)
-		print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'] + "\n")
+		print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'])
 
 if not args.nostdout:
 	log.info("Outputting warnings on stdout")
@@ -172,6 +191,16 @@ if not args.nostdout:
 	printCollectionStdout(covidExistingControls, "COVID Controls")
 	print("\n\n")
 	printCollectionStdout(covidProspective, "COVID Prospective")
+	print("\n\n")
+	print("Totals:")
+	print("- total number of COVID-relevant biobanks: %d"%(len(covidBiobanks)))
+	print("- total number of COVID-relevant collections with existing samples: %d in %d biobanks"%(len(covidExistingDiagnosed),len(covidBiobanksExistingDiagnosed)))
+	print("- total number of COVID-relevant collections with control samples: %d in %d biobanks"%(len(covidExistingControls),len(covidBiobanksExistingControls)))
+	print("- total number of COVID-relevant prospective collections: %d in %d biobanks"%(len(covidProspective),len(covidBiobanksProspective)))
+	print("Estimated totals:")
+	print("- total number of samples advertised explicitly in COVID-relevant collections: %d"%(covidCollectionSamplesExplicit))
+	print("- total number of donors advertised explicitly in COVID-relevant collections: %d"%(covidCollectionDonorsExplicit))
+	print("- total number of samples advertised in COVID-relevant collections including OoM estimates: %d"%(covidCollectionSamplesIncOoM))
 
 if args.outputXLSX is not None:
 	log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
