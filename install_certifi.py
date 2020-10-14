@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # install_certifi.py
 #
 # sample script to install or update a set of default Root Certificates

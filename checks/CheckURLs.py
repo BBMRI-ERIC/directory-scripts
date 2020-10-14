@@ -5,6 +5,7 @@ import re
 import urllib
 import pprint
 import ssl
+import certifi
 import logging as log
 import os
 
