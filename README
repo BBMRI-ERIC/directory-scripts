@@ -32,8 +32,14 @@ mkdir -p data-quality-cache/emails
 ``	
 - Download the MOLGENIS Python API library:
   ``
-pip install molgenis-py-client
+pip3 install molgenis-py-client
 ``
+
+- Install/update root certificates (also check install_certifi.py script)
+  ``
+pip3 install --upgrade certifi
+``
+
 
 ## Running the script
 
