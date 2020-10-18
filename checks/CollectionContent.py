@@ -30,10 +30,10 @@ class CollectionContent(IPlugin):
 			diags = []
 			if 'diagnosis_available' in collection:
 				diag_ranges = []
-				for t in collection['diagnosis_available']:
-					diags.append(t['id'])
-					if re.search('-', t['id']):
-						diag_ranges.append(t['id'])
+				for d in collection['diagnosis_available']:
+					diags.append(d['id'])
+					if re.search('-', d['id']):
+						diag_ranges.append(d['id'])
 				if diag_ranges:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 					warnings.append(warning)
@@ -60,17 +60,16 @@ class CollectionContent(IPlugin):
 					warnings.append(warning)
 
 
-			if 'HOSPITAL' in types or 'DISEASE_SPECIFIC' in types or 'RD' in types:
-				diagnoses = []
-				if 'diagnosis_available' in collection:
-					for d in collection['diagnosis_available']:
-						diagnoses.append(d['id'])
-				if len(diagnoses) < 1:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No diagnoses provide for HOSPITAL or DISEASE_SPECIFIC or RD collection")
-					warnings.append(warning)
+			if any(x in types for x in ['HOSPITAL', 'DISEASE_SPECIFIC', 'RD']) and len(diags) < 1:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No diagnoses provide for HOSPITAL or DISEASE_SPECIFIC or RD collection")
+				warnings.append(warning)
 
 			if 'BIOLOGICAL_SAMPLES' in data_categories and len(materials) == 0:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No material types are provided while biological samples are collected")
+				warnings.append(warning)
+
+			if 'MEDICAL_RECORDS' in data_categories and len(diags) < 1:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No diagnoses provide for a collection with MEDICAL_RECORDS among its data categories")
 				warnings.append(warning)
 
 			if 'IMAGING_DATA' in data_categories:
