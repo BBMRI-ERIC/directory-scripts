@@ -16,9 +16,13 @@ import os.path
 import xlsxwriter
 
 from directory import Directory
-
+from nncontacts import NNContacts
 
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
+
+# if some nodes don't want to get the invitations
+#turnedOffNNs = {'UK'}
+turnedOffNNs = {}
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -114,9 +118,26 @@ if args.outputXLSX is not None:
 	worksheet.set_column(0,0, 60)
 	worksheet.set_column(1,1, 40)
 	worksheet.set_column(2,2, 120)
+	worksheet.set_column(3,3, 20)
+	worksheet.set_column(4,4, 120)
 	for c in contactsToCollections:
 		worksheet.write_string(worksheet_row, 0, c)
 		worksheet.write_string(worksheet_row, 1, contactsToEmails[c])
 		worksheet.write_string(worksheet_row, 2, "\n".join(contactsToCollections[c]), wrapped_cell_format)
+		correspondingNNs = {dir.getBiobankNN(dir.getCollectionBiobank(collection)) for collection in contactsToCollections[c]}
+		if len(correspondingNNs) > 1:
+			log.warn("Multiple national nodes found for contact %s: %s"%(c, ",".join(correspondingNNs)))
+		elif len(correspondingNNs) == 1: 
+			NN = correspondingNNs.pop()
+			if (NN not in turnedOffNNs):
+				if (NN in NNContacts.NNtoEmails):
+					additionalContacts = NNContacts.NNtoEmails[NN]
+					NN = "bbmri." + NN.lower()
+				else:
+					additionalContacts = "petr.holub@bbmri-eric.eu"
+				worksheet.write_string(worksheet_row, 3, NN)
+				worksheet.write_string(worksheet_row, 4, additionalContacts.replace(",",";"))
+		else:
+			log.warn("No national nodes found for contact %s"%(c))
 		worksheet_row += 1
 	workbook.close()
