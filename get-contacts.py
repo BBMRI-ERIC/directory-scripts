@@ -132,7 +132,7 @@ if args.outputXLSX is not None:
 			if (NN not in turnedOffNNs):
 				if (NN in NNContacts.NNtoEmails):
 					additionalContacts = NNContacts.NNtoEmails[NN]
-					NN = "bbmri." + NN.lower()
+					NN = "BBMRI." + NN.lower()
 				else:
 					additionalContacts = "petr.holub@bbmri-eric.eu"
 				worksheet.write_string(worksheet_row, 3, NN)
