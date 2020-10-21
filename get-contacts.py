@@ -135,6 +135,7 @@ if args.outputXLSX is not None:
 					NN = "BBMRI." + NN.lower()
 				else:
 					additionalContacts = "petr.holub@bbmri-eric.eu"
+					NN = "BBMRI-nonmember." + NN.lower()
 				worksheet.write_string(worksheet_row, 3, NN)
 				worksheet.write_string(worksheet_row, 4, additionalContacts.replace(",",";"))
 		else:
