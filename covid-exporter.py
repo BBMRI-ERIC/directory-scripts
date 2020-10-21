@@ -185,7 +185,6 @@ def printCollectionStdout(collectionList : List, headerStr : str):
 		print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'])
 
 if not args.nostdout:
-	log.info("Outputting warnings on stdout")
 	printCollectionStdout(covidExistingDiagnosed, "COVID Diagnosed")
 	print("\n\n")
 	printCollectionStdout(covidExistingControls, "COVID Controls")
