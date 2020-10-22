@@ -164,7 +164,6 @@ for collection in dir.getCollections():
 	if re.search('COVID19', collection['id']) and not (covid_diag or covid_control or covid_prospective):
 		log.warning("Incorrectly types COVID collectionID - missing diagnosis " + collection['id'])
 		covid_diag = True
-	
 	if covid_diag and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has COVID-positive cases")
 		covidExistingDiagnosed.append(collection)
@@ -186,6 +185,10 @@ for collection in dir.getCollections():
 			covidCollectionDonorsExplicit += collection['number_of_donors']
 			if not non_covid:
 				covidOnlyCollectionDonorsExplicit += collection['number_of_donors']
+
+	if covid_diag and non_covid:
+		log.info("Collection " + collection['id'] + " has a mixture of COVID and non-COVID diagnoses")
+
 	if covid_control and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has control cases for COVID")
 		covidExistingControls.append(collection)
