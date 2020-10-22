@@ -57,13 +57,18 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 covidExistingDiagnosed = []
 covidExistingControls = []
 covidProspective = []
+covidOnlyExistingDiagnosed = []
 covidBiobanksExistingDiagnosed = set()
+covidOnlyBiobanksExistingDiagnosed = set()
 covidBiobanksExistingControls = set()
 covidBiobanksProspective = set()
 covidBiobanks = set()
 covidCollectionSamplesExplicit = 0
 covidCollectionDonorsExplicit = 0
 covidCollectionSamplesIncOoM = 0
+covidOnlyCollectionSamplesExplicit = 0
+covidOnlyCollectionDonorsExplicit = 0
+covidOnlyCollectionSamplesIncOoM = 0
 
 for collection in dir.getCollections():
 	log.debug("Analyzing collection " + collection['id'])
@@ -105,6 +110,7 @@ for collection in dir.getCollections():
 	covid_diag = False
 	covid_control = False
 	covid_prospective = False
+	non_covid = False
 
 	for d in collection['diagnosis_available']:
 		if re.search('-', d['id']):
@@ -131,6 +137,14 @@ for collection in dir.getCollections():
 		if re.search('(840533007|840534001|840535000|840536004|840539006|840544004|840546002)', d):
 			covid_diag = True
 
+	# now we try to get as pessimistic estimates as possible
+	if not diag_ranges:
+		for d in diags:
+			if not (re.search('U07', d) or re.search('RA01', d) or re.search('(840533007|840534001|840535000|840536004|840539006|840544004|840546002)', d)):
+				non_covid = True
+	else:
+		non_covid = True
+
 	if types:
 		if 'PROSPECTIVE_STUDY' in types and (covid_diag or covid_control):
 			covid_prospective = True
@@ -155,13 +169,23 @@ for collection in dir.getCollections():
 		log.info("Collection " + collection['id'] + " has COVID-positive cases")
 		covidExistingDiagnosed.append(collection)
 		covidBiobanksExistingDiagnosed.add(biobankId)
+		if not non_covid:
+			covidOnlyExistingDiagnosed.append(collection)
+			covidOnlyBiobanksExistingDiagnosed.add(biobankId)
 		if 'size' in collection and isinstance(collection['size'], int):
 			covidCollectionSamplesExplicit += collection['size']
 			covidCollectionSamplesIncOoM += collection['size']
+			if not non_covid:
+				covidOnlyCollectionSamplesExplicit += collection['size']
+				covidOnlyCollectionSamplesIncOoM += collection['size']
 		else:
 			covidCollectionSamplesIncOoM += 10**OoM
+			if not non_covid:
+				covidOnlyCollectionSamplesIncOoM += 10**OoM
 		if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
 			covidCollectionDonorsExplicit += collection['number_of_donors']
+			if not non_covid:
+				covidOnlyCollectionDonorsExplicit += collection['number_of_donors']
 	if covid_control and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has control cases for COVID")
 		covidExistingControls.append(collection)
@@ -194,11 +218,15 @@ if not args.nostdout:
 	print("Totals:")
 	print("- total number of COVID-relevant biobanks: %d"%(len(covidBiobanks)))
 	print("- total number of COVID-relevant collections with existing samples: %d in %d biobanks"%(len(covidExistingDiagnosed),len(covidBiobanksExistingDiagnosed)))
+	print("- total number of exclusive COVID collections with existing samples: %d in %d biobanks"%(len(covidOnlyExistingDiagnosed),len(covidOnlyBiobanksExistingDiagnosed)))
 	print("- total number of COVID-relevant collections with control samples: %d in %d biobanks"%(len(covidExistingControls),len(covidBiobanksExistingControls)))
 	print("- total number of COVID-relevant prospective collections: %d in %d biobanks"%(len(covidProspective),len(covidBiobanksProspective)))
 	print("Estimated totals:")
+	print("- total number of samples advertised explicitly in COVID-only collections: %d"%(covidOnlyCollectionSamplesExplicit))
 	print("- total number of samples advertised explicitly in COVID-relevant collections: %d"%(covidCollectionSamplesExplicit))
+	print("- total number of donors advertised explicitly in COVID-only collections: %d"%(covidOnlyCollectionDonorsExplicit))
 	print("- total number of donors advertised explicitly in COVID-relevant collections: %d"%(covidCollectionDonorsExplicit))
+	print("- total number of samples advertised in COVID-only collections including OoM estimates: %d"%(covidOnlyCollectionSamplesIncOoM))
 	print("- total number of samples advertised in COVID-relevant collections including OoM estimates: %d"%(covidCollectionSamplesIncOoM))
 
 if args.outputXLSX is not None:
