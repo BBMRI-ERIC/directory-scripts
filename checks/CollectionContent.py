@@ -64,12 +64,24 @@ class CollectionContent(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No diagnoses provide for HOSPITAL or DISEASE_SPECIFIC or RD collection")
 				warnings.append(warning)
 
+			if len(diags) > 0 and not any(x in types for x in ['HOSPITAL', 'DISEASE_SPECIFIC', 'RD']):
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Diagnoses provided but none of HOSPITAL, DISEASE_SPECIFIC, RD is specified as collection type (this may be easily false positive check)")
+				warnings.append(warning)
+
 			if 'BIOLOGICAL_SAMPLES' in data_categories and len(materials) == 0:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No material types are provided while biological samples are collected")
 				warnings.append(warning)
 
+			if len(materials) > 0 and 'BIOLOGICAL_SAMPLES' not in data_categories:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Sample types advertised but BIOLOGICAL_SAMPLES missing among its data categories")
+				warnings.append(warning)
+
 			if 'MEDICAL_RECORDS' in data_categories and len(diags) < 1:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No diagnoses provide for a collection with MEDICAL_RECORDS among its data categories")
+				warnings.append(warning)
+
+			if len(diags) > 0 and 'MEDICAL_RECORDS' not in data_categories:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Diagnoses provided but no MEDICAL_RECORDS among its data categories")
 				warnings.append(warning)
 
 			modalities = []
