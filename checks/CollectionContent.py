@@ -72,22 +72,27 @@ class CollectionContent(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No diagnoses provide for a collection with MEDICAL_RECORDS among its data categories")
 				warnings.append(warning)
 
+			modalities = []
+			if 'imaging_modality' in collection:
+				for m in collection['imaging_modality']:
+					modalities.append(m['id'])
+
+			image_dataset_types = []
+			if 'image_dataset_type' in collection:
+				for idt in collection['image_dataset_type']:
+					image_dataset_types.append(idt['id'])
+
 			if 'IMAGING_DATA' in data_categories:
-				modalities = []
-				if 'imaging_modality' in collection:
-					for m in collection['imaging_modality']:
-						modalities.append(m['id'])
 				if len(modalities) < 1:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No image modalities provided for image collection")
 					warnings.append(warning)
 
-				image_dataset_types = []
-				if 'image_dataset_type' in collection:
-					for idt in collection['image_dataset_type']:
-						image_dataset_types.append(idt['id'])
 				if len(image_dataset_types) < 1:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No image dataset types provided for image collection")
 					warnings.append(warning)
 
+			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGING_DATA' not in data_categories:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Imaging modalities or image data set found, but IMAGING_DATA is not among data categories: image_modality = %s, image_dataset_type = %s"%(modalities,image_dataset_types))
+				warnings.append(warning)
 
 		return warnings

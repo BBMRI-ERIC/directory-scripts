@@ -153,7 +153,7 @@ for collection in dir.getCollections():
 		if types and not 'PROSPECTIVE_STUDY' in types:
 			log.warning("Prospective study by ID but not by collection type for collectionID " + collection['id'])
 		covid_prospective = True
-	
+
 	if re.search('^Ability to collect', collection['name']):
 		if types and not 'PROSPECTIVE_STUDY' in types:
 			log.warning("Prospective study by name but not by collection type for collectionID " + collection['id'])
@@ -187,7 +187,7 @@ for collection in dir.getCollections():
 				covidOnlyCollectionDonorsExplicit += collection['number_of_donors']
 
 	if covid_diag and non_covid:
-		log.info("Collection " + collection['id'] + " has a mixture of COVID and non-COVID diagnoses")
+		log.info("Collection " + collection['id'] + " has a mixture of COVID and non-COVID diagnoses: %s"%(diags+diag_ranges))
 
 	if covid_control and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has control cases for COVID")
