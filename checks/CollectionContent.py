@@ -91,15 +91,15 @@ class CollectionContent(IPlugin):
 				warnings.append(warning)
 
 			if 'RD' in types and len(diags_orpha) == 0:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Rare disease (RD) collection without ORPHA code based diagnoses")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Rare disease (RD) collection without ORPHA code diagnoses")
 				warnings.append(warning)
 
 			if len(diags_orpha) > 0 and 'RD' not in types:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code based diagnoses provided, but collection not marked as rare disease (RD) collection")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code diagnoses provided, but collection not marked as rare disease (RD) collection")
 				warnings.append(warning)
 
 			if len(diags_orpha) > 0 and len(diags_icd10) == 0:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code based diagnoses specified, but no ICD-10 equivalents provided")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code diagnoses specified, but no ICD-10 equivalents provided, thus making collection impossible to find for users using ICD-10 codes")
 				warnings.append(warning)
 
 			# TODO implement more detailed checks using ORPHA to ICD-10 code mappings - for each ORPHA term, there should be at least one ICD-10 matching term
