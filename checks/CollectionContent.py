@@ -28,12 +28,18 @@ class CollectionContent(IPlugin):
 				for t in collection['type']:
 					types.append(t['id'])
 			diags = []
+			diags_icd10 = []
+			diags_orpha = []
 			if 'diagnosis_available' in collection:
 				diag_ranges = []
 				for d in collection['diagnosis_available']:
 					diags.append(d['id'])
 					if re.search('-', d['id']):
 						diag_ranges.append(d['id'])
+					if re.search('^urn:miriam:icd:', d['id']):
+						diags_icd10.append(d['id'])
+					elif re.search('^ORPHA:', d['id']): 
+						diags_orpha.append(d['id'])
 				if diag_ranges:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 					warnings.append(warning)
@@ -83,6 +89,20 @@ class CollectionContent(IPlugin):
 			if len(diags) > 0 and 'MEDICAL_RECORDS' not in data_categories:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Diagnoses provided but no MEDICAL_RECORDS among its data categories")
 				warnings.append(warning)
+
+			if 'RD' in types and len(diags_orpha) == 0:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Rare disease (RD) collection without ORPHA code based diagnoses")
+				warnings.append(warning)
+
+			if len(diags_orpha) > 0 and 'RD' not in types:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code based diagnoses provided, but collection not marked as rare disease (RD) collection")
+				warnings.append(warning)
+
+			if len(diags_orpha) > 0 and len(diags_icd10) == 0:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code based diagnoses specified, but no ICD-10 equivalents provided")
+				warnings.append(warning)
+
+			# TODO implement more detailed checks using ORPHA to ICD-10 code mappings - for each ORPHA term, there should be at least one ICD-10 matching term
 
 			modalities = []
 			if 'imaging_modality' in collection:
