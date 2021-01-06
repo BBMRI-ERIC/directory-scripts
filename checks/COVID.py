@@ -107,7 +107,6 @@ class COVID(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection type not provided")
 				warnings.append(warning)
                         
-
 			if re.search(covidProspectiveCollectionIdPattern, collection['id']):
 				biobankHasCovidProspectiveCollection[biobank['id']] = True
 				if not 'DISEASE_SPECIFIC' in types:
@@ -131,6 +130,11 @@ class COVID(IPlugin):
 					if OoM > 0:
 						warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude")
 						warnings.append(warning)
+			
+			# also find other prospective collections containing COVID-19
+			if not re.search(covidProspectiveCollectionIdPattern, collection['id']) and covid_diag and 'PROSPECTIVE_COLLECTION' in types:
+				biobankHasCovidProspectiveCollection[biobank['id']] = True
+				log.debug("Prospective COVID-19 collection found with non-standard identifier: %s (%s) in biobank %s (%s)" % (collection['id'], collection['name'], biobank['id'], biobank['name']))
 
 
 			if re.search('.*:COVID19$', collection['id']):
@@ -184,7 +188,7 @@ class COVID(IPlugin):
 				warnings.append(warning)
 
 			if biobank['id'] in biobankHasCovidProspectiveCollection and not 'ProspectiveCollections' in biobank_covid:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern) but ProspectiveCollections is not among covid19biobank attributes")
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has prospective COVID-19 collection defined but ProspectiveCollections is not among covid19biobank attributes")
 				warnings.append(warning)
 
 		return warnings
