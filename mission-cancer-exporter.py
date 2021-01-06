@@ -161,8 +161,8 @@ for collection in dir.getCollections():
 
         if re.search(r'^ORPHA:', d):
             d = re.sub(r'^ORPHA:', '', d)
-            if OrphaCodes.isValidOrphaCode(d):
-                isCancer = OrphaCodes.isCancerOrphaCode(d)
+            if orphacodes.isValidOrphaCode(d):
+                isCancer = orphacodes.isCancerOrphaCode(d)
                 if isCancer:
                     log.debug("Collection %s identified as cancer collection due to ORPHA code %s" % (collection['id'], d))
                     cancer_diag = True
