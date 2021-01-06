@@ -172,68 +172,11 @@ for collection in dir.getCollections():
             else:
                 log.warn("Collection %s has invalid ORPHA code %s" % (d))
 
-    #            m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', d)
-    #			if m:
-    #				log.debug("Block: %s, code: %s, subcode %s"%(m.group('block'), m.group('code'), m.group('subcode')))
-    #				if m.group('block') == 'C' or (m.group('block') == 'D' and int(m.group('code')) <= 48):
-    #					log.debug("Collection %s identified as cancer collection due to ICD-10 code %s"%(collection['id'],d))
-    #					cancer_diag = True
-    #				else:
-    #					log.debug("Collection %s identified as non-cancer collection due to ICD-10 code %s"%(collection['id'],d))
-    #					non_cancer = True
-    #			elif d in ['C7A', 'C7B', 'D3A']:
-    #				log.debug("Collection %s identified as cancer collection due to ICD-10 less common code %s"%(collection['id'],d))
-    #				cancer_diag = True
-    #			elif d in cancer_chapters_roman:
-    #				if d == "II":
-    #					log.debug("Collection %s identified as cancer collection due to ICD-10 chapter %s"%(collection['id'],d))
-    #					cancer_diag = True
-    #				else:
-    #					log.debug("Collection %s identified as non-cancer collection due to ICD-10 chapter %s"%(collection['id'],d))
-    #					non_cancer = True
-    #			else:
-    #				log.warn("Cannot match ICD-10 diagnosis %s"%(d))
-
-    # Add ORPHAcode parser based on en_product1.xml mappings
-
-    #		code = icd10.find(d)
-    #		log.debug("Code %s found and converted to %s"%(d,code))
-    #		if code is None:
-    #			if d in cancer_chapters_roman:
-    #				if d == "II":
-    #					log.debug("Cancer diagnosis term found: %s"%(d))
-    #					cancer_diag = True
-    #			else:
-    #				log.warn("Detected unknown code: %s"%(d))
-    #			continue
-    #		try:
-    #			if code.chapter == "II":
-    #				log.debug("Cancer diagnosis term found: %s"%(d))
-    #				cancer_diag = True
-    #			elif d in ['C7A', 'C7B', 'D3A']:
-    #				log.debug("Less common cancer diagnosis term found: %s"%(d))
-    #				cancer_diag = True
-    #			else:
-    #				log.debug("Non-cancer diagnosis term found: %s"%(d))
-    #				non_cancer = True
-    #		except:
-    #			log.warn("Failed to process code: %s"%(d))
-
-    # TODO: write a more generic parser of ranges
-    #	for d in diag_ranges:
-    #		if re.search('^urn:miriam:icd:', d):
-    #			d = re.sub('^urn:miriam:icd:', '', d)
-    #			if d in cancer_diag_ranges:
-    #				log.debug("Collection %s identified as cancer collection due to ICD-10 code range %s"%(collection['id'],d))
-    #				cancer_diag = True
-    #			else:
-    #				log.debug("Collection %s identified as non-cancer collection due to ICD-10 code range %s"%(collection['id'],d))
-    #				non_cancer = True
-
     if cancer_diag:
         log.info("Collection " + collection['id'] + " has cancer cases")
         cancerExistingDiagnosed.append(collection)
         cancerBiobanksExistingDiagnosed.add(biobankId)
+        cancerBiobanks.add(biobankId)
         if not non_cancer:
             log.info("Collection %s has cancer cases only" % (collection['id']))
             cancerOnlyExistingDiagnosed.append(collection)
@@ -265,8 +208,7 @@ def printCollectionStdout(collectionList: List, headerStr: str):
     for collection in collectionList:
         biobankId = dir.getCollectionBiobank(collection['id'])
         biobank = dir.getBiobankById(biobankId)
-        print("   Collection: " + collection['id'] + " - " + collection[
-            'name'] + ". Parent biobank: " + biobankId + " - " + biobank['name'])
+        log.info("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " + biobankId + " - " + biobank['name'])
 
 
 if not args.nostdout:
