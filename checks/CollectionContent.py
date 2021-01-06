@@ -40,11 +40,12 @@ class CollectionContent(IPlugin):
 					if re.search('^urn:miriam:icd:', d['id']):
 						diags_icd10.append(re.sub('^urn:miriam:icd:','',d['id']))
 					elif re.search('^ORPHA:', d['id']): 
-						if orphacodes.isValidOrphaCode(d):
-							diags_orpha.append(re.sub('^ORPHA:', '', d['id']))
-						else:
-							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid ORPHA code found: %s" % (d['id']))
-							warnings.append(warning)
+						if dir.issetOrphaCodesMapper():
+							if orphacodes.isValidOrphaCode(d):
+								diags_orpha.append(re.sub('^ORPHA:', '', d['id']))
+							else:
+								warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid ORPHA code found: %s" % (d['id']))
+								warnings.append(warning)
 				if diag_ranges:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 					warnings.append(warning)

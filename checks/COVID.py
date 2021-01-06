@@ -186,4 +186,8 @@ class COVID(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)")
 				warnings.append(warning)
 
+			if biobank['id'] in biobankHasCovidProspectiveCollection and not 'ProspectiveCollections' in biobank_covid:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern) but ProspectiveCollections is not among covid19biobank attributes")
+				warnings.append(warning)
+
 		return warnings
