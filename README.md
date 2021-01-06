@@ -12,34 +12,29 @@
   - yapsy
 
 ## Installation
-- Verify installation:
+- Verify installation:  
   ``
 python3 -m ensurepip
 ``
 - For each of the above packages `pip3  install --upgrade <package>`
-- Ensure that file `/etc/resolve.conf` exists. If it does not exist create it with the following contents:
-
+- Ensure that file `/etc/resolve.conf` exists. If it does not exist create it with the following contents:  
   ``
 nameserver 8.8.8.8
 ``
-
-- Create the diskcache directories:
-
+- Create the diskcache directories:  
   ``
 mkdir -p data-quality-cache/directory
 mkdir -p data-quality-cache/geolocator
 mkdir -p data-quality-cache/emails
 ``	
-- Download the MOLGENIS Python API library:
+- Download the MOLGENIS Python API library:  
   ``
 pip3 install molgenis-py-client
 ``
-
-- Install/update root certificates (also check install_certifi.py script)
+- Install/update root certificates (also check install_certifi.py script)  
   ``
 pip3 install --upgrade certifi
 ``
-
 - If you want support for checking mappings of ORPHA codes to ICD-10 codes for RD biobanks, you need to get en_product1.xml from
   http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html
 
