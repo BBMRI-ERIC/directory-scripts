@@ -97,7 +97,7 @@ class CollectionContent(IPlugin):
 					orphacodes = dir.getOrphaCodesMapper()
 					for d in diags_icd10:
 						orpha = orphacodes.icd10ToOrpha(re.sub('^urn:miriam:icd:','',d))
-						if orpha is not None and len(orpha) > 1:
+						if orpha is not None and len(orpha) > 0:
 							orphalist = [c['code'] + "/" + c['mapping_type'] for c in orpha]
 							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Consider adding following ORPHA codes (based on mapping ICD-10 code %s to ORPHA codes): %s"%(re.sub('^urn:miriam:icd:','',d), ",".join(orphalist)))
 							warnings.append(warning)
