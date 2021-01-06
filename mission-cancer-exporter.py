@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=8:sw=8:tw=0:noet
+# vim:ts=4:sw=4:tw=0:et
 
 import pprint
 import re
@@ -158,6 +158,19 @@ for collection in dir.getCollections():
                         non_cancer = True
                 else:
                     log.warning("Cannot match ICD-10 diagnosis %s" % (d))
+
+        if re.search(r'^ORPHA:', d):
+            d = re.sub(r'^ORPHA:', '', d)
+            if OrphaCodes.isValidOrphaCode(d):
+                isCancer = OrphaCodes.isCancerOrphaCode(d)
+                if isCancer:
+                    log.debug("Collection %s identified as cancer collection due to ORPHA code %s" % (collection['id'], d))
+                    cancer_diag = True
+                else:
+                    log.debug("Collection %s identified as non-cancer collection due to ORPHA code %s" % (collection['id'], d))
+                    non_cancer = True
+            else:
+                log.warn("Collection %s has invalid ORPHA code %s" % (d))
 
     #            m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', d)
     #			if m:

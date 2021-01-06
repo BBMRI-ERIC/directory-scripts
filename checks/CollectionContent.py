@@ -10,6 +10,7 @@ class CollectionContent(IPlugin):
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running collection content checks (CollectionContent)")
+		orphacodes = dir.getOrphaCodesMapper()
 		for collection in dir.getCollections():
 			OoM = collection['order_of_magnitude']['id']
 
@@ -37,9 +38,13 @@ class CollectionContent(IPlugin):
 					if re.search('-', d['id']):
 						diag_ranges.append(d['id'])
 					if re.search('^urn:miriam:icd:', d['id']):
-						diags_icd10.append(d['id'])
+						diags_icd10.append(re.sub('^urn:miriam:icd:','',d['id']))
 					elif re.search('^ORPHA:', d['id']): 
-						diags_orpha.append(d['id'])
+						if orphacodes.isValidOrphaCode(d):
+							diags_orpha.append(re.sub('^ORPHA:', '', d['id']))
+						else:
+							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid ORPHA code found: %s" % (d['id']))
+							warnings.append(warning)
 				if diag_ranges:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 					warnings.append(warning)
@@ -94,12 +99,11 @@ class CollectionContent(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Rare disease (RD) collection without ORPHA code diagnoses")
 				warnings.append(warning)
 				if dir.issetOrphaCodesMapper():
-					orphacodes = dir.getOrphaCodesMapper()
 					for d in diags_icd10:
-						orpha = orphacodes.icd10ToOrpha(re.sub('^urn:miriam:icd:','',d))
+						orpha = orphacodes.icd10ToOrpha(d)
 						if orpha is not None and len(orpha) > 0:
-							orphalist = [c['code'] + "/" + c['mapping_type'] for c in orpha]
-							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Consider adding following ORPHA codes (based on mapping ICD-10 code %s to ORPHA codes): %s"%(re.sub('^urn:miriam:icd:','',d), ",".join(orphalist)))
+							orphalist = ["%(code)s(%(name)s)/%(mapping_type)s" % {'code' : c['code'], 'name' : orphacodes.orphaToNamesString(c['code']), 'mapping_type' : c['mapping_type']} for c in orpha]
+							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Consider adding following ORPHA code(s) to the RD collection - based on mapping ICD-10 code %s to ORPHA codes: %s"%(d, ",".join(orphalist)))
 							warnings.append(warning)
 
 
@@ -112,9 +116,8 @@ class CollectionContent(IPlugin):
 				warnings.append(warning)
 
 			if len(diags_orpha) > 0 and dir.issetOrphaCodesMapper():
-				orphacodes = dir.getOrphaCodesMapper()
 				for d in diags_orpha:
-					icd10codes = orphacodes.orphaToIcd10(re.sub('^ORPHA:', '', d))
+					icd10codes = orphacodes.orphaToIcd10(d)
 					for c in icd10codes:
 						if 'urn:miriam:icd:' + c['code'] not in diags_icd10:
 							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code %s provided, but its translation to ICD-10 as %s is not provided (mapping is of %s type). It is recommended to provide this translation explicitly until Directory implements full semantic mapping search."%(d,c['code'],c['mapping_type']))

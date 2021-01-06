@@ -1,4 +1,4 @@
-# vim:ts=8:sw=8:tw=0:noet
+# vim:ts=4:sw=4:tw=0:et
 
 import logging as log
 import re
@@ -8,6 +8,7 @@ from typing import List
 
 from typing_extensions import TypedDict
 
+from icd10codeshelper import ICD10CodesHelper
 
 class MappingWithType(TypedDict):
     code : str
@@ -24,10 +25,17 @@ class OrphaCodes:
         #self.__icd10_to_orpha_code_map = Dict[str, List[MappingWithType]]
         self.__orpha_to_icd10_code_map = {}
         self.__icd10_to_orpha_code_map = {}
+        self.__orpha_codes = []
         self.__orpha_cancer_codes = []
+        self.__orpha_to_name_map = {}
         for disease in orpha_tree.findall('DisorderList/Disorder'):
             orpha_code = disease.findtext('OrphaCode')
+            self.__orpha_codes.append(orpha_code)
             log.debug("Processing Orpha code %s"%(orpha_code))
+            for name in disease.findall("Name[@lang='en']"):
+                if orpha_code not in self.__orpha_to_name_map:
+                    self.__orpha_to_name_map[orpha_code] = []
+                self.__orpha_to_name_map[orpha_code].append(name.text)
             for external_code in disease.findall('ExternalReferenceList/ExternalReference'):
                 source = external_code.findtext('Source')
                 icd10_code = external_code.findtext('Reference')
@@ -52,6 +60,14 @@ class OrphaCodes:
                     log.debug("Orpha code %s maps to ICD-10 codes %s" % (orpha_code, self.__orpha_to_icd10_code_map[orpha_code]))
                     self.__icd10_to_orpha_code_map[icd10_code].append(MappingWithType(code=orpha_code, mapping_type=mapping_type_inverse))
                     log.debug("ICD-10 code %s maps to Orpha codes %s" % (icd10_code, self.__icd10_to_orpha_code_map[icd10_code]))
+                    if ICD10CodesHelper.isCancerCode(icd10_code):
+                        self.__orpha_cancer_codes.append(orpha_code)
+
+    def isValidOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_codes else False
+
+    def isCancerOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_cancer_codes else False
 
     def orphaToIcd10(self, code : str) -> List[MappingWithType]:
         if code not in self.__orpha_to_icd10_code_map:
@@ -63,3 +79,8 @@ class OrphaCodes:
             return None
         return self.__icd10_to_orpha_code_map[code]
 
+    def orphaToNamesList(self, code : str) -> List[str]:
+        return self.__orpha_to_name_map[code]
+
+    def orphaToNamesString(self, code : str) -> str:
+        return ", ".join(self.orphaToNamesList(code))
