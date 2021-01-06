@@ -116,9 +116,6 @@ class COVID(IPlugin):
 				if not 'PROSPECTIVE_COLLECTION' in types:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types")
 					warnings.append(warning)
-				if not 'ProspectiveCollections' in biobank_covid:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "ProspectiveCollections capability must be specified in covid19biobank section of biobank attributes if there is a COVID19PROSPECTIVE collection provided")
-					warnings.append(warning)
 				if OoM > 0:
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude")
 					warnings.append(warning)
