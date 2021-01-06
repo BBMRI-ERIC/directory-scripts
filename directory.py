@@ -1,3 +1,5 @@
+# vim:ts=8:sw=8:tw=0:noet
+
 import logging as log
 import os.path
 import time
@@ -192,7 +194,19 @@ class Directory:
 			raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
 
 		log.info('Directory structure initialized')
+		self.__orphacodesmapper = None
 
+	def setOrphaCodesMapper(self, o):
+		self.__orphacodesmapper = o
+
+	def issetOrphaCodesMapper(self) -> bool:
+		if self.__orphacodesmapper is not None:
+			return True
+		else:
+			return False
+
+	def getOrphaCodesMapper(self):
+		return self.__orphacodesmapper
 
 	def getBiobanks(self):
 		return self.biobanks

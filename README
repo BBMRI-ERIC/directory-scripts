@@ -40,9 +40,13 @@ pip3 install molgenis-py-client
 pip3 install --upgrade certifi
 ``
 
+- If you want support for checking mappings of ORPHA codes to ICD-10 codes for RD biobanks, you need to get en_product1.xml from
+  http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html
 
 ## Running the script
 
 ``
 python3 data-check.py
+python3 data-check.py --purge-all-caches -X test_results.xlsx
+python3 data-check.py -O en_product1.xml
 ``

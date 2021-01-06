@@ -17,6 +17,8 @@ from customwarnings import DataCheckWarning
 from nncontacts import NNContacts
 from directory import Directory
 
+from orphacodes import OrphaCodes
+
 disabledChecks = {
 #		"SemiemptyFields" : {"bbmri-eric:ID:NO_HUNT", "bbmri-eric:ID:NO_Janus"}
 		}
@@ -52,6 +54,8 @@ parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs
 parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular long remote checks')
 parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
+parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1,
+                    help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 
@@ -118,6 +122,11 @@ class WarningsContainer:
 
 dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 warningContainer = WarningsContainer()
+
+orphacodes = None
+if args.orphacodesfile is not None:
+	orphacodes = OrphaCodes(args.orphacodesfile[0])
+	dir.setOrphaCodesMapper(orphacodes)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))

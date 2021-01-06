@@ -103,6 +103,15 @@ class CollectionContent(IPlugin):
 				warnings.append(warning)
 
 			# TODO implement more detailed checks using ORPHA to ICD-10 code mappings - for each ORPHA term, there should be at least one ICD-10 matching term
+			if len(diags_orpha) > 0 and dir.issetOrphaCodesMapper():
+				orphacodes = dir.getOrphaCodesMapper()
+				for d in diags_orpha:
+					icd10codes = orphacodes.orphaToIcd10(re.sub('^ORPHA:', '', d))
+					for c in icd10codes:
+						if 'urn:miriam:icd:' + c['code'] not in diags_icd10:
+							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code %s provided, but its translation to ICD-10 as %s is not provided (mapping is of %s type). It is recommended to provide this translation explicitly until Directory implements full semantic mapping search."%(d,c['code'],c['mapping_type']))
+							warnings.append(warning)
+
 
 			modalities = []
 			if 'imaging_modality' in collection:
