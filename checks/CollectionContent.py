@@ -93,6 +93,15 @@ class CollectionContent(IPlugin):
 			if 'RD' in types and len(diags_orpha) == 0:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Rare disease (RD) collection without ORPHA code diagnoses")
 				warnings.append(warning)
+				if dir.issetOrphaCodesMapper():
+					orphacodes = dir.getOrphaCodesMapper()
+					for d in diags_icd10:
+						orpha = orphacodes.icd10ToOrpha(re.sub('^urn:miriam:icd:','',d))
+						if orpha is not None and len(orpha) > 1:
+							orphalist = [c['code'] + "/" + c['mapping_type'] for c in orpha]
+							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Consider adding following ORPHA codes (based on mapping ICD-10 code %s to ORPHA codes): %s"%(re.sub('^urn:miriam:icd:','',d), ",".join(orphalist)))
+							warnings.append(warning)
+
 
 			if len(diags_orpha) > 0 and 'RD' not in types:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code diagnoses provided, but collection not marked as rare disease (RD) collection")
@@ -102,7 +111,6 @@ class CollectionContent(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code diagnoses specified, but no ICD-10 equivalents provided, thus making collection impossible to find for users using ICD-10 codes")
 				warnings.append(warning)
 
-			# TODO implement more detailed checks using ORPHA to ICD-10 code mappings - for each ORPHA term, there should be at least one ICD-10 matching term
 			if len(diags_orpha) > 0 and dir.issetOrphaCodesMapper():
 				orphacodes = dir.getOrphaCodesMapper()
 				for d in diags_orpha:
@@ -111,7 +119,6 @@ class CollectionContent(IPlugin):
 						if 'urn:miriam:icd:' + c['code'] not in diags_icd10:
 							warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "ORPHA code %s provided, but its translation to ICD-10 as %s is not provided (mapping is of %s type). It is recommended to provide this translation explicitly until Directory implements full semantic mapping search."%(d,c['code'],c['mapping_type']))
 							warnings.append(warning)
-
 
 			modalities = []
 			if 'imaging_modality' in collection:
