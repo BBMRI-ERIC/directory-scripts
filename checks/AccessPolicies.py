@@ -29,6 +29,9 @@ class AccessPolicies(IPlugin):
 						other_data = True
 			if 'data_use' in collection:
 				DUOs.extend(collection['data_use'])
+
+			biobankId = dir.getCollectionBiobank(collection['id'])
+			biobank = dir.getBiobankById(biobankId)
 			
 			if 'BIOLOGICAL_SAMPLES' in data_categories:
 				if((not 'sample_access_fee' in collection or collection['sample_access_fee'] == False) and 
@@ -57,9 +60,28 @@ class AccessPolicies(IPlugin):
 			if not DUOs:
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No Data Use Ontology (DUO) term provided")
 				warnings.append(warning)
-			else:
-				if  not any(x in DUOs for x in ['DUO:0000042', 'DUO:0000006', 'DUO:0000005']):
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "None of generic research use purposes provided ('DUO:0000042', 'DUO:0000006', 'DUO:0000005') - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes")
+
+			if  not any(x in DUOs for x in ['DUO:0000042', 'DUO:0000006', 'DUO:0000005']):
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "None of generic research use purposes provided ('DUO:0000042', 'DUO:0000006', 'DUO:0000005') - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes")
+				warnings.append(warning)
+			if  not 'DUO:0000029' in DUOs:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Data return is not required - it is recommended for biobanks to support it based on BBMRI-ERIC Access policy (but not required)")
+				warnings.append(warning)
+
+			if any((x in collection and collection[x] == True) for x in ['sample_access_joint_project', 'data_access_joint_project', 'image_joint_projects']) and 'DUO:0000020' not in DUOs:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Joint projects for sample/data/image access specified and 'DUO:0000020' is not specified")
+				warnings.append(warning)
+
+			for attribute,DUO_term in [('collaboration_non_for_profit', 'DUO:0000018'), ('collaboration_non_for_profit', 'DUO:0000018')]:
+				if any((x in collection and collection[x] == True) for x in [attribute]) and DUO_term not in DUOs:
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"{attribute} specified on collection level but '{DUO_term}' is not specified")
 					warnings.append(warning)
+				elif any((x not in collection and x in biobank and biobank[x] == True) for x in [attribute]) and DUO_term not in DUOs:
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"{attribute} specified on biobank level and not overridden on collection but '{DUO_term}' is not specified")
+					warnings.append(warning)
+
+			if any((x in biobank and biobank[x] == True) for x in []) and 'DUO:0000020' not in DUOs:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Joint projects for sample/data/image access specified and 'DUO:0000020' is not specified")
+				warnings.append(warning)
 
 		return warnings
