@@ -21,11 +21,14 @@ class AccessPolicies(IPlugin):
 
 			data_categories = []
 			other_data = False
+			DUOs = []
 			if 'data_categories' in collection:
 				for c in collection['data_categories']:
 					data_categories.append(c['id'])
 					if ('BIOLOGICAL_SAMPLES' != c['id'] and 'IMAGING_DATA' != c['id']):
 						other_data = True
+			if 'data_use' in collection:
+				DUOs.extend(collection['data_use'])
 			
 			if 'BIOLOGICAL_SAMPLES' in data_categories:
 				if((not 'sample_access_fee' in collection or collection['sample_access_fee'] == False) and 
@@ -51,5 +54,12 @@ class AccessPolicies(IPlugin):
 					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "No imaging access mode enabled and no imaging access policy (description nor URI) provided for a collection which contains imaging data")
 					warnings.append(warning)
 							
+			if not DUOs:
+				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No Data Use Ontology (DUO) term provided")
+				warnings.append(warning)
+			else:
+				if  not any(x in DUOs for x in ['DUO:0000042', 'DUO:0000006', 'DUO:0000005']):
+					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "None of generic research use purposes provided ('DUO:0000042', 'DUO:0000006', 'DUO:0000005') - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes")
+					warnings.append(warning)
 
 		return warnings
