@@ -147,4 +147,33 @@ class CollectionContent(IPlugin):
 				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Imaging modalities or image data set found, but IMAGING_DATA is not among data categories: image_modality = %s, image_dataset_type = %s"%(modalities,image_dataset_types))
 				warnings.append(warning)
 
+			age_unit = None
+			if 'age_unit' in collection:
+				age_units = collection['age_unit']
+				if len(age_units) > 1:
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Ambiguous speification of age_unit - only one value is permitted. Provided values %s"%(age_units)))
+				elif len(age_units) == 1:
+					age_unit = age_units[0]
+			if ('age_high' in collection or 'age_low' in collection) and ('age_low' not in collection or len(age_units) < 1):
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Missing age_unit for provided age range: {collection.get('age_low')}-{collection.get('age_high')}"))
+
+			age_min_limit = -1
+			if age_unit == "MONTH":
+				age_min_limit = age_min_limit*12
+			elif age_unit == "WEEK":
+				age_min_limit = age_min_limit*52.1775
+			elif age_unit == "DAY":
+				age_min_limit = age_min_limit*365.2
+
+			if ('age_high' in collection and collection['age_high'] < age_min_limit):
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Age_high is below the minimum value limit (%d %s): offending value %d"%(age_min_limit, age_unit, collection['age_high'])))
+			if ('age_low' in collection and collection['age_low'] < age_min_limit):
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Age_low is below the minimum value limit (%d %s): offending value %d"%(age_min_limit, age_unit, collection['age_low'])))
+			
+			if ('age_high' in collection and 'age_low' in collection):
+				if (collection['age_low'] > collection['age_high']):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Age_low (%d) is higher than age_high (%d)"%(collection['age_low'], collection['age_high'])))
+				elif (collection['age_low'] == collection['age_high']):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, "Suspect situation: age_low == age_high == (%d) (may be false positive)"%(collection['age_low'])))
+
 		return warnings
