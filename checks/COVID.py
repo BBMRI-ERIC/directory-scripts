@@ -96,40 +96,31 @@ class COVID(IPlugin):
 
 			if covid_diag or covid_control:
 				if not covidNetworkName in biobank_networks:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank contains COVID collection " + collection['id'] + ' but not marked as part of ' + covidNetworkName)
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank contains COVID collection " + collection['id'] + ' but not marked as part of ' + covidNetworkName))
 				if not 'covid19' in biobank_covid:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank contains COVID collection " + collection['id'] + ' but does not have "covid19" attribute in "covid19biobank" section of attributes')
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank contains COVID collection " + collection['id'] + ' but does not have "covid19" attribute in "covid19biobank" section of attributes'))
 
 
 			if len(types) < 1:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection type not provided")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection type not provided"))
                         
 			if re.search(covidProspectiveCollectionIdPattern, collection['id']):
 				biobankHasCovidProspectiveCollection[biobank['id']] = True
 				if not 'DISEASE_SPECIFIC' in types:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
 				if not 'PROSPECTIVE_COLLECTION' in types:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types"))
 				if OoM > 0:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
 				if not covid_diag and not covid_control:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "COVID19PROSPECTIVE collection misses COVID-19 diagnosis or COVID-19 controls filled in")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "COVID19PROSPECTIVE collection misses COVID-19 diagnosis or COVID-19 controls filled in"))
 
 			if re.search('^Ability to collect', collection['name']) and (covid_diag or covid_control):
 				if not re.search(covidProspectiveCollectionIdPattern, collection['id']):
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, 'Collection having "ability to collect" does not have COVID19PROSPECTIVE label')
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, 'Collection having "ability to collect" does not have COVID19PROSPECTIVE label'))
 					# only report the following if it hasn't been reported above (hence only if the COVID19PROSPECTIVE does not match)
 					if OoM > 0:
-						warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude")
-						warnings.append(warning)
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
 			
 			# also find other prospective collections containing COVID-19
 			if not re.search(covidProspectiveCollectionIdPattern, collection['id']) and covid_diag and 'PROSPECTIVE_COLLECTION' in types:
@@ -139,17 +130,13 @@ class COVID(IPlugin):
 
 			if re.search('.*:COVID19$', collection['id']):
 				if not 'DISEASE_SPECIFIC' in types:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
 				if not 'DNA' in materials and not 'PATHOGEN' in materials and not 'PERIPHERAL_BLOOD_CELLS' in materials and not 'PLASMA' in materials and not 'RNA' in materials and not 'SALIVA' in materials and not 'SERUM' in materials and not 'WHOLE_BLOOD' in materials and not 'FECES' in materials and not 'BUFFY_COAT' in materials and not 'NASAL_SWAB' in materials and not 'THROAT_SWAB' in materials:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Supect material types: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Supect material types: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB"))
 				if 'NASAL_SWAB' in materials or 'THROAT_SWAB' in materials or 'FECES' in materials and not ('BSL2' in biobank_covid or 'BSL3' in biobank_covid):
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Suspect situation: collection contains infectious material (nasal/throat swabs, faeces) while the parent biobank does not indicate BSL2 nor BSL3 available")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Suspect situation: collection contains infectious material (nasal/throat swabs, faeces) while the parent biobank does not indicate BSL2 nor BSL3 available"))
 				if not covid_diag:
-					warning = DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "COVID19 collection misses COVID-19 diagnosis filled in")
-					warnings.append(warning)
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "COVID19 collection misses COVID-19 diagnosis filled in"))
 
 
 		for biobank in dir.getBiobanks():
@@ -167,11 +154,9 @@ class COVID(IPlugin):
 					biobank_networks.append(n['id'])
 
 			if covidNetworkName in biobank_networks and not 'covid19' in biobank_covid:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank is part of " + covidNetworkName + " but does not have covid19 among covid19biobank attributes")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank is part of " + covidNetworkName + " but does not have covid19 among covid19biobank attributes"))
 			if 'covid19' in biobank_covid and not covidNetworkName in biobank_networks:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has covid19 among covid19biobank attributes but is not part of " + covidNetworkName)
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has covid19 among covid19biobank attributes but is not part of " + covidNetworkName))
 
 			# This is a simple check if the biobank has other services than just the attribute of being a covid19 biobank
 			other_covid_services = False
@@ -180,15 +165,12 @@ class COVID(IPlugin):
 					other_covid_services = True
 
 			if 'covid19' in biobank_covid and not (biobank['id'] in biobankHasCovidCollection or biobank['id'] in biobankHasCovidControls or other_covid_services):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has covid19 among covid19biobank but has no relevant services nor any collection of COVID-19 samples nor any collection of COVID-19 controls")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has covid19 among covid19biobank but has no relevant services nor any collection of COVID-19 samples nor any collection of COVID-19 controls"))
 	
 			if 'ProspectiveCollections' in biobank_covid and not biobank['id'] in biobankHasCovidProspectiveCollection:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)"))
 
 			if biobank['id'] in biobankHasCovidProspectiveCollection and not 'ProspectiveCollections' in biobank_covid:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has prospective COVID-19 collection defined but ProspectiveCollections is not among covid19biobank attributes")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank has prospective COVID-19 collection defined but ProspectiveCollections is not among covid19biobank attributes"))
 
 		return warnings

@@ -93,8 +93,7 @@ class CheckURLs(IPlugin):
 		log.info("Testing biobank URLs")
 		for biobank in dir.getBiobanks():
 			if not 'url' in biobank or re.search('^\s*$', biobank['url']):
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Missing URL")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Missing URL"))
 			else:
 				URLwarnings = testURL(biobank['url'], 
 						DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank URL")

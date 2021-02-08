@@ -12,6 +12,5 @@ class OrphanedCollections(IPlugin):
 		for collection in dir.getCollections():
 			collections = dir.getGraphBiobankCollectionsFromCollection(collection['id'])
 			if len(collections.edges) < 1:
-				warning = DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Orphaned collection")
-				warnings.append(warning)
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Orphaned collection"))
 		return warnings
