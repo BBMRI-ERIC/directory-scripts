@@ -73,6 +73,7 @@ python3 data-check.py -d --purge-all-caches
 ``
 - **covid-exporter.py** - statistics generator for COVID-19 biobanks
 - **mission-cancer-exporter.py** - statistics generator for cancer biobanks
+- **pediatric-exporter.py** - statistics generator for pediatric biobanks/collections
 - **diagnosis-exporter.py** - dumper of diagnosis information from the directory, used for development purposes only  
 ``
 ./diagnosis-exporter.py -d >diagnosis-exporter.log 2>&1
