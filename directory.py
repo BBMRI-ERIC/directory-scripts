@@ -36,7 +36,12 @@ class Directory:
 			self.biobanks = cache['biobanks']
 		else:
 			start_time = time.perf_counter()
-			self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,covid19biobank')
+			# TODO: remove exception handling once BBMRI.uk staging has been fixed
+			try:
+				self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,covid19biobank')
+			except:
+				log.warning("Using work-around for inconsistence in the database structure.")
+				self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,COVID_19')
 			cache['biobanks'] = self.biobanks
 			end_time = time.perf_counter()
 			log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
