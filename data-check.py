@@ -56,6 +56,10 @@ parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_cons
 parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
 parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1,
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
+parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
+parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
+parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
+
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 
@@ -120,7 +124,10 @@ class WarningsContainer:
 
 # Main code
 
-dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+if args.username is not None and args.password is not None:
+	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+else:
+	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 warningContainer = WarningsContainer()
 
 orphacodes = None

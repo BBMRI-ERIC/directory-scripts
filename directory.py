@@ -11,8 +11,10 @@ from diskcache import Cache
 
 class Directory:
 
-	def __init__(self, purgeCaches=[], debug=False, pp=None):
+	def __init__(self, package='eu_bbmri_eric', purgeCaches=[], debug=False, pp=None, username=None, password=None):
 		self.__pp = pp
+		self.__package = package
+		log.debug('Checking data in package: ' + package)
 
 		cache_dir = 'data-check-cache/directory'
 		if not os.path.exists(cache_dir):
@@ -24,12 +26,17 @@ class Directory:
 		self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
 		log.info('Retrieving directory content from ' + self.__directoryURL)
 		session = molgenis.client.Session(self.__directoryURL)
+		if username is not None and password is not None:
+			log.info("Logging in to MOLGENIS with a user account.")
+			log.debug('username: ' + username)
+			log.debug('password: ' + password)
+			session.login(username, password)
 		log.info('   ... retrieving biobanks')
 		if 'biobanks' in cache:
 			self.biobanks = cache['biobanks']
 		else:
 			start_time = time.perf_counter()
-			self.biobanks = session.get("eu_bbmri_eric_biobanks", expand='contact,collections,country,covid19biobank')
+			self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,covid19biobank')
 			cache['biobanks'] = self.biobanks
 			end_time = time.perf_counter()
 			log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -38,8 +45,8 @@ class Directory:
 			self.collections = cache['collections']
 		else:
 			start_time = time.perf_counter()
-			self.collections = session.get("eu_bbmri_eric_collections", expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
-			#self.collections = session.get("eu_bbmri_eric_collections", num=2000, expand=[])
+			self.collections = session.get(self.__package + "_collections", expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
+			#self.collections = session.get(self.__package + "_collections", num=2000, expand=[])
 			cache['collections'] = self.collections
 			end_time = time.perf_counter()
 			if debug and self.__pp is not None:
@@ -51,7 +58,7 @@ class Directory:
 			self.contacts = cache['contacts']
 		else:
 			start_time = time.perf_counter()
-			self.contacts = session.get("eu_bbmri_eric_persons", num=2000, expand='biobanks,collections,country')
+			self.contacts = session.get(self.__package + "_persons", num=2000, expand='biobanks,collections,country')
 			cache['contacts'] = self.contacts
 			end_time = time.perf_counter()
 			log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -60,7 +67,7 @@ class Directory:
 			self.networks = cache['networks']
 		else:
 			start_time = time.perf_counter()
-			self.networks = session.get("eu_bbmri_eric_networks", num=2000, expand='contact')
+			self.networks = session.get(self.__package + "_networks", num=2000, expand='contact')
 			cache['networks'] = self.networks
 			end_time = time.perf_counter()
 			log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -153,9 +160,12 @@ class Directory:
 			if 'biobanks' in n:
 				for b in n['biobanks']:
 					self.networkGraph.add_edge(n['id'], b['id'])
+			# TODO remove once the datamodel is fixed
 			if 'contacts' in n:
 				for c in n['contacts']:
 					self.contactGraph.add_edge(n['id'], 'contactID:'+c['id'])
+			if 'contact' in n:
+				self.contactGraph.add_edge(n['id'], 'contactID:'+n['contact']['id'])
 			if 'collections' in n:
 				for c in n['collections']:
 					self.networkGraph.add_edge(n['id'], c['id'])
