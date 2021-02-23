@@ -67,7 +67,7 @@ class ContactFields(IPlugin):
 								cache_item = { 'valid' : True, 'warning' : None }
 								cache[contact_email] = cache_item
 						log.info(log_message)
-					except (DNS.Base.TimeoutError, DNS.Base.ServerError) as e:
+					except (DNS.Base.TimeoutError, DNS.Base.ServerError, DNS.Base.SocketError) as e:
 						log_message += " -> failed with exception (" + str(e) + ")"
 						log.error(log_message)
 
