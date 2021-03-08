@@ -306,8 +306,9 @@ for collection in dir.getCollections():
                     pediatricOnlyCancerOnlyCollectionDonorsExplicit += collection['number_of_donors']
 
 pd_cancerExistingDiagnosed = pd.DataFrame(cancerExistingDiagnosed)
-pd_cancerExistingControls = pd.DataFrame(cancerExistingControls)
-pd_cancerProspective = pd.DataFrame(cancerProspective)
+pd_cancerOnlyExistingDiagnosed = pd.DataFrame(cancerOnlyExistingDiagnosed)
+pd_pediatricCancerExistingDiagnosed = pd.DataFrame(pediatricCancerExistingDiagnosed)
+pd_pediatricOnlyCancerExistingDiagnosed = pd.DataFrame(pediatricOnlyCancerExistingDiagnosed)
 
 
 def printCollectionStdout(collectionList: List, headerStr: str):
@@ -383,7 +384,8 @@ if not args.nostdout:
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
-    pd_cancerExistingDiagnosed.to_excel(writer, sheet_name='Cancer Diagnosed')
-    pd_cancerExistingControls.to_excel(writer, sheet_name='Cancer Controls')
-    pd_cancerProspective.to_excel(writer, sheet_name='Cancer Prospective')
+    pd_cancerExistingDiagnosed.to_excel(writer, sheet_name='Cancer')
+    pd_cancerOnlyExistingDiagnosed.to_excel(writer, sheet_name='Cancer-only')
+    pd_pediatricCancerExistingDiagnosed.to_excel(writer, sheet_name='Pediatric cancer')
+    pd_pediatricOnlyCancerExistingDiagnosed.to_excel(writer, sheet_name='Pediatric cancer-only')
     writer.save()

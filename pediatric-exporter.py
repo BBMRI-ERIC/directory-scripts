@@ -167,7 +167,7 @@ for collection in dir.getCollections():
                     log.debug("Collection %s identified as non-cancer collection due to ORPHA code %s" % (collection['id'], d))
                     non_cancer = True
             else:
-                log.warn("Collection %s has invalid ORPHA code %s" % (d))
+                log.warning("Collection %s has invalid ORPHA code %s" % (d))
 
     pediatric = False
     pediatricOnly = False
@@ -176,9 +176,9 @@ for collection in dir.getCollections():
     if 'age_unit' in collection:
         age_units = collection['age_unit']
         if len(age_units) > 1:
-            log.warn("Ambiguous age units provided for %s: %s"%(collection['id'],age_units))
+            log.warning("Ambiguous age units provided for %s: %s"%(collection['id'],age_units))
         if len(age_units) < 1:
-            log.warn("Age units missing for %s"%(collection['id']))
+            log.warning("Age units missing for %s"%(collection['id']))
         else:
             age_unit = age_units[0]['id']
 
@@ -196,12 +196,12 @@ for collection in dir.getCollections():
             pediatricOnly = True
             log.debug("Prenatal collection detected: %s (%s), age range: %d-%d, diags: %s"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high'), diags + diag_ranges))
         else:
-            log.warn("Age range mismatch detected for collection: %s (%s), age range: %d-%d"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high')))
+            log.warning("Age range mismatch detected for collection: %s (%s), age range: %d-%d"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high')))
     elif 'age_high' in collection and collection['age_high'] < 0:
-        log.warn("Age range mismatch detected for collection: %s (%s), age range: %d-%d"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high')))
+        log.warning("Age range mismatch detected for collection: %s (%s), age range: %d-%d"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high')))
     else:
         if 'age_low' in collection and 'age_high' in collection and collection['age_low'] > collection['age_high']:
-            log.warn("Age range mismatch detected for collection: %s (%s), age range: %d-%d"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high')))
+            log.warning("Age range mismatch detected for collection: %s (%s), age range: %d-%d"%(collection['id'], collection['name'], collection.get('age_low'), collection.get('age_high')))
         else:
             if (('age_low' in collection and collection['age_low'] < age_max ) or ('age_high' in collection and collection['age_high'] < age_max)):
                 pediatric = True
@@ -231,9 +231,8 @@ for collection in dir.getCollections():
         if pediatricOnly:
             pediatricOnlyCollectionDonorsExplicit += collection['number_of_donors']
 
-#pd_cancerExistingDiagnosed = pd.DataFrame(cancerExistingDiagnosed)
-#pd_cancerExistingControls = pd.DataFrame(cancerExistingControls)
-#pd_cancerProspective = pd.DataFrame(cancerProspective)
+pd_pediatricExistingDiagnosed = pd.DataFrame(pediatricExistingDiagnosed)
+pd_pediatricOnlyExistingDiagnosed = pd.DataFrame(pediatricOnlyExistingDiagnosed)
 
 
 def printCollectionStdout(collectionList: List, headerStr: str):
@@ -269,7 +268,6 @@ if not args.nostdout:
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
-    pd_cancerExistingDiagnosed.to_excel(writer, sheet_name='Cancer Diagnosed')
-    pd_cancerExistingControls.to_excel(writer, sheet_name='Cancer Controls')
-    pd_cancerProspective.to_excel(writer, sheet_name='Cancer Prospective')
+    pd_pediatricExistingDiagnosed.to_excel(writer, sheet_name='Pediatric')
+    pd_pediatricOnlyExistingDiagnosed.to_excel(writer, sheet_name='Pediatric-only')
     writer.save()
