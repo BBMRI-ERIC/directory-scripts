@@ -264,6 +264,14 @@ if not args.nostdout:
     print("- total of samples advertised in pediatric-only collections including OoM estimates: %d" % (
         pediatricOnlyCollectionSamplesIncOoM))
 
+for df in (pd_pediatricExistingDiagnosed, pd_pediatricOnlyExistingDiagnosed):
+    df['country'] = df['country'].map(lambda x: x['id'] )
+    df['biobank'] = df['biobank'].map(lambda x: x['name'] )
+    df['order_of_magnitude'] = df['order_of_magnitude'].map(lambda x: x['size'] )
+    df['type'] = df['type'].map(lambda x: ",".join([e['id'] for e in x]) )
+    for col in ('data_categories','standards','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','quality','sub_collections'):
+        df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
+    df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
