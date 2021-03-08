@@ -381,14 +381,13 @@ if not args.nostdout:
         pediatricCancerCollectionSamplesIncOoM))
 
 for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed): 
-    df['country'] = df['country'].map(lambda x: x['id'] )
-    df['biobank'] = df['biobank'].map(lambda x: x['name'] )
-    df['order_of_magnitude'] = df['order_of_magnitude'].map(lambda x: x['size'] )
-    df['type'] = df['type'].map(lambda x: ",".join([e['id'] for e in x]) )
-    #df['parent_collection'] = df['parent_collection'].map(lambda x: x['id'] if type(x) is dict and 'id' in x else x)
-    for col in ('data_categories','standards','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','quality','sub_collections'):
+    for (col, attr) in [('country','id'),('biobank','name'),('order_of_magnitude','size'),('parent_collection','id')]:
+        if col in df:
+            df[col] = df[col].map(lambda x: x[attr] if type(x) is dict and attr in x else x)
+    for col in ('type','also_known','data_categories','standards','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','quality','sub_collections','data_use'):
         df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
     df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )
+    del df['contact_priority']
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
