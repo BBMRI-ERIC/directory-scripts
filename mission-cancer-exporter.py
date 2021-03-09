@@ -381,9 +381,12 @@ if not args.nostdout:
         pediatricCancerCollectionSamplesIncOoM))
 
 for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed): 
-    for (col, attr) in [('country','id'),('biobank','name'),('order_of_magnitude','size'),('parent_collection','id')]:
+    for (col, attr) in [('country','id'),('biobank','name'),('parent_collection','id')]:
         if col in df:
             df[col] = df[col].map(lambda x: x[attr] if type(x) is dict and attr in x else x)
+    for col in ('order_of_magnitude','order_of_magnitude_donors'):
+        if col in df:
+            df[col] = df[col].map(lambda x: "%d (%s)"%(x['id'],x['size']) if type(x) is dict else x)
     for col in ('type','also_known','data_categories','standards','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','quality','sub_collections','data_use'):
         df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
     df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )

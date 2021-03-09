@@ -38,8 +38,14 @@ class BiobankGeo(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			if 'latitude' in biobank and not re.search('^\s*$', biobank['latitude']) and 'longitude' in biobank and not re.search('^\s*$', biobank['longitude']):
-				#biobank['latitude'] = re.sub(r',', r'.', biobank['latitude'])
-				#biobank['longitude'] = re.sub(r',', r'.', biobank['longitude'])
+				# we check before doing any convenience substitutions 
+				if not re.search (geocoords_pattern, biobank['latitude']):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + biobank['latitude'] + "'"))
+				if not re.search (geocoords_pattern, biobank['longitude']):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + biobank['longitude'] + "'"))
+				# this is for convenience - if there are commas used instead of periods, we should still do the remaining checks
+				biobank['latitude'] = re.sub(r',', r'.', biobank['latitude'])
+				biobank['longitude'] = re.sub(r',', r'.', biobank['longitude'])
 				if re.search (geocoords_pattern, biobank['latitude']) and re.search (geocoords_pattern, biobank['longitude']):
 					if geoCodingEnabled:
 						logMessage = "Checking reverse geocoding for " + biobank['latitude'] + ", " + biobank['longitude']
@@ -59,19 +65,19 @@ class BiobankGeo(IPlugin):
 							logMessage += " -> failed (" + str(e) + ")"
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Reverse geocoding of the biobank  location failed (" + str(e) + ")"))
 						log.info(logMessage)
-
-				else:
-					if not re.search (geocoords_pattern, biobank['latitude']):
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + biobank['latitude'] + "'"))
-					if not re.search (geocoords_pattern, biobank['longitude']):
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid biobank longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + biobank['longitude'] + "'"))
 			else:
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], DataCheckEntityType.BIOBANK, "Missing geographical coordinates"))
 
 		for collection in dir.getCollections():
 			if 'latitude' in collection and not re.search('^\s*$', collection['latitude']) and 'longitude' in collection and not re.search('^\s*$', collection['longitude']):
-				#collection['latitude'] = re.sub(r',', r'.', collection['latitude'])
-				#collection['longitude'] = re.sub(r',', r'.', collection['longitude'])
+				# we check before doing any convenience substitutions 
+				if not re.search (geocoords_pattern, collection['latitude']):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid collection latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + collection['latitude'] + "'"))
+				if not re.search (geocoords_pattern, collection['longitude']):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid collection longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + collection['longitude'] + "'"))
+				# this is for convenience - if there are commas used instead of periods, we should still do the remaining checks
+				collection['latitude'] = re.sub(r',', r'.', collection['latitude'])
+				collection['longitude'] = re.sub(r',', r'.', collection['longitude'])
 				if re.search (geocoords_pattern, collection['latitude']) and re.search (geocoords_pattern, collection['longitude']):
 					if geoCodingEnabled:
 						logMessage = "Checking reverse geocoding for " + collection['latitude'] + ", " + collection['longitude']
@@ -93,12 +99,6 @@ class BiobankGeo(IPlugin):
 							logMessage += " -> failed (" + str(e) + ")"
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Reverse geocoding of the collection  location failed (" + str(e) + ")"))
 						log.info(logMessage)
-
-				else:
-					if not re.search (geocoords_pattern, collection['latitude']):
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid collection latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + collection['latitude'] + "'"))
-					if not re.search (geocoords_pattern, collection['longitude']):
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid collection longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): '" + collection['longitude'] + "'"))
 
 		cache.close()
 		return warnings
