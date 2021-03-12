@@ -221,7 +221,7 @@ if not args.nostdout:
 	print("Totals:")
 	print("- total number of COVID-relevant biobanks: %d"%(len(covidBiobanks)))
 	print("- total number of COVID-relevant collections with existing samples: %d in %d biobanks"%(len(covidExistingDiagnosed),len(covidBiobanksExistingDiagnosed)))
-	print("- total number of exclusive COVID collections with existing samples: %d in %d biobanks"%(len(covidOnlyExistingDiagnosed),len(covidOnlyBiobanksExistingDiagnosed)))
+	print("- total number of COVID-only collections with existing samples: %d in %d biobanks"%(len(covidOnlyExistingDiagnosed),len(covidOnlyBiobanksExistingDiagnosed)))
 	print("- total number of COVID-relevant collections with control samples: %d in %d biobanks"%(len(covidExistingControls),len(covidBiobanksExistingControls)))
 	print("- total number of COVID-relevant prospective collections: %d in %d biobanks"%(len(covidProspective),len(covidBiobanksProspective)))
 	print("Estimated totals:")
@@ -243,6 +243,9 @@ for df in (pd_covidExistingDiagnosed,pd_covidProspective):
         df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
     df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )
     del df['contact_priority']
+
+covidOnlyCollectionIDs = [c['id'] for c in covidOnlyExistingDiagnosed]
+pd_covidExistingDiagnosed['COVID_only'] = pd_covidExistingDiagnosed['id'].map(lambda x: True if x in covidOnlyCollectionIDs else False)
 
 if args.outputXLSX is not None:
 	log.info("Outputting warnings in Excel file " + args.outputXLSX[0])

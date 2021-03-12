@@ -64,7 +64,7 @@ class AccessPolicies(IPlugin):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No Data Use Ontology (DUO) term provided"))
 
 			# Generic checks on allowing research
-			DUO_terms_research = ['DUO:0000007', 'DUO:0000006', 'DUO:0000005']
+			DUO_terms_research = ['DUO:0000007', 'DUO:0000006', 'DUO:0000042']
 			if  not any(x in DUOs for x in DUO_terms_research):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"None of generic research use purposes provided ({DUO_terms_research}) - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes"))
 
