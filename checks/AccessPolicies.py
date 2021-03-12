@@ -19,6 +19,7 @@ class AccessPolicies(IPlugin):
 		for collection in dir.getCollections():
 
 			data_categories = []
+			materials = []
 			collection_types = []
 			other_data = False
 			DUOs = []
@@ -27,6 +28,9 @@ class AccessPolicies(IPlugin):
 					data_categories.append(c['id'])
 					if ('BIOLOGICAL_SAMPLES' != c['id'] and 'IMAGING_DATA' != c['id']):
 						other_data = True
+			if 'materials' in collection:
+				for c in collection['materials']:
+					materials.append(c['id'])
 			if 'type' in collection:
 				for t in collection['type']:
 					collection_types.append(t['id'])
@@ -91,9 +95,15 @@ class AccessPolicies(IPlugin):
 				elif any((x not in collection and x in biobank and biobank[x] == True) for x in attributes) and negative_DUO_term in DUOs:
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on biobank level and not overridden on collection but conflicting '{DUO_term}' is specified"))
 
+			# DUO term DUO:0000007 is potentially relevant for DISEASE_SPECIFIC collections
 			DUO_term_disease_specific = 'DUO:0000007'
 			if 'DISEASE_SPECIFIC' in collection_types and DUO_term_disease_specific not in DUOs:
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Collection is disease specific but '{DUO_term_disease_specific}' is not specified (may be false-positive)"))
+
+			# DUO term DUO:0000021 (ethics approval needed) is usually needed for reuse of human biological material
+			DUO_term_ethics_needed = 'DUO:0000021'
+			if materials and DUO_term_ethics_needed not in DUOs:
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Collection contains biological material types '{materials}' but ethics approval needed '{DUO_term_ethics_needed}' is not specified (may be false-positive)"))
 
 
 		return warnings
