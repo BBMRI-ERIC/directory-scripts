@@ -55,7 +55,7 @@ If you want to purge just the directory cache and output just to XLSX, and be a 
 python3 data-check.py -v --purge-cache directory -N -X test_results.xlsx
 ``
 
-If you have en_product1.xml with ORPHA code mappings, you run the extended checks using  
+If you have en_product1.xml with ORPHA code mappings (http://www.orphadata.org/cgi-bin/rare_free.html), you run the extended checks using  
 ``
 python3 data-check.py -O en_product1.xml
 ``
