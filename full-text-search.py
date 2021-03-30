@@ -73,7 +73,7 @@ for biobank in dir.getBiobanks():
 
 for contact in dir.getContacts():
 	log.debug("Analyzing contact " + contact['id'])
-	writer.add_document(id=contact['id'], type=u"CONTACT", head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'), phone=contact.get('phone'), email=contact.get('email'))
+	writer.add_document(id=contact['id'], type=u"CONTACT", name=" ".join((biobank.get('head_firstname'), biobank.get('head_lastname'))), head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'), phone=contact.get('phone'), email=contact.get('email'))
 
 writer.commit()
 
