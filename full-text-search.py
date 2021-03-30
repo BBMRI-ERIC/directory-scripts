@@ -87,7 +87,7 @@ matchingContacts = {}
 from whoosh.qparser import QueryParser,MultifieldParser
 with ix.searcher() as searcher:
 	#query = QueryParser("name", ix.schema).parse("Masaryk")
-	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email"], ix.schema).parse(args.searchQuery)
+	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email"], ix.schema).parse(" ".join(args.searchQuery))
 	results = searcher.search(query)
 	for r in results:
 		print(r)
