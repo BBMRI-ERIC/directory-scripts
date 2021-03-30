@@ -57,7 +57,7 @@ indexdir = "indexdir"
 if not os.path.exists(indexdir):
     os.makedirs(indexdir)
 
-schema = Schema(id=ID(stored=True), type=STORED, name=TEXT, acronym=ID, description=TEXT, address=TEXT, phone=TEXT, email=TEXT, juridical_person=TEXT, bioresource_reference=ID, head_firstname=TEXT, head_lastname=TEXT)
+schema = Schema(id=ID(stored=True), type=STORED, name=TEXT, acronym=ID, description=TEXT, address=TEXT, phone=TEXT, email=TEXT, juridical_person=TEXT, bioresource_reference=ID, head_name=TEXT, head_firstname=TEXT, head_lastname=TEXT)
 ix = create_in(indexdir, schema)
 writer = ix.writer()
 
@@ -65,15 +65,16 @@ for collection in dir.getCollections():
 	log.debug("Analyzing collection " + collection['id'])
 	biobankId = dir.getCollectionBiobank(collection['id'])
 	biobank = dir.getBiobankById(biobankId)
-	writer.add_document(id=collection['id'], type=u"COLLECTION", name=collection.get('name'), description=collection.get('description'), acronym=collection.get('acronym'), bioresource_reference=biobank.get('bioresource_reference'), head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'))
+	writer.add_document(id=collection['id'], type=u"COLLECTION", name=collection.get('name'), description=collection.get('description'), acronym=collection.get('acronym'), bioresource_reference=collection.get('bioresource_reference'), head_firstname=collection.get('head_firstname'), head_lastname=collection.get('head_lastname'))
 
 for biobank in dir.getBiobanks():
 	log.debug("Analyzing biobank " + biobank['id'])
-	writer.add_document(id=biobank['id'], type=u"BIOBANK", name=biobank.get('name'), description=biobank.get('description'), acronym=biobank.get('acronym'), juridical_person=biobank.get('juridical_person'), bioresource_reference=biobank.get('bioresource_reference'), head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'))
+	log.debug("   biobank contact name: " + " ".join(filter(None,[biobank.get('head_firstname'), biobank.get('head_lastname')])))
+	writer.add_document(id=biobank['id'], type=u"BIOBANK", name=biobank.get('name'), description=biobank.get('description'), acronym=biobank.get('acronym'), juridical_person=biobank.get('juridical_person'), bioresource_reference=biobank.get('bioresource_reference'), head_name=" ".join(filter(None,[biobank.get('head_firstname'), biobank.get('head_lastname')])), head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'))
 
 for contact in dir.getContacts():
 	log.debug("Analyzing contact " + contact['id'])
-	writer.add_document(id=contact['id'], type=u"CONTACT", name=" ".join((biobank.get('head_firstname'), biobank.get('head_lastname'))), head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'), phone=contact.get('phone'), email=contact.get('email'))
+	writer.add_document(id=contact['id'], type=u"CONTACT", name=" ".join(filter(None,[biobank.get('head_firstname'), biobank.get('head_lastname')])), head_firstname=biobank.get('head_firstname'), head_lastname=biobank.get('head_lastname'), phone=contact.get('phone'), email=contact.get('email'))
 
 writer.commit()
 
@@ -92,7 +93,7 @@ matchingContacts = {}
 from whoosh.qparser import QueryParser,MultifieldParser
 with ix.searcher() as searcher:
 	#query = QueryParser("name", ix.schema).parse("Masaryk")
-	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_firstname", "head_lastname"], ix.schema).parse(" ".join(args.searchQuery))
+	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_name", "head_firstname", "head_lastname"], ix.schema).parse(" ".join(args.searchQuery))
 	results = searcher.search(query)
 	for r in results:
 		print(r)
