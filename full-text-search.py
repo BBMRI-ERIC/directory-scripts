@@ -15,6 +15,8 @@ from directory import Directory
 
 from whoosh.index import create_in
 from whoosh.fields import *
+from whoosh.analysis import CharsetFilter, StemmingAnalyzer
+from whoosh.support.charset import accent_map
 
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
@@ -57,7 +59,8 @@ indexdir = "indexdir"
 if not os.path.exists(indexdir):
     os.makedirs(indexdir)
 
-schema = Schema(id=ID(stored=True), type=STORED, name=TEXT, acronym=ID, description=TEXT, address=TEXT, phone=TEXT, email=TEXT, juridical_person=TEXT, bioresource_reference=ID, head_name=TEXT)
+my_ana = StemmingAnalyzer() | CharsetFilter(accent_map)
+schema = Schema(id=TEXT(stored=True), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana))
 ix = create_in(indexdir, schema)
 writer = ix.writer()
 
