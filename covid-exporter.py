@@ -57,11 +57,13 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 covidExistingDiagnosed = []
 covidExistingControls = []
 covidProspective = []
+covidOther = []
 covidOnlyExistingDiagnosed = []
 covidBiobanksExistingDiagnosed = set()
 covidOnlyBiobanksExistingDiagnosed = set()
 covidBiobanksExistingControls = set()
 covidBiobanksProspective = set()
+covidBiobanksOther = set()
 covidBiobanks = set()
 covidCollectionSamplesExplicit = 0
 covidCollectionDonorsExplicit = 0
@@ -86,6 +88,10 @@ for collection in dir.getCollections():
 	if 'network' in biobank:
 		for n in biobank['network']:
 			biobank_networks.append(n['id'])
+	collection_networks = []
+	if 'network' in collection:
+		for n in collection['network']:
+			collection_networks.append(n['id'])
 
 	OoM = collection['order_of_magnitude']['id']
 
@@ -188,7 +194,6 @@ for collection in dir.getCollections():
 
 	if covid_diag and non_covid:
 		log.info("Collection " + collection['id'] + " has a mixture of COVID and non-COVID diagnoses: %s"%(diags+diag_ranges))
-
 	if covid_control and not covid_prospective:
 		log.info("Collection " + collection['id'] + " has control cases for COVID")
 		covidExistingControls.append(collection)
@@ -197,12 +202,18 @@ for collection in dir.getCollections():
 		log.info("Collection " + collection['id'] + " is a prospective COVID collection")
 		covidProspective.append(collection)
 		covidBiobanksProspective.add(biobankId)
-	if covid_diag or covid_control or covid_prospective:
+
+	if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:COVID19' in collection_networks and not covid_diag and not covid_control and not covid_prospective:
+		covidOther.append(collection)
+		covidBiobanksOther.add(biobankId)
+
+	if covid_diag or covid_control or covid_prospective or 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:COVID19' in collection_networks:
 		covidBiobanks.add(biobankId)
 
 pd_covidExistingDiagnosed = pd.DataFrame(covidExistingDiagnosed)
 pd_covidExistingControls = pd.DataFrame(covidExistingControls)
 pd_covidProspective = pd.DataFrame(covidProspective)
+pd_covidOther = pd.DataFrame(covidOther)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
 	print(headerStr + " - " + str(len(collectionList)) + " collections")
@@ -224,6 +235,7 @@ if not args.nostdout:
 	print("- total number of COVID-only collections with existing samples: %d in %d biobanks"%(len(covidOnlyExistingDiagnosed),len(covidOnlyBiobanksExistingDiagnosed)))
 	print("- total number of COVID-relevant collections with control samples: %d in %d biobanks"%(len(covidExistingControls),len(covidBiobanksExistingControls)))
 	print("- total number of COVID-relevant prospective collections: %d in %d biobanks"%(len(covidProspective),len(covidBiobanksProspective)))
+	print("- total number of other COVID-relevant collections: %d in %d biobanks"%(len(covidOther),len(covidBiobanksOther)))
 	print("Estimated totals:")
 	print("- total number of samples advertised explicitly in COVID-only collections: %d"%(covidOnlyCollectionSamplesExplicit))
 	print("- total number of samples advertised explicitly in COVID-relevant collections: %d"%(covidCollectionSamplesExplicit))
@@ -232,7 +244,7 @@ if not args.nostdout:
 	print("- total number of samples advertised in COVID-only collections including OoM estimates: %d"%(covidOnlyCollectionSamplesIncOoM))
 	print("- total number of samples advertised in COVID-relevant collections including OoM estimates: %d"%(covidCollectionSamplesIncOoM))
 
-for df in (pd_covidExistingDiagnosed,pd_covidProspective):
+for df in (pd_covidExistingDiagnosed,pd_covidProspective,pd_covidOther):
     for (col, attr) in [('country','id'),('biobank','name'),('parent_collection','id')]:
         if col in df:
             df[col] = df[col].map(lambda x: x[attr] if type(x) is dict and attr in x else x)
@@ -253,4 +265,5 @@ if args.outputXLSX is not None:
 	pd_covidExistingDiagnosed.to_excel(writer, sheet_name='COVID Diagnosed')
 	pd_covidExistingControls.to_excel(writer, sheet_name='COVID Controls')
 	pd_covidProspective.to_excel(writer, sheet_name='COVID Prospective')
+	pd_covidOther.to_excel(writer, sheet_name='COVID Other')
 	writer.save()
