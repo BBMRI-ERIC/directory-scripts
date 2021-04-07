@@ -75,6 +75,10 @@ python3 data-check.py -d --purge-all-caches
 - **mission-cancer-exporter.py** - statistics generator for cancer biobanks
 - **pediatric-exporter.py** - statistics generator for pediatric biobanks/collections
 - **diagnosis-exporter.py** - dumper of diagnosis information from the directory, used for development purposes only  
-``
-./diagnosis-exporter.py -d >diagnosis-exporter.log 2>&1
-``
+  - `./diagnosis-exporter.py -d >diagnosis-exporter.log 2>&1`
+- **full-text-search.py** - fulltext search of the Directory using Whoosh library with Lucene search syntax. Examples of use
+  - `./full-text-search.py 'bbmri-eric:ID:UK_GBR-1-101'`
+  - `./full-text-search.py '"Cell therapy"~3'`
+  - `./full-text-search.py '*420*'`
+  - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
+
