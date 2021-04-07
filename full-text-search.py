@@ -64,6 +64,9 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
 	    os.makedirs(indexdir)
 
 	my_ana = StemmingAnalyzer() | CharsetFilter(accent_map)
+	# this tokenizer allows for searching on full IDs as well as on components between : chars
+	# however, in search there is a problem with searching for : chars - escaping does not work, hence introduced the hack below to replace : with ?
+	# uncommenting LoggingFilter() and running the script with -d allows for debugging the tokenization
 	my_id_ana = RegexTokenizer(expression=re.compile('[^ ]+')) | LowercaseFilter() | TeeFilter(PassFilter(), IntraWordFilter(delims=u':',splitnums=False) | StopFilter(stoplist=frozenset(['bbmri-eric', 'id', 'contactid', 'networkid', 'collection']))) # | LoggingFilter()
 	schema = Schema(id=TEXT(stored=True,analyzer=my_id_ana), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana))
 	ix = create_in(indexdir, schema)
