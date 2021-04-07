@@ -15,7 +15,8 @@ from directory import Directory
 
 from whoosh.index import create_in
 from whoosh.fields import *
-from whoosh.analysis import CharsetFilter, StemmingAnalyzer
+from whoosh.analysis import *
+from whoosh.query import *
 from whoosh.support.charset import accent_map
 
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
@@ -60,7 +61,8 @@ if not os.path.exists(indexdir):
     os.makedirs(indexdir)
 
 my_ana = StemmingAnalyzer() | CharsetFilter(accent_map)
-schema = Schema(id=TEXT(stored=True), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana))
+my_id_ana = RegexTokenizer(expression=re.compile('[^ ]+')) | LowercaseFilter() | TeeFilter(PassFilter(), IntraWordFilter(delims=u':',splitnums=False) | StopFilter(stoplist=frozenset(['bbmri-eric', 'id', 'contactid', 'networkid', 'collection']))) # | LoggingFilter()
+schema = Schema(id=TEXT(stored=True,analyzer=my_id_ana), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana))
 ix = create_in(indexdir, schema)
 writer = ix.writer()
 
@@ -97,8 +99,10 @@ matchingContacts = {}
 
 from whoosh.qparser import QueryParser,MultifieldParser
 with ix.searcher() as searcher:
-	#query = QueryParser("name", ix.schema).parse("Masaryk")
-	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_name", "address"], ix.schema).parse(" ".join(args.searchQuery))
-	results = searcher.search(query)
+	searchq = " ".join(args.searchQuery)
+	# XXX: this is a hack workaround around escaping of : character that does not work properly
+	searchq = re.sub(r':', '?', searchq)
+	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_name", "address"], ix.schema).parse(searchq)
+	results = searcher.search(query, limit=None)
 	for r in results:
 		print(r)
