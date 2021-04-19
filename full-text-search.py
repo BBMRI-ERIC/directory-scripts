@@ -68,7 +68,7 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
 	# however, in search there is a problem with searching for : chars - escaping does not work, hence introduced the hack below to replace : with ?
 	# uncommenting LoggingFilter() and running the script with -d allows for debugging the tokenization
 	my_id_ana = RegexTokenizer(expression=re.compile('[^ ]+')) | LowercaseFilter() | TeeFilter(PassFilter(), IntraWordFilter(delims=u':',splitnums=False) | StopFilter(stoplist=frozenset(['bbmri-eric', 'id', 'contactid', 'networkid', 'collection']))) # | LoggingFilter()
-	schema = Schema(id=TEXT(stored=True,analyzer=my_id_ana), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana))
+	schema = Schema(id=TEXT(stored=True,analyzer=my_id_ana), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana),contact_id=TEXT(analyzer=my_id_ana))
 	ix = create_in(indexdir, schema)
 	writer = ix.writer()
 
@@ -79,11 +79,19 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
 		log.debug("Analyzing collection " + collection['id'])
 		biobankId = dir.getCollectionBiobank(collection['id'])
 		biobank = dir.getBiobankById(biobankId)
-		writer.add_document(id=collection['id'], type=u"COLLECTION", name=collection.get('name'), description=collection.get('description'), acronym=collection.get('acronym'), bioresource_reference=collection.get('bioresource_reference'), head_name=getFullName(collection))
+		contactId = None
+		if 'contact' in collection:
+			contactId = collection['contact']['id']
+		elif 'contact' in biobank:
+			contactId = biobank['contact']['id']
+		writer.add_document(id=collection['id'], type=u"COLLECTION", name=collection.get('name'), description=collection.get('description'), acronym=collection.get('acronym'), bioresource_reference=collection.get('bioresource_reference'), head_name=getFullName(collection), contact_id=contactId)
 
 	for biobank in dir.getBiobanks():
 		log.debug("Analyzing biobank " + biobank['id'])
-		writer.add_document(id=biobank['id'], type=u"BIOBANK", name=biobank.get('name'), description=biobank.get('description'), acronym=biobank.get('acronym'), juridical_person=biobank.get('juridical_person'), bioresource_reference=biobank.get('bioresource_reference'), head_name=getFullName(biobank))
+		contactId = None
+		if 'contact' in biobank:
+			contactId = biobank['contact']['id']
+		writer.add_document(id=biobank['id'], type=u"BIOBANK", name=biobank.get('name'), description=biobank.get('description'), acronym=biobank.get('acronym'), juridical_person=biobank.get('juridical_person'), bioresource_reference=biobank.get('bioresource_reference'), head_name=getFullName(biobank), contact_id=contactId)
 
 	for contact in dir.getContacts():
 		log.debug("Analyzing contact " + contact['id'])
@@ -103,7 +111,7 @@ with ix.searcher() as searcher:
 	searchq = " ".join(args.searchQuery)
 	# XXX: this is a hack workaround around escaping of : character that does not work properly
 	searchq = re.sub(r':', '?', searchq)
-	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_name", "address"], ix.schema).parse(searchq)
+	query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_name", "address", "contact_id"], ix.schema).parse(searchq)
 	results = searcher.search(query, limit=None)
 	for r in results:
 		print(r)
