@@ -65,45 +65,58 @@ class AccessPolicies(IPlugin):
 			# DUO specific checks
 							
 			if not DUOs:
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No Data Use Ontology (DUO) term provided"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "No Data Use Ontology (DUO) term provided in data_use attribute"))
+
+			# aux routine to translate DUO codes to URLs
+			def DUOs_to_url(DUO_list):
+				if not isinstance(DUO_list, list):
+					DUO_list = [ DUO_list ]
+				replacements = [
+						(r':', '_'),
+						(r'^', 'http://purl.obolibrary.org/obo/'),
+						]
+				DUO_urls = DUO_list
+				for s, t in replacements:
+					DUO_urls = [re.sub(s, t, i) for i in DUO_urls]
+				return " ".join(DUO_urls)
 
 			# Generic checks on allowing research
 			DUO_terms_research = ['DUO:0000007', 'DUO:0000006', 'DUO:0000042']
 			if  not any(x in DUOs for x in DUO_terms_research):
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"None of generic research use purposes provided ({DUO_terms_research}) - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"None of generic research use purposes provided ({DUO_terms_research}) in data_use attribute - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes. DUO documentation available at {DUOs_to_url(DUO_terms_research)}"))
 
 			# description of data reuse policy based on BBMRI-ERIC Access Policy
 			DUO_term_data_return = 'DUO:0000029'
 			if  not DUO_term_data_return in DUOs:
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Data return is not required (missing {DUO_term_data_return}) - it is recommended for biobanks to support it based on BBMRI-ERIC Access policy (but not required)"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Data return is not required (missing {DUO_term_data_return}) in data_use attribute - it is recommended for biobanks to support it based on BBMRI-ERIC Access policy (but not required). DUO documentation available at {DUOs_to_url(DUO_term_data_return)}"))
 
 			# checks on different modes of collaboration - this is still a bit messy as DUO does not fit perfectly to our needs
 			DUO_term_joint_project = 'DUO:0000020'
 			if any((x in collection and collection[x] == True) for x in ['sample_access_joint_project', 'data_access_joint_project', 'image_joint_projects']) and DUO_term_joint_project not in DUOs:
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Joint projects for sample/data/image access specified and {DUO_term_joint_project} is not specified"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Joint projects for sample/data/image access specified and {DUO_term_joint_project} is not specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term_joint_project)}"))
 
 			# DUO term DUO:0000018 seems not only to allow non-for-profit collaboration, but also forbids commercial collaboration
 			for attributes,negative_attributes,DUO_term in [(['collaboration_non_for_profit'], ['collaboration_commercial'], 'DUO:0000018')]:
 				if any((x in collection and collection[x] == True) for x in attributes) and not (any((x in collection and collection[x] == True) for x in negative_attributes) or any((x not in collection and x in biobank and biobank[x] == True) for x in negative_attributes)) and DUO_term not in DUOs:
-					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on collection level but '{DUO_term}' is not specified (may be however intentional)"))
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on collection level but '{DUO_term}' is not specified in data_use attribute (may be however intentional). DUO documentation available at {DUOs_to_url(DUO_term)}"))
 				elif any((x not in collection and x in biobank and biobank[x] == True) for x in attributes) and not (any((x in collection and collection[x] == True) for x in negative_attributes) or any((x not in collection and x in biobank and biobank[x] == True) for x in negative_attributes)) and DUO_term not in DUOs:
-					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on biobank level and not overridden on collection but '{DUO_term}' is not specified (may be however intentional)"))
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on biobank level and not overridden on collection but '{DUO_term}' is not specified in data_use attribute (may be however intentional). DUO documentation available at {DUOs_to_url(DUO_term)}"))
 
 			for attributes,negative_DUO_term in [(['collaboration_commercial'], 'DUO:0000018')]:
 				if any((x in collection and collection[x] == True) for x in attributes) and negative_DUO_term in DUOs:
-					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on collection level but conflicting '{DUO_term}' is specified"))
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on collection level but conflicting '{DUO_term}' is specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term)}"))
 				elif any((x not in collection and x in biobank and biobank[x] == True) for x in attributes) and negative_DUO_term in DUOs:
-					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on biobank level and not overridden on collection but conflicting '{DUO_term}' is specified"))
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"At least one of {attributes} specified on biobank level and not overridden on collection but conflicting '{DUO_term}' is specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term)}"))
 
 			# DUO term DUO:0000007 is potentially relevant for DISEASE_SPECIFIC collections
 			DUO_term_disease_specific = 'DUO:0000007'
 			if 'DISEASE_SPECIFIC' in collection_types and DUO_term_disease_specific not in DUOs:
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Collection is disease specific but '{DUO_term_disease_specific}' is not specified (may be false-positive)"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Collection is disease specific but '{DUO_term_disease_specific}' is not specified in data_use attribute (may be false-positive). DUO documentation available at {DUOs_to_url(DUO_term_disease_specific)}"))
 
 			# DUO term DUO:0000021 (ethics approval needed) is usually needed for reuse of human biological material
 			DUO_term_ethics_needed = 'DUO:0000021'
 			if materials and DUO_term_ethics_needed not in DUOs:
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Collection contains biological material types '{materials}' but ethics approval needed '{DUO_term_ethics_needed}' is not specified (may be false-positive)"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"Collection contains biological material types '{materials}' but ethics approval needed '{DUO_term_ethics_needed}' is not specified in data_use attribute (may be false-positive). DUO documentation available at {DUOs_to_url(DUO_term_ethics_needed)}"))
 
 
 		return warnings

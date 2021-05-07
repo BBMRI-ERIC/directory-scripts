@@ -81,4 +81,5 @@ python3 data-check.py -d --purge-all-caches
   - `./full-text-search.py '"Cell therapy"~3'`
   - `./full-text-search.py '*420*'`
   - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
+  - `./full-text-search.py 'myID' | perl -ne "while(<>) {if(m/^.*?'id':\s+'(.+?)'.*$/) {print \$1 . \"\n\";}}"`
 
