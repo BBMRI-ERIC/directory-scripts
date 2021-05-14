@@ -14,7 +14,7 @@ class AccessPolicies(IPlugin):
 		for biobank in dir.getBiobanks():
 			if((not 'collaboration_commercial' in biobank or biobank['collaboration_commercial'] == False) and
 					(not 'collaboration_non_for_profit' in biobank or biobank['collaboration_non_for_profit'] == False)):
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank is available neither for commercial nor for non-for-profit collaboration"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank is available neither for commercial nor for non-for-profit collaboration"))
 
 		for collection in dir.getCollections():
 
