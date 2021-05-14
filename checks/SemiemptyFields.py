@@ -21,7 +21,7 @@ class SemiemptyFields(IPlugin):
 		log.info("Running empty or semi-empty fields checks (SemiemptyFields)")
 		for biobank in dir.getBiobanks():
 			if not 'description' in biobank or re.search('^\s*$', biobank['description']) or re.search('^\s*N/?A\s*$', biobank['description']):
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Missing description for biobank ('description' attribute is empty for the biobank)"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, "Missing description for biobank ('description' attribute is empty for the biobank)"))
 			if 'description' in biobank and descriptionTooShort(biobank['description']):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, f"Suspiciously short description for biobank ('description' attribute {biobank['description']} has less than {str(minDescWords)} words)"))
 			if not 'name' in biobank or re.search('^\s*$', biobank['name']) or re.search('^\s*N/?A\s*$', biobank['name']):
