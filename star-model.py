@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=8:sw=8:tw=0:noet
+# vim:ts=4:sw=4:tw=0:et
 
 from typing import List
 
@@ -67,5 +67,9 @@ for collection in dir.getCollections():
             print(f"Subcollections of parent collection {collection['id']} - {collection['name']}")
             for subcollection_Id in subcollection_graph.successors(collection['id']):
                 subcollection = dir.getCollectionById(subcollection_Id)
-                print(f"{subcollection_Id} - {subcollection['name']}")
+                if collection['name'].lower() in subcollection['name'].lower():
+                    data_element = re.sub(re.escape(collection['name'] + ' - '), '', subcollection['name'], flags=re.IGNORECASE)
+                    print(f"{subcollection_Id} - Data element: {data_element}")
+                else:
+                    print(f"{subcollection_Id} - Name: {subcollection['name']}")
             print("")
