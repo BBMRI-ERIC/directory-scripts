@@ -7,6 +7,8 @@ import logging as log
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
 
+from directory import Directory
+
 class AccessPolicies(IPlugin):
 	def check(self, dir, args):
 		warnings = []
@@ -18,25 +20,16 @@ class AccessPolicies(IPlugin):
 
 		for collection in dir.getCollections():
 
+			materials = Directory.getListOfEntityAttributeIds(collection, 'materials')
+			collection_types = Directory.getListOfEntityAttributeIds(collection, 'type')
+			DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use')
 			data_categories = []
-			materials = []
-			collection_types = []
 			other_data = False
-			DUOs = []
 			if 'data_categories' in collection:
 				for c in collection['data_categories']:
 					data_categories.append(c['id'])
 					if ('BIOLOGICAL_SAMPLES' != c['id'] and 'IMAGING_DATA' != c['id']):
 						other_data = True
-			if 'materials' in collection:
-				for c in collection['materials']:
-					materials.append(c['id'])
-			if 'type' in collection:
-				for t in collection['type']:
-					collection_types.append(t['id'])
-			if 'data_use' in collection:
-				for t in collection['data_use']:
-					DUOs.append(t['id'])
 
 			biobankId = dir.getCollectionBiobank(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
