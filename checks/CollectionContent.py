@@ -6,6 +6,8 @@ import logging as log
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
 
+from directory import Directory
+
 class CollectionContent(IPlugin):
 	def check(self, dir, args):
 		warnings = []
@@ -13,21 +15,10 @@ class CollectionContent(IPlugin):
 		orphacodes = dir.getOrphaCodesMapper()
 		for collection in dir.getCollections():
 			OoM = collection['order_of_magnitude']['id']
+			materials = Directory.getListOfEntityAttributeIds(collection, 'materials')
+			data_categories = Directory.getListOfEntityAttributeIds(collection, 'data_categories')
+			types = Directory.getListOfEntityAttributeIds(collection, 'type')
 
-			materials = []
-			if 'materials' in collection:
-				for m in collection['materials']:
-					materials.append(m['id'])
-			
-			data_categories = []
-			if 'data_categories' in collection:
-				for c in collection['data_categories']:
-					data_categories.append(c['id'])
-
-			types = []
-			if 'type' in collection:
-				for t in collection['type']:
-					types.append(t['id'])
 			diags = []
 			diags_icd10 = []
 			diags_orpha = []

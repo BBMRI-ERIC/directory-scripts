@@ -56,3 +56,16 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
 for collection in dir.getCollections():
     log.info(f"Collection ID: {collection['id']}")
+    if re.search('^bbmri-eric:ID:AT_MUG:collection:', collection['id']):
+        subcollections = dir.getCollectionsDescendants(collection['id'])
+        if len(subcollections) > 0:
+            # just parent biobank ID
+            biobankId = dir.getCollectionBiobank(collection['id'])
+            # get the whole subgraph of ancestors, current collection and its descendants
+            subcollection_graph = dir.getGraphBiobankCollectionsFromCollection(collection['id'])
+
+            print(f"Subcollections of parent collection {collection['id']} - {collection['name']}")
+            for subcollection_Id in subcollection_graph.successors(collection['id']):
+                subcollection = dir.getCollectionById(subcollection_Id)
+                print(f"{subcollection_Id} - {subcollection['name']}")
+            print("")

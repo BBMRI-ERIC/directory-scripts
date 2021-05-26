@@ -1,6 +1,6 @@
 # BBMRI-ERIC Directory Validation Scripts
 ## Requirements
-- Python 3.6
+- Python >= 3.6
 - The following python packages:
   - networkx
   - geopy
@@ -21,12 +21,6 @@ python3 -m ensurepip
   ``
 nameserver 8.8.8.8
 ``
-- Create the diskcache directories:  
-  ``
-mkdir -p data-quality-cache/directory
-mkdir -p data-quality-cache/geolocator
-mkdir -p data-quality-cache/emails
-``	
 - Download the MOLGENIS Python API library:  
   ``
 pip3 install molgenis-py-client

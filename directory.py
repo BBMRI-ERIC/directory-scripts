@@ -226,9 +226,9 @@ class Directory:
 	def getBiobanks(self):
 		return self.biobanks
 
-	def getBiobankById(self, biobankID : str):
+	def getBiobankById(self, biobankId : str):
 		for b in self.biobanks:
-			if b['id'] == biobankID:
+			if b['id'] == biobankId:
 				return b
 
 	def getBiobanksCount(self):
@@ -245,6 +245,11 @@ class Directory:
 
 	def getCollections(self):
 		return self.collections
+
+	def getCollectionById(self, collectionId : str):
+		for c in self.collections:
+			if c['id'] == collectionId:
+				return c
 
 	def getCollectionsCount(self):
 		return len(self.collections)
@@ -266,7 +271,7 @@ class Directory:
 		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.ancestors(self.directoryCollectionsDAG, collectionID).union(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)).union({collectionID}))
 
 	def getCollectionsDescendants(self, collectionID : str):
-		return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID))
+		return nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)
 
 	def getContacts(self):
 		return self.contacts
@@ -289,3 +294,6 @@ class Directory:
 		else:
 			NN = "EU"
 		return NN
+
+	def getListOfEntityAttributeIds(entity, key : str):
+		return [ element['id'] for element in entity[key] ] if key in entity else []
