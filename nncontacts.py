@@ -12,7 +12,6 @@ class NNContacts:
 			'EE' : 'andres.metspalu@ut.ee, kristjan.metsalu@ut.ee',
 			'EU' : 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl',
 			'FI' : 'marco.hautalahti@finbb.fi, pauli.wihuri@finbb.fi',
-			'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
 			'GR' : 's.kolyva@pasteur.gr, thanos@bioacademy.gr, koumakis@ics.forth.gr',
 			'IT' : 'marialuisa.lavitrano@unimib.it, luciano.milanesi@itb.cnr.it, barbara.parodi@hsanmartino.it, elena.bravo@iss.it, matteo.gnocchi@itb.cnr.it, marco.moscatelli@itb.cnr.it',
 			'LV' : 'klovins@biomed.lu.lv, vita@biomed.lu.lv, inese.polaka@rtu.lv, linda.zaharenko@biomed.lu.lv',
@@ -22,8 +21,9 @@ class NNContacts:
 			'PL' : 'dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl, andrzej.strug@gumed.edu.pl, aklis@bee2code.com',
 			'SE' : 'tobias.sjoblom@igp.uu.se',
 			'TR' : 'nese.atabey@ibg.edu.tr',
-			'UK' : 'philip.quinlan@nottingham.ac.uk, jurgen.mitsch@nottingham.ac.uk',
+			'UK' : 'contact@biobankinguk.org',
 			'IARC' : 'kozlakidisz@iarc.fr',
 			}
 
 			# 'NL' : 'e.j.van.enckevort@rug.nl, g.meijer@nki.nl, a.vanderlugt@erasmusmc.nl, m.a.swertz@gmail.com;',
+			# 'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
