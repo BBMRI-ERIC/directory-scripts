@@ -15,7 +15,7 @@ import xlsxwriter
 import pandas as pd
 
 from directory import Directory
-import dfutils
+import pddfutils
 
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
@@ -245,7 +245,7 @@ if not args.nostdout:
 	print("- total number of samples advertised in COVID-relevant collections including OoM estimates: %d"%(covidCollectionSamplesIncOoM))
 
 for df in (pd_covidExistingDiagnosed,pd_covidProspective,pd_covidOther):
-    dfutils.tidyCollectionDf(df)
+    pddfutils.tidyCollectionDf(df)
 
 covidOnlyCollectionIDs = [c['id'] for c in covidOnlyExistingDiagnosed]
 pd_covidExistingDiagnosed['COVID_only'] = pd_covidExistingDiagnosed['id'].map(lambda x: True if x in covidOnlyCollectionIDs else False)

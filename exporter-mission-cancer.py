@@ -14,7 +14,7 @@ import pandas as pd
 from directory import Directory
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
-import dfutils
+import pddfutils
 
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
@@ -383,7 +383,7 @@ if not args.nostdout:
         pediatricCancerCollectionSamplesIncOoM))
 
 for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed): 
-    dfutils.tidyCollectionDf(df)
+    pddfutils.tidyCollectionDf(df)
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
