@@ -271,10 +271,13 @@ for df in (pd_pediatricExistingDiagnosed, pd_pediatricOnlyExistingDiagnosed):
     for col in ('order_of_magnitude','order_of_magnitude_donors'):
         if col in df:
             df[col] = df[col].map(lambda x: "%d (%s)"%(x['id'],x['size']) if type(x) is dict else x)
-    for col in ('type','also_known','data_categories','standards','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','quality','sub_collections','data_use'):
+    for col in ('type','also_known','data_categories','quality','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','sub_collections','data_use'):
         df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
     df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )
-    del df['contact_priority']
+    df['contact_email'] = df['contact'].apply(lambda c: c['email'])
+    df['contact_name'] = df['contact'].apply(lambda c: " ".join([x for x in [c.get('first_name'), c.get('last_name')] if x]))
+    df['contact_name_with_titles'] = df['contact'].apply(lambda c: " ".join([x for x in [c.get('title_before_name'), c.get('first_name'), c.get('last_name'), c.get('title_after_name')] if x]))
+    #del df['contact_priority']
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
