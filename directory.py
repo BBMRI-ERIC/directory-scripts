@@ -258,6 +258,10 @@ class Directory:
 		collection = self.directoryGraph.nodes[collectionID]['data']
 		return collection['biobank']['id']
 
+	def getCollectionContact(self, collectionID : str):
+		collection = self.directoryGraph.nodes[collectionID]['data']
+		return self.contactHashmap[collection['contact']['id']]
+
 	def getCollectionNN(self, collectionID):
 		# TODO: handle IARC!
 		return self.getBiobankNN(self.getCollectionBiobank(collectionID))
