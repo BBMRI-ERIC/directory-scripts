@@ -35,6 +35,6 @@ def tidyCollectionDf (df : pd.DataFrame):
 def tidyBiobankDf (df : pd.DataFrame):
     linearizeStructures(df, [('country','id'), ('network','name'), ('covid19biobank','id'), ('capabilities','id'), ('quality','id')])
     extractContactDetails(df)
-    for c in ['it_support_available', 'it_staff_size', 'is_available', 'his_available', 'partner_charter_signed', 'collections', 'contact']:
+    for c in ['it_support_available', 'it_staff_size', 'is_available', 'his_available', 'partner_charter_signed', 'collections']:
         del df[c]
             

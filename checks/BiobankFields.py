@@ -22,4 +22,7 @@ class BiobankFields(IPlugin):
 			if not 'head_role' in biobank or re.search('^\s*$', biobank['head_role']):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], DataCheckEntityType.BIOBANK, "Missing head person role ('head_role' attribute is empty)"))
 
+			if 'contact'  not in biobank or type(biobank['contact']) is not dict:
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Missing valid contact for the biobank"))
+
 		return warnings
