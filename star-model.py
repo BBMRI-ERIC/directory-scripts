@@ -60,7 +60,7 @@ for collection in dir.getCollections():
         subcollections = dir.getCollectionsDescendants(collection['id'])
         if len(subcollections) > 0:
             # just parent biobank ID
-            biobankId = dir.getCollectionBiobank(collection['id'])
+            biobankId = dir.getCollectionBiobankId(collection['id'])
             # get the whole subgraph of ancestors, current collection and its descendants
             subcollection_graph = dir.getGraphBiobankCollectionsFromCollection(collection['id'])
 

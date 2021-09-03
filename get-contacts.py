@@ -66,7 +66,7 @@ contactsToEmails = {}
 for collection in dir.getCollections():
 	log.debug("Analyzing collection " + collection['id'])
 	collectionId = collection['id']
-	biobankId = dir.getCollectionBiobank(collection['id'])
+	biobankId = dir.getCollectionBiobankId(collection['id'])
 	biobank = dir.getBiobankById(biobankId)
 	if 'contact' in collection:
 		contactId = collection['contact']['id']
@@ -90,7 +90,7 @@ for collection in dir.getCollections():
 def printCollectionStdout(collectionList : List, headerStr : str):
 	print(headerStr + " - " + str(len(collectionList)) + " collections")
 	for collection in collectionList:
-		biobankId = dir.getCollectionBiobank(collection['id'])
+		biobankId = dir.getCollectionBiobankId(collection['id'])
 		biobank = dir.getBiobankById(biobankId)
 		print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'])
 
@@ -124,7 +124,7 @@ if args.outputXLSX is not None:
 		worksheet.write_string(worksheet_row, 0, c)
 		worksheet.write_string(worksheet_row, 1, contactsToEmails[c])
 		worksheet.write_string(worksheet_row, 2, "\n".join(contactsToCollections[c]), wrapped_cell_format)
-		correspondingNNs = {dir.getBiobankNN(dir.getCollectionBiobank(collection)) for collection in contactsToCollections[c]}
+		correspondingNNs = {dir.getBiobankNN(dir.getCollectionBiobankId(collection)) for collection in contactsToCollections[c]}
 		if len(correspondingNNs) > 1:
 			log.warn("Multiple national nodes found for contact %s: %s"%(c, ",".join(correspondingNNs)))
 		elif len(correspondingNNs) == 1: 

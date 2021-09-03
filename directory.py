@@ -254,7 +254,7 @@ class Directory:
 	def getCollectionsCount(self):
 		return len(self.collections)
 
-	def getCollectionBiobank(self, collectionID : str):
+	def getCollectionBiobankId(self, collectionID : str):
 		collection = self.directoryGraph.nodes[collectionID]['data']
 		return collection['biobank']['id']
 
@@ -264,7 +264,7 @@ class Directory:
 
 	def getCollectionNN(self, collectionID):
 		# TODO: handle IARC!
-		return self.getBiobankNN(self.getCollectionBiobank(collectionID))
+		return self.getBiobankNN(self.getCollectionBiobankId(collectionID))
 
 	# return the whole subgraph including the biobank itself
 	def getGraphBiobankCollectionsFromBiobank(self, biobankID : str):

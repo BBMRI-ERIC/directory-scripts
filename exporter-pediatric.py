@@ -79,7 +79,7 @@ pediatricOnlyCollectionSamplesIncOoM = 0
 
 for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
-    biobankId = dir.getCollectionBiobank(collection['id'])
+    biobankId = dir.getCollectionBiobankId(collection['id'])
     biobank = dir.getBiobankById(biobankId)
     biobank_capabilities = []
     if 'capabilities' in biobank:
@@ -239,7 +239,7 @@ pd_pediatricOnlyExistingDiagnosed = pd.DataFrame(pediatricOnlyExistingDiagnosed)
 def printCollectionStdout(collectionList: List, headerStr: str):
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
-        biobankId = dir.getCollectionBiobank(collection['id'])
+        biobankId = dir.getCollectionBiobankId(collection['id'])
         biobank = dir.getBiobankById(biobankId)
         log.info("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " + biobankId + " - " + biobank['name'])
 

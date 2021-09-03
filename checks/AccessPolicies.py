@@ -31,7 +31,7 @@ class AccessPolicies(IPlugin):
 					if ('BIOLOGICAL_SAMPLES' != c['id'] and 'IMAGING_DATA' != c['id']):
 						other_data = True
 
-			biobankId = dir.getCollectionBiobank(collection['id'])
+			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
 			
 			if 'BIOLOGICAL_SAMPLES' in data_categories:

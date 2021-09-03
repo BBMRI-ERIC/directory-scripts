@@ -18,7 +18,7 @@ class COVID(IPlugin):
 		biobankHasCovidControls = {}
 
 		for collection in dir.getCollections():
-			biobankId = dir.getCollectionBiobank(collection['id'])
+			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
 			biobank_capabilities = []
 			if 'capabilities' in biobank:

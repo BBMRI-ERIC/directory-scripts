@@ -90,7 +90,7 @@ class BiobankGeo(IPlugin):
 								country_code = location.raw['address']['country_code']
 								cache[loc_string] = country_code
 							logMessage += " -> OK"
-							biobankId = dir.getCollectionBiobank(collection['id'])
+							biobankId = dir.getCollectionBiobankId(collection['id'])
 							biobank = dir.getBiobankById(biobankId)
 							if ((biobank['country']['id'] != "IARC" and biobank['country']['id'] != "EU") and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):

@@ -61,7 +61,7 @@ countryCollections = {}
 for collection in dir.getCollections():
 	collectionId = collection['id']
 	log.debug("Analyzing collection " + collectionId)
-	biobankId = dir.getCollectionBiobank(collectionId)
+	biobankId = dir.getCollectionBiobankId(collectionId)
 	biobank = dir.getBiobankById(biobankId)
 	NN = dir.getBiobankNN(biobankId)
 	if not NN in countryBiobanks:

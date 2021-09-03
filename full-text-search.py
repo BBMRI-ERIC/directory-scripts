@@ -77,7 +77,7 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
 
 	for collection in dir.getCollections():
 		log.debug("Analyzing collection " + collection['id'])
-		biobankId = dir.getCollectionBiobank(collection['id'])
+		biobankId = dir.getCollectionBiobankId(collection['id'])
 		biobank = dir.getBiobankById(biobankId)
 		contactId = None
 		if 'contact' in collection:
