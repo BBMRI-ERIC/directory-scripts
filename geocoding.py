@@ -41,7 +41,7 @@ config.read(args.configFile)
 if 'biobankProperties' in config['Biobank config']:
     biobankInputFeatures = config['Biobank config']['biobankProperties'].split(',')
 else:
-    biobankInputFeatures = ['biobankID','biobankName','biobankType','covid19biobank']
+    biobankInputFeatures = ['biobankID','biobankName','biobankType','covid19biobank','biobankSize']
 
 
 ###############
@@ -109,11 +109,18 @@ for biobank in dir.getBiobanks():
     biobankPropertiesDict = {}
     if 'biobankID' in biobankInputFeatures:
         biobankPropertiesDict['biobankID'] = biobank['id']
-    biobankPropertiesDict['biobankSize'] = len(biobank['collections']) # NOTE: FIX THIS!!
+    if 'biobankSize' in biobankInputFeatures:
+        try:
+            biobankPropertiesDict['biobankSize'] = max(int(coll['order_of_magnitude']['id']) for coll in biobank['collections'])
+        except ValueError:
+            pass
     if 'biobankName' in biobankInputFeatures:
         biobankPropertiesDict['biobankName'] = biobank['name']
     if 'biobankType' in biobankInputFeatures:
         biobankPropertiesDict['biobankType'] = 'biobank' ### DEFAULT
+
+
+
 
     if 'covid19biobank' in biobankInputFeatures and 'covid19biobank' in biobank.keys():
         biobankCOVID = []
