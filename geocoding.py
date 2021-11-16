@@ -1,4 +1,7 @@
 #!/usr/bin/python3
+"""
+Script for creating geoJSON
+"""
 
 #############
 ## Imports ##
@@ -12,9 +15,9 @@ import sys
 import json
 import configparser
 import os
+import pdoc
 from geopy.geocoders import Nominatim
 from dms2dec.dms_convert import dms2dec
-from diskcache import Cache
 
 # Internal
 from directory import Directory
@@ -88,9 +91,6 @@ if args.username is not None and args.password is not None:
 	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
 	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
-
-cache_dir = 'data-check-cache/directory'
-cache = Cache(cache_dir)
 
 sys.stdout.reconfigure(encoding='utf-8') # NOTE: Needed on Windows to redirect strout
 
@@ -167,5 +167,3 @@ for biobank in dir.getBiobanks():
 outFile = args.outName + '.geojson'
 with open(outFile, 'w') as outfile:
     json.dump(features, outfile, indent=4)
-
-cache.close()
