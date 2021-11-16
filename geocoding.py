@@ -46,6 +46,10 @@ if 'biobankProperties' in config['Biobank config']:
 else:
     biobankInputFeatures = ['biobankID','biobankName','biobankType','covid19biobank','biobankSize']
 
+if 'biobanksNameSkip' in config['Skip biobank']:
+    biobanksNameSkip = config['Skip biobank']['biobanksNameSkip'].split(',')
+else:
+    biobanksNameSkip = []
 
 ###############
 ## Functions ##
@@ -103,64 +107,66 @@ geolocator = Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change
 
 # Get biobanks from Directory:
 for biobank in dir.getBiobanks():
-    biobankDict = {}
+    if biobank['name'] not in biobanksNameSkip:
+        biobankDict = {}
 
-    # Biobank properties:
-    biobankPropertiesDict = {}
-    if 'biobankID' in biobankInputFeatures:
-        biobankPropertiesDict['biobankID'] = biobank['id']
-    if 'biobankSize' in biobankInputFeatures:
-        try:
-            biobankPropertiesDict['biobankSize'] = max(int(coll['order_of_magnitude']['id']) for coll in biobank['collections'])
-        except ValueError:
-            pass
-    if 'biobankName' in biobankInputFeatures:
-        biobankPropertiesDict['biobankName'] = biobank['name']
-    if 'biobankType' in biobankInputFeatures:
-        biobankPropertiesDict['biobankType'] = 'biobank' ### DEFAULT
+        # Biobank properties:
+        biobankPropertiesDict = {}
+        if 'biobankID' in biobankInputFeatures:
+            biobankPropertiesDict['biobankID'] = biobank['id']
+        if 'biobankSize' in biobankInputFeatures:
+            try:
+                biobankPropertiesDict['biobankSize'] = max(int(coll['order_of_magnitude']['id']) for coll in biobank['collections'])
+            except ValueError:
+                pass
+        if 'biobankName' in biobankInputFeatures:
+            biobankPropertiesDict['biobankName'] = biobank['name']
+        if 'biobankType' in biobankInputFeatures:
+            biobankPropertiesDict['biobankType'] = 'biobank' ### DEFAULT
 
+        if 'covid19biobank' in biobankInputFeatures and 'covid19biobank' in biobank.keys():
+            biobankCOVID = []
+            for COVIDDict in biobank['covid19biobank']:
+                biobankCOVIDDict = {}
+                biobankCOVIDDict['_href']=COVIDDict['_href']
+                biobankCOVIDDict['id']=COVIDDict['id']
+                biobankCOVIDDict['name']=COVIDDict['name']
+                biobankCOVID.append(biobankCOVIDDict)
+            biobankPropertiesDict['biobankCOVID'] = biobankCOVID
 
+        biobankDict['properties'] = biobankPropertiesDict
 
+        biobankDict['type'] = 'Feature' ### DEFAULT
 
-    if 'covid19biobank' in biobankInputFeatures and 'covid19biobank' in biobank.keys():
-        biobankCOVID = []
-        for COVIDDict in biobank['covid19biobank']:
-            biobankCOVIDDict = {}
-            biobankCOVIDDict['_href']=COVIDDict['_href']
-            biobankCOVIDDict['id']=COVIDDict['id']
-            biobankCOVIDDict['name']=COVIDDict['name']
-            biobankCOVID.append(biobankCOVIDDict)
-        biobankPropertiesDict['biobankCOVID'] = biobankCOVID
+        # Biobank geometry:
+        biobankGeometryDict = {}
+        location = None
 
-    biobankDict['properties'] = biobankPropertiesDict
+        # Override biobank location through config file:
+        if biobank['name'] in config['Override biobank position'].keys():        
+            biobankGeometryDict['coordinates'] = [float(i) for i in config['Override biobank position'][biobank['name']].split(',')]
 
-    biobankDict['type'] = 'Feature' ### DEFAULT
-
-    # Biobank geometry:
-    biobankGeometryDict = {}
-    location = None
-
-    if 'longitude' in biobank.keys() and 'latitude' in biobank.keys():
-        if '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
-            biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
+        elif 'longitude' in biobank.keys() and 'latitude' in biobank.keys():
+            if '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
+                biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
+            else:
+                biobankGeometryDict['coordinates'] = [float(re.sub(r',', r'.', biobank['longitude'])), float(re.sub(r',', r'.', biobank['latitude']))]
+            print ('Coordinates provided')
+        elif 'contact' in biobank.keys():
+            lookForCoordinatesFeatures = ['address', 'zip', 'city', 'country']
+            location = lookForCoordinates(biobank, lookForCoordinatesFeatures)
+            if location:
+                biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
+                print ("(geodecoding done) ")
+            else:
+                print ("(geodecoding failed) ")
         else:
-            biobankGeometryDict['coordinates'] = [float(re.sub(r',', r'.', biobank['longitude'])), float(re.sub(r',', r'.', biobank['latitude']))]
-        print ('Coordinates provided')
-    elif 'contact' in biobank.keys():
-        lookForCoordinatesFeatures = ['address', 'zip', 'city', 'country']
-        location = lookForCoordinates(biobank, lookForCoordinatesFeatures)
-        if location:
-            biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
-            print ("(geodecoding done) ")
-        else:
-            print ("(geodecoding failed) ")
-    else:
-        print ("(geocoding skipped, no contact provided)")
+            print ("(geocoding skipped, no contact provided)")
 
-    biobankGeometryDict['type'] = 'Point' ### DEFAULT
-    biobankDict['geometry'] = biobankGeometryDict
+        biobankGeometryDict['type'] = 'Point' ### DEFAULT
+        biobankDict['geometry'] = biobankGeometryDict
 
-    features['features'].append(biobankDict)
+        features['features'].append(biobankDict)
 
 
 # Write geoJSON
