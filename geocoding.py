@@ -100,6 +100,7 @@ sys.stdout.reconfigure(encoding='utf-8') # NOTE: Needed on Windows to redirect s
 
 # Initialize main dictionary
 features = {}
+features['type'] = 'FeatureCollection'
 features['features'] = []
 
 # Get geolocator information
@@ -163,10 +164,14 @@ for biobank in dir.getBiobanks():
         else:
             print ("(geocoding skipped, no contact provided)")
 
-        biobankGeometryDict['type'] = 'Point' ### DEFAULT
-        biobankDict['geometry'] = biobankGeometryDict
+        # Skip biobank if not available coordinates:
+        if biobankGeometryDict:
+            biobankGeometryDict['type'] = 'Point' ### DEFAULT
+            biobankDict['geometry'] = biobankGeometryDict
 
-        features['features'].append(biobankDict)
+            features['features'].append(biobankDict)
+        else:
+            print ("Skipping " +' '+ str(biobank['name']))
 
 
 # Write geoJSON
