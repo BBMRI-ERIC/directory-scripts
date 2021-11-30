@@ -54,6 +54,9 @@ else:
 indexdir = "indexdir"
 
 
+# purging directory cache means the index cache should be purged as well - data has to be refreshed in the index, too
+if 'directory' in args.purgeCaches:
+        args.purgeCaches.add('index')
 if 'index' in args.purgeCaches or not os.path.exists(indexdir):
 	dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
