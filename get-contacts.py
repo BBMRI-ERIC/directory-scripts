@@ -7,11 +7,13 @@ from typing import List
 
 import pprint
 import re
+import string
 import argparse
 import logging as log
 import time
 from typing import List
 import os.path
+from nameparser import HumanName
 
 import xlsxwriter
 
@@ -91,7 +93,7 @@ if args.negotiator:
 			assert collectionId not in collectionsToContacts
 			collectionsToContacts[collectionId] = contactId
 		else:
-			log.warn("Collection %s does not provide contact information!"%(collectionId))
+			log.warning("Collection %s does not provide contact information!"%(collectionId))
 
 
 	def printCollectionStdout(collectionList : List, headerStr : str):
@@ -133,7 +135,7 @@ if args.negotiator:
 			worksheet.write_string(worksheet_row, 2, "\n".join(contactsToCollections[c]), wrapped_cell_format)
 			correspondingNNs = {dir.getBiobankNN(dir.getCollectionBiobankId(collection)) for collection in contactsToCollections[c]}
 			if len(correspondingNNs) > 1:
-				log.warn("Multiple national nodes found for contact %s: %s"%(c, ",".join(correspondingNNs)))
+				log.warning("Multiple national nodes found for contact %s: %s"%(c, ",".join(correspondingNNs)))
 			elif len(correspondingNNs) == 1: 
 				NN = correspondingNNs.pop()
 				if (NN not in turnedOffNNs):
@@ -146,7 +148,7 @@ if args.negotiator:
 					worksheet.write_string(worksheet_row, 3, NN)
 					worksheet.write_string(worksheet_row, 4, additionalContacts.replace(",",";"))
 			else:
-				log.warn("No national nodes found for contact %s"%(c))
+				log.warning("No national nodes found for contact %s"%(c))
 			worksheet_row += 1
 		workbook.close()
 
@@ -162,7 +164,14 @@ else:
 		activeContacts.add(contactId)
 		contact = dir.getContact(contactId)
 		contactsToEmails[contactId] = contact['email']
-		contactsToNames[contactId] = " ".join(filter(None,[contact.get('first_name'), contact.get('last_name')]))
+		name = " ".join(filter(None,[contact.get('title_before_name'), contact.get('first_name'), contact.get('last_name'), contact.get('title_after_name')]))
+		#name = name.translate(str.maketrans('', '', string.punctuation))
+		name = name.translate(str.maketrans('', '', '@'))
+		name = HumanName(name.lower().strip())
+		name.capitalize()
+		if re.search('^(\w\.)+$', name.first):
+			name.first = name.first.upper()
+		contactsToNames[contactId] = name.__str__()
 
 
 	for collection in dir.getCollections():
@@ -180,7 +189,7 @@ else:
 			else:
 				contactsToCollections[contactId] = [collectionId]
 		else:
-			log.warn("Collection %s does not provide contact information!"%(collectionId))
+			log.warning("Collection %s does not provide contact information!"%(collectionId))
 
 	for biobank in dir.getBiobanks():
 		log.debug("Analyzing biobank " + biobank['id'])
@@ -195,7 +204,7 @@ else:
 			else:
 				contactsToBiobanks[contactId] = [biobankId]
 		else:
-			log.warn("Biobank %s does not provide contact information!"%(biobankId))
+			log.warning("Biobank %s does not provide contact information!"%(biobankId))
 
 	uniqueEmails = {}
 	emailToNames = {}
@@ -204,7 +213,7 @@ else:
 		if email in uniqueEmails:
 			uniqueEmails[email].add(c)
 			if emailToNames[email] != contactsToNames[c]:
-				log.warn("Conflicting name found for the same email %s: %s, using existing %s"%(email,contactsToNames[c],emailToNames[email]))
+				log.warning("Conflicting name found for the same email %s: %s, using existing %s"%(email,contactsToNames[c],emailToNames[email]))
 		else:
 			uniqueEmails[email] = {c}
 			emailToNames[email] = contactsToNames[c]
