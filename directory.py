@@ -280,6 +280,9 @@ class Directory:
 	def getContacts(self):
 		return self.contacts
 
+	def getContact(self, contactID : str):
+		return self.contactHashmap[contactID]
+
 	def getContactNN(self, contactID : str):
 		# TODO: handle IARC!
 		return self.contactHashmap[contactID]['country']['id']
