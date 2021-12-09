@@ -16,7 +16,7 @@ import json
 import configparser
 import os
 import pdoc
-from geopy.geocoders
+import geopy.geocoders
 from dms2dec.dms_convert import dms2dec
 
 # Internal
