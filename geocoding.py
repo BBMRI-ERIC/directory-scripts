@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3.6
 """
 Script for creating geoJSON
 """
@@ -28,7 +28,7 @@ from directory import Directory
 
 parser = argparse.ArgumentParser()
 parser.add_argument('configFile', help='Provide config file') #NOTE: Provide better description.
-parser.add_argument('-o', '--outName', dest='outName', default='bbmri-directory', help='Output file name')
+parser.add_argument('-o', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
@@ -102,15 +102,13 @@ if args.username is not None and args.password is not None:
 else:
 	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
-sys.stdout.reconfigure(encoding='utf-8') # NOTE: Needed on Windows to redirect strout
-
 # Initialize main dictionary
 features = {}
 features['type'] = 'FeatureCollection'
 features['features'] = []
 
 # Get geolocator information
-geolocator = geopy.geocoders.Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
 
 # Try geolocator certificates
 try:
@@ -119,7 +117,7 @@ try:
 except:
     print ('Disable SSL')
     disableSSLCheck()
-    geolocator = geopy.geocoders.Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+    geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
 
 # Try again:
 try:
@@ -129,7 +127,7 @@ except:
     print ('Change adapter')
     disableSSLCheck() # Need to be done again
     geopy.geocoders.options.default_adapter_factory = geopy.adapters.URLLibAdapter
-    geolocator = geopy.geocoders.Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+    geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
 
 # Try again:
 try:
