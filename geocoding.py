@@ -11,11 +11,8 @@ Script for creating geoJSON
 import pprint
 import re
 import argparse
-import sys
 import json
 import configparser
-import os
-import pdoc
 import geopy.geocoders
 from dms2dec.dms_convert import dms2dec
 
