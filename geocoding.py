@@ -16,7 +16,7 @@ import json
 import configparser
 import os
 import pdoc
-from geopy.geocoders import Nominatim
+from geopy.geocoders
 from dms2dec.dms_convert import dms2dec
 
 # Internal
@@ -84,6 +84,12 @@ def lookForCoordinates(biobank, lookForCoordinatesFeatures):
                 return location
             places += 1
 
+def disableSSLCheck():
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    geopy.geocoders.options.default_ssl_context = ctx
+
 
 ##########
 ## Main ##
@@ -104,7 +110,32 @@ features['type'] = 'FeatureCollection'
 features['features'] = []
 
 # Get geolocator information
-geolocator = Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+geolocator = geopy.geocoders.Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+
+# Try geolocator certificates
+try:
+    geolocator.geocode('Graz, Austria')
+# If this does not work, disable ssl certificates:
+except:
+    print ('Disable SSL')
+    disableSSLCheck()
+    geolocator = geopy.geocoders.Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+
+# Try again:
+try:
+    geolocator.geocode('Graz, Austria')
+# If this does not work, change adapter:
+except:
+    print ('Change adapter')
+    disableSSLCheck() # Need to be done again
+    geopy.geocoders.options.default_adapter_factory = geopy.adapters.URLLibAdapter
+    geolocator = geopy.geocoders.Nominatim(user_agent='test_160211112222',timeout=15) # NOTE: Change user agent.
+
+# Try again:
+try:
+    geolocator.geocode('Graz, Austria')
+except:
+    print ('Geolocator fails')
 
 # Get biobanks from Directory:
 for biobank in dir.getBiobanks():
