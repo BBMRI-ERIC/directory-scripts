@@ -49,6 +49,11 @@ if 'biobanksNameSkip' in config['Skip biobank']:
 else:
     biobanksNameSkip = []
 
+if 'biobanksCountrySkip' in config['Skip country']:
+    biobanksCountrySkip = config['Skip country']['biobanksCountrySkip'].split(',')
+else:
+    biobanksCountrySkip = []
+
 ###############
 ## Functions ##
 ###############
@@ -135,7 +140,7 @@ except:
 
 # Get biobanks from Directory:
 for biobank in dir.getBiobanks():
-    if biobank['name'] not in biobanksNameSkip:
+    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip:
         biobankDict = {}
 
         # Biobank properties:
