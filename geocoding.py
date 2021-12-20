@@ -15,6 +15,7 @@ import json
 import configparser
 import geopy.geocoders
 from dms2dec.dms_convert import dms2dec
+import ssl
 
 # Internal
 from directory import Directory
