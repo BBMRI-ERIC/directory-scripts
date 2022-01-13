@@ -117,26 +117,26 @@ geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686;
 try:
     geolocator.geocode('Graz, Austria')
 # If this does not work, disable ssl certificates:
-except:
+except geopy.exc.GeocoderUnavailable:
     print ('Disable SSL')
     disableSSLCheck()
     geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
 
-# Try again:
-try:
-    geolocator.geocode('Graz, Austria')
-# If this does not work, change adapter:
-except:
-    print ('Change adapter')
-    disableSSLCheck() # Need to be done again
-    geopy.geocoders.options.default_adapter_factory = geopy.adapters.URLLibAdapter
-    geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
+    # Try again:
+    try:
+        geolocator.geocode('Graz, Austria')
+    # If this does not work, change adapter:
+    except geopy.exc.GeocoderUnavailable:
+        print ('Change adapter')
+        disableSSLCheck() # Need to be done again
+        geopy.geocoders.options.default_adapter_factory = geopy.adapters.URLLibAdapter
+        geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
 
-# Try again:
-try:
-    geolocator.geocode('Graz, Austria')
-except:
-    print ('Geolocator fails')
+        # Try again:
+        try:
+            geolocator.geocode('Graz, Austria')
+        except:
+            print ('Geolocator fails')
 
 # Get biobanks from Directory:
 for biobank in dir.getBiobanks():
