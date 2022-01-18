@@ -16,6 +16,7 @@ import configparser
 import geopy.geocoders
 from dms2dec.dms_convert import dms2dec
 import ssl
+import logging as log
 
 # Internal
 from directory import Directory
@@ -28,12 +29,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument('configFile', help='Provide config file') #NOTE: Provide better description.
 parser.add_argument('-o', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
+parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
 parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
+
+# Set logs:
+if args.debug:
+    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
+elif args.verbose:
+    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
+else:
+    log.basicConfig(format="%(levelname)s: %(message)s")
+
 
 # Parse config file
 config = configparser.ConfigParser()
@@ -73,7 +84,7 @@ def lookForCoordinates(biobank, lookForCoordinatesFeatures):
                 lookBy.append(biobank['contact'][locFeature])
     location = geolocator.geocode(', '.join(lookBy))
     if location:
-        print ('Coordinates from: '+ ', '.join(lookBy))
+        log.debug('Coordinates from: '+ ', '.join(lookBy))
         return location
     # If location not found, remove specific fields and retain general ones.
     else:
@@ -83,7 +94,7 @@ def lookForCoordinates(biobank, lookForCoordinatesFeatures):
             location = geolocator.geocode(', '.join(lookBy[places:len(lookBy)+1]))
             
             if location:
-                print ('Coordinates from: '+ ', '.join(lookBy[places:len(lookBy)+1]))
+                log.debug('Coordinates from: '+ ', '.join(lookBy[places:len(lookBy)+1]))
                 return location
             places += 1
 
@@ -118,7 +129,7 @@ try:
     geolocator.geocode('Graz, Austria')
 # If this does not work, disable ssl certificates:
 except geopy.exc.GeocoderUnavailable:
-    print ('Disable SSL')
+    log.debug('Disable SSL')
     disableSSLCheck()
     geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
 
@@ -127,7 +138,7 @@ except geopy.exc.GeocoderUnavailable:
         geolocator.geocode('Graz, Austria')
     # If this does not work, change adapter:
     except geopy.exc.GeocoderUnavailable:
-        print ('Change adapter')
+        log.debug('Change adapter')
         disableSSLCheck() # Need to be done again
         geopy.geocoders.options.default_adapter_factory = geopy.adapters.URLLibAdapter
         geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
@@ -136,7 +147,8 @@ except geopy.exc.GeocoderUnavailable:
         try:
             geolocator.geocode('Graz, Austria')
         except:
-            print ('Geolocator fails')
+            log.warning('Geolocator fails with the following error:')
+            raise
 
 # Get biobanks from Directory:
 for biobank in dir.getBiobanks():
@@ -186,17 +198,17 @@ for biobank in dir.getBiobanks():
                 biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
             else:
                 biobankGeometryDict['coordinates'] = [float(re.sub(r',', r'.', biobank['longitude'])), float(re.sub(r',', r'.', biobank['latitude']))]
-            print ('Coordinates provided')
+            log.info(biobank['name'] + ': Coordinates provided')
         elif 'contact' in biobank.keys():
             lookForCoordinatesFeatures = ['address', 'zip', 'city', 'country']
             location = lookForCoordinates(biobank, lookForCoordinatesFeatures)
             if location:
                 biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
-                print ("(geodecoding done) ")
+                log.info(biobank['name'] + ": geodecoding done ")
             else:
-                print ("(geodecoding failed) ")
+                log.warning(biobank['name'] + ": geodecoding failed ")
         else:
-            print ("(geocoding skipped, no contact provided)")
+            log.warning(biobank['name'] + ": no contact provided")
 
         # Skip biobank if not available coordinates:
         if biobankGeometryDict:
@@ -205,7 +217,7 @@ for biobank in dir.getBiobanks():
 
             features['features'].append(biobankDict)
         else:
-            print ("Skipping " +' '+ str(biobank['name']))
+            log.warning("Skipping " + str(biobank['name']))
 
 
 # Write geoJSON
