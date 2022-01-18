@@ -17,6 +17,7 @@ import geopy.geocoders
 from dms2dec.dms_convert import dms2dec
 import ssl
 import logging as log
+import smtplib
 
 # Internal
 from directory import Directory
@@ -98,12 +99,26 @@ def lookForCoordinates(biobank, lookForCoordinatesFeatures):
                 return location
             places += 1
 
+
 def disableSSLCheck():
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     geopy.geocoders.options.default_ssl_context = ctx
 
+
+def sendEmail(sender, receivers, message):
+   '''
+   Sender: String containing sender email.
+   Receivers: List containing receivers emails.
+   Message: String containing the message.
+   '''
+   try:
+      smtpObj = smtplib.SMTP('localhost')
+      smtpObj.sendmail(sender, receivers, message)         
+      print ("Successfully sent email")
+   except SMTPException:
+      print ("Error: unable to send email")
 
 ##########
 ## Main ##
@@ -148,6 +163,7 @@ except geopy.exc.GeocoderUnavailable:
             geolocator.geocode('Graz, Austria')
         except:
             log.warning('Geolocator fails with the following error:')
+            sendEmail('eva.gaal93@gmail.com', ['eva.garcia-alvarez@bbmri-eric.eu'], 'Geolocator failed!')
             raise
 
 # Get biobanks from Directory:
