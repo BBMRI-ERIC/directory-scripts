@@ -116,9 +116,9 @@ def sendEmail(sender, receivers, message):
    try:
       smtpObj = smtplib.SMTP('localhost')
       smtpObj.sendmail(sender, receivers, message)         
-      print ("Successfully sent email")
-   except SMTPException:
-      print ("Error: unable to send email")
+      log.info("Successfully sent email")
+   except ConnectionRefusedError:
+      log.info("Error: unable to send email")
 
 ##########
 ## Main ##
