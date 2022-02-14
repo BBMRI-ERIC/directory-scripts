@@ -27,6 +27,9 @@ class OrphaCodes:
         self.__icd10_to_orpha_code_map = {}
         self.__orpha_codes = []
         self.__orpha_cancer_codes = []
+        self.__orpha_IBDLynch_codes = []
+        self.__orpha_ChronicPancreatitisDuctalCancer_codes = []
+        self.__orpha_Cholangiocarcinoma_codes = []
         self.__orpha_to_name_map = {}
         for disease in orpha_tree.findall('DisorderList/Disorder'):
             orpha_code = disease.findtext('OrphaCode')
@@ -62,12 +65,27 @@ class OrphaCodes:
                     log.debug("ICD-10 code %s maps to Orpha codes %s" % (icd10_code, self.__icd10_to_orpha_code_map[icd10_code]))
                     if ICD10CodesHelper.isCancerCode(icd10_code):
                         self.__orpha_cancer_codes.append(orpha_code)
+                    if ICD10CodesHelper.isIBDLynchCode(icd10_code):
+                        self.__orpha_IBDLynch_codes.append(orpha_code)
+                    if ICD10CodesHelper.isChronicPancreatitisDuctalCancerCode(icd10_code):
+                        self.__orpha_ChronicPancreatitisDuctalCancer_codes.append(orpha_code)
+                    if ICD10CodesHelper.isCholangiocarcinomaCode(icd10_code):
+                        self.__orpha_Cholangiocarcinoma_codes.append(orpha_code)
 
     def isValidOrphaCode(self, code : str) -> bool:
         return True if code in self.__orpha_codes else False
 
     def isCancerOrphaCode(self, code : str) -> bool:
         return True if code in self.__orpha_cancer_codes else False
+
+    def isIBDLynchOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_IBDLynch_codes else False
+
+    def isChronicPancreatitisDuctalCancerOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_ChronicPancreatitisDuctalCancer_codes else False
+
+    def isCholangiocarcinomaOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_Cholangiocarcinoma_codes else False
 
     def orphaToIcd10(self, code : str) -> List[MappingWithType]:
         if code not in self.__orpha_to_icd10_code_map:

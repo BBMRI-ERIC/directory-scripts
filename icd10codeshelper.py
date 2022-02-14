@@ -68,3 +68,46 @@ class ICD10CodesHelper:
 
       # this is unparsable
       return None
+
+   def isIBDLynchCode(code : str) -> bool: # Inflammatory Bowel Disease
+      m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
+      IBDLynchCode = False
+      if m:
+         log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         if m.group('block') == 'K' and (int(m.group('code')) == 50 or int(m.group('code')) == 51 or int(m.group('code')) == 52):
+                  IBDLynchCode = True
+         return IBDLynchCode
+
+   def isChronicPancreatitisDuctalCancerCode(code : str) -> bool:
+      m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
+      ChronicPancreatitisDuctalCancer = False
+      if m:
+         log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         if m.group('block') == 'C' and (int(m.group('code')) == 25):
+            if m.group('subcode') and (int(m.group('subcode')) == 3):
+               ChronicPancreatitisDuctalCancer = True
+            else: # NOTE: Do we accept code level entries?
+               ChronicPancreatitisDuctalCancer = True
+         if m.group('block') == 'D' and (m.group('code') == '01'):
+            if m.group('subcode') and (int(m.group('subcode')) == 7):
+               ChronicPancreatitisDuctalCancer = True
+         elif m.group('block') == 'K' and (int(m.group('code')) == 86):
+            if m.group('subcode') and ((int(m.group('subcode')) == 0 or int(m.group('subcode')) == 1)):
+               ChronicPancreatitisDuctalCancer = True
+            else: # NOTE: Do we accept code level entries?
+               ChronicPancreatitisDuctalCancer = True
+
+         return ChronicPancreatitisDuctalCancer
+
+
+   def isCholangiocarcinomaCode(code : str) -> bool:
+      m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
+      if m:
+         log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         if m.group('block') == 'C' and (int(m.group('code')) == 22):
+            if m.group('subcode') and (int(m.group('subcode')) == 0 or int(m.group('subcode')) == 1):
+               return True
+            #else: # NOTE: Do we accept code level entries?
+               #return True
+         else:
+            return False
