@@ -16,6 +16,8 @@ cancer_chapters_roman = list(map(roman.toRoman, range(1, 23)))  # chapter 22 add
 
 obesity_diag_ranges = ['E65-E68']
 
+IBD_diag_ranges = ['K50-K52']
+
 
 class ICD10CodesHelper:
 
@@ -74,11 +76,23 @@ class ICD10CodesHelper:
       IBDLynchCode = False
       if m:
          log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         # IBD
          if m.group('block') == 'K' and (int(m.group('code')) == 50 or int(m.group('code')) == 51 or int(m.group('code')) == 52):
+                  IBDLynchCode = True
+         # Lynch
+         elif m.group('block') == 'D' and (int(m.group('code')) == 48):
+            if m.group('subcode') and (int(m.group('subcode')) == 9):
                   IBDLynchCode = True
          return IBDLynchCode
 
+      # now we deal with ranges
+      if code in IBD_diag_ranges:
+             return True
+      else:
+             return False
+
    def isChronicPancreatitisDuctalCancerCode(code : str) -> bool:
+      # NOTE: Add range here?
       m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
       ChronicPancreatitisDuctalCancer = False
       if m:

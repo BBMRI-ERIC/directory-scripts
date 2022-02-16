@@ -143,22 +143,19 @@ for collection in dir.getCollections():
             isIBDLynch = ICD10CodesHelper.isIBDLynchCode(d)
             if isIBDLynch is not None and isIBDLynch:
                     log.debug(
-                        "Collection %s identified as IBD or Lynch collection due to ICD-10 code %s" % (collection['id'], d))
-                    IBDLynch = True
+                        "Collection %s identified as IBD or Lynch syndrome collection due to ICD-10 code %s" % (collection['id'], d))
         
         # Search Chronic Pancreatitis and Ductal Cancer
             isChronicPancreatitisDuctalCancer = ICD10CodesHelper.isChronicPancreatitisDuctalCancerCode(d)
             if isChronicPancreatitisDuctalCancer is not None and isChronicPancreatitisDuctalCancer:
                     log.debug(
                         "Collection %s identified as pancreatic ductal malignancy or chronic pancreatitis collection due to ICD-10 code %s" % (collection['id'], d))
-                    isChronicPancreatitisDuctalCancer = True
 
         # Search Cholangiocarcinoma
             isCholangiocarcinoma = ICD10CodesHelper.isCholangiocarcinomaCode(d)
             if isCholangiocarcinoma is not None and isCholangiocarcinoma:
                     log.debug(
                         "Collection %s identified as cholangiocarcinoma collection due to ICD-10 code %s" % (collection['id'], d))
-                    isCholangiocarcinoma = True
 
         # ORPHA codes
         if re.search(r'^ORPHA:', d):
@@ -167,7 +164,7 @@ for collection in dir.getCollections():
                 # Search Lynch and IBD
                 isIBDLynch = orphacodes.isIBDLynchOrphaCode(d)
                 if isIBDLynch:
-                    log.debug("Collection %s identified as IBD or Lynch collection due to ORPHA code %s" % (collection['id'], d))
+                    log.debug("Collection %s identified as IBD or Lynch syndrome collection due to ORPHA code %s" % (collection['id'], d))
                 isChronicPancreatitisDuctalCancer = orphacodes.isChronicPancreatitisDuctalOrphaCode(d)
                 # Search Chronic Pancreatitis and Ductal Cancer
                 if isChronicPancreatitisDuctalCancer:
@@ -183,9 +180,9 @@ for collection in dir.getCollections():
     # Search by name
     if 'name' in collection:
         # Search Lynch and IBD
-        if re.search(r'(inflammatory bowel|IBD|Lynch|Crohn|Ulcerative colitis)', collection['name'], re.IGNORECASE):
-                    log.debug("Collection %s identified as IBD or Lynch collection due to its name %s" % (collection['id'], collection['name']))
-                    IBDLynch = True
+        if re.search(r'(inflammatory bowel|IBD|Crohn|Ulcerative colitis|Lynch|HNPCC)', collection['name'], re.IGNORECASE):
+                    log.debug("Collection %s identified as IBD or Lynch syndrome collection due to its name %s" % (collection['id'], collection['name']))
+                    isIBDLynch = True
         # Search Chronic Pancreatitis and Ductal Cancer
         if re.search(r'(pancreatitis|Pancreatic Duct Adenocarcinoma|IPMN)', collection['name'], re.IGNORECASE):
                     log.debug("Collection %s identified as pancreatic ductal malignancy or chronic pancreatitis collection due to its name %s" % (collection['id'], collection['name']))
@@ -198,11 +195,11 @@ for collection in dir.getCollections():
     # Search by description
     if 'description' in collection:
         # Search Lynch and IBD
-        if re.search(r'(inflammatory bowel|IBD|Lynch|Crohn|Ulcerative colitis)', collection['description'], re.IGNORECASE):
-                    log.debug("Collection %s identified as IBD or Lynch collection due to its description" % (collection['id']))
-                    IBDLynch = True
+        if re.search(r'(inflammatory bowel|IBD|Crohn|Ulcerative colitis|Lynch|HNPCC)', collection['description'], re.IGNORECASE):
+                    log.debug("Collection %s identified as IBD or Lynch syndrome collection due to its description" % (collection['id']))
+                    isIBDLynch = True
         # Search Chronic Pancreatitis and Ductal Cancer
-        if re.search(r'(pancreatitis|Pancreatic Ductal Adenocarcinoma|IPMN)', collection['description'], re.IGNORECASE):
+        if re.search(r'(pancreatitis|Pancreatic Duct Adenocarcinoma|IPMN)', collection['description'], re.IGNORECASE):
                     log.debug("Collection %s identified as pancreatic ductal malignancy or chronic pancreatitis collection due to its description" % (collection['id']))
                     isChronicPancreatitisDuctalCancer = True
         # Search Cholangiocarcinoma
@@ -244,7 +241,7 @@ for collection in dir.getCollections():
         if (('age_low' in collection and collection['age_low'] <= age_max ) and ('age_high' in collection and collection['age_high'] >= age_min)):
             wantedAgeRange = True
 
-    if isIBDLynch:
+    if isIBDLynch and wantedAgeRange:
         log.info(f"IBD or Lynch syndrome collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
         collectionsIBDLynchDiagnosed.append(collection)
         biobanksIBDLynchDiagnosed.add(biobankId)
@@ -257,7 +254,7 @@ for collection in dir.getCollections():
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             IBDLynchDonorsExplicit += collection['number_of_donors']
     
-    if isChronicPancreatitisDuctalCancer:
+    if isChronicPancreatitisDuctalCancer and wantedAgeRange:
         log.info(f"Pancreatic ductal malignancy or chronic pancreatitis collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
         collectionsChronicPancreatitisDuctalCancerDiagnosed.append(collection)
         biobanksChronicPancreatitisDuctalCancerDiagnosed.add(biobankId)
@@ -270,7 +267,7 @@ for collection in dir.getCollections():
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             chronicPancreatitisDuctalCancerDonorsExplicit += collection['number_of_donors']
     
-    if isCholangiocarcinoma:
+    if isCholangiocarcinoma and wantedAgeRange:
         log.info(f"Cholangiocarcinoma collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
         collectionsCholangiocarcinomaDiagnosed.append(collection)
         biobanksCholangiocarcinomaDiagnosed.add(biobankId)
@@ -311,8 +308,8 @@ if not args.nostdout:
     print("- total of cholangiocarcinoma samples: %d explicit, %d with OoM; donors: %d explicit" % (
     cholangiocarcinomaSamplesExplicit, cholangiocarcinomaSamplesIncOoM, cholangiocarcinomaDonorsExplicit))
 
-#for df in (pd_collectionsIBDLynchDiagnosed, pd_collectionsChronicPancreatitisDuctalCancerDiagnosed, pd_collectionsCholangiocarcinomaDiagnosed):
-    #pddfutils.tidyCollectionDf(df)
+for df in (pd_collectionsIBDLynchDiagnosed, pd_collectionsChronicPancreatitisDuctalCancerDiagnosed, pd_collectionsCholangiocarcinomaDiagnosed):
+    pddfutils.tidyCollectionDf(df)
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
