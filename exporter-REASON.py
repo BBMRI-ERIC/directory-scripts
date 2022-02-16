@@ -62,6 +62,7 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
+# NOTE: Changed
 orphacodes = OrphaCodes(''.join(args.orphacodesfile))
 
 collectionsIBDLynchDiagnosed = []
