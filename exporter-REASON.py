@@ -166,7 +166,7 @@ for collection in dir.getCollections():
                 isIBDLynch = orphacodes.isIBDLynchOrphaCode(d)
                 if isIBDLynch:
                     log.debug("Collection %s identified as IBD or Lynch syndrome collection due to ORPHA code %s" % (collection['id'], d))
-                isChronicPancreatitisDuctalCancer = orphacodes.isChronicPancreatitisDuctalOrphaCode(d)
+                isChronicPancreatitisDuctalCancer = orphacodes.isChronicPancreatitisDuctalCancerOrphaCode(d)
                 # Search Chronic Pancreatitis and Ductal Cancer
                 if isChronicPancreatitisDuctalCancer:
                     log.debug("Collection %s identified as pancreatic ductal malignancy or chronic pancreatitis collection due to ORPHA code %s" % (collection['id'], d))
@@ -316,6 +316,6 @@ if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
     pd_collectionsIBDLynchDiagnosed.to_excel(writer, sheet_name='Lynch syndrome or IBD')
-    pd_collectionsChronicPancreatitisDuctalCancerDiagnosed.to_excel(writer, sheet_name='Pancreatic ductal malignancy or chronic pancreatitis')
+    pd_collectionsChronicPancreatitisDuctalCancerDiagnosed.to_excel(writer, sheet_name='Pan ductal malig or chronic pan')
     pd_collectionsCholangiocarcinomaDiagnosed.to_excel(writer, sheet_name='Cholangiocarcinoma')
     writer.save()
