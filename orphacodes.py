@@ -30,6 +30,8 @@ class OrphaCodes:
         self.__orpha_IBDLynch_codes = []
         self.__orpha_ChronicPancreatitisDuctalCancer_codes = []
         self.__orpha_Cholangiocarcinoma_codes = []
+        self.__orpha_Endometriosis_codes = []
+        self.__orpha_Myomatosis_codes = []
         self.__orpha_to_name_map = {}
         for disease in orpha_tree.findall('DisorderList/Disorder'):
             orpha_code = disease.findtext('OrphaCode')
@@ -71,6 +73,10 @@ class OrphaCodes:
                         self.__orpha_ChronicPancreatitisDuctalCancer_codes.append(orpha_code)
                     if ICD10CodesHelper.isCholangiocarcinomaCode(icd10_code):
                         self.__orpha_Cholangiocarcinoma_codes.append(orpha_code)
+                    if ICD10CodesHelper.isEndometriosisCode(icd10_code):
+                        self.__orpha_Endometriosis_codes.append(orpha_code)
+                    if ICD10CodesHelper.isMyomatosisCode(icd10_code):
+                        self.__orpha_Myomatosis_codes.append(orpha_code)
 
     def isValidOrphaCode(self, code : str) -> bool:
         return True if code in self.__orpha_codes else False
@@ -86,6 +92,12 @@ class OrphaCodes:
 
     def isCholangiocarcinomaOrphaCode(self, code : str) -> bool:
         return True if code in self.__orpha_Cholangiocarcinoma_codes else False
+
+    def isEndometriosisOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_Endometriosis_codes else False
+
+    def isMyomatosisOrphaCode(self, code : str) -> bool:
+        return True if code in self.__orpha_Myomatosis_codes else False
 
     def orphaToIcd10(self, code : str) -> List[MappingWithType]:
         if code not in self.__orpha_to_icd10_code_map:

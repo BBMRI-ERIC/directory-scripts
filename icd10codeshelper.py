@@ -125,3 +125,23 @@ class ICD10CodesHelper:
                #return True
          else:
             return False
+
+   # Endometriosis -> N80
+   def isEndometriosisCode(code : str) -> bool:
+      m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
+      if m:
+         log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         if m.group('block') == 'N' and (int(m.group('code')) == 80):
+            return True
+         else:
+            return False
+
+   # Myomatosis -> D25
+   def isMyomatosisCode(code : str) -> bool:
+      m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
+      if m:
+         log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         if m.group('block') == 'D' and (int(m.group('code')) == 25):
+            return True
+         else:
+            return False
