@@ -6,7 +6,7 @@
   - geopy
   - validate_email
   - xlsxwriter
-  - py3dns
+  - py3dns (on Windows this silently conflicts if dnspython is already installed)
   - requests
   - diskcache
   - yapsy
