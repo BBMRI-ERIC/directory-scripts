@@ -1,4 +1,4 @@
-# vim:ts=4:sw=4:tw=0:et
+# vim:ts=4:sw=4:tw=0:sts=4:et
 
 import logging as log
 import os.path

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=4:sw=4:tw=0:et
+# vim:ts=4:sw=4:sts=4:tw=0:et
 
 import re
 from builtins import str, isinstance, len, set, int
