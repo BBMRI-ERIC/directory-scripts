@@ -1,4 +1,5 @@
 #!/usr/local/bin/python3.6
+# vim:ts=4:sw=4:tw=0:sts=4:et
 """
 Script for creating geoJSON
 """
