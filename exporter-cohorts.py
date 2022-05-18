@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=4:sw=4:tw=0:sts=4:et
+# vim:ts=4:sw=4:tw=0:et
 
 from typing import List
 
@@ -143,4 +143,4 @@ if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
     pd_cohortCollections.to_excel(writer, sheet_name='Cohort collections',index=False)
-    writer.close()
+    writer.save()

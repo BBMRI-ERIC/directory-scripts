@@ -1,4 +1,4 @@
-# vim:ts=4:sw=4:tw=0:sts=4:et
+# vim:ts=4:sw=4:tw=0:et
 
 import logging as log
 import os.path
@@ -14,7 +14,6 @@ class Directory:
     def __init__(self, package='eu_bbmri_eric', purgeCaches=[], debug=False, pp=None, username=None, password=None):
         self.__pp = pp
         self.__package = package
-        
         log.debug('Checking data in package: ' + package)
 
         cache_dir = 'data-check-cache/directory'
@@ -25,7 +24,6 @@ class Directory:
             cache.clear()
 
         self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
-        self.__directoryURL = "https://directory-backend.molgenis.net/"
         log.info('Retrieving directory content from ' + self.__directoryURL)
         session = molgenis.client.Session(self.__directoryURL)
         if username is not None and password is not None:
@@ -40,10 +38,10 @@ class Directory:
             start_time = time.perf_counter()
             # TODO: remove exception handling once BBMRI.uk staging has been fixed
             try:
-                self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,capabilities')
+                self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,covid19biobank')
             except:
                 log.warning("Using work-around for inconsistence in the database structure.")
-                self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country')
+                self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,COVID_19')
             cache['biobanks'] = self.biobanks
             end_time = time.perf_counter()
             log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -78,15 +76,6 @@ class Directory:
             cache['networks'] = self.networks
             end_time = time.perf_counter()
             log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
-        log.info('   ... all entities retrieved')
-        if 'facts' in cache:
-            self.facts = cache['facts']
-        else:
-            start_time = time.perf_counter()
-            self.facts = session.get(self.__package + "_facts")
-            cache['facts'] = self.facts
-            end_time = time.perf_counter()
-            log.info('   ... retrieved facts in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... all entities retrieved')
         self.contactHashmap = {}
 
@@ -198,30 +187,23 @@ class Directory:
                 for n in c['networks']:
                     self.contactGraph.add_edge('contactID:'+c['id'], n['id'])
 
-        log.info('Checks of directory data as graphs')
-        # now we check if all the edges in the graph are in both directions
-        for e in self.directoryGraph.edges():
-            if not self.directoryGraph.has_edge(e[1],e[0]):
-                #raise Exception('DirectoryStructure', 'directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                log.warning('DirectoryStructure - directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.directoryGraph.add_edge(e[1],e[0])
-        for e in self.contactGraph.edges():
-            if not self.contactGraph.has_edge(e[1],e[0]):
-                #raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                log.warning('DirectoryStructure - contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.contactGraph.add_edge(e[1],e[0])
-        for e in self.networkGraph.edges():
-            if not self.networkGraph.has_edge(e[1],e[0]):
-                #raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                log.warning('DirectoryStructure - networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.networkGraph.add_edge(e[1],e[0])
-
         # now make graphs immutable
         nx.freeze(self.directoryGraph)
         nx.freeze(self.directoryCollectionsDAG)
         nx.freeze(self.contactGraph)
         nx.freeze(self.networkGraph)
 
+        log.info('Checks of directory data as graphs')
+        # now we check if all the edges in the graph are in both directions
+        for e in self.directoryGraph.edges():
+            if not self.directoryGraph.has_edge(e[1],e[0]):
+                raise Exception('DirectoryStructure', 'directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+        for e in self.contactGraph.edges():
+            if not self.contactGraph.has_edge(e[1],e[0]):
+                raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+        for e in self.networkGraph.edges():
+            if not self.networkGraph.has_edge(e[1],e[0]):
+                raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
         # we check that DAG is indeed DAG :-)
         if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
             raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
@@ -280,36 +262,6 @@ class Directory:
         collection = self.directoryGraph.nodes[collectionID]['data']
         return self.contactHashmap[collection['contact']['id']]
 
-    def isTopLevelCollection(self, collectionID : str):
-        collection = self.directoryGraph.nodes[collectionID]['data']
-        return not 'parent_collection' in collection
-
-    def isCountableCollection(self, collectionID : str, metric : str):
-        assert metric == 'number_of_donors' or metric == 'size' 
-        # note that this is intentionally not implemented for OoM - since OoM is a required parameter and thus any child collection would be double-counted
-        collection = self.directoryGraph.nodes[collectionID]['data']
-        if not (metric in collection and isinstance(collection[metric], int)):
-            return False
-        else:
-            if not 'parent_collection' in collection:
-                return True
-            else:
-                parent = self.getCollectionById(collection['parent_collection']['id'])
-                parent_dist = 1
-                while parent is not None:
-                    if metric in parent and isinstance(parent[metric], int):
-                        log.debug(f'Collection {collectionID} is not countable as it has countable parent {parent["id"]} (distance {parent_dist}) for metric {metric}.')
-                        return False
-                    if 'parent_collection' in parent:
-                        parent = self.getCollectionById(parent['parent_collection']['id'])
-                        parent_dist += 1
-                    else:
-                        if parent_dist > 1:
-                            log.debug(f'Detected collection {collectionID} deeper than 1 from {parent["id"]} (distance {parent_dist}) for metric {metric}.')
-                        parent = None
-                return True
-                
-
     def getCollectionNN(self, collectionID):
         # TODO: handle IARC!
         return self.getBiobankNN(self.getCollectionBiobankId(collectionID))
@@ -337,9 +289,6 @@ class Directory:
 
     def getNetworks(self):
         return self.networks
-
-    def getFacts(self):
-        return self.facts
 
     def getNetworkNN(self, networkID : str):
         # TODO: review handling of IARC/EU/global collections
