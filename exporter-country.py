@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=8:sw=8:tw=0:noet
+# vim:ts=4:sw=4:tw=0:et
 
 from typing import List
 
@@ -59,32 +59,32 @@ countryBiobanksWithCollections = {}
 countryCollections = {}
 
 for collection in dir.getCollections():
-	collectionId = collection['id']
-	log.debug("Analyzing collection " + collectionId)
-	biobankId = dir.getCollectionBiobankId(collectionId)
-	biobank = dir.getBiobankById(biobankId)
-	NN = dir.getBiobankNN(biobankId)
-	if not NN in countryBiobanks:
-		countryBiobanks[NN] = set()
-	if not NN in countryBiobanksWithCollections:
-		countryBiobanksWithCollections[NN] = set()
-	if not NN in countryCollections:
-		countryCollections[NN] = set()
-	countryBiobanks[NN].add(biobankId)
-	countryBiobanksWithCollections[NN].add(biobankId)
-	countryCollections[NN].add(collectionId)
-	
+    collectionId = collection['id']
+    log.debug("Analyzing collection " + collectionId)
+    biobankId = dir.getCollectionBiobankId(collectionId)
+    biobank = dir.getBiobankById(biobankId)
+    NN = dir.getBiobankNN(biobankId)
+    if not NN in countryBiobanks:
+        countryBiobanks[NN] = set()
+    if not NN in countryBiobanksWithCollections:
+        countryBiobanksWithCollections[NN] = set()
+    if not NN in countryCollections:
+        countryCollections[NN] = set()
+    countryBiobanks[NN].add(biobankId)
+    countryBiobanksWithCollections[NN].add(biobankId)
+    countryCollections[NN].add(collectionId)
+    
 for biobank in dir.getBiobanks():
-	biobankId = biobank['id']
-	NN = dir.getBiobankNN(biobankId)
-	if not NN in countryBiobanks:
-		countryBiobanks[NN] = set()
-	if not biobankId in countryBiobanks[NN]:
-		log.info(f"Biobank {biobankId} without having collections")
-		countryBiobanks[NN].add(biobankId)
+    biobankId = biobank['id']
+    NN = dir.getBiobankNN(biobankId)
+    if not NN in countryBiobanks:
+        countryBiobanks[NN] = set()
+    if not biobankId in countryBiobanks[NN]:
+        log.info(f"Biobank {biobankId} without having collections")
+        countryBiobanks[NN].add(biobankId)
 
 for NN in sorted(countryBiobanks):
-	print(f"{NN}: biobanks total = {len(countryBiobanks[NN])}, biobanks with collections = {len(countryBiobanksWithCollections[NN])}, collections = {len(countryCollections[NN])}")
+    print(f"{NN}: biobanks total = {len(countryBiobanks[NN])}, biobanks with collections = {len(countryBiobanksWithCollections[NN])}, collections = {len(countryCollections[NN])}")
 
 #for collection in countryCollections['UK']:
-#	print(f"{collection}")
+#   print(f"{collection}")

@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.6
+#!/usr/local/bin/python
 """
 Script for creating geoJSON
 """
@@ -208,7 +208,7 @@ for biobank in dir.getBiobanks():
             biobankGeometryDict['coordinates'] = [float(i) for i in config['Override biobank position'][biobank['name']].split(',')]
 
         elif 'longitude' in biobank.keys() and 'latitude' in biobank.keys():
-            dmsSymbols = ['º','°']
+            dmsSymbols = ['o','°']
             #if '°' in biobank['longitude'] or '°' in biobank['latitude'] or '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
             if any(x in biobank['longitude'] for x in dmsSymbols) or any(x in biobank['latitude'] for x in dmsSymbols):
                 biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
