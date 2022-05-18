@@ -86,7 +86,7 @@ for collection in dir.getCollections():
     if 'materials' in collection:
         for m in collection['materials']:
             materials.append(m['id'])
-    
+
     data_categories = []
     if 'data_categories' in collection:
         for c in collection['data_categories']:
@@ -97,7 +97,7 @@ for collection in dir.getCollections():
         for t in collection['type']:
             types.append(t['id'])
     log.debug("Types: " + str(types))
-    
+
     diags = []
     diag_ranges = []
     covid_diag = False
@@ -113,11 +113,11 @@ for collection in dir.getCollections():
 
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
-    
+
     if 'BSL2' in biobank_covid or 'BSL3' in biobank_covid:
         ecraidBSLCollections.append(collection)
         ecraidRelevantBiobankIds.add(biobankId)
-    
+
     if 'PATHOGEN' in materials:
         ecraidPathogenCollections.append(collection)
         ecraidRelevantBiobankIds.add(biobankId)

@@ -94,7 +94,7 @@ for biobank in dir.getBiobanks():
             biobanks[biobank['id']]['biobankSizeEstimate'] += 3 * 10^OoM
         else:
             biobanks[biobank['id']]['biobankSizeExact'] += size
-    biobanks[biobank['id']]['biobankSizeTotal'] = biobanks[biobank['id']]['biobankSizeExact'] + biobanks[biobank['id']]['biobankSizeEstimate'] 
+    biobanks[biobank['id']]['biobankSizeTotal'] = biobanks[biobank['id']]['biobankSizeExact'] + biobanks[biobank['id']]['biobankSizeEstimate']
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))

@@ -20,7 +20,6 @@ from whoosh.query import *
 from whoosh.support.charset import accent_map
 
 cachesList = ['directory', 'index']
-typeList = ['COLLECTION', 'BIOBANK', 'CONTACT', 'NETWORK']
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -35,12 +34,10 @@ parser = argparse.ArgumentParser()
 parser.register('action', 'extend', ExtendAction)
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-i', '--print-ids-only', dest='printIdsOnly', action='store_true', help='print only matching IDs instead of search hits')
 parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
-parser.add_argument('--limit-types', dest='limitTypes', nargs='+', action='extend', choices=typeList, help='return only specific types')
 parser.add_argument('searchQuery', nargs='+', help='search query')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[], limitTypes=[])
+parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 
 if args.debug:
@@ -58,8 +55,8 @@ indexdir = "indexdir"
 
 
 # purging directory cache means the index cache should be purged as well - data has to be refreshed in the index, too
-if 'directory' in args.purgeCaches and 'index' not in args.purgeCaches:
-        args.purgeCaches.append('index')
+if 'directory' in args.purgeCaches:
+        args.purgeCaches.add('index')
 if 'index' in args.purgeCaches or not os.path.exists(indexdir):
     dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 

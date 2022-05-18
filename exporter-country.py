@@ -73,7 +73,7 @@ for collection in dir.getCollections():
     countryBiobanks[NN].add(biobankId)
     countryBiobanksWithCollections[NN].add(biobankId)
     countryCollections[NN].add(collectionId)
-    
+
 for biobank in dir.getBiobanks():
     biobankId = biobank['id']
     NN = dir.getBiobankNN(biobankId)

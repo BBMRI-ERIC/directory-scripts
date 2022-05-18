@@ -99,7 +99,7 @@ for collection in dir.getCollections():
     if 'materials' in collection:
         for m in collection['materials']:
             materials.append(m['id'])
-    
+
     data_categories = []
     if 'data_categories' in collection:
         for c in collection['data_categories']:
@@ -110,7 +110,7 @@ for collection in dir.getCollections():
         for t in collection['type']:
             types.append(t['id'])
     log.debug("Types: " + str(types))
-    
+
     diags = []
     diag_ranges = []
     covid_diag = False
@@ -154,7 +154,7 @@ for collection in dir.getCollections():
     if types:
         if 'PROSPECTIVE_STUDY' in types and (covid_diag or covid_control):
             covid_prospective = True
-    
+
     if re.search('COVID19PROSPECTIVE', collection['id']):
         if types and not 'PROSPECTIVE_STUDY' in types:
             log.warning("Prospective study by ID but not by collection type for collectionID " + collection['id'])
@@ -166,7 +166,7 @@ for collection in dir.getCollections():
         if not re.search('COVID19PROSPECTIVE', collection['id']):
             log.warning("Prospective study by name but missing correct collection ID for collectionID " + collection['id'])
         covid_prospective = True
-    
+
     if re.search('COVID19', collection['id']) and not (covid_diag or covid_control or covid_prospective):
         log.warning("Incorrectly types COVID collectionID - missing diagnosis " + collection['id'])
         covid_diag = True

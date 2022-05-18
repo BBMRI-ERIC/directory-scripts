@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.6
+#!/usr/local/bin/python
 """
 Script for creating geoJSON
 """
@@ -18,17 +18,9 @@ from dms2dec.dms_convert import dms2dec
 import ssl
 import logging as log
 import smtplib
-import pandas as pd
-from flatten_json import flatten
 
 # Internal
 from directory import Directory
-
-#import sys
-#sys.stdout.reconfigure(encoding='utf-8') # NOTE: Needed on Windows to redirect strout
-
-
-cachesList = ['directory', 'geocoding']
 
 #####################
 ## Parse arguments ##
@@ -42,9 +34,6 @@ parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
 parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
-parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
-#parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
@@ -89,8 +78,11 @@ def lookForCoordinates(biobank, lookForCoordinatesFeatures):
     '''
     lookBy = []
     for locFeature in lookForCoordinatesFeatures:
-        if not pd.isna(biobank[locFeature]):
-                lookBy.append(biobank[locFeature])
+        if locFeature in biobank['contact'].keys():
+            if locFeature == 'country':
+                lookBy.append(biobank['contact'][locFeature]['name'])
+            else:
+                lookBy.append(biobank['contact'][locFeature])
     location = geolocator.geocode(', '.join(lookBy))
     if location:
         log.debug('Coordinates from: '+ ', '.join(lookBy))
@@ -124,9 +116,9 @@ def sendEmail(sender, receivers, message):
    try:
       smtpObj = smtplib.SMTP('localhost')
       smtpObj.sendmail(sender, receivers, message)         
-      print ("Successfully sent email")
-   except SMTPException:
-      print ("Error: unable to send email")
+      log.info("Successfully sent email")
+   except ConnectionRefusedError:
+      log.info("Error: unable to send email")
 
 ##########
 ## Main ##
@@ -175,58 +167,17 @@ except geopy.exc.GeocoderUnavailable:
             raise
 
 # Get biobanks from Directory:
-# Flatten the results and create a pandas dataframe. Every entry per biobank is going to be a new column. As there are nested dictionaries, consecutive numbers are asigned to repeated keys.
-dic_flattened = [flatten(d, '-') for d in dir.getBiobanks()]
-df = pd.DataFrame(dic_flattened)
-
-# Filter dataframe according to user input
-for column, value in config['Filter dataset'].items():
-    # Convert column name to regex, based on getBiobanks_keyList
-    column_regex = column.replace('>', '-[0-9]*-')
-    # Get all column names containing that expression
-    if '*' in column_regex:
-        wanted_Columns = list(df.filter(regex=column_regex, axis=1).columns)
-    else:
-        wanted_Columns = list(df.filter(items=[column_regex], axis=1).columns)
-    # Check if any of these columns match the input conditions and get the rows in which conditions are met
-    for condition in config['Filter dataset'][column].split(','):
-        # Look for the exact same string that is provided as input
-        if config['Filter dataset exact string']['searchExactString'] == 'Yes':
-            new_df = df[(df[wanted_Columns] == condition.strip('\n')).any(axis=1)] # This only works matching the exact same string.
-        # Search for the provided string as a substring (if it is contained as part of another string it is also taken into account):
-        elif config['Filter dataset exact string']['searchExactString'] == 'No':
-            new_df = df[(df[wanted_Columns].apply(lambda col: col.str.contains(condition.strip('\n'), na=False), axis=1)).any(axis=1)]
-        # Add the new filtered df to the final one
-        if not 'filtered_df' in locals():
-            filtered_df = new_df
-        else:
-            filtered_df = pd.concat([filtered_df,new_df])
-            filtered_df.loc[filtered_df.astype(str).drop_duplicates().index]
-
-# If there is not filtered dataframe because not filters were selected, use the original df:
-if not 'filtered_df' in locals():
-    filtered_df = df
-
-if args.printDf:
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_colwidth', None)
-    print (filtered_df)
-
-# Iterate dataframe rows
-for index, biobank in filtered_df.iterrows():
-
+for biobank in dir.getBiobanks():
     if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip:
         biobankDict = {}
+
         # Biobank properties:
         biobankPropertiesDict = {}
         if 'biobankID' in biobankInputFeatures:
             biobankPropertiesDict['biobankID'] = biobank['id']
         if 'biobankSize' in biobankInputFeatures:
             try:
-                # Get a list of column names for order of magnitude
-                collections_order_of_magnitude_id_columns = list(filtered_df.filter(regex='collections-[0-9]*-order_of_magnitude-id', axis=1).columns)
-                # Within those columns get the one with the maximum value
-                biobankPropertiesDict['biobankSize'] = int(biobank[collections_order_of_magnitude_id_columns].max())
+                biobankPropertiesDict['biobankSize'] = max(int(coll['order_of_magnitude']['id']) for coll in biobank['collections'])
             except ValueError:
                 pass
         if 'biobankName' in biobankInputFeatures:
@@ -234,28 +185,15 @@ for index, biobank in filtered_df.iterrows():
         if 'biobankType' in biobankInputFeatures:
             biobankPropertiesDict['biobankType'] = 'biobank' ### DEFAULT
 
-        if 'covid19biobank' in biobankInputFeatures and 'capabilities' in biobank.keys():
+        if 'covid19biobank' in biobankInputFeatures and 'covid19biobank' in biobank.keys():
             biobankCOVID = []
-            # For each capabilities-_href column, look for covid19 information and store it in the dictionary:
-            for idx in range(0,len(list(filtered_df.filter(regex='capabilities-[0-9]*-_href', axis=1).columns))):
+            for COVIDDict in biobank['covid19biobank']:
                 biobankCOVIDDict = {}
-                if not pd.isna(biobank['capabilities-'+ str(idx) +'-_href']):
-                    if 'covid19' in biobank['capabilities-'+str(idx)+'-_href']:
-                        biobankCOVIDDict['_href']=biobank['capabilities-'+ str(idx) +'-_href']
-                        biobankCOVIDDict['id']=biobank['capabilities-'+str(idx)+'-id']
-                        biobankCOVIDDict['name']=biobank['capabilities-'+str(idx)+'-label']
-                        biobankCOVID.append(biobankCOVIDDict)
+                biobankCOVIDDict['_href']=COVIDDict['_href']
+                biobankCOVIDDict['id']=COVIDDict['id']
+                biobankCOVIDDict['name']=COVIDDict['name']
+                biobankCOVID.append(biobankCOVIDDict)
             biobankPropertiesDict['biobankCOVID'] = biobankCOVID
-
-        #New 0106
-        network_columns = list(filtered_df.filter(regex='network-[0-9]*-_href', axis=1).columns)
-        if not biobankCOVID and 'COVID19' in str(biobank[network_columns].values):
-            biobankCOVID = []
-            biobankCOVIDDict = {}
-            biobankCOVIDDict['name']='COVID19 Network'
-            biobankCOVID.append(biobankCOVIDDict)
-            biobankPropertiesDict['biobankCOVID'] = biobankCOVID 
-
 
         biobankDict['properties'] = biobankPropertiesDict
 
@@ -269,16 +207,16 @@ for index, biobank in filtered_df.iterrows():
         if biobank['name'] in config['Override biobank position'].keys():        
             biobankGeometryDict['coordinates'] = [float(i) for i in config['Override biobank position'][biobank['name']].split(',')]
 
-        elif not pd.isna(biobank['longitude']) and not pd.isna(biobank['latitude']):
-            dmsSymbols = ['º','°']
+        elif 'longitude' in biobank.keys() and 'latitude' in biobank.keys():
+            dmsSymbols = ['o','°']
             #if '°' in biobank['longitude'] or '°' in biobank['latitude'] or '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
             if any(x in biobank['longitude'] for x in dmsSymbols) or any(x in biobank['latitude'] for x in dmsSymbols):
                 biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
             else:
                 biobankGeometryDict['coordinates'] = [float(re.sub(r',', r'.', biobank['longitude'])), float(re.sub(r',', r'.', biobank['latitude']))]
             log.info(biobank['name'] + ': Coordinates provided')
-        elif biobank['contact-_href']:
-            lookForCoordinatesFeatures = ['contact-address', 'contact-zip', 'contact-city', 'contact-country-name']
+        elif 'contact' in biobank.keys():
+            lookForCoordinatesFeatures = ['address', 'zip', 'city', 'country']
             location = lookForCoordinates(biobank, lookForCoordinatesFeatures)
             if location:
                 biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]

@@ -25,7 +25,7 @@ class DataCheckWarning:
         self.directoryEntityID = directoryEntityID
         self.directoryEntityType = directoryEntityType
         self.message = message
-    
+
     def dump(self):
         print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message)
 

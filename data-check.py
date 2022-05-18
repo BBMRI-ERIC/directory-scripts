@@ -82,7 +82,7 @@ class WarningsContainer:
         self.__warningsNNs.setdefault(warning.NN,[]).append(warning)
         if warning.recipients != "":
             warning_key = recipients + ", "
-        try: 
+        try:
             warning_key += NNContacts.NNtoEmails[warning.NN]
         except KeyError:
             warning_key += 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl, a.w.hodselmans@rug.nl'

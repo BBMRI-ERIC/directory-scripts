@@ -87,7 +87,7 @@ for collection in dir.getCollections():
     if 'materials' in collection:
         for m in collection['materials']:
             materials.append(m['id'])
-    
+
     data_categories = []
     if 'data_categories' in collection:
         for c in collection['data_categories']:
@@ -98,7 +98,7 @@ for collection in dir.getCollections():
         for t in collection['type']:
             types.append(t['id'])
     log.debug("Types: " + str(types))
-    
+
     diags = []
     diag_ranges = []
     covid_diag = False
@@ -114,7 +114,7 @@ for collection in dir.getCollections():
 
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
-    
+
     if 'COHORT' in types or 'POPULATION_BASED' in types:
         cohortCollections.append(collection)
         cohortBiobankIds.add(biobankId)
