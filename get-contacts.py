@@ -167,6 +167,7 @@ else:
 		name = " ".join(filter(None,[contact.get('title_before_name'), contact.get('first_name'), contact.get('last_name'), contact.get('title_after_name')]))
 		#name = name.translate(str.maketrans('', '', string.punctuation))
 		name = name.translate(str.maketrans('', '', '@'))
+		name = re.sub(r'\(.*?\)', '', name)
 		name = HumanName(name.lower().strip())
 		name.capitalize()
 		if re.search('^(\w\.)+$', name.first):

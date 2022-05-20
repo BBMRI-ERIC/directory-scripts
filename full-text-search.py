@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3.8
 # vim:ts=8:sw=8:tw=0:noet
 
 from typing import List

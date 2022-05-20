@@ -1,4 +1,5 @@
-# vim:ts=8:sw=8:tw=0:noet
+#!/usr/bin/python3
+# vim:ts=4:sw=4:tw=0:et
 
 from builtins import *
 
@@ -12,6 +13,8 @@ cancer_diag_ranges = ['C00-D49', 'C00-C97', 'C00-C75', 'C00-C14', 'C15-C26', 'C3
                       'D37-D48', 'C50-C50', 'C97-C97']
 
 cancer_chapters_roman = list(map(roman.toRoman, range(1, 23)))  # chapter 22 added in 2020
+
+obesity_diag_ranges = ['E65-E68']
 
 
 class ICD10CodesHelper:
@@ -47,3 +50,21 @@ class ICD10CodesHelper:
          return True
       else:
          return False
+
+   def isObesityCode(code : str) -> bool:
+      m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
+      if m:
+         log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
+         if m.group('block') == 'E' and (int(m.group('code')) == 66):
+            return True
+         else:
+            return False
+
+      # now we deal with ranges
+      if code in obesity_diag_ranges:
+             return True
+      else:
+             return False
+
+      # this is unparsable
+      return None
