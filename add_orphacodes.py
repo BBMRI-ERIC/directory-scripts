@@ -1,3 +1,4 @@
+# vim:ts=4:sw=4:tw=0:sts=4:et
 """
 Script to add Orphacodes to collections in the BBMRI directory EMX file.
 The script gets in input the directory EMX file, the orphanet file with mappings used by OrphaCodes class and the output

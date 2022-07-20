@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=8:sw=8:tw=0:noet
+# vim:ts=4:sw=4:tw=0:sts=4:et
 
 import pprint
 import re

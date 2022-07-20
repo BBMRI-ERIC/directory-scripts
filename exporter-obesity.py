@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=4:sw=4:tw=0:et
+# vim:ts=4:sw=4:tw=0:sts=4:et
 
 import pprint
 import re
@@ -143,7 +143,7 @@ for collection in dir.getCollections():
     if 'name' in collection:
         if re.search(r'(obesity|obese)', collection['name'], re.IGNORECASE):
                     log.debug("Collection %s identified as obesity collection due to its name %s" % (collection['id'], collection['name']))
-                    obesit = True
+                    obesity = True
 
     if 'description' in collection:
         if re.search(r'(obesity|obese)', collection['description'], re.IGNORECASE):

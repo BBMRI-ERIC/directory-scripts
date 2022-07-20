@@ -54,14 +54,15 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-ecraidBSLCollections = []
-ecraidPathogenCollections = []
-ecraidRelevantBiobankIds = set()
+cohortCollections = []
+cohortBiobankIds = set()
+cohortCountries = set()
 
 for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
     biobankId = dir.getCollectionBiobankId(collection['id'])
     biobank = dir.getBiobankById(biobankId)
+    country = biobank['country']['id']
 
     biobank_capabilities = []
     if 'capabilities' in biobank:
@@ -114,21 +115,13 @@ for collection in dir.getCollections():
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
     
-    if 'BSL2' in biobank_covid or 'BSL3' in biobank_covid:
-        ecraidBSLCollections.append(collection)
-        ecraidRelevantBiobankIds.add(biobankId)
-    
-    if 'PATHOGEN' in materials:
-        ecraidPathogenCollections.append(collection)
-        ecraidRelevantBiobankIds.add(biobankId)
+    if 'COHORT' in types or 'POPULATION_BASED' in types:
+        cohortCollections.append(collection)
+        cohortBiobankIds.add(biobankId)
+        cohortCountries.add(country)
 
-pd_ecraidBSLCollections = pd.DataFrame(ecraidBSLCollections)
-pd_ecraidPathogenCollections = pd.DataFrame(ecraidPathogenCollections)
-
-ecraidRelevantBiobanks = []
-for b in ecraidRelevantBiobankIds:
-    ecraidRelevantBiobanks.append(dir.getBiobankById(b))
-pd_ecraidRelevantBiobanks = pd.DataFrame(ecraidRelevantBiobanks)
+pd_cohortCollections = pd.DataFrame(cohortCollections)
+pddfutils.tidyBiobankDf(pd_cohortCollections)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
     print(headerStr + " - " + str(len(collectionList)) + " collections")
@@ -138,24 +131,16 @@ def printCollectionStdout(collectionList : List, headerStr : str):
         print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'])
 
 if not args.nostdout:
-    printCollectionStdout(ecraidBSLCollections, "ECRAID-relevant collections with BSL-2/BSL-3 labs")
-    print("\n\n")
-    printCollectionStdout(ecraidPathogenCollections, "ECRAID-relevant pathogen collections")
+    printCollectionStdout(cohortCollections, "Cohort collections")
+    print("List of countries: %s"%(", ".join(sorted(cohortCountries))))
     print("\n\n")
     print("Totals:")
-    print("- total number of ECRAID-relevant biobanks: %d"%(len(ecraidRelevantBiobanks)))
-    print("- total number of ECRAID-relevant collections with BSL-2/BSL-3 labs: %d"%(len(ecraidBSLCollections)))
-    print("- total number of ECRAID-relevant pathogen collections: %d"%(len(ecraidPathogenCollections)))
-
-for df in (pd_ecraidBSLCollections,pd_ecraidPathogenCollections):
-    pddfutils.tidyCollectionDf(df)
-
-pddfutils.tidyBiobankDf(pd_ecraidRelevantBiobanks)
+    print("- total number of cohort biobanks: %d"%(len(cohortBiobankIds)))
+    print("- total number of cohort collections: %d"%(len(cohortCollections)))
+    print("- total number of cohort countries: %d"%(len(cohortCountries)))
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
-    pd_ecraidBSLCollections.to_excel(writer, sheet_name='Collections with BSL labs',index=False)
-    pd_ecraidPathogenCollections.to_excel(writer, sheet_name='Pathogen collections',index=False)
-    pd_ecraidRelevantBiobanks.to_excel(writer, sheet_name='Institutions',index=False)
+    pd_cohortCollections.to_excel(writer, sheet_name='Cohort collections',index=False)
     writer.save()
