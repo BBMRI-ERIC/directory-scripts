@@ -42,7 +42,8 @@ parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
 parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding')
+parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
+parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 #parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
@@ -205,6 +206,11 @@ for column, value in config['Filter dataset'].items():
 # If there is not filtered dataframe because not filters were selected, use the original df:
 if not 'filtered_df' in locals():
     filtered_df = df
+
+if args.printDf:
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_colwidth', None)
+    print (filtered_df)
 
 # Iterate dataframe rows
 for index, biobank in filtered_df.iterrows():
