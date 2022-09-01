@@ -10,6 +10,7 @@
   - requests
   - diskcache
   - yapsy
+  - whoosh
 
 ## Installation
 - Verify installation:  
