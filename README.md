@@ -71,10 +71,10 @@ python3 data-check.py -d --purge-all-caches
 - **pediatric-exporter.py** - statistics generator for pediatric biobanks/collections
 - **diagnosis-exporter.py** - dumper of diagnosis information from the directory, used for development purposes only  
   - `./diagnosis-exporter.py -d >diagnosis-exporter.log 2>&1`
-- **full-text-search.py** - fulltext search of the Directory using Whoosh library with Lucene search syntax. Examples of use
+- **full-text-search.py** - fulltext search of the Directory using Whoosh library with [Lucene search syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html). Information in [Whoosh documentation](https://whoosh.readthedocs.io/en/latest/querylang.html). Examples of use - note that you may need to use escaping of double quote characters if running from shell:
   - `./full-text-search.py 'bbmri-eric:ID:UK_GBR-1-101'`
   - `./full-text-search.py '"Cell therapy"~3'`
   - `./full-text-search.py '*420*'`
   - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
   - `./full-text-search.py 'myID' | perl -ne "while(<>) {if(m/^.*?'id':\s+'(.+?)'.*$/) {print \$1 . \"\n\";}}"`
-
+  
