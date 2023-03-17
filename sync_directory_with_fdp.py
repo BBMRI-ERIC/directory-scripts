@@ -9,6 +9,7 @@ DIRECTORY_URL = f'{directoryURL}'  # URL of the directory
 
 BBMRI_BIOBANK_ENTITY = 'eu_bbmri_eric_biobanks'
 BBMRI_COLLECTION_ENTITY = 'eu_bbmri_eric_collections'
+BBMRI_DATA_SERVICE_ENTITY = 'eu_bbmri_eric_record_service'
 
 FDP_BIOBANK_ENTITY = 'fdp_Biobank'
 FDP_COLLECTION_ENTITY = 'fdp_Collection'
@@ -18,10 +19,10 @@ ORPHA_DIRECTORY_PREFIX = 'ORPHA:'
 ICD_10_ONTOLOGY_PREFIX = 'http://purl.bioontology.org/ontology/ICD10/'
 ICD_10_DIRECTORY_PREFIX = 'urn:miriam:icd:'
 
-BIOBANKS_ATTRIBUTES = 'id,name,acronym,description,country,juridical_person,collections,contact'
-BIOBANKS_EXPAND_ATTRIBUTES = 'country,juridical_person,collections,contact'
-COLLECTIONS_ATTRIBUTES = 'id,name,description,biobank,diagnosis_available,country,parent_collection'
-COLLECTIONS_EXPAND_ATTRIBUTES = 'biobank,diagnosis_available,country'
+COLLECTIONS_ATTRIBUTES = '*,record_service(*)'
+BIOBANKS_ATTRIBUTES = f'id,name,acronym,description,country,juridical_person,contact,collections'
+BIOBANKS_EXPAND_ATTRIBUTES = f'country,juridical_person,contact,collections'
+COLLECTIONS_EXPAND_ATTRIBUTES = 'biobank,diagnosis_available,country,record_service'
 
 COLLECTION_TYPES_ONTOLOGIES = {
     'BIRTH_COHORT': 'http://purl.obolibrary.org/obo/OBI_0002614',
@@ -45,7 +46,7 @@ COLLECTION_TYPES_ONTOLOGIES = {
 
 def _get_missing_biobanks(session, **kwargs):
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
-    source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
+    source_records = session.get(BBMRI_BIOBANK_ENTITY, q='id==bbmri-eric:ID:RD_ES:44001', **kwargs)
     print("Getting ids already present")
     dest_records_ids = [r['identifier'] for r in session.get(FDP_BIOBANK_ENTITY, attributes='identifier')]
     new_records = [sr for sr in source_records if sr['id'] not in dest_records_ids]
@@ -81,6 +82,7 @@ def _get_collection_type_ontology_code(collection_type):
 
 def get_records_to_add(biobank_data, session):
     missing_iris = []
+    dataServices = []
     for c in biobank_data['collections']:
         for d in c['diagnosis_available']:
             try:
@@ -96,7 +98,16 @@ def get_records_to_add(biobank_data, session):
                 if ontology_code is not None:
                     missing_iris.append((t['id'], ontology_code))
 
-    return {
+        if 'record_service' in c:
+            rs_data = session.get_by_id(BBMRI_DATA_SERVICE_ENTITY, c['record_service']['id'])
+            dataServices.append({
+                'identifier': rs_data['id'],
+                'endpointUrl': rs_data['url'],
+                'endpointDescription': rs_data['description'] if 'description' in rs_data else None,
+                'conformsTo': rs_data['conformsTo']
+            })
+
+    res = {
         'fdp_Biobank': {
             'IRI': f'{DIRECTORY_URL}/api/fdp/fdp_Biobank/{biobank_data["id"]}',
             'catalog': 'bbmri-directory',  # TODO: get it dynamically
@@ -125,20 +136,27 @@ def get_records_to_add(biobank_data, session):
             'biobank': biobank_data["id"],
             'description': c['description'] if 'description' in c else None,
             'type': [t['id'] for t in c['type'] if _get_collection_type_ontology_code(t['id']) is not None],
-            'theme': [d['id'] for d in c['diagnosis_available']]
+            'theme': [d['id'] for d in c['diagnosis_available']],
+            'service': c['record_service']['id'] if 'record_service' in c else None
         } for c in biobank_data['collections']],
-        'fdp_IRI': missing_iris
+        'fdp_IRI': missing_iris,
     }
+    if len(dataServices) > 0:
+        res.update({
+            'fdp_DataService': dataServices
+        })
+    return res
 
 
 def sync_biobanks(session, **kwargs):
-    missing_biobanks = _get_missing_biobanks(session, attributes=BIOBANKS_ATTRIBUTES,
-                                             expand=BIOBANKS_EXPAND_ATTRIBUTES, **kwargs)
+    missing_biobanks = _get_missing_biobanks(session, attributes=BIOBANKS_ATTRIBUTES, expand=BIOBANKS_EXPAND_ATTRIBUTES,
+                                             **kwargs)
     biobanks = []
     publishers = []
     contacts = []
     collections = []
     iris = set()
+    data_services = []
     for b in missing_biobanks:
         records = get_records_to_add(b, session)
         biobanks.append(records['fdp_Biobank'])
@@ -147,11 +165,23 @@ def sync_biobanks(session, **kwargs):
         collections.extend(records['fdp_Collection'])
         iris.update(records['fdp_IRI'])
 
+        if 'fdp_DataService' in records:
+            data_services.extend(records['fdp_DataService'])
+
+    print(data_services)
+    session.delete_list('fdp_DataService', [d['identifier'] for d in data_services])
+    session.delete_list('fdp_Collection', [c['identifier'] for c in collections])
+    session.delete_list('fdp_Biobank', [b['identifier'] for b in biobanks])
+    session.delete_list('fdp_Publisher', [p['identifier'] for p in publishers])
+    session.delete_list('fdp_ContactPointIndividual', [c['identifier'] for c in contacts])
+
     _add_new_records(session, 'fdp_Publisher', publishers)
     _add_new_records(session, 'fdp_ContactPointIndividual', contacts)
     _add_new_records(session, 'fdp_IRI', [{'id': i[0], 'IRI': i[1]} for i in iris])
+    _add_new_records(session, 'fdp_DataService', data_services)
     _add_new_records(session, 'fdp_Biobank', biobanks)
     _add_new_records(session, 'fdp_Collection', collections)
+
 
 s = client.Session(MOLGENIS_URL)
 s.login('admin', 'admin')
