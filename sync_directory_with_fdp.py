@@ -1,18 +1,23 @@
+from collections import OrderedDict
+
 from molgenis import client
 from molgenis.client import MolgenisRequestError
 
-molgenisURL = 'http://localhost:82'
-directoryURL = 'http://localhost:82'
+molgenis_url = 'http://localhost:82'
+directory_url = 'http://localhost:82'
 
-MOLGENIS_URL = f'{molgenisURL}'  # URL of the molgenis to query
-DIRECTORY_URL = f'{directoryURL}'  # URL of the directory
+MOLGENIS_URL = f'{molgenis_url}'  # URL of the molgenis to query
+DIRECTORY_URL = f'{directory_url}'  # URL of the directory
 
 BBMRI_BIOBANK_ENTITY = 'eu_bbmri_eric_biobanks'
-BBMRI_COLLECTION_ENTITY = 'eu_bbmri_eric_collections'
 BBMRI_DATA_SERVICE_ENTITY = 'eu_bbmri_eric_record_service'
 
-FDP_BIOBANK_ENTITY = 'fdp_Biobank'
-FDP_COLLECTION_ENTITY = 'fdp_Collection'
+FDP_BIOBANK = 'fdp_Biobank'
+FDP_COLLECTION = 'fdp_Collection'
+FDP_PUBLISHER = 'fdp_Publisher'
+FDP_CONTACT = 'fdp_ContactPointIndividual'
+FDP_DATA_SERVICE = 'fdp_DataService'
+FDP_IRI = 'fdp_IRI'
 
 ORPHA_ONTOLOGY_PREFIX = 'http://www.orpha.net/ORDO/Orphanet_'
 ORPHA_DIRECTORY_PREFIX = 'ORPHA:'
@@ -44,17 +49,21 @@ COLLECTION_TYPES_ONTOLOGIES = {
 }
 
 
-def _get_missing_biobanks(session, **kwargs):
+def get_missing_biobanks(session, reset, **kwargs):
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
-    source_records = session.get(BBMRI_BIOBANK_ENTITY, q='id==bbmri-eric:ID:RD_ES:44001', **kwargs)
+    source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
+    # if reset is True the missing biobanks are all
+    if reset:
+        return source_records
+
     print("Getting ids already present")
-    dest_records_ids = [r['identifier'] for r in session.get(FDP_BIOBANK_ENTITY, attributes='identifier')]
+    dest_records_ids = [r['identifier'] for r in session.get(FDP_BIOBANK, attributes='identifier')]
     new_records = [sr for sr in source_records if sr['id'] not in dest_records_ids]
     print("Found {} new records to insert".format(len(new_records)))
-    return source_records
+    return new_records
 
 
-def _add_new_records(session, entity, records):
+def create_records(session, entity, records):
     created_records = []
     for i in range(0, len(records), 1000):
         try:
@@ -65,42 +74,54 @@ def _add_new_records(session, entity, records):
     print("Added {} record(s) of type {}".format(len(created_records), entity))
 
 
-def _convert_country(country):
+def delete_records(session, entity, records):
+    removed_records = []
+    for i in range(0, len(records), 1000):
+        try:
+            removed_records.extend(
+                session.delete_list(entity, [record['identifier'] for record in records[i:i + 1000]]))
+        except MolgenisRequestError as ex:
+            print("Error removing records")
+            print(ex)
+    print(f"Removed {len(removed_records)} of type {entity}")
+
+
+def get_country(country):
     return 'GB' if country == 'UK' else country
 
 
-def _get_disease_ontology_code(disease_code):
+def get_disease_ontology_code(disease_code):
     if ORPHA_DIRECTORY_PREFIX in disease_code:
-        return disease_code.replace(ORPHA_ONTOLOGY_PREFIX, ORPHA_ONTOLOGY_PREFIX)
+        return disease_code.replace(ORPHA_DIRECTORY_PREFIX, ORPHA_ONTOLOGY_PREFIX)
     if ICD_10_DIRECTORY_PREFIX in disease_code:
         return disease_code.replace(ICD_10_DIRECTORY_PREFIX, ICD_10_ONTOLOGY_PREFIX)
 
 
-def _get_collection_type_ontology_code(collection_type):
+def get_collection_type_ontology_code(collection_type):
     return COLLECTION_TYPES_ONTOLOGIES.get(collection_type, None)
 
 
 def get_records_to_add(biobank_data, session):
     missing_iris = []
-    dataServices = []
+    data_services = []
     for c in biobank_data['collections']:
         for d in c['diagnosis_available']:
             try:
                 session.get_by_id('fdp_IRI', d['id'], attributes='id')
             except MolgenisRequestError:
-                missing_iris.append((d['id'], _get_disease_ontology_code(d['id'])))
+                missing_iris.append((d['id'], get_disease_ontology_code(d['id'])))
 
         for t in c['type']:
             try:
                 session.get_by_id('fdp_IRI', t['id'], attributes='id')
             except MolgenisRequestError:
-                ontology_code = _get_collection_type_ontology_code(t['id'])
+                ontology_code = get_collection_type_ontology_code(t['id'])
                 if ontology_code is not None:
                     missing_iris.append((t['id'], ontology_code))
 
         if 'record_service' in c:
             rs_data = session.get_by_id(BBMRI_DATA_SERVICE_ENTITY, c['record_service']['id'])
-            dataServices.append({
+            data_services.append({
                 'identifier': rs_data['id'],
                 'endpointUrl': rs_data['url'],
                 'endpointDescription': rs_data['description'] if 'description' in rs_data else None,
@@ -108,82 +129,82 @@ def get_records_to_add(biobank_data, session):
             })
 
     res = {
-        'fdp_Biobank': {
+        FDP_BIOBANK: {
+            'identifier': biobank_data['id'],
             'IRI': f'{DIRECTORY_URL}/api/fdp/fdp_Biobank/{biobank_data["id"]}',
             'catalog': 'bbmri-directory',  # TODO: get it dynamically
-            'identifier': biobank_data['id'],
             'title': biobank_data['name'],
             'acronym': biobank_data['acronym'] if 'acronym' in biobank_data else None,
             'description': biobank_data['description'] if 'description' in biobank_data else None,
             'publisher': f'{biobank_data["id"]}-pub',
             'landingPage': f'{DIRECTORY_URL}/#/biobank/{biobank_data["id"]}',
             'contactPoint': f'{biobank_data["id"]}-cp' if 'contact' in biobank_data else None,
-            'country': _convert_country(biobank_data['country']['id'])
+            'country': get_country(biobank_data['country']['id'])
         },
-        'fdp_Publisher': {
+        FDP_PUBLISHER: {
             'identifier': f'{biobank_data["id"]}-pub',
             'label': biobank_data['juridical_person']
         },
-        'fdp_ContactPointIndividual': {
+        FDP_CONTACT: {
             'identifier': f'{biobank_data["id"]}-cp',
             'email': f'mailto:{biobank_data["contact"]["email"]}' if 'contact' in biobank_data else '',
             'address': '',
             'telephone': '',
         },
-        'fdp_Collection': [{
+        FDP_COLLECTION: [{
             'identifier': c['id'],
             'title': c['name'],
             'biobank': biobank_data["id"],
             'description': c['description'] if 'description' in c else None,
-            'type': [t['id'] for t in c['type'] if _get_collection_type_ontology_code(t['id']) is not None],
+            'type': [t['id'] for t in c['type'] if get_collection_type_ontology_code(t['id']) is not None],
             'theme': [d['id'] for d in c['diagnosis_available']],
             'service': c['record_service']['id'] if 'record_service' in c else None
         } for c in biobank_data['collections']],
-        'fdp_IRI': missing_iris,
+        FDP_IRI: missing_iris,
+        FDP_DATA_SERVICE: data_services
     }
-    if len(dataServices) > 0:
-        res.update({
-            'fdp_DataService': dataServices
-        })
     return res
 
 
-def sync_biobanks(session, **kwargs):
-    missing_biobanks = _get_missing_biobanks(session, attributes=BIOBANKS_ATTRIBUTES, expand=BIOBANKS_EXPAND_ATTRIBUTES,
-                                             **kwargs)
-    biobanks = []
-    publishers = []
-    contacts = []
-    collections = []
-    iris = set()
-    data_services = []
+def sync(session, reset, **kwargs):
+    missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,
+                                            expand=BIOBANKS_EXPAND_ATTRIBUTES,
+                                            **kwargs)
+
+    records = OrderedDict({
+        FDP_PUBLISHER: [],
+        FDP_CONTACT: [],
+        FDP_IRI: set(),
+        FDP_DATA_SERVICE: [],
+        FDP_BIOBANK: [],
+        FDP_COLLECTION: []
+    })
     for b in missing_biobanks:
-        records = get_records_to_add(b, session)
-        biobanks.append(records['fdp_Biobank'])
-        publishers.append(records['fdp_Publisher'])
-        contacts.append(records['fdp_ContactPointIndividual'])
-        collections.extend(records['fdp_Collection'])
-        iris.update(records['fdp_IRI'])
+        new_records = get_records_to_add(b, session)
+        for k, v in new_records.items():
+            if type(records[k]) == list:
+                if type(new_records[k]) == list:
+                    records[k].extend(new_records[k])
+                else:
+                    records[k].append(new_records[k])
+            else:
+                records[k].update(new_records[k])
 
-        if 'fdp_DataService' in records:
-            data_services.extend(records['fdp_DataService'])
+    if reset:
+        for k, v in reversed(records.items()):
+            if k != 'fdp_IRI' and len(v) > 0:
+                delete_records(session, k, v)
 
-    print(data_services)
-    session.delete_list('fdp_DataService', [d['identifier'] for d in data_services])
-    session.delete_list('fdp_Collection', [c['identifier'] for c in collections])
-    session.delete_list('fdp_Biobank', [b['identifier'] for b in biobanks])
-    session.delete_list('fdp_Publisher', [p['identifier'] for p in publishers])
-    session.delete_list('fdp_ContactPointIndividual', [c['identifier'] for c in contacts])
-
-    _add_new_records(session, 'fdp_Publisher', publishers)
-    _add_new_records(session, 'fdp_ContactPointIndividual', contacts)
-    _add_new_records(session, 'fdp_IRI', [{'id': i[0], 'IRI': i[1]} for i in iris])
-    _add_new_records(session, 'fdp_DataService', data_services)
-    _add_new_records(session, 'fdp_Biobank', biobanks)
-    _add_new_records(session, 'fdp_Collection', collections)
+    for k, v in records.items():
+        if len(v) > 0:
+            if k == FDP_IRI:
+                create_records(session, k, [{'id': i[0], 'IRI': i[1]} for i in v])
+            else:
+                create_records(session, k, v)
 
 
 s = client.Session(MOLGENIS_URL)
 s.login('admin', 'admin')
 
-sync_biobanks(s, num=1)
+reset = True
+sync(s, reset)
