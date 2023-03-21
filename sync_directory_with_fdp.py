@@ -1,13 +1,8 @@
+import logging
 from collections import OrderedDict
 
 from molgenis import client
 from molgenis.client import MolgenisRequestError
-
-molgenis_url = 'http://localhost:82'
-directory_url = 'http://localhost:82'
-
-MOLGENIS_URL = f'{molgenis_url}'  # URL of the molgenis to query
-DIRECTORY_URL = f'{directory_url}'  # URL of the directory
 
 BBMRI_BIOBANK_ENTITY = 'eu_bbmri_eric_biobanks'
 BBMRI_DATA_SERVICE_ENTITY = 'eu_bbmri_eric_record_service'
@@ -24,10 +19,8 @@ ORPHA_DIRECTORY_PREFIX = 'ORPHA:'
 ICD_10_ONTOLOGY_PREFIX = 'http://purl.bioontology.org/ontology/ICD10/'
 ICD_10_DIRECTORY_PREFIX = 'urn:miriam:icd:'
 
-COLLECTIONS_ATTRIBUTES = '*,record_service(*)'
 BIOBANKS_ATTRIBUTES = f'id,name,acronym,description,country,juridical_person,contact,collections'
 BIOBANKS_EXPAND_ATTRIBUTES = f'country,juridical_person,contact,collections'
-COLLECTIONS_EXPAND_ATTRIBUTES = 'biobank,diagnosis_available,country,record_service'
 
 COLLECTION_TYPES_ONTOLOGIES = {
     'BIRTH_COHORT': 'http://purl.obolibrary.org/obo/OBI_0002614',
@@ -101,7 +94,7 @@ def get_collection_type_ontology_code(collection_type):
     return COLLECTION_TYPES_ONTOLOGIES.get(collection_type, None)
 
 
-def get_records_to_add(biobank_data, session):
+def get_records_to_add(biobank_data, session, directory_prefix):
     missing_iris = []
     data_services = []
     for c in biobank_data['collections']:
@@ -131,13 +124,13 @@ def get_records_to_add(biobank_data, session):
     res = {
         FDP_BIOBANK: {
             'identifier': biobank_data['id'],
-            'IRI': f'{DIRECTORY_URL}/api/fdp/fdp_Biobank/{biobank_data["id"]}',
+            'IRI': f'{directory_prefix}/api/fdp/fdp_Biobank/{biobank_data["id"]}',
             'catalog': 'bbmri-directory',  # TODO: get it dynamically
             'title': biobank_data['name'],
             'acronym': biobank_data['acronym'] if 'acronym' in biobank_data else None,
             'description': biobank_data['description'] if 'description' in biobank_data else None,
             'publisher': f'{biobank_data["id"]}-pub',
-            'landingPage': f'{DIRECTORY_URL}/#/biobank/{biobank_data["id"]}',
+            'landingPage': f'{directory_prefix}/#/biobank/{biobank_data["id"]}',
             'contactPoint': f'{biobank_data["id"]}-cp' if 'contact' in biobank_data else None,
             'country': get_country(biobank_data['country']['id'])
         },
@@ -166,7 +159,7 @@ def get_records_to_add(biobank_data, session):
     return res
 
 
-def sync(session, reset, **kwargs):
+def sync(session, reset, directory_prefix, **kwargs):
     missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,
                                             expand=BIOBANKS_EXPAND_ATTRIBUTES,
                                             **kwargs)
@@ -180,7 +173,7 @@ def sync(session, reset, **kwargs):
         FDP_COLLECTION: []
     })
     for b in missing_biobanks:
-        new_records = get_records_to_add(b, session)
+        new_records = get_records_to_add(b, session, directory_prefix)
         for k, v in new_records.items():
             if type(records[k]) == list:
                 if type(new_records[k]) == list:
@@ -203,8 +196,18 @@ def sync(session, reset, **kwargs):
                 create_records(session, k, v)
 
 
-s = client.Session(MOLGENIS_URL)
-s.login('admin', 'admin')
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--molgenis-url', '-U')
+    parser.add_argument('--molgenis-user', '-u')
+    parser.add_argument('--molgenis-password', '-p')
+    parser.add_argument('--directory-prefix', '-d', help='The main prefix of the url to be used to generate IRIs', default='https://directory.bbmri-eric.eu/')
+    parser.add_argument('--reset', '-r', dest='reset', action='store_true')
+    args = parser.parse_args()
 
-reset = True
-sync(s, reset)
+    s = client.Session(args.molgenis_url)
+    s.login(args.molgenis_user, args.molgenis_password)
+
+    sync(s, args.directory_prefix, args.reset)
+
