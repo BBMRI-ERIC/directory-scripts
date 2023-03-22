@@ -159,7 +159,7 @@ def get_records_to_add(biobank_data, session, directory_prefix):
     return res
 
 
-def sync(session, reset, directory_prefix, **kwargs):
+def sync(session, directory_prefix, reset, **kwargs):
     missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,
                                             expand=BIOBANKS_EXPAND_ATTRIBUTES,
                                             **kwargs)
