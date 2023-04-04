@@ -5,11 +5,12 @@ from molgenis import client
 from molgenis.client import MolgenisRequestError
 
 BBMRI_BIOBANK_ENTITY = 'eu_bbmri_eric_biobanks'
+BBMRI_CONTACT_ENTITY = 'eu_bbmri_eric_persons'
 BBMRI_DATA_SERVICE_ENTITY = 'eu_bbmri_eric_record_service'
 
 FDP_BIOBANK = 'fdp_Biobank'
 FDP_COLLECTION = 'fdp_Collection'
-FDP_PUBLISHER = 'fdp_Publisher'
+FDP_BIOBANK_ORGANIZATION = 'fdp_BiobankOrganization'
 FDP_CONTACT = 'fdp_ContactPointIndividual'
 FDP_DATA_SERVICE = 'fdp_DataService'
 FDP_IRI = 'fdp_IRI'
@@ -67,12 +68,12 @@ def create_records(session, entity, records):
     print("Added {} record(s) of type {}".format(len(created_records), entity))
 
 
-def delete_records(session, entity, records):
+def delete_records(session, entity, records_ids):
     removed_records = []
-    for i in range(0, len(records), 1000):
+    for i in range(0, len(records_ids), 1000):
         try:
             removed_records.extend(
-                session.delete_list(entity, [record['identifier'] for record in records[i:i + 1000]]))
+                session.delete_list(entity, [record_id for record_id in records_ids[i:i + 1000]]))
         except MolgenisRequestError as ex:
             print("Error removing records")
             print(ex)
@@ -94,17 +95,38 @@ def get_collection_type_ontology_code(collection_type):
     return COLLECTION_TYPES_ONTOLOGIES.get(collection_type, None)
 
 
+def get_contact_record(session, contact_id):
+    contact = session.get_by_id(BBMRI_CONTACT_ENTITY, contact_id)
+    return (
+        f'{contact["id"]}',
+        f'mailto:{contact["email"]}',
+        f'tel:{contact["phone"].replace(" ", "")}' if 'phone' in contact else None,
+        contact['first_name'] if 'first_name' in contact else None,
+        contact['last_name'] if 'last_name' in contact else None,
+        contact['title_before_name'] if 'title_before_name' in contact else None,
+        contact['title_after_name'] if 'title_after_name' in contact else None
+    )
+
+
 def get_records_to_add(biobank_data, session, directory_prefix):
     missing_iris = []
     data_services = []
-    for c in biobank_data['collections']:
-        for d in c['diagnosis_available']:
+    contacts = []
+    print('processing biobank', biobank_data['id'])
+
+    print("getting biobank's contact data")
+    if 'contact' in biobank_data:
+        contacts.append(get_contact_record(session, biobank_data['contact']['id']))
+
+    for collection in biobank_data['collections']:
+        print("processing collection", collection['id'])
+        for d in collection['diagnosis_available']:
             try:
                 session.get_by_id('fdp_IRI', d['id'], attributes='id')
             except MolgenisRequestError:
                 missing_iris.append((d['id'], get_disease_ontology_code(d['id'])))
 
-        for t in c['type']:
+        for t in collection['type']:
             try:
                 session.get_by_id('fdp_IRI', t['id'], attributes='id')
             except MolgenisRequestError:
@@ -112,45 +134,45 @@ def get_records_to_add(biobank_data, session, directory_prefix):
                 if ontology_code is not None:
                     missing_iris.append((t['id'], ontology_code))
 
-        if 'record_service' in c:
-            rs_data = session.get_by_id(BBMRI_DATA_SERVICE_ENTITY, c['record_service']['id'])
+        if 'contact' in collection:
+            contacts.append(get_contact_record(session, collection['contact']['id']))
+
+        if 'record_service' in collection:
+            rs = session.get_by_id(BBMRI_DATA_SERVICE_ENTITY, collection['record_service']['id'])
             data_services.append({
-                'identifier': rs_data['id'],
-                'endpointUrl': rs_data['url'],
-                'endpointDescription': rs_data['description'] if 'description' in rs_data else None,
-                'conformsTo': rs_data['conformsTo']
+                'identifier': rs['id'],
+                'endpointUrl': rs['url'],
+                'endpointDescription': rs['description'] if 'description' in rs else None,
+                'conformsTo': rs['conformsTo']
             })
 
     res = {
         FDP_BIOBANK: {
             'identifier': biobank_data['id'],
-            'IRI': f'{directory_prefix}/api/fdp/fdp_Biobank/{biobank_data["id"]}',
-            'catalog': 'bbmri-directory',  # TODO: get it dynamically
+            'IRI': f'{directory_prefix}/api/fdp/fdp_Biobank/{biobank_data["id"]}',  # TODO: use the PID
             'title': biobank_data['name'],
             'acronym': biobank_data['acronym'] if 'acronym' in biobank_data else None,
             'description': biobank_data['description'] if 'description' in biobank_data else None,
             'publisher': f'{biobank_data["id"]}-pub',
             'landingPage': f'{directory_prefix}/#/biobank/{biobank_data["id"]}',
-            'contactPoint': f'{biobank_data["id"]}-cp' if 'contact' in biobank_data else None,
+            'contactPoint': f'{biobank_data["contact"]["id"]}' if 'contact' in biobank_data else None,
             'country': get_country(biobank_data['country']['id'])
         },
-        FDP_PUBLISHER: {
+        FDP_BIOBANK_ORGANIZATION: {
             'identifier': f'{biobank_data["id"]}-pub',
-            'label': biobank_data['juridical_person']
+            'name': biobank_data['juridical_person']
         },
-        FDP_CONTACT: {
-            'identifier': f'{biobank_data["id"]}-cp',
-            'email': f'mailto:{biobank_data["contact"]["email"]}' if 'contact' in biobank_data else '',
-            'address': '',
-            'telephone': '',
-        },
+        FDP_CONTACT: contacts,
         FDP_COLLECTION: [{
             'identifier': c['id'],
+            'IRI': f'{directory_prefix}/api/fdp/fdp_Collection/{c["id"]}',
+            'contactPoint': f'{c["contact"]["id"]}' if 'contact' in c else None,
+            'catalog': 'bbmri-directory',  # TODO: get it dynamically
             'title': c['name'],
             'biobank': biobank_data["id"],
             'description': c['description'] if 'description' in c else None,
-            'type': [t['id'] for t in c['type'] if get_collection_type_ontology_code(t['id']) is not None],
-            'theme': [d['id'] for d in c['diagnosis_available']],
+            'type': [t['id'] for t in collection['type'] if get_collection_type_ontology_code(t['id']) is not None],
+            'theme': [d['id'] for d in collection['diagnosis_available']],
             'service': c['record_service']['id'] if 'record_service' in c else None
         } for c in biobank_data['collections']],
         FDP_IRI: missing_iris,
@@ -165,8 +187,8 @@ def sync(session, directory_prefix, reset, **kwargs):
                                             **kwargs)
 
     records = OrderedDict({
-        FDP_PUBLISHER: [],
-        FDP_CONTACT: [],
+        FDP_BIOBANK_ORGANIZATION: [],
+        FDP_CONTACT: set(),
         FDP_IRI: set(),
         FDP_DATA_SERVICE: [],
         FDP_BIOBANK: [],
@@ -185,29 +207,46 @@ def sync(session, directory_prefix, reset, **kwargs):
 
     if reset:
         for k, v in reversed(records.items()):
-            if k != 'fdp_IRI' and len(v) > 0:
-                delete_records(session, k, v)
+            if k not in (FDP_IRI, FDP_CONTACT) and len(v) > 0:
+                delete_records(session, k, [i['identifier'] for i in v])
+            if k == FDP_CONTACT and len(v) > 0:
+                delete_records(session, k, [i[0] for i in v])
 
     for k, v in records.items():
         if len(v) > 0:
             if k == FDP_IRI:
                 create_records(session, k, [{'id': i[0], 'IRI': i[1]} for i in v])
+            elif k == FDP_CONTACT:
+                create_records(session, k, [{
+                    'identifier': i[0],
+                    'email': i[1],
+                    'telephone': i[2],
+                    'given_name': i[3],
+                    'family_name': i[4],
+                    'honorific_prefix': i[5],
+                    'honorific_suffix': i[6]
+                } for i in v])
             else:
                 create_records(session, k, v)
 
 
 if __name__ == '__main__':
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--molgenis-url', '-U')
     parser.add_argument('--molgenis-user', '-u')
     parser.add_argument('--molgenis-password', '-p')
-    parser.add_argument('--directory-prefix', '-d', help='The main prefix of the url to be used to generate IRIs', default='https://directory.bbmri-eric.eu/')
+    parser.add_argument('--directory-prefix', '-d',
+                        help='The main prefix of the url to be used to generate IRIs',
+                        default='https://directory.bbmri-eric.eu/')
     parser.add_argument('--reset', '-r', dest='reset', action='store_true')
     args = parser.parse_args()
+
+    directory_prefix = args.directory_prefix.replace('/', '',
+                                                     -1)  # just in case the input put the last /, it removes it
 
     s = client.Session(args.molgenis_url)
     s.login(args.molgenis_user, args.molgenis_password)
 
-    sync(s, args.directory_prefix, args.reset)
-
+    sync(s, directory_prefix, args.reset)
