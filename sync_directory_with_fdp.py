@@ -171,8 +171,8 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'title': c['name'],
             'biobank': biobank_data["id"],
             'description': c['description'] if 'description' in c else None,
-            'type': [t['id'] for t in collection['type'] if get_collection_type_ontology_code(t['id']) is not None],
-            'theme': [d['id'] for d in collection['diagnosis_available']],
+            'type': [t['id'] for t in c['type'] if get_collection_type_ontology_code(t['id']) is not None],
+            'theme': [d['id'] for d in c['diagnosis_available']],
             'service': c['record_service']['id'] if 'record_service' in c else None
         } for c in biobank_data['collections']],
         FDP_IRI: missing_iris,
