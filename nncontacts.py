@@ -24,9 +24,9 @@ class NNContacts:
             'PL' : 'dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl, andrzej.strug@gumed.edu.pl, aklis@bee2code.com',
             'SE' : 'tobias.sjoblom@igp.uu.se',
             'TR' : 'nese.atabey@ibg.edu.tr',
-            'UK' : 'contact@biobankinguk.org',
             'IARC' : 'kozlakidisz@iarc.fr',
             }
 
             # 'NL' : 'e.j.van.enckevort@rug.nl, g.meijer@nki.nl, a.vanderlugt@erasmusmc.nl, m.a.swertz@gmail.com;',
             # 'FR' : 'soraya.aakki@inserm.fr, michael.hisbergues@inserm.fr',
+            # 'UK' : 'contact@biobankinguk.org',
