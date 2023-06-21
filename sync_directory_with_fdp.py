@@ -1,4 +1,11 @@
-import logging
+"""
+Script to synchronize the BBMRI Directory data of biobanks and collections with their FAIR Data Point/DCAT representation.
+It gets the data of biobanks and collections from a Molgenis instance of the Directory, converts it and upload the
+converted one into another Molgenis instance. The Molgenis instance can be the same or different. The destination
+instance needs to be deployed with the FDP instance already deployed. Also, the FDP must have the fdp_Catalog already
+created.
+"""
+
 from collections import OrderedDict
 
 from molgenis import client
@@ -8,6 +15,7 @@ BBMRI_BIOBANK_ENTITY = 'eu_bbmri_eric_biobanks'
 BBMRI_CONTACT_ENTITY = 'eu_bbmri_eric_persons'
 BBMRI_DATA_SERVICE_ENTITY = 'eu_bbmri_eric_record_service'
 
+FDP_CATALOG = 'fdp_Catalog'
 FDP_BIOBANK = 'fdp_Biobank'
 FDP_COLLECTION = 'fdp_Collection'
 FDP_BIOBANK_ORGANIZATION = 'fdp_BiobankOrganization'
@@ -42,7 +50,10 @@ COLLECTION_TYPES_ONTOLOGIES = {
     'TWIN_STUDY': 'http://purl.obolibrary.org/obo/OBIB_0000700'
 }
 
-
+"""
+It gets the data from the source Molgenis and filters the one that are already it the destination Molgenis.
+If reset flag is True it doesn't filter the biobanks to add 
+"""
 def get_missing_biobanks(session, reset, **kwargs):
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
     source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
@@ -57,6 +68,13 @@ def get_missing_biobanks(session, reset, **kwargs):
     return new_records
 
 
+"""
+Send converted data to the destination
+
+:params session: Molgenis session to use
+:params entity: the name of Molgenis entity type of the records to add 
+:params records: lists of dictionary with data of the FDP entity to add
+"""
 def create_records(session, entity, records):
     created_records = []
     for i in range(0, len(records), 1000):
@@ -68,6 +86,13 @@ def create_records(session, entity, records):
     print("Added {} record(s) of type {}".format(len(created_records), entity))
 
 
+"""
+Delete records in the destination Molgenis. Used when reset flag is True
+
+:params session: Molgenis session to use
+:params entity: the name of Molgenis entity type of the records to delete
+:params records_ids: the ids of the records of type :entity: to delete 
+"""
 def delete_records(session, entity, records_ids):
     removed_records = []
     for i in range(0, len(records_ids), 1000):
@@ -80,10 +105,16 @@ def delete_records(session, entity, records_ids):
     print(f"Removed {len(removed_records)} of type {entity}")
 
 
+"""
+Returns the country code correspondent to the country in input 
+"""
 def get_country(country):
     return 'GB' if country == 'UK' else country
 
 
+"""
+Returns the IRI of the disease code to use in the FDP
+"""
 def get_disease_ontology_code(disease_code):
     if ORPHA_DIRECTORY_PREFIX in disease_code:
         return disease_code.replace(ORPHA_DIRECTORY_PREFIX, ORPHA_ONTOLOGY_PREFIX)
@@ -91,10 +122,22 @@ def get_disease_ontology_code(disease_code):
         return disease_code.replace(ICD_10_DIRECTORY_PREFIX, ICD_10_ONTOLOGY_PREFIX)
 
 
+"""
+Return the IRI of the collection type
+
+:params collection_type: the collection type code in the directory 
+"""
 def get_collection_type_ontology_code(collection_type):
     return COLLECTION_TYPES_ONTOLOGIES.get(collection_type, None)
 
 
+"""
+Gets the contact data of the contact with id :contact_id: from the source Molgenis and 
+returns the FDP corresponding FDP record
+
+:params session: Molgenis session to use
+:params contact_id: the id of the contact in the Directory
+"""
 def get_contact_record(session, contact_id):
     contact = session.get_by_id(BBMRI_CONTACT_ENTITY, contact_id)
     return (
@@ -108,6 +151,16 @@ def get_contact_record(session, contact_id):
     )
 
 
+"""
+It generates the FDP records related to a biobank from the representation of the biobank in the Directory.
+It returns a dictionary with data for entities:
+fdp_Biobank: data of the Biobank as organization
+fdp_BiobankOrganization: data of the Jurystic Person that manage the Biobank
+fdp_Collection: list of collections of the biobank
+fdp_Contacts: contact of the biobank and the collections to add
+fdp_IRI: codes of diseases and collection types (if not already present in the destination)
+fdp_DataService: data related to the Data service, if present
+"""
 def get_records_to_add(biobank_data, session, directory_prefix):
     missing_iris = []
     data_services = []
@@ -121,12 +174,14 @@ def get_records_to_add(biobank_data, session, directory_prefix):
     for collection in biobank_data['collections']:
         print("processing collection", collection['id'])
         for d in collection['diagnosis_available']:
+            # it checks if the diagnosis is already present in the destination, if not it adds it to the ones to insert
             try:
                 session.get_by_id('fdp_IRI', d['id'], attributes='id')
             except MolgenisRequestError:
                 missing_iris.append((d['id'], get_disease_ontology_code(d['id'])))
 
         for t in collection['type']:
+            # same as diagnosis for collection type
             try:
                 session.get_by_id('fdp_IRI', t['id'], attributes='id')
             except MolgenisRequestError:
@@ -135,9 +190,11 @@ def get_records_to_add(biobank_data, session, directory_prefix):
                     missing_iris.append((t['id'], ontology_code))
 
         if 'contact' in collection:
+            # it adds data about the contacts
             contacts.append(get_contact_record(session, collection['contact']['id']))
 
         if 'record_service' in collection:
+            # if the collection has a record service it generates the corresponding DataService
             rs = session.get_by_id(BBMRI_DATA_SERVICE_ENTITY, collection['record_service']['id'])
             data_services.append({
                 'identifier': rs['id'],
@@ -167,7 +224,7 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'identifier': c['id'],
             'IRI': f'{directory_prefix}/api/fdp/fdp_Collection/{c["id"]}',
             'contactPoint': f'{c["contact"]["id"]}' if 'contact' in c else None,
-            'catalog': 'bbmri-directory',  # TODO: get it dynamically
+            # 'catalog': 'bbmri-directory',  # it
             'title': c['name'],
             'biobank': biobank_data["id"],
             'description': c['description'] if 'description' in c else None,
@@ -180,12 +237,21 @@ def get_records_to_add(biobank_data, session, directory_prefix):
     }
     return res
 
+def update_catalog(session, new_collections):
+    prev_collections = session.get_by_id(FDP_CATALOG, 'bbmri-directory', attributes='collection')
 
+    collections = set([c['identifier'] for c in prev_collections['collection'] + new_collections])
+
+    session.update_one(FDP_CATALOG, 'bbmri-directory', 'collection', list(collections))
+
+"""
+Main function that gets the data of the missing biobanks, convert it and upload the new records.
+"""
 def sync(session, directory_prefix, reset, **kwargs):
+    # it gets the missing biobanks
     missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,
-                                            expand=BIOBANKS_EXPAND_ATTRIBUTES,
-                                            **kwargs)
-
+                                            expand=BIOBANKS_EXPAND_ATTRIBUTES, **kwargs)
+    # it gathers the data for all the biobanks
     records = OrderedDict({
         FDP_BIOBANK_ORGANIZATION: [],
         FDP_CONTACT: set(),
@@ -195,7 +261,9 @@ def sync(session, directory_prefix, reset, **kwargs):
         FDP_COLLECTION: []
     })
     for b in missing_biobanks:
+        # it gets the records to add for a biobank
         new_records = get_records_to_add(b, session, directory_prefix)
+        # it updates the overall records with the ones from of the processed biobank
         for k, v in new_records.items():
             if type(records[k]) == list:
                 if type(new_records[k]) == list:
@@ -205,13 +273,16 @@ def sync(session, directory_prefix, reset, **kwargs):
             else:
                 records[k].update(new_records[k])
 
+    # if the reset flag is True, it deletes the old records
     if reset:
+        session.update_one('fdp_Catalog', 'bbmri-directory', 'collection', [])
         for k, v in reversed(records.items()):
             if k not in (FDP_IRI, FDP_CONTACT) and len(v) > 0:
                 delete_records(session, k, [i['identifier'] for i in v])
             if k == FDP_CONTACT and len(v) > 0:
                 delete_records(session, k, [i[0] for i in v])
 
+    # it creates all the
     for k, v in records.items():
         if len(v) > 0:
             if k == FDP_IRI:
@@ -229,6 +300,8 @@ def sync(session, directory_prefix, reset, **kwargs):
             else:
                 create_records(session, k, v)
 
+    update_catalog(session, records[FDP_COLLECTION])
+
 
 if __name__ == '__main__':
     import argparse
@@ -238,8 +311,7 @@ if __name__ == '__main__':
     parser.add_argument('--molgenis-user', '-u')
     parser.add_argument('--molgenis-password', '-p')
     parser.add_argument('--directory-prefix', '-d',
-                        help='The main prefix of the url to be used to generate IRIs',
-                        default='https://directory.bbmri-eric.eu/')
+                        help='The main prefix of the url to be used to generate IRIs')
     parser.add_argument('--reset', '-r', dest='reset', action='store_true')
     args = parser.parse_args()
 
