@@ -2,8 +2,8 @@
 Script to synchronize the BBMRI Directory data of biobanks and collections with their FAIR Data Point/DCAT representation.
 It gets the data of biobanks and collections from a Molgenis instance of the Directory, converts it and upload the
 converted one into another Molgenis instance. The Molgenis instance can be the same or different. The destination
-instance needs to be deployed with the FDP instance already deployed. Also, the FDP must have the fdp_Catalog already
-created.
+instance needs the FDP EMX model and the "bbmri-directory" FDP_Catalog (i.e., the FDP Catalog with data of the directory)
+already deployed
 """
 
 from collections import OrderedDict
