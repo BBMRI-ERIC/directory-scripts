@@ -50,11 +50,12 @@ COLLECTION_TYPES_ONTOLOGIES = {
     'TWIN_STUDY': 'http://purl.obolibrary.org/obo/OBIB_0000700'
 }
 
-"""
-It gets the data from the source Molgenis and filters the one that are already it the destination Molgenis.
-If reset flag is True it doesn't filter the biobanks to add 
-"""
+
 def get_missing_biobanks(session, reset, **kwargs):
+    """
+    It gets the data from the source Molgenis and filters the one that are already it the destination Molgenis.
+    If reset flag is True it doesn't filter the biobanks to add
+    """
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
     source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
     # if reset is True the missing biobanks are all
@@ -68,14 +69,14 @@ def get_missing_biobanks(session, reset, **kwargs):
     return new_records
 
 
-"""
-Send converted data to the destination
-
-:params session: Molgenis session to use
-:params entity: the name of Molgenis entity type of the records to add 
-:params records: lists of dictionary with data of the FDP entity to add
-"""
 def create_records(session, entity, records):
+    """
+    Send converted data to the destination
+
+    :params session: Molgenis session to use
+    :params entity: the name of Molgenis entity type of the records to add
+    :params records: lists of dictionary with data of the FDP entity to add
+    """
     created_records = []
     for i in range(0, len(records), 1000):
         try:
@@ -86,14 +87,14 @@ def create_records(session, entity, records):
     print("Added {} record(s) of type {}".format(len(created_records), entity))
 
 
-"""
-Delete records in the destination Molgenis. Used when reset flag is True
-
-:params session: Molgenis session to use
-:params entity: the name of Molgenis entity type of the records to delete
-:params records_ids: the ids of the records of type :entity: to delete 
-"""
 def delete_records(session, entity, records_ids):
+    """
+    Delete records in the destination Molgenis. Used when reset flag is True
+
+    :params session: Molgenis session to use
+    :params entity: the name of Molgenis entity type of the records to delete
+    :params records_ids: the ids of the records of type :entity: to delete
+    """
     removed_records = []
     for i in range(0, len(records_ids), 1000):
         try:
@@ -105,40 +106,40 @@ def delete_records(session, entity, records_ids):
     print(f"Removed {len(removed_records)} of type {entity}")
 
 
-"""
-Returns the country code correspondent to the country in input 
-"""
 def get_country(country):
+    """
+    Returns the country code correspondent to the country in input
+    """
     return 'GB' if country == 'UK' else country
 
 
-"""
-Returns the IRI of the disease code to use in the FDP
-"""
 def get_disease_ontology_code(disease_code):
+    """
+    Returns the IRI of the disease code to use in the FDP
+    """
     if ORPHA_DIRECTORY_PREFIX in disease_code:
         return disease_code.replace(ORPHA_DIRECTORY_PREFIX, ORPHA_ONTOLOGY_PREFIX)
     if ICD_10_DIRECTORY_PREFIX in disease_code:
         return disease_code.replace(ICD_10_DIRECTORY_PREFIX, ICD_10_ONTOLOGY_PREFIX)
 
 
-"""
-Return the IRI of the collection type
-
-:params collection_type: the collection type code in the directory 
-"""
 def get_collection_type_ontology_code(collection_type):
+    """
+    Return the IRI of the collection type
+
+    :params collection_type: the collection type code in the directory
+    """
     return COLLECTION_TYPES_ONTOLOGIES.get(collection_type, None)
 
 
-"""
-Gets the contact data of the contact with id :contact_id: from the source Molgenis and 
-returns the FDP corresponding FDP record
-
-:params session: Molgenis session to use
-:params contact_id: the id of the contact in the Directory
-"""
 def get_contact_record(session, contact_id):
+    """
+    Gets the contact data of the contact with id :contact_id: from the source Molgenis and
+    returns the FDP corresponding FDP record
+
+    :params session: Molgenis session to use
+    :params contact_id: the id of the contact in the Directory
+    """
     contact = session.get_by_id(BBMRI_CONTACT_ENTITY, contact_id)
     return (
         f'{contact["id"]}',
@@ -151,17 +152,18 @@ def get_contact_record(session, contact_id):
     )
 
 
-"""
-It generates the FDP records related to a biobank from the representation of the biobank in the Directory.
-It returns a dictionary with data for entities:
-fdp_Biobank: data of the Biobank as organization
-fdp_BiobankOrganization: data of the Jurystic Person that manage the Biobank
-fdp_Collection: list of collections of the biobank
-fdp_Contacts: contact of the biobank and the collections to add
-fdp_IRI: codes of diseases and collection types (if not already present in the destination)
-fdp_DataService: data related to the Data service, if present
-"""
 def get_records_to_add(biobank_data, session, directory_prefix):
+    """
+    It generates the FDP records related to a biobank from the representation of the biobank in the Directory.
+    It returns a dictionary with data for entities:
+    fdp_Biobank: data of the Biobank as organization
+    fdp_BiobankOrganization: data of the Jurystic Person that manage the Biobank
+    fdp_Collection: list of collections of the biobank
+    fdp_Contacts: contact of the biobank and the collections to add
+    fdp_IRI: codes of diseases and collection types (if not already present in the destination)
+    fdp_DataService: data related to the Data service, if present
+    """
+
     missing_iris = []
     data_services = []
     contacts = []
@@ -244,10 +246,10 @@ def update_catalog(session, new_collections):
 
     session.update_one(FDP_CATALOG, 'bbmri-directory', 'collection', list(collections))
 
-"""
-Main function that gets the data of the missing biobanks, convert it and upload the new records.
-"""
 def sync(session, directory_prefix, reset, **kwargs):
+    """
+    Main function that gets the data of the missing biobanks, convert it and upload the new records.
+    """
     # it gets the missing biobanks
     missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,
                                             expand=BIOBANKS_EXPAND_ATTRIBUTES, **kwargs)
