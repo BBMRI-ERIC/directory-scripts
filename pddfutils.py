@@ -23,9 +23,11 @@ def linearizeStructures (df : pd.DataFrame, rules : list):
 def tidyCollectionDf (df : pd.DataFrame):
     linearizeStructures(df, [('country','id'),('biobank','name'),('network','name'),('parent_collection','id')])
     for col in ('order_of_magnitude','order_of_magnitude_donors'):
+        assert col in df, f"{col} expected in df"
         if col in df:
             df[col] = df[col].map(lambda x: "%d (%s)"%(x['id'],x['size']) if type(x) is dict else x)
     for col in ('type','also_known','data_categories','quality','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','sub_collections','data_use'):
+        assert col in df, f"{col} expected in df"
         df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
     df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )
     extractContactDetails(df)
@@ -36,9 +38,10 @@ def tidyCollectionDf (df : pd.DataFrame):
 def tidyBiobankDf (df : pd.DataFrame):
     linearizeStructures(df, [('country','id'), ('network','name'), ('covid19biobank','id'), ('capabilities','id'), ('quality','id')])
     extractContactDetails(df)
-    for c in ['it_support_available', 'it_staff_size', 'is_available', 'his_available', 'partner_charter_signed', 'collections','contact']:
+    for col in ['it_support_available', 'it_staff_size', 'is_available', 'his_available', 'partner_charter_signed', 'collections','contact']:
+        assert col in df, f"{col} expected in df"
         try:
-            del df[c]
+            del df[col]
         except KeyError:
             pass
     df.sort_values(by=['country','id'],ascending=True,inplace=True)
