@@ -18,7 +18,7 @@ BBMRI_DATA_SERVICE_ENTITY = 'eu_bbmri_eric_record_service'
 FDP_CATALOG = 'fdp_Catalog'
 FDP_BIOBANK = 'fdp_Biobank'
 FDP_COLLECTION = 'fdp_Collection'
-FDP_BIOBANK_ORGANIZATION = 'fdp_BiobankOrganization'
+FDP_BIOBANK_LEGAL_PERSON = 'fdp_BiobankLegalPerson'
 FDP_CONTACT = 'fdp_ContactPointIndividual'
 FDP_DATA_SERVICE = 'fdp_DataService'
 FDP_IRI = 'fdp_IRI'
@@ -58,13 +58,18 @@ def get_missing_biobanks(session, reset, **kwargs):
     """
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
     source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
+    biobanks_with_record_service = []
+    for sr in source_records:
+        for c in sr["collections"]:
+            if "record_service" in c:
+                biobanks_with_record_service.append(sr)
     # if reset is True the missing biobanks are all
     if reset:
-        return source_records
+        return biobanks_with_record_service
 
     print("Getting ids already present")
     dest_records_ids = [r['identifier'] for r in session.get(FDP_BIOBANK, attributes='identifier')]
-    new_records = [sr for sr in source_records if sr['id'] not in dest_records_ids]
+    new_records = [sr for sr in biobanks_with_record_service if sr['id'] not in dest_records_ids]
     print("Found {} new records to insert".format(len(new_records)))
     return new_records
 
@@ -217,23 +222,25 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'contactPoint': f'{biobank_data["contact"]["id"]}' if 'contact' in biobank_data else None,
             'country': get_country(biobank_data['country']['id'])
         },
-        FDP_BIOBANK_ORGANIZATION: {
+        FDP_BIOBANK_LEGAL_PERSON: {
             'identifier': f'{biobank_data["id"]}-pub',
             'name': biobank_data['juridical_person']
         },
         FDP_CONTACT: contacts,
         FDP_COLLECTION: [{
-            'identifier': c['id'],
             'IRI': f'{directory_prefix}/api/fdp/fdp_Collection/{c["id"]}',
-            'contactPoint': f'{c["contact"]["id"]}' if 'contact' in c else None,
-            # 'catalog': 'bbmri-directory',  # it
-            'title': c['name'],
+            'identifier': c['id'],
             'biobank': biobank_data["id"],
+            'title': c['name'],
             'description': c['description'] if 'description' in c else None,
-            'type': [t['id'] for t in c['type'] if get_collection_type_ontology_code(t['id']) is not None],
             'theme': [d['id'] for d in c['diagnosis_available']],
-            'service': c['record_service']['id'] if 'record_service' in c else None
-        } for c in biobank_data['collections']],
+            'type': [t['id'] for t in c['type'] if get_collection_type_ontology_code(t['id']) is not None],
+            'landingPage': f'{directory_prefix}/#/biobank/{c["id"]}',
+            'contactPoint': f'{c["contact"]["id"]}' if 'contact' in c else None,
+            'service': c['record_service']['id'] if 'record_service' in c else None,
+            'vpConnection': 'ejprd-vp-discoverable' if 'record_service' in c else None,
+            'personalData': 'true'
+        } for c in biobank_data['collections'] if len(f'{directory_prefix}/#/biobank/{c["id"]}') < 255] ,
         FDP_IRI: missing_iris,
         FDP_DATA_SERVICE: data_services
     }
@@ -253,9 +260,10 @@ def sync(session, directory_prefix, reset, **kwargs):
     # it gets the missing biobanks
     missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,
                                             expand=BIOBANKS_EXPAND_ATTRIBUTES, **kwargs)
+
     # it gathers the data for all the biobanks
     records = OrderedDict({
-        FDP_BIOBANK_ORGANIZATION: [],
+        FDP_BIOBANK_LEGAL_PERSON: [],
         FDP_CONTACT: set(),
         FDP_IRI: set(),
         FDP_DATA_SERVICE: [],
@@ -317,9 +325,7 @@ if __name__ == '__main__':
     parser.add_argument('--reset', '-r', dest='reset', action='store_true')
     args = parser.parse_args()
 
-    directory_prefix = args.directory_prefix.replace('/', '',
-                                                     -1)  # just in case the input put the last /, it removes it
-
+    directory_prefix = args.directory_prefix # .replace('/', '', -1)  # just in case the input put the last /, it removes it
     s = client.Session(args.molgenis_url)
     s.login(args.molgenis_user, args.molgenis_password)
 
