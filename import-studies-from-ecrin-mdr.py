@@ -1,6 +1,20 @@
 """
-Script that imports the ECRIN MDR studies into the BBMRI Directory
-It needs a csv file input where each row associates the MDR ID of the ID to the collection in BBMRI
+Script that imports the ECRIN MDR studies into the BBMRI Directory.
+This script works with a version of the BBMRI Directory with the following modifications:
+    - addition of the entity `eu_bbmri_eric_studies`
+    - addition of the xref attribute `study` to eu_bbmri_collections to link the collection with the study that generated it
+
+It get in input:
+    - a CSV file with three columns mdr_id,mdr_title,collection_id containingn the id of the study in ECRIN, its title and
+      the id of the corresponding collection in the directory
+    - the url of the directory
+    - the username and the password of the user with insert rights in the directory
+
+For each study in the CSV, the script:
+  - gets the study information from the ECRIN MDR
+  - creates a eu_bbmri_eric_studies object in the Directory
+  - creates an eu_bbmri_eric_also_known_in record with the link to the study in ECRIN MDR
+  - updates the collection with the study and the also_known_in links
 """
 
 import argparse
@@ -93,10 +107,10 @@ def create_directory_entities(session, mdr_data, mdr_title, collections_ids):
     except MolgenisRequestError:
         pass
 
-    # it removes the also known in record if already present
+    # it removes the also_known_in record if already present
     try:
         session.delete(BBMRI_ALSO_KNOWN_IN, also_known_id)
-        logger.debug("Also_Known_in already present: removing")
+        logger.debug("also_Known_in already present: removing")
     except MolgenisRequestError:
         pass
 
