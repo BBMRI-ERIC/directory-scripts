@@ -5,9 +5,9 @@ converted one into another Molgenis instance. The Molgenis instance can be the s
 instance needs the FDP EMX model and the "bbmri-directory" FDP_Catalog (i.e., the FDP Catalog with data of the directory)
 already deployed
 """
-
 from collections import OrderedDict
 
+import pprint
 from molgenis import client
 from molgenis.client import MolgenisRequestError
 
@@ -60,9 +60,12 @@ def get_missing_biobanks(session, reset, **kwargs):
     source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
     biobanks_with_record_service = []
     for sr in source_records:
+        add_biobank = False
         for c in sr["collections"]:
             if "record_service" in c:
-                biobanks_with_record_service.append(sr)
+                add_biobank = True
+        if add_biobank:
+            biobanks_with_record_service.append(sr)
     # if reset is True the missing biobanks are all
     if reset:
         return biobanks_with_record_service
@@ -82,6 +85,12 @@ def create_records(session, entity, records):
     :params entity: the name of Molgenis entity type of the records to add
     :params records: lists of dictionary with data of the FDP entity to add
     """
+    # with open(f'fdp_data/{entity}.csv', 'w' ) as csvfile:
+    #     writer = csv.DictWriter(csvfile, fieldnames=records[0].keys(), dialect="excel", quotechar="\"")
+    #     writer.writeheader()
+    #     for r in records:
+    #         writer.writerow(r)
+
     created_records = []
     for i in range(0, len(records), 1000):
         try:
@@ -207,13 +216,14 @@ def get_records_to_add(biobank_data, session, directory_prefix):
                 'identifier': rs['id'],
                 'endpointUrl': rs['url'],
                 'endpointDescription': rs['description'] if 'description' in rs else None,
-                'conformsTo': rs['conformsTo']
+                'conformsTo': rs['conformsTo'],
+                'type': rs['type']
             })
 
     res = {
         FDP_BIOBANK: {
             'identifier': biobank_data['id'],
-            'IRI': f'{directory_prefix}/api/fdp/fdp_Biobank/{biobank_data["id"]}',  # TODO: use the PID
+            # 'IRI': f'{directory_prefix}/api/fdp/fdp_Biobank/{biobank_data["id"]}',  # TODO: use the PID
             'title': biobank_data['name'],
             'acronym': biobank_data['acronym'] if 'acronym' in biobank_data else None,
             'description': biobank_data['description'] if 'description' in biobank_data else None,
@@ -240,11 +250,13 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'service': c['record_service']['id'] if 'record_service' in c else None,
             'vpConnection': 'ejprd-vp-discoverable' if 'record_service' in c else None,
             'personalData': 'true'
-        } for c in biobank_data['collections'] if len(f'{directory_prefix}/#/biobank/{c["id"]}') < 255] ,
+        } for c in biobank_data['collections'] if
+            'record_service' in c and len(f'{directory_prefix}/#/biobank/{c["id"]}') < 255],
         FDP_IRI: missing_iris,
         FDP_DATA_SERVICE: data_services
     }
     return res
+
 
 def update_catalog(session, new_collections):
     prev_collections = session.get_by_id(FDP_CATALOG, 'bbmri-directory', attributes='collection')
@@ -252,6 +264,7 @@ def update_catalog(session, new_collections):
     collections = set([c['identifier'] for c in prev_collections['collection'] + new_collections])
 
     session.update_one(FDP_CATALOG, 'bbmri-directory', 'collection', list(collections))
+
 
 def sync(session, directory_prefix, reset, **kwargs):
     """
@@ -291,7 +304,7 @@ def sync(session, directory_prefix, reset, **kwargs):
                 delete_records(session, k, [i['identifier'] for i in v])
             if k == FDP_CONTACT and len(v) > 0:
                 delete_records(session, k, [i[0] for i in v])
-
+    pprint.pprint(records)
     # it creates all the
     for k, v in records.items():
         if len(v) > 0:
@@ -325,7 +338,7 @@ if __name__ == '__main__':
     parser.add_argument('--reset', '-r', dest='reset', action='store_true')
     args = parser.parse_args()
 
-    directory_prefix = args.directory_prefix # .replace('/', '', -1)  # just in case the input put the last /, it removes it
+    directory_prefix = args.directory_prefix  # .replace('/', '', -1)  # just in case the input put the last /, it removes it
     s = client.Session(args.molgenis_url)
     s.login(args.molgenis_user, args.molgenis_password)
 
