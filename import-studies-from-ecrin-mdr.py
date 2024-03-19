@@ -34,14 +34,14 @@ logger.setLevel(logging.DEBUG)
 fmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 hdlr = logging.StreamHandler()
-hdlr.setLevel(logging.INFO)
+hdlr.setLevel(logging.DEBUG)
 hdlr.setFormatter(fmt)
 
 logger.addHandler(hdlr)
 
-ECRIN_URL = 'https://mdr.ecrin-rms.org/mdr/v1'
-ECRIN_SPECIFIC_STUDY = f'{ECRIN_URL}/specific-study'
-ECRIN_MDR_URL = f'{ECRIN_URL}/study'
+ECRIN_URL = 'https://newmdr.ecrin.org'
+ECRIN_STUDY_API_ENDPOINT = f'{ECRIN_URL}/api/Study/AllDetails'
+ECRIN_STUDY_URL = f'{ECRIN_URL}/Study'
 
 BBMRI_ALSO_KNOWN_IN = 'eu_bbmri_eric_also_known_in'
 BBMRI_STUDY = 'eu_bbmri_eric_studies'
@@ -54,11 +54,11 @@ def get_study_detail(mdr_id):
 
     :param mdr_id: Id of the study
     """
-    payload = {
-        "studyId": mdr_id
-    }
-    res = requests.post(ECRIN_MDR_URL, json=payload)
-    return res.json()
+    res = requests.get(f'{ECRIN_STUDY_API_ENDPOINT}/{mdr_id}')
+    if res.status_code == 200:
+        return res.json()
+    else:
+        return None
 
 
 def get_age_unit(min_age, max_age):
@@ -71,15 +71,24 @@ def get_age_unit(min_age, max_age):
         "Weeks": "WEEK"
     }
     if min_age is not None and max_age is not None:
-        assert min_age['unitName'] == max_age['unitName']
-        unit = min_age['unitName']
+        assert min_age['unit_name'] == max_age['unit_name']
+        unit = min_age['unit_name']
     elif min_age is not None:
-        unit = min_age['unitName']
+        unit = min_age['unit_name']
     elif max_age is not None:
-        unit = max_age['unitName']
+        unit = max_age['unit_name']
     else:
         return None
     return mapping[unit]
+
+def get_sex_value(ecrin_gender_eligibility):
+    return {
+        'Male': 'MALE',
+        'Female': 'FEMALE',
+        'Not provided': 'NAV',
+        'All': ['MALE','FEMALE']
+    }[ecrin_gender_eligibility]
+
 
 
 def create_directory_entities(session, mdr_data, mdr_title, collections_ids):
@@ -92,8 +101,10 @@ def create_directory_entities(session, mdr_data, mdr_title, collections_ids):
 
     It also updates the collections linked to the study with the reference to the newly created study
     """
+
     also_known_id = f'ecrin-mdr:{mdr_data["id"]}'  # internal bbmri id of the "also_known_entity" corresponding to the study
-    study_id = f'bbmri_eric:ID:EXT:{mdr_data["id"]}'  # internal bbmri id of the study
+    old_study_id = f'bbmri_eric:ID:EXT:{mdr_data["id"]}'  # internal bbmri id of the study
+    study_id = f'bbmri_eric:ID:{mdr_data["id"]}'  # internal bbmri id of the study
 
     # It removes old studies' references from collections record
     for cid in collections_ids:
@@ -102,41 +113,50 @@ def create_directory_entities(session, mdr_data, mdr_title, collections_ids):
 
     # it removes the study if already present
     try:
-        session.delete(BBMRI_STUDY, study_id)
-        logger.debug("Study already present: removing")
-    except MolgenisRequestError:
-        pass
+        res = session.delete(BBMRI_STUDY, old_study_id)
+        logger.debug("Study %s already present: removing" % study_id)
+        logger.debug("Removed response %s" % res.status_code)
+        if res.status_code == 204:
+            res = session.delete(BBMRI_STUDY, study_id)
+            logger.debug("Failed removing old id. Trying new study")
+    except MolgenisRequestError as e:
+        logger.debug("Removal failed")
 
     # it removes the also_known_in record if already present
     try:
         session.delete(BBMRI_ALSO_KNOWN_IN, also_known_id)
         logger.debug("also_Known_in already present: removing")
-    except MolgenisRequestError:
-        pass
+    except MolgenisRequestError as e:
+        logger.debug(e)
 
     # creates the also known record
     also_known = {
         'id': also_known_id,
         'name_system': 'ECRIN MDR',
         'pid': mdr_data["id"],
-        'url': f'https://crmdr.org/study/{mdr_data["id"]}',
-        'national_node': 'EXT',  # to
+        'url': f'{ECRIN_STUDY_URL}/{mdr_data["id"]}',
+        'national_node': 'EXT',
         'withdrawn': False,
-        'label': mdr_data["displayTitle"]
+        'label': mdr_data["display_title"]
     }
     logger.debug("Adding also_known_in")
     session.add(BBMRI_ALSO_KNOWN_IN, also_known)
 
+    try:
+        number_of_subject = int(mdr_data['study_enrolment'])
+    except (ValueError, TypeError):
+        number_of_subject = None
     # creates the study record
     study = {
         'id': study_id,
         'title': mdr_title,
-        'description': mdr_data['briefDescription'],
-        'type': mdr_data['studyType'],
-        'status': mdr_data['studyStatus'],
-        'min_age': mdr_data['minAge'].get('value') if mdr_data['minAge'] is not None else None,
-        'max_age': mdr_data['maxAge'].get('value') if mdr_data['maxAge'] is not None else None,
-        'age_unit': get_age_unit(mdr_data['minAge'], mdr_data['maxAge']),
+        'description': mdr_data['brief_description'],
+        'type': mdr_data['study_type']['name'],
+        'number_of_subjects': number_of_subject,
+        'sex': get_sex_value(mdr_data['study_gender_elig']['name']),
+        'age_low': mdr_data['min_age'].get('value') if mdr_data['min_age'] is not None else None,
+        'age_high': mdr_data['max_age'].get('value') if mdr_data['max_age'] is not None else None,
+        'age_unit': get_age_unit(mdr_data['min_age'], mdr_data['max_age']),
         'also_known': also_known_id
     }
     logger.debug("Adding study")
@@ -163,12 +183,12 @@ def process_study(molgenis_session, mdr_id, mdr_title, collections_ids):
     logger.debug("Collections are %s" % collections_ids)
     logger.debug("Getting study detail")
     study_detail = get_study_detail(mdr_id)
-    if study_detail["total"] == 0:
+    if study_detail is None:
         logger.debug("Couldn't find details for study")
         return False
     else:
-        logger.debug("Updating directory for study")
-        return create_directory_entities(molgenis_session, study_detail['data'][0], mdr_title, collections_ids)
+        logger.info("Updating directory for study")
+        return create_directory_entities(molgenis_session, study_detail['full_study'], mdr_title, collections_ids)
 
 
 def file_exist(file_argument):
@@ -207,12 +227,12 @@ if __name__ == '__main__':
         studies_collections = defaultdict(list)
 
         for match in reader:
-            studies_collections[(match["MDR ID"], match["MDR Title"])].append(
-                f"bbmri-eric:ID:{match['BBMRI collection id']}")
+            studies_collections[(match["mdr_id"], match["mdr_title"])].append(
+                f"bbmri-eric:ID:{match['collection_id']}")
         molgenis_session = client.Session(url=args.url)
         molgenis_session.login(args.username, args.password)
         studies_per_id = count_studies_ids(studies_collections)
-
+        print(studies_collections)
         for s, c in studies_collections.items():
             if process_study(molgenis_session, s[0], s[1], c) is True:
                 successes.append(s[0])
