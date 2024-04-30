@@ -133,22 +133,31 @@ for collection in dir.getCollections():
     if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
         allCollectionDonorsExplicit += collection['number_of_donors']
 
+for biobank in dir.getBiobanks():
+    biobankId = biobank['id']
+    log.debug("Analyzing biobank " + biobankId)
+    if not biobankId in allBiobanks and not biobankId in withdrawnBiobanks:
+        log.info("   Biobank without any collection identified: " + biobankId)
+        if 'withdrawn' in biobank and biobank['withdrawn']:
+            withdrawnBiobanks.add(biobankId)
+            log.debug("Detected a withdrawn biobank without any collection " + biobankId)
+        else:
+            allBiobanks.add(biobankId)
+
 pd_allCollections = pd.DataFrame(allCollections)
 pd_withdrawnCollections = pd.DataFrame(withdrawnCollections)
 pd_allBiobanks = pd.DataFrame([dir.getBiobankById(biobankId) for biobankId in allBiobanks])
 pd_withdrawnBiobanks = pd.DataFrame([dir.getBiobankById(biobankId) for biobankId in withdrawnBiobanks])
 
-def printCollectionStdout(collectionList: List, headerStr: str):
-    print(headerStr + " - " + str(len(collectionList)) + " collections")
+def printCollectionStdout(collectionList: List):
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])
         biobank = dir.getBiobankById(biobankId)
         log.info("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " + biobankId + " - " + biobank['name'])
-
+    log.info("\n\n")
 
 if not args.nostdout:
-    printCollectionStdout(allCollections, "Existing")
-    print("\n\n")
+    printCollectionStdout(allCollections)
     print("Totals:")
     print("- total of biobanks: %d" % (len(allBiobanks)))
     print("- total of withdrawn biobanks: %d" % (len(withdrawnBiobanks)))
@@ -159,7 +168,6 @@ if not args.nostdout:
         allCollectionSamplesExplicit, allCollectionDonorsExplicit))
     print("- total of samples advertised in all-relevant collections including OoM estimates: %d" % (
         allCollectionSamplesIncOoM))
-    print("\n\n")
 
 for df in (pd_allCollections, pd_withdrawnCollections):
     pddfutils.tidyCollectionDf(df)
