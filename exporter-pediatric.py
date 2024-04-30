@@ -247,23 +247,15 @@ def printCollectionStdout(collectionList: List, headerStr: str):
 if not args.nostdout:
     print("Biobanks/collections totals:")
     print("- total of pediatric biobanks: %d" % (len(pediatricBiobanks)))
-    print("- total of pediatric collections with existing samples: %d in %d biobanks" % (
-    len(pediatricExistingDiagnosed), len(pediatricBiobanksExistingDiagnosed)))
-    print("- total of pediatric collections with existing samples: %d in %d biobanks" % (
-    len(pediatricOnlyExistingDiagnosed), len(pediatricOnlyBiobanksExistingDiagnosed)))
+    print("- total of pediatric collections with existing samples: %d in %d biobanks" % (len(pediatricExistingDiagnosed), len(pediatricBiobanksExistingDiagnosed)))
     print("- total of pediatric-only biobanks: %d" % (len(pediatricOnlyBiobanks)))
-    print("- total of pediatric-only collections with existing samples: %d in %d biobanks" % (
-    len(pediatricOnlyExistingDiagnosed), len(pediatricOnlyBiobanksExistingDiagnosed)))
+    print("- total of pediatric-only collections with existing samples: %d in %d biobanks" % (len(pediatricOnlyExistingDiagnosed), len(pediatricOnlyBiobanksExistingDiagnosed)))
     print("\n")
     print("Estimated sample totals:")
-    print("- total of samples/donors advertised explicitly in pediatric collections: %d / %d" % (
-        pediatricCollectionSamplesExplicit, pediatricCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric collections including OoM estimates: %d" % (
-        pediatricCollectionSamplesIncOoM))
-    print("- total of samples/donors advertised explicitly in pediatric-only collections: %d / %d" % (
-        pediatricOnlyCollectionSamplesExplicit, pediatricOnlyCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric-only collections including OoM estimates: %d" % (
-        pediatricOnlyCollectionSamplesIncOoM))
+    print("- total of samples/donors advertised explicitly in pediatric collections: %d / %d" % (pediatricCollectionSamplesExplicit, pediatricCollectionDonorsExplicit))
+    print("- total of samples advertised in pediatric collections including OoM estimates: %d" % (pediatricCollectionSamplesIncOoM))
+    print("- total of samples/donors advertised explicitly in pediatric-only collections: %d / %d" % (pediatricOnlyCollectionSamplesExplicit, pediatricOnlyCollectionDonorsExplicit))
+    print("- total of samples advertised in pediatric-only collections including OoM estimates: %d" % (pediatricOnlyCollectionSamplesIncOoM))
 
 for df in (pd_pediatricExistingDiagnosed, pd_pediatricOnlyExistingDiagnosed):
     pddfutils.tidyCollectionDf(df)

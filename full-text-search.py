@@ -20,6 +20,7 @@ from whoosh.query import *
 from whoosh.support.charset import accent_map
 
 cachesList = ['directory', 'index']
+typeList = ['COLLECTION', 'BIOBANK', 'CONTACT', 'NETWORK']
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -34,10 +35,12 @@ parser = argparse.ArgumentParser()
 parser.register('action', 'extend', ExtendAction)
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
+parser.add_argument('-i', '--print-ids-only', dest='printIdsOnly', action='store_true', help='print only matching IDs instead of search hits')
 parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
+parser.add_argument('--limit-types', dest='limitTypes', nargs='+', action='extend', choices=typeList, help='return only specific types')
 parser.add_argument('searchQuery', nargs='+', help='search query')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[], limitTypes=[])
 args = parser.parse_args()
 
 if args.debug:
@@ -55,8 +58,8 @@ indexdir = "indexdir"
 
 
 # purging directory cache means the index cache should be purged as well - data has to be refreshed in the index, too
-if 'directory' in args.purgeCaches:
-        args.purgeCaches.add('index')
+if 'directory' in args.purgeCaches and 'index' not in args.purgeCaches:
+        args.purgeCaches.append('index')
 if 'index' in args.purgeCaches or not os.path.exists(indexdir):
     dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
@@ -71,12 +74,24 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
     # however, in search there is a problem with searching for : chars - escaping does not work, hence introduced the hack below to replace : with ?
     # uncommenting LoggingFilter() and running the script with -d allows for debugging the tokenization
     my_id_ana = RegexTokenizer(expression=re.compile('[^ ]+')) | LowercaseFilter() | TeeFilter(PassFilter(), IntraWordFilter(delims=u':',splitnums=False) | StopFilter(stoplist=frozenset(['bbmri-eric', 'id', 'contactid', 'networkid', 'collection']))) # | LoggingFilter()
-    schema = Schema(id=TEXT(stored=True,analyzer=my_id_ana), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_name=TEXT(analyzer=my_ana),contact_id=TEXT(analyzer=my_id_ana))
+    schema = Schema(id=TEXT(stored=True,analyzer=my_id_ana), type=STORED, name=TEXT(stored=True,analyzer=my_ana), acronym=ID, description=TEXT(analyzer=my_ana), address=TEXT(analyzer=my_ana), phone=TEXT, email=TEXT, juridical_person=TEXT(analyzer=my_ana), bioresource_reference=TEXT, head_id=TEXT(analyzer=my_id_ana), head_name=TEXT(analyzer=my_ana), contact_id=TEXT(analyzer=my_id_ana), contact_name=TEXT(analyzer=my_ana), also_known=TEXT(analyzer=my_ana))
     ix = create_in(indexdir, schema)
     writer = ix.writer()
 
-    def getFullName(entity):
-        return " ".join(filter(None,[entity.get('head_title_before_name'), entity.get('head_firstname'), entity.get('head_lastname'), entity.get('head_title_after_name')]))
+    def getContact(contactId):
+        contact = None
+        try:
+            contact = dir.getContact(contactId)
+        except:
+            pass
+        return contact
+
+
+    def getContactFullName(entity):
+        if entity is None:
+            return ""
+        else:
+            return " ".join(filter(None,[entity.get('title_before_name'), entity.get('first_name'), entity.get('last_name'), entity.get('title_after_name')]))
 
     for collection in dir.getCollections():
         log.debug("Analyzing collection " + collection['id'])
@@ -87,18 +102,28 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
             contactId = collection['contact']['id']
         elif 'contact' in biobank:
             contactId = biobank['contact']['id']
-        writer.add_document(id=collection['id'], type=u"COLLECTION", name=collection.get('name'), description=collection.get('description'), acronym=collection.get('acronym'), bioresource_reference=collection.get('bioresource_reference'), head_name=getFullName(collection), contact_id=contactId)
+        writer.add_document(id=collection['id'], type=u"COLLECTION", name=collection.get('name'), description=collection.get('description'), acronym=collection.get('acronym'), bioresource_reference=collection.get('bioresource_reference'), contact_id=contactId, contact_name=getContactFullName(getContact(contactId)))
 
     for biobank in dir.getBiobanks():
         log.debug("Analyzing biobank " + biobank['id'])
         contactId = None
         if 'contact' in biobank:
             contactId = biobank['contact']['id']
-        writer.add_document(id=biobank['id'], type=u"BIOBANK", name=biobank.get('name'), description=biobank.get('description'), acronym=biobank.get('acronym'), juridical_person=biobank.get('juridical_person'), bioresource_reference=biobank.get('bioresource_reference'), head_name=getFullName(biobank), contact_id=contactId)
+        headId = None
+        if 'head' in biobank:
+            headId = biobank['head']['id']
+        writer.add_document(id=biobank['id'], type=u"BIOBANK", name=biobank.get('name'), description=biobank.get('description'), acronym=biobank.get('acronym'), juridical_person=biobank.get('juridical_person'), bioresource_reference=biobank.get('bioresource_reference'), head_id=headId, head_name=getContactFullName(getContact(headId)), contact_id=contactId, contact_name=getContactFullName(getContact(contactId)))
 
     for contact in dir.getContacts():
         log.debug("Analyzing contact " + contact['id'])
-        writer.add_document(id=contact['id'], type=u"CONTACT", name=" ".join(filter(None,[contact.get('title_before_name'), contact.get('first_name'), contact.get('last_name'), contact.get('title_after_name')])), phone=contact.get('phone'), email=contact.get('email'), address=", ".join(filter(None,[contact.get('address'),contact.get('city'),contact.get('zip')])))
+        writer.add_document(id=contact['id'], type=u"CONTACT", name=getContactFullName(contact), phone=contact.get('phone'), email=contact.get('email'), address=", ".join(filter(None,[contact.get('address'),contact.get('city'),contact.get('zip')])))
+    
+    for network in dir.getNetworks():
+        log.debug("Analyzing network " + network['id'])
+        contactId = None
+        if 'contact' in network:
+            contactId = network['contact']['id']
+        writer.add_document(id=network['id'], type=u"NETWORK", name=network.get('name'), description=network.get('description'), acronym=network.get('acronym'), contact_id=contactId, contact_name=getContactFullName(getContact(contactId)), also_known=network.get('also_known'))
 
     writer.commit()
 
@@ -114,7 +139,13 @@ with ix.searcher() as searcher:
     searchq = " ".join(args.searchQuery)
     # XXX: this is a hack workaround around escaping of : character that does not work properly
     searchq = re.sub(r':', '?', searchq)
-    query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "head_name", "address", "contact_id"], ix.schema).parse(searchq)
+    query = MultifieldParser(["id", "name", "description", "acronym", "phone", "email", "juridical_person", "bioresource_reference", "address", "contact_id", "contact_name", "head_id", "head_name", "also_known"], ix.schema).parse(searchq)
     results = searcher.search(query, limit=None)
     for r in results:
-        print(r)
+        if args.limitTypes:
+            if r["type"] not in args.limitTypes:
+                continue
+        if args.printIdsOnly:
+            print(r["id"])
+        else:
+            print(r)

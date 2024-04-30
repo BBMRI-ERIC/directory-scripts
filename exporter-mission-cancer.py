@@ -235,7 +235,7 @@ for collection in dir.getCollections():
                 pediatric = True
             if 'age_high' in collection and collection['age_high'] < age_max:
                 pediatricOnly = True
-                log.debug("Pediatric-only collection detected: %s, age range: %d-%d, diags: %s"%(collection['id'], collection.get('age_low'), collection.get('age_high'), diags + diag_ranges))
+                log.debug("Pediatric-only collection detected: %s, age range: %d-%d, diags: %s"%(collection['id'], (collection.get('age_low') if 'age_low' in collection else 0), collection.get('age_high'), diags + diag_ranges))
 
     if cancer_diag:
         log.info(f"Cancer collection detected: {collection['id']}")
