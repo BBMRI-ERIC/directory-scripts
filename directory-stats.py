@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=8:sw=8:tw=0:noet
+# vim:ts=4:sw=4:tw=0:sts=4:et
 
 import pprint
 import re
@@ -21,8 +21,8 @@ from diskcache import Cache
 from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
 disabledChecks = {
-#		"SemiemptyFields" : {"bbmri-eric:ID:NO_HUNT", "bbmri-eric:ID:NO_Janus"}
-		}
+#       "SemiemptyFields" : {"bbmri-eric:ID:NO_HUNT", "bbmri-eric:ID:NO_Janus"}
+        }
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -39,7 +39,7 @@ simplePluginManager.collectPlugins()
 
 pluginList = []
 for pluginInfo in simplePluginManager.getAllPlugins():
-	pluginList.append(os.path.basename(pluginInfo.path))
+    pluginList.append(os.path.basename(pluginInfo.path))
 
 remoteCheckList = ['emails', 'geocoding', 'URLs']
 cachesList = ['directory', 'emails', 'geocoding']
@@ -75,35 +75,35 @@ dir = Directory()
 
 biobanks = {}
 for biobank in dir.getBiobanks():
-	biobankID = biobank['id']
-	collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
-	biobanks[biobankID] = {}
-	biobanks[biobankID]['topLevelCollections'] = collections.successors(biobank['id'])
-	biobanks[biobankID]['biobankOrderOfMagnitude'] = 0
-	biobanks[biobankID]['biobankSizeExact'] = 0
-	biobanks[biobankID]['biobankSizeEstimate'] = 0
-	for collectionID in biobanks[biobank['id']]['topLevelCollections']:
-		OoM = dir.directoryGraph.nodes[collectionID]['data']['order_of_magnitude']['id']
-		if 'size' in collection.keys:
-			size = collection['size']
-		else:
-			size = 0
-		if OoM > biobanks[biobank['id']]['biobankOrderOfMagnitude']:
-			biobanks[biobank['id']]['biobankOrderOfMagnitude'] = OoM
-		if size == 0:
-			biobanks[biobank['id']]['biobankSizeEstimate'] += 3 * 10^OoM
-		else:
-			biobanks[biobank['id']]['biobankSizeExact'] += size
-	biobanks[biobank['id']]['biobankSizeTotal'] = biobanks[biobank['id']]['biobankSizeExact'] + biobanks[biobank['id']]['biobankSizeEstimate'] 
+    biobankID = biobank['id']
+    collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
+    biobanks[biobankID] = {}
+    biobanks[biobankID]['topLevelCollections'] = collections.successors(biobank['id'])
+    biobanks[biobankID]['biobankOrderOfMagnitude'] = 0
+    biobanks[biobankID]['biobankSizeExact'] = 0
+    biobanks[biobankID]['biobankSizeEstimate'] = 0
+    for collectionID in biobanks[biobank['id']]['topLevelCollections']:
+        OoM = dir.directoryGraph.nodes[collectionID]['data']['order_of_magnitude']['id']
+        if 'size' in collection.keys:
+            size = collection['size']
+        else:
+            size = 0
+        if OoM > biobanks[biobank['id']]['biobankOrderOfMagnitude']:
+            biobanks[biobank['id']]['biobankOrderOfMagnitude'] = OoM
+        if size == 0:
+            biobanks[biobank['id']]['biobankSizeEstimate'] += 3 * 10^OoM
+        else:
+            biobanks[biobank['id']]['biobankSizeExact'] += size
+    biobanks[biobank['id']]['biobankSizeTotal'] = biobanks[biobank['id']]['biobankSizeExact'] + biobanks[biobank['id']]['biobankSizeEstimate'] 
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
 if not args.nostdout:
-	log.info("Outputting warnings on stdout")
+    log.info("Outputting warnings on stdout")
 
-	for biobankID in sorted(biobanks.iteritems(), key=lambda kv: kv[1]['biobankSizeTotal']):
-		print(biobankID + "\t" + len(biobanks[biobankID]['topLevelCollections']) + "\t" + biobanks[biobankID]['biobankSizeTotal'])
+    for biobankID in sorted(biobanks.iteritems(), key=lambda kv: kv[1]['biobankSizeTotal']):
+        print(biobankID + "\t" + len(biobanks[biobankID]['topLevelCollections']) + "\t" + biobanks[biobankID]['biobankSizeTotal'])
 
 if args.outputXLSX is not None:
-	log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
+    log.info("Outputting warnings in Excel file " + args.outputXLSX[0])

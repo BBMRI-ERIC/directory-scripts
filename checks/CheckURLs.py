@@ -51,12 +51,19 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 				warnings.append(URLErrorWarning)
 				URL_well_formatted = False
 				logString += " -> malformatted URL (ValueError)"
-			except ConnectionResetError as e:
-				URLErrorWarning.message += " produced connection reset by peer (" + URL + ")"
+			except ConnectionError as e:
+				cause = "failed"
+				if isinstance(e, ConnectionAbortedError):
+					cause = "aborted by peer"
+				elif isinstance(e, ConnectionRefusedError):
+					cause = "refused by peer"
+				elif isinstance(e, ConnectionResetError):
+					cause = "reset by peer"
+				URLErrorWarning.message += " produced connection %s (%s)" % (cause, URL)
 				warnings.append(URLErrorWarning)
 				URL_well_formatted = True
 				URL_connection_reset = True
-				logString += " -> connection reset by peer"
+				logString += " -> connection " + cause
 			except Exception as e:
 				logString += " -> unknown exception"
 				log.info(logString)

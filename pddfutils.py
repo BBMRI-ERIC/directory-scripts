@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# vim:ts=4:sw=4:tw=0:et
+# vim:ts=4:sw=4:sts=4:tw=0:et
 
 import re
 from builtins import str, isinstance, len, set, int
@@ -37,6 +37,9 @@ def tidyBiobankDf (df : pd.DataFrame):
     linearizeStructures(df, [('country','id'), ('network','name'), ('covid19biobank','id'), ('capabilities','id'), ('quality','id')])
     extractContactDetails(df)
     for c in ['it_support_available', 'it_staff_size', 'is_available', 'his_available', 'partner_charter_signed', 'collections','contact']:
-        del df[c]
+        try:
+            del df[c]
+        except KeyError:
+            pass
     df.sort_values(by=['country','id'],ascending=True,inplace=True)
             

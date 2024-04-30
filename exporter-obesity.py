@@ -64,18 +64,22 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
 orphacodes = OrphaCodes(args.orphacodesfile)
 
-pediatricExistingDiagnosed = []
-pediatricOnlyExistingDiagnosed = []
-pediatricBiobanksExistingDiagnosed = set()
-pediatricOnlyBiobanksExistingDiagnosed = set()
-pediatricBiobanks = set()
-pediatricOnlyBiobanks = set()
-pediatricCollectionSamplesExplicit = 0
-pediatricCollectionDonorsExplicit = 0
-pediatricCollectionSamplesIncOoM = 0
-pediatricOnlyCollectionSamplesExplicit = 0
-pediatricOnlyCollectionDonorsExplicit = 0
-pediatricOnlyCollectionSamplesIncOoM = 0
+collectionsPediatricOnlyObesityDiagnosed = []
+biobanksPediatricOnlyObesityDiagnosed = set()
+pediatricOnlyObesitySamplesExplicit = 0
+pediatricOnlyObesitySamplesIncOoM = 0
+pediatricOnlyObesityDonorsExplicit = 0
+collectionsPediatricObesityDiagnosed = []
+biobanksPediatricObesityDiagnosed = set()
+pediatricObesitySamplesExplicit = 0
+pediatricObesitySamplesIncOoM = 0
+pediatricObesityDonorsExplicit = 0
+collectionsObesityDiagnosed = []
+biobanksObesityDiagnosed = set()
+obesitySamplesExplicit = 0
+obesitySamplesIncOoM = 0
+obesityDonorsExplicit = 0
+
 
 for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
@@ -114,10 +118,7 @@ for collection in dir.getCollections():
 
     diags = []
     diag_ranges = []
-    cancer_diag = False
-    cancer_control = False
-    cancer_prospective = False
-    non_cancer = False
+    obesity = False
 
     for d in collection['diagnosis_available']:
         if re.search('-', d['id']):
@@ -133,42 +134,21 @@ for collection in dir.getCollections():
     for d in diags + diag_ranges:
         if re.search(r'^urn:miriam:icd:', d):
             d = re.sub(r'^urn:miriam:icd:', '', d)
-            isCancer = ICD10CodesHelper.isCancerCode(d)
-            if isCancer is not None:
-                if isCancer:
+            isObesity = ICD10CodesHelper.isObesityCode(d)
+            if isObesity is not None and isObesity:
                     log.debug(
-                        "Collection %s identified as cancer collection due to ICD-10 code %s" % (collection['id'], d))
-                    cancer_diag = True
-                else:
-                    log.debug("Collection %s identified as non-cancer collection due to ICD-10 code %s" % (
-                    collection['id'], d))
-                    non_cancer = True
-            else:
-                isCancerChapter = ICD10CodesHelper.isCancerChapter(d)
-                if isCancerChapter is not None:
-                    if isCancerChapter:
-                        log.debug("Collection %s identified as cancer collection due to ICD-10 chapter %s" % (
-                        collection['id'], d))
-                        cancer_diag = True
-                    else:
-                        log.debug("Collection %s identified as non-cancer collection due to ICD-10 chapter %s" % (
-                        collection['id'], d))
-                        non_cancer = True
-                else:
-                    log.warning("Cannot match ICD-10 diagnosis %s" % (d))
+                        "Collection %s identified as obesity collection due to ICD-10 code %s" % (collection['id'], d))
+                    obesity = True
 
-        if re.search(r'^ORPHA:', d):
-            d = re.sub(r'^ORPHA:', '', d)
-            if orphacodes.isValidOrphaCode(d):
-                isCancer = orphacodes.isCancerOrphaCode(d)
-                if isCancer:
-                    log.debug("Collection %s identified as cancer collection due to ORPHA code %s" % (collection['id'], d))
-                    cancer_diag = True
-                else:
-                    log.debug("Collection %s identified as non-cancer collection due to ORPHA code %s" % (collection['id'], d))
-                    non_cancer = True
-            else:
-                log.warning("Collection %s has invalid ORPHA code %s" % (d))
+    if 'name' in collection:
+        if re.search(r'(obesity|obese)', collection['name'], re.IGNORECASE):
+                    log.debug("Collection %s identified as obesity collection due to its name %s" % (collection['id'], collection['name']))
+                    obesity = True
+
+    if 'description' in collection:
+        if re.search(r'(obesity|obese)', collection['description'], re.IGNORECASE):
+                    log.debug("Collection %s identified as obesity collection due to its description" % (collection['id']))
+                    obesity = True
 
     pediatric = False
     pediatricOnly = False
@@ -210,30 +190,46 @@ for collection in dir.getCollections():
                 pediatricOnly = True
                 log.debug("Pediatric-only collection detected: %s, age range: %d-%d, diags: %s"%(collection['id'], collection.get('age_low'), collection.get('age_high'), diags + diag_ranges))
 
-    if pediatric:
-        log.info(f"Pediatric collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
-        pediatricExistingDiagnosed.append(collection)
-        pediatricBiobanksExistingDiagnosed.add(biobankId)
-        pediatricBiobanks.add(biobankId)
-        if 'size' in collection and isinstance(collection['size'], int):
-            pediatricCollectionSamplesExplicit += collection['size']
-            pediatricCollectionSamplesIncOoM += collection['size']
-    if pediatricOnly:
+    if pediatricOnly and obesity:
         log.info(f"Pediatric-only collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
-        pediatricOnlyExistingDiagnosed.append(collection)
-        pediatricOnlyBiobanksExistingDiagnosed.add(biobankId)
-        pediatricOnlyBiobanks.add(biobankId)
+        collectionsPediatricOnlyObesityDiagnosed.append(collection)
+        biobanksPediatricOnlyObesityDiagnosed.add(biobankId)
         if 'size' in collection and isinstance(collection['size'], int):
-            pediatricOnlyCollectionSamplesExplicit += collection['size']
-            pediatricOnlyCollectionSamplesIncOoM += collection['size']
-    if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
-        if pediatric:
-            pediatricCollectionDonorsExplicit += collection['number_of_donors']
-        if pediatricOnly:
-            pediatricOnlyCollectionDonorsExplicit += collection['number_of_donors']
+            pediatricOnlyObesitySamplesExplicit += collection['size']
+            pediatricOnlyObesitySamplesIncOoM += collection['size']
+        else:
+            log.info('Adding %d for OoM %d on behalf of %s'%(10**OoM, OoM, collection['id']))
+            pediatricOnlyObesitySamplesIncOoM += 10 ** OoM
+        if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
+            pediatricOnlyObesityDonorsExplicit += collection['number_of_donors']
+    elif pediatric and obesity:
+        log.info(f"Pediatric collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
+        collectionsPediatricObesityDiagnosed.append(collection)
+        biobanksPediatricObesityDiagnosed.add(biobankId)
+        if 'size' in collection and isinstance(collection['size'], int):
+            pediatricObesitySamplesExplicit += collection['size']
+            pediatricObesitySamplesIncOoM += collection['size']
+        else:
+            log.info('Adding %d for OoM %d on behalf of %s'%(10**OoM, OoM, collection['id']))
+            pediatricObesitySamplesIncOoM += 10 ** OoM
+        if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
+            pediatricObesityDonorsExplicit += collection['number_of_donors']
+    elif obesity:
+        log.info(f"Pediatric-only collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
+        collectionsObesityDiagnosed.append(collection)
+        biobanksObesityDiagnosed.add(biobankId)
+        if 'size' in collection and isinstance(collection['size'], int):
+            obesitySamplesExplicit += collection['size']
+            obesitySamplesIncOoM += collection['size']
+        else:
+            log.info('Adding %d for OoM %d on behalf of %s'%(10**OoM, OoM, collection['id']))
+            obesitySamplesIncOoM += 10 ** OoM
+        if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
+            obesityDonorsExplicit += collection['number_of_donors']
 
-pd_pediatricExistingDiagnosed = pd.DataFrame(pediatricExistingDiagnosed)
-pd_pediatricOnlyExistingDiagnosed = pd.DataFrame(pediatricOnlyExistingDiagnosed)
+pd_collectionsPediatricOnlyObesityDiagnosed = pd.DataFrame(collectionsPediatricOnlyObesityDiagnosed)
+pd_collectionsPediatricObesityDiagnosed = pd.DataFrame(collectionsPediatricObesityDiagnosed)
+pd_collectionsObesityDiagnosed = pd.DataFrame(collectionsObesityDiagnosed)
 
 
 def printCollectionStdout(collectionList: List, headerStr: str):
@@ -246,31 +242,26 @@ def printCollectionStdout(collectionList: List, headerStr: str):
 
 if not args.nostdout:
     print("Biobanks/collections totals:")
-    print("- total of pediatric biobanks: %d" % (len(pediatricBiobanks)))
-    print("- total of pediatric collections with existing samples: %d in %d biobanks" % (
-    len(pediatricExistingDiagnosed), len(pediatricBiobanksExistingDiagnosed)))
-    print("- total of pediatric collections with existing samples: %d in %d biobanks" % (
-    len(pediatricOnlyExistingDiagnosed), len(pediatricOnlyBiobanksExistingDiagnosed)))
-    print("- total of pediatric-only biobanks: %d" % (len(pediatricOnlyBiobanks)))
-    print("- total of pediatric-only collections with existing samples: %d in %d biobanks" % (
-    len(pediatricOnlyExistingDiagnosed), len(pediatricOnlyBiobanksExistingDiagnosed)))
-    print("\n")
-    print("Estimated sample totals:")
-    print("- total of samples/donors advertised explicitly in pediatric collections: %d / %d" % (
-        pediatricCollectionSamplesExplicit, pediatricCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric collections including OoM estimates: %d" % (
-        pediatricCollectionSamplesIncOoM))
-    print("- total of samples/donors advertised explicitly in pediatric-only collections: %d / %d" % (
-        pediatricOnlyCollectionSamplesExplicit, pediatricOnlyCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric-only collections including OoM estimates: %d" % (
-        pediatricOnlyCollectionSamplesIncOoM))
+    print("- total of pediatric-only obesity collections with existing samples: %d in %d biobanks" % (
+    len(collectionsPediatricOnlyObesityDiagnosed), len(biobanksPediatricOnlyObesityDiagnosed)))
+    print("- total of pediatric-only obesity samples: %d explicit, %d with OoM; donors: %d explicit" % (
+    pediatricOnlyObesitySamplesExplicit, pediatricOnlyObesitySamplesIncOoM,  pediatricOnlyObesityDonorsExplicit))
+    print("- total of pediatric obesity collections with existing samples: %d in %d biobanks" % (
+    len(collectionsPediatricObesityDiagnosed), len(biobanksPediatricObesityDiagnosed)))
+    print("- total of pediatric obesity samples: %d explicit, %d with OoM; donors: %d explicit" % (
+    pediatricObesitySamplesExplicit, pediatricObesitySamplesIncOoM,  pediatricObesityDonorsExplicit))
+    print("- total of obesity collections with existing samples: %d in %d biobanks" % (
+    len(collectionsObesityDiagnosed), len(biobanksObesityDiagnosed)))
+    print("- total of obesity samples: %d explicit, %d with OoM; donors: %d explicit" % (
+    obesitySamplesExplicit, obesitySamplesIncOoM,  obesityDonorsExplicit))
 
-for df in (pd_pediatricExistingDiagnosed, pd_pediatricOnlyExistingDiagnosed):
+for df in (pd_collectionsPediatricOnlyObesityDiagnosed, pd_collectionsPediatricObesityDiagnosed, pd_collectionsObesityDiagnosed):
     pddfutils.tidyCollectionDf(df)
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
-    pd_pediatricExistingDiagnosed.to_excel(writer, sheet_name='Pediatric')
-    pd_pediatricOnlyExistingDiagnosed.to_excel(writer, sheet_name='Pediatric-only')
+    pd_collectionsPediatricOnlyObesityDiagnosed.to_excel(writer, sheet_name='Pediatric-only obesity')
+    pd_collectionsPediatricObesityDiagnosed.to_excel(writer, sheet_name='Pediatric obesity')
+    pd_collectionsObesityDiagnosed.to_excel(writer, sheet_name='Obesity')
     writer.save()
