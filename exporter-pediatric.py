@@ -168,7 +168,7 @@ for collection in dir.getCollections():
                     log.debug("Collection %s identified as non-cancer collection due to ORPHA code %s" % (collection['id'], d))
                     non_cancer = True
             else:
-                log.warning("Collection %s has invalid ORPHA code %s" % (d))
+                log.warning("Collection %s has invalid ORPHA code %s" % (collection['id'], d))
 
     pediatric = False
     pediatricOnly = False
@@ -208,7 +208,7 @@ for collection in dir.getCollections():
                 pediatric = True
             if 'age_high' in collection and collection['age_high'] < age_max:
                 pediatricOnly = True
-                log.debug("Pediatric-only collection detected: %s, age range: %d-%d, diags: %s"%(collection['id'], collection.get('age_low'), collection.get('age_high'), diags + diag_ranges))
+                log.debug(f"Pediatric-only collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
 
     if pediatric:
         log.info(f"Pediatric collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
