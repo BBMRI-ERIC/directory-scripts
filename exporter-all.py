@@ -129,7 +129,7 @@ for collection in dir.getCollections():
         allCollectionSamplesExplicit += collection['size']
         allCollectionSamplesIncOoM += collection['size']
     else:
-        allCollectionSamplesIncOoM += int(0.3*(10 ** OoM))
+        allCollectionSamplesIncOoM += int(10 ** OoM)
     if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
         allCollectionDonorsExplicit += collection['number_of_donors']
 
