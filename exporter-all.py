@@ -129,6 +129,7 @@ for collection in dir.getCollections():
         allCollectionSamplesExplicit += collection['size']
         allCollectionSamplesIncOoM += collection['size']
     else:
+        # Intentionally, the lower bound of the OoM interval is taken - the size of the collection should be in the range of 10**OoM to 10**(OoM+1) - and hence using 10**OoM is a bound nobody can question unless there is a bug in the underlying data. Historically, we used also 0.3*10**(OoM+1).
         allCollectionSamplesIncOoM += int(10 ** OoM)
     if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
         allCollectionDonorsExplicit += collection['number_of_donors']
