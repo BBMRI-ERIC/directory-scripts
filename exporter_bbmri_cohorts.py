@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/python3.6
 '''
 BBMRI-ERIC Directory Cohorts
 '''
@@ -32,6 +32,9 @@ cachesList = ['directory', 'geocoding']
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
+parser.add_argument('-a', '--aggregator', dest='aggregator', type=str, default=['Network','Entity','Country'], help='Space-separated list of the aggregators used in stdout. Accepted values: Network Entity Country')
+parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', default='bbmri_cohorts_stats.xlsx',
+                    help='output of results into an XLSX with filename provided as parameter')
 parser.add_argument('-o', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
@@ -41,8 +44,10 @@ parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', 
 parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 #parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
 
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
+aggregator = args.aggregator
+outputXLSX = args.outputXLSX
 
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
@@ -64,7 +69,7 @@ for biobank in dir.getBiobanks():
         for n in biobank['network']:
             if n['id'] == 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts':
                 bbmri_cohort_bb.append(biobank)
-                print(biobank['id'] +' '+biobank['country']['id'])
+                #print(biobank['id'] +' '+biobank['country']['id'])
             if n['id'] == 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA':
                 bbmri_cohort_dna_bb.append(biobank)
 
@@ -89,29 +94,48 @@ for collection in dir.getCollections():
         
 
 df  = pd.DataFrame(columns = ['Network','Entity','Country'])
+df_bb  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID'])
+df_coll  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID'])
+
 
 for biobank_cohort in bbmri_cohort_bb:
     df.loc[len(df)] = ['BBMRI_Cohort','Biobank',str(biobank_cohort['country']['id'])]
+    df_bb.loc[len(df)] = ['BBMRI_Cohort','Biobank',str(biobank_cohort['country']['id']),str(biobank_cohort['name']),str(biobank_cohort['id'])]
     #print('BBMRI_Cohort' + '\tBiobank\t' + str(biobank_cohort['country']['id']))
 
 for biobank_cohort_dna in bbmri_cohort_dna_bb:
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','Biobank',str(biobank_cohort_dna['country']['id'])]
+    df_bb.loc[len(df)] = ['BBMRI_Cohort_DNA','Biobank',str(biobank_cohort_dna['country']['id']),str(biobank_cohort_dna['name']),str(biobank_cohort_dna['id'])]
     #print('BBMRI_Cohort_DNA' + '\tBiobank\t' + str(biobank_cohort_dna['country']['id']))
 
 for bbcoll_cohort in bbmri_cohort_bbcoll:
     df.loc[len(df)] = ['BBMRI_Cohort','BiobankCollection',str(bbcoll_cohort['country']['id'])]
+    df_bb.loc[len(df)] = ['BBMRI_Cohort','BiobankCollection',str(bbcoll_cohort['country']['id']),str(bbcoll_cohort['name']),str(bbcoll_cohort['id'])]
     #print('BBMRI_Cohort' + '\tCollection\t' + str(coll_cohort['country']['id']))
 
 for bbcoll_cohort_dna in bbmri_cohort_dna_bbcoll:
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','BiobankCollection',str(bbcoll_cohort_dna['country']['id'])]
+    df_bb.loc[len(df)] = ['BBMRI_Cohort_DNA','BiobankCollection',str(bbcoll_cohort_dna['country']['id']),str(bbcoll_cohort_dna['name']),str(bbcoll_cohort_dna['id'])]
     #print('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
 
 for coll_cohort in bbmri_cohort_coll:
     df.loc[len(df)] = ['BBMRI_Cohort','Collection',str(coll_cohort['country']['id'])]
+    df_coll.loc[len(df)] = ['BBMRI_Cohort','Collection',str(coll_cohort['country']['id']),str(coll_cohort['name']),str(coll_cohort['id'])]
     #print('BBMRI_Cohort' + '\tCollection\t' + str(coll_cohort['country']['id']))
 
 for coll_cohort_dna in bbmri_cohort_dna_coll:
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','Collection',str(coll_cohort_dna['country']['id'])]
+    df_coll.loc[len(df)] = ['BBMRI_Cohort_DNA','Collection',str(coll_cohort_dna['country']['id']),str(coll_cohort_dna['name']),str(coll_cohort_dna['id'])]
     #print('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
 
-print (df.groupby(['Network','Entity','Country']).size().reset_index(name='Count'))
+
+def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str):
+    log.info("Outputting warnings in Excel file " + filename)
+    writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+    dfBiobanks.to_excel(writer, sheet_name=biobanksLabel)
+    dfCollections.to_excel(writer, sheet_name=collectionsLabel)
+    writer.save()
+
+outputExcelBiobanksCollections(args.outputXLSX, df_bb, "Biobanks", df_coll, "Collections")
+
+print (df.groupby(aggregator).size().reset_index(name='Count'))
