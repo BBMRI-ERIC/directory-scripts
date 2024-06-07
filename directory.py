@@ -4,7 +4,7 @@ import logging as log
 import os.path
 import time
 
-import molgenis.client
+from molgenis_emx2_pyclient import Client
 import networkx as nx
 from diskcache import Cache
 
@@ -23,9 +23,9 @@ class Directory:
         if 'directory' in purgeCaches:
             cache.clear()
 
-        self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
+        self.__directoryURL = "https://directory-emx2-acc.molgenis.net/api/"
         log.info('Retrieving directory content from ' + self.__directoryURL)
-        session = molgenis.client.Session(self.__directoryURL)
+        session = Client(self.__directoryURL)
         if username is not None and password is not None:
             log.info("Logging in to MOLGENIS with a user account.")
             log.debug('username: ' + username)
