@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+#!/usr/bin/python3
+=======
 #!/usr/local/bin/python3.6
+>>>>>>> 446821d0a5a686f03ed46e84ae6eeef3bea29ba8
 '''
 BBMRI-ERIC Directory Cohorts
 '''
