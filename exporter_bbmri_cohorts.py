@@ -129,13 +129,13 @@ for coll_cohort_dna in bbmri_cohort_dna_coll:
     #print('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
 
 
-def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str):
+def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str):
     log.info("Outputting warnings in Excel file " + filename)
     writer = pd.ExcelWriter(filename, engine='xlsxwriter')
     dfBiobanks.to_excel(writer, sheet_name=biobanksLabel)
     dfCollections.to_excel(writer, sheet_name=collectionsLabel)
-    writer.save()
+    dfStats.to_excel(writer, sheet_name=statsLabel)
+    writer.close()
 
-outputExcelBiobanksCollections(args.outputXLSX, df_bb, "Biobanks", df_coll, "Collections")
-
-print (df.groupby(aggregator).size().reset_index(name='Count'))
+statsdf = df.groupby(aggregator).size().reset_index(name='Count')
+outputExcelBiobanksCollections(args.outputXLSX, df_bb, "Biobanks", df_coll, "Collections", statsdf, "Stats")
