@@ -87,9 +87,9 @@ class BBMRICohorts(IPlugin):
 			# Check presence of fact tables
 			if collection['facts'] != []:
 				if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
-					log.info("Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
+					log.info(f"Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
 				if BBMRICohortsNetworkName in biobank_networks or BBMRICohortsDNANetworkName in biobank_networks:
-					log.info("Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
+					log.info(f"Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
 
 				for fact in dir.getFacts():
 					if fact['collection']['id'] == collection['id']:
