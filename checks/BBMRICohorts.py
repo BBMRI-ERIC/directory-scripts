@@ -2,7 +2,7 @@
 
 import re
 import logging as log
-import collections
+import collections as python_collections
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
@@ -98,39 +98,34 @@ class BBMRICohorts(IPlugin):
 						# TODO: add getting also age, sex and material groups - and use sets not arrays, it's not ordered
 
 
-				# TODO: check that the fact table contains all the diagnoses described in the collection
-				if collFactsDiseases != [] and collections.Counter(collFactsDiseases) != collections.Counter(diags):
+				# check that the fact table contains all the diagnoses described in the collection
+				if collFactsDiseases != [] and python_collections.Counter(collFactsDiseases) != python_collections.Counter(diags):
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Diagnoses of collection and facts table do not match"))
 			
-			# TODO: check that the fact table contains all the age ranges and biological sex that are described in the collection
-			if collFactsAgeGroups != [] and collections.Counter(collFactsAgeGroups) != collections.Counter(collAges):
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Age ranges of collection and facts table do not match"))
-			if collFactsSexGroups != [] and collections.Counter(collFactsSexGroups) != collections.Counter(collSex):
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Sex of collection and facts table do not match"))
+				# check that the fact table contains all the age ranges and biological sex that are described in the collection
+				if collFactsAgeGroups != [] and python_collections.Counter(collFactsAgeGroups) != python_collections.Counter(collAges):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Age ranges of collection and facts table do not match"))
+				if collFactsSexGroups != [] and python_collections.Counter(collFactsSexGroups) != python_collections.Counter(collSex):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Sex of collection and facts table do not match"))
 
-			# TODO: check that the fact table contains all the material types that are described in the collection
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Material types of collection and facts table do not match"))
-			# TODO: check that the total numbers of samples and donors are filled out
+				# TODO: check that the fact table contains all the material types that are described in the collection
+				#	warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Material types of collection and facts table do not match"))
+
 			if 'size' in collection:
 				if not isinstance(collection['size'], int):
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) is not an integer"))
-				# TODO: check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
+				# check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
 				if collsFactsSamples != collection['size']:
 						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection size (number of samples {collection['size']}) differs from total number of samples in facts table ({collsFactsSamples})"))
 			else:
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) not provided"))
+
 			# TODO: check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted
 			if 'network' in collection:
 				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA' in str(collection['network']): # IMPROVE CODE
 					pass # TODO check materials and add those compatible with the network
 
 		for biobank in dir.getBiobanks():
-			'''
-			biobank_capabilities = []
-			if 'capabilities' in biobank:
-				for c in biobank['capabilities']:
-					biobank_capabilities.append(c['id'])
-			'''
 			biobank_networks = []
 			if 'network' in biobank:
 				for n in biobank['network']:
@@ -146,7 +141,5 @@ class BBMRICohorts(IPlugin):
 			for network in [BBMRICohortsNetworkName, BBMRICohortsDNANetworkName]:
 				if network in biobank_networks and not network in collection_networks:
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
-
-			# TODO: check that if the biobank-level membership in BBMRI-Cohorts network network is provided, there is at least one collection which has the membership in the network
 			
 		return warnings
