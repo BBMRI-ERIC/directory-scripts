@@ -88,18 +88,26 @@ class BBMRICohorts(IPlugin):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) not provided"))
 			# TODO: check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted
 			if 'network' in collection:
-				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA' in str(collection['network']):
+				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA' in str(collection['network']): # IMPROVE CODE
 					pass # TODO check materials and add those compatible with the network
 
 		for biobank in dir.getBiobanks():
+			'''
 			biobank_capabilities = []
 			if 'capabilities' in biobank:
 				for c in biobank['capabilities']:
 					biobank_capabilities.append(c['id'])
+			'''
 			biobank_networks = []
+			matchNetworks=False
 			if 'network' in biobank:
-				for n in biobank['network']:
-					biobank_networks.append(n['id'])
+				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts' in str(biobank['network']): # IMPROVE CODE
+					for coll in biobank['collections']:
+						if 'network' in coll:
+							if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts' in coll['network']:
+								matchNetworks=True
+					if not matchNetworks:
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank in BBMRI-Cohorts network but no collections in such network."))
 
 			# TODO: check that if the biobank-level membership in BBMRI-Cohorts network network is provided, there is at least one collection which has the membership in the network
 			
