@@ -17,10 +17,10 @@ class BBMRICohorts(IPlugin):
 
 		collectionFacts = []
 		collFactsDiseases = set()
-		collsFactsSamples = []
-		collFactsAgeGroups = {}
-		collFactsSexGroups = {}
-		collFactsMaterialTypes = {}
+		collFactsAgeGroups = set()
+		collFactsSexGroups = set()
+		collFactsMaterialTypes =set() 
+		collsFactsSamples = 0
 
 		for collection in dir.getCollections():
 			biobankId = dir.getCollectionBiobankId(collection['id'])
@@ -64,10 +64,11 @@ class BBMRICohorts(IPlugin):
 			if collection['facts'] != []:
 				for fact in dir.getFacts():
 					if fact['collection']['id'] == collection['id']:
-						#collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
+						collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
 						if 'disease' in fact:
 							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
-							collsFactsSamples.append(fact['number_of_samples'])
+							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
+							collsFactsSamples += fact['number_of_samples']
 						# TODO: add getting also age, sex and material groups - and use sets not arrays, it's not ordered
 
 
