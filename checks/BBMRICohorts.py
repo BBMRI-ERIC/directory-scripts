@@ -84,7 +84,7 @@ class BBMRICohorts(IPlugin):
 				if not isinstance(collection['size'], int):
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) is not an integer"))
 				# TODO: check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
-				if sum(collsFactsSamples) != collection['size']:
+				if collsFactsSamples != collection['size']:
 						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) differs from total number of samples in facts table"))
 			else:
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) not provided"))
