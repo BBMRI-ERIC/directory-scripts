@@ -10,13 +10,10 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntit
 BBMRICohortsNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts'
 BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA'
 
-class COVID(IPlugin):
+class BBMRICohorts(IPlugin):
 	def check(self, dir):
 		warnings = []
-		log.info("Running COVID content checks (COVID)")
-		biobankHasCovidCollection = {}
-		biobankHasCovidProspectiveCollection = {}
-		biobankHasCovidControls = {}
+		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 
 		collectionFacts = []
 		collFactsDiseases = []
