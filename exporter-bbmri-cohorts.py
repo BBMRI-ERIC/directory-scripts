@@ -101,32 +101,32 @@ df_coll  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID'])
 for biobank_cohort in bbmri_cohort_bb:
     df.loc[len(df)] = ['BBMRI_Cohort','Biobank',str(biobank_cohort['country']['id'])]
     df_bb.loc[len(df)] = ['BBMRI_Cohort','Biobank',str(biobank_cohort['country']['id']),str(biobank_cohort['name']),str(biobank_cohort['id'])]
-    #print('BBMRI_Cohort' + '\tBiobank\t' + str(biobank_cohort['country']['id']))
+    log.info('BBMRI_Cohort' + '\tBiobank\t' + str(biobank_cohort['country']['id']))
 
 for biobank_cohort_dna in bbmri_cohort_dna_bb:
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','Biobank',str(biobank_cohort_dna['country']['id'])]
     df_bb.loc[len(df)] = ['BBMRI_Cohort_DNA','Biobank',str(biobank_cohort_dna['country']['id']),str(biobank_cohort_dna['name']),str(biobank_cohort_dna['id'])]
-    #print('BBMRI_Cohort_DNA' + '\tBiobank\t' + str(biobank_cohort_dna['country']['id']))
+    log.info('BBMRI_Cohort_DNA' + '\tBiobank\t' + str(biobank_cohort_dna['country']['id']))
 
 for bbcoll_cohort in bbmri_cohort_bbcoll:
     df.loc[len(df)] = ['BBMRI_Cohort','BiobankCollection',str(bbcoll_cohort['country']['id'])]
     df_bb.loc[len(df)] = ['BBMRI_Cohort','BiobankCollection',str(bbcoll_cohort['country']['id']),str(bbcoll_cohort['name']),str(bbcoll_cohort['id'])]
-    #print('BBMRI_Cohort' + '\tCollection\t' + str(coll_cohort['country']['id']))
+    log.info('BBMRI_Cohort' + '\tCollection\t' + str(bbcoll_cohort['country']['id']))
 
 for bbcoll_cohort_dna in bbmri_cohort_dna_bbcoll:
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','BiobankCollection',str(bbcoll_cohort_dna['country']['id'])]
     df_bb.loc[len(df)] = ['BBMRI_Cohort_DNA','BiobankCollection',str(bbcoll_cohort_dna['country']['id']),str(bbcoll_cohort_dna['name']),str(bbcoll_cohort_dna['id'])]
-    #print('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
+    log.info('BBMRI_Cohort_DNA' + '\tCollection\t' + str(bbcoll_cohort_dna['country']['id']))
 
 for coll_cohort in bbmri_cohort_coll:
     df.loc[len(df)] = ['BBMRI_Cohort','Collection',str(coll_cohort['country']['id'])]
     df_coll.loc[len(df)] = ['BBMRI_Cohort','Collection',str(coll_cohort['country']['id']),str(coll_cohort['name']),str(coll_cohort['id'])]
-    #print('BBMRI_Cohort' + '\tCollection\t' + str(coll_cohort['country']['id']))
+    log.info('BBMRI_Cohort' + '\tCollection\t' + str(coll_cohort['country']['id']))
 
 for coll_cohort_dna in bbmri_cohort_dna_coll:
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','Collection',str(coll_cohort_dna['country']['id'])]
     df_coll.loc[len(df)] = ['BBMRI_Cohort_DNA','Collection',str(coll_cohort_dna['country']['id']),str(coll_cohort_dna['name']),str(coll_cohort_dna['id'])]
-    #print('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
+    log.info('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
 
 
 def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str):

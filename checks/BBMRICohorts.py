@@ -2,7 +2,7 @@
 
 import re
 import logging as log
-import collections as python_collections
+import collections as py_collections
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
@@ -12,8 +12,8 @@ BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-
 
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, warningsList): # TO improve
-	if factsList != [] and python_collections.Counter(factsList) != python_collections.Counter(collList):
-		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, errorDescription))
+	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
+		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {collList} - fact information: {factsList}"))
 
 class BBMRICohorts(IPlugin):
 
@@ -118,12 +118,12 @@ class BBMRICohorts(IPlugin):
 
 						if 'size' in collection:
 							if not isinstance(collection['size'], int):
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) is not an integer"))
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) is not an integer"))
 							# check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
 							if collsFactsSamples != collection['size']:
-									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection size (number of samples {collection['size']}) differs from total number of samples in facts table ({collsFactsSamples})"))
+									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) differs from total number of samples in facts table ({collsFactsSamples})"))
 						else:
-							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) not provided"))
+							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) not provided"))
 
 						# check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted (DNA, Peripheral blood cells, Whole Blood)
 						if 'network' in collection:
