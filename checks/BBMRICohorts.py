@@ -16,7 +16,11 @@ class BBMRICohorts(IPlugin):
 		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 
 		collectionFacts = []
-		collFactsDiseases = []
+		collFactsDiseases = {}
+		collFactsAgeGroups = {}
+		collFactsSexGroups = {}
+		collFactsMaterialTypes = {}
+
 		for collection in dir.getCollections():
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
@@ -61,7 +65,9 @@ class BBMRICohorts(IPlugin):
 					if fact['collection']['id'] == collection['id']:
 						#collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
 						if 'disease' in fact:
-							collFactsDiseases.append(fact['disease']['id']) # Collect all diagnoses from facts
+							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
+						# TODO: add getting also age, sex and material groups - and use sets not arrays, it's not ordered
+
 
 				# TODO: check that the fact table contains all the diagnoses described in the collection
 				if collFactsDiseases!= [] and collections.Counter(collFactsDiseases) != collections.Counter(diags):
