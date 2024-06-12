@@ -60,6 +60,25 @@ class BBMRICohorts(IPlugin):
 				else:
 					diags.append(d['id'])
 
+			age_ranges = set()
+			collAges = set()
+			if 'age_range' in collection:
+				for a in collection['age_range']:
+					if re.search('-', a['id']):
+						age_ranges.add(a['id'])
+					else:
+						collAges.add(a['id'])
+
+			sex_ranges = set()
+			collSex = set()
+			for s in collection['sex']:
+				if re.search('-', s['id']):
+					sex_ranges.add(s['id'])
+				else:
+					collSex.add(s['id'])
+					
+
+
 			# Check presence of fact tables
 			if collection['facts'] != []:
 				for fact in dir.getFacts():
@@ -67,23 +86,31 @@ class BBMRICohorts(IPlugin):
 						collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
 						if 'disease' in fact:
 							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
-							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
+							collFactsAgeGroups.add(fact['age_range']['id']) 
+							collFactsSexGroups.add(fact['sex']['id'])
+							collFactsMaterialTypes.add(fact['sample_type']['id'])
 							collsFactsSamples += fact['number_of_samples']
 						# TODO: add getting also age, sex and material groups - and use sets not arrays, it's not ordered
 
 
 				# TODO: check that the fact table contains all the diagnoses described in the collection
-				if collFactsDiseases!= [] and collections.Counter(collFactsDiseases) != collections.Counter(diags):
-					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection and facts table do not match"))
+				if collFactsDiseases != [] and collections.Counter(collFactsDiseases) != collections.Counter(diags):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Diagnoses of collection and facts table do not match"))
 			
 			# TODO: check that the fact table contains all the age ranges and biological sex that are described in the collection
+			if collFactsAgeGroups != [] and collections.Counter(collFactsAgeGroups) != collections.Counter(collAges):
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Age ranges of collection and facts table do not match"))
+			if collFactsSexGroups != [] and collections.Counter(collFactsSexGroups) != collections.Counter(collSex):
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Sex of collection and facts table do not match"))
+
 			# TODO: check that the fact table contains all the material types that are described in the collection
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Material types of collection and facts table do not match"))
 			# TODO: check that the total numbers of samples and donors are filled out
 			if 'size' in collection:
 				if not isinstance(collection['size'], int):
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) is not an integer"))
 				# TODO: check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
-				if sum(collsFactsSamples) != collection['size']:
+				if collsFactsSamples != collection['size']:
 						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) differs from total number of samples in facts table"))
 			else:
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) not provided"))
