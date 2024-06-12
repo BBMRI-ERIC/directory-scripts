@@ -1,0 +1,9 @@
+[Core]
+Name = Checks related to the BBMRI Cohorts in the Directory
+Module = BBMRICohorts
+
+[Documentation]
+Author = Petr Holub, Eva Garcia-Alvarez
+Version = 1.0
+Description = Checks content related to the BBMRI Cohorts
+
