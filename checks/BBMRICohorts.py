@@ -16,13 +16,6 @@ class BBMRICohorts(IPlugin):
 		warnings = []
 		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 
-		collectionFacts = []
-		collFactsDiseases = set()
-		collFactsAgeGroups = set()
-		collFactsSexGroups = set()
-		collFactsMaterialTypes =set() 
-		collsFactsSamples = 0
-
 		for collection in dir.getCollections():
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
@@ -84,8 +77,20 @@ class BBMRICohorts(IPlugin):
 					
 
 
+			collectionFacts = []
+			collFactsDiseases = set()
+			collFactsAgeGroups = set()
+			collFactsSexGroups = set()
+			collFactsMaterialTypes =set() 
+			collsFactsSamples = 0
+
 			# Check presence of fact tables
 			if collection['facts'] != []:
+				if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
+					log.info("Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
+				if BBMRICohortsNetworkName in biobank_networks or BBMRICohortsDNANetworkName in biobank_networks:
+					log.info("Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
+
 				for fact in dir.getFacts():
 					if fact['collection']['id'] == collection['id']:
 						collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
@@ -122,7 +127,7 @@ class BBMRICohorts(IPlugin):
 
 			# TODO: check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted
 			if 'network' in collection:
-				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA' in str(collection['network']): # IMPROVE CODE
+				if BBMRICohortsDNANetworkName in collection_networks: 
 					pass # TODO check materials and add those compatible with the network
 
 		for biobank in dir.getBiobanks():
