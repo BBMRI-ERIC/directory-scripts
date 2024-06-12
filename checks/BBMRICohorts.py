@@ -11,7 +11,8 @@ BBMRICohortsNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Coh
 BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA'
 
 class BBMRICohorts(IPlugin):
-	def check(self, dir):
+
+	def check(self, dir, args):
 		warnings = []
 		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 
