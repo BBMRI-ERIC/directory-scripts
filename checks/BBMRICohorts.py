@@ -16,7 +16,8 @@ class BBMRICohorts(IPlugin):
 		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 
 		collectionFacts = []
-		collFactsDiseases = {}
+		collFactsDiseases = set()
+		collsFactsSamples = []
 		collFactsAgeGroups = {}
 		collFactsSexGroups = {}
 		collFactsMaterialTypes = {}
@@ -66,6 +67,7 @@ class BBMRICohorts(IPlugin):
 						#collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
 						if 'disease' in fact:
 							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
+							collsFactsSamples.append(fact['number_of_samples'])
 						# TODO: add getting also age, sex and material groups - and use sets not arrays, it's not ordered
 
 
@@ -76,8 +78,18 @@ class BBMRICohorts(IPlugin):
 			# TODO: check that the fact table contains all the age ranges and biological sex that are described in the collection
 			# TODO: check that the fact table contains all the material types that are described in the collection
 			# TODO: check that the total numbers of samples and donors are filled out
-			# TODO: check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
+			if 'size' in collection:
+				if not isinstance(collection['size'], int):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) is not an integer"))
+				# TODO: check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
+				if sum(collsFactsSamples) != collection['size']:
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) differs from total number of samples in facts table"))
+			else:
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size (number of samples) not provided"))
 			# TODO: check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted
+			if 'network' in collection:
+				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA' in str(collection['network']):
+					pass # TODO check materials and add those compatible with the network
 
 		for biobank in dir.getBiobanks():
 			biobank_capabilities = []
@@ -90,5 +102,5 @@ class BBMRICohorts(IPlugin):
 					biobank_networks.append(n['id'])
 
 			# TODO: check that if the biobank-level membership in BBMRI-Cohorts network network is provided, there is at least one collection which has the membership in the network
-
+			
 		return warnings
