@@ -24,10 +24,6 @@ class BBMRICohorts(IPlugin):
 			if 'capabilities' in biobank:
 				for c in biobank['capabilities']:
 					biobank_capabilities.append(c['id'])
-			biobank_covid = []
-			if 'covid19biobank' in biobank:
-				for c in biobank['covid19biobank']:
-					biobank_covid.append(c['id'])
 			biobank_networks = []
 			if 'network' in biobank:
 				for n in biobank['network']:
@@ -52,8 +48,6 @@ class BBMRICohorts(IPlugin):
                         
 			diags = []
 			diag_ranges = []
-			covid_diag = False
-			covid_control = False
 
 			for d in collection['diagnosis_available']:
 				if re.search('-', d['id']):
@@ -84,10 +78,6 @@ class BBMRICohorts(IPlugin):
 			if 'capabilities' in biobank:
 				for c in biobank['capabilities']:
 					biobank_capabilities.append(c['id'])
-			biobank_covid = []
-			if 'covid19biobank' in biobank:
-				for c in biobank['covid19biobank']:
-					biobank_covid.append(c['id'])
 			biobank_networks = []
 			if 'network' in biobank:
 				for n in biobank['network']:
