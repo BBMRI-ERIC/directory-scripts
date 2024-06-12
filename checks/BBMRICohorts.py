@@ -2,6 +2,7 @@
 
 import re
 import logging as log
+import collections
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
@@ -10,13 +11,15 @@ BBMRICohortsNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Coh
 BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA'
 
 class COVID(IPlugin):
-	def check(self, dir, args):
+	def check(self, dir):
 		warnings = []
 		log.info("Running COVID content checks (COVID)")
 		biobankHasCovidCollection = {}
 		biobankHasCovidProspectiveCollection = {}
 		biobankHasCovidControls = {}
 
+		collectionFacts = []
+		collFactsDiseases = []
 		for collection in dir.getCollections():
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
@@ -61,9 +64,18 @@ class COVID(IPlugin):
 				else:
 					diags.append(d['id'])
 
+			# Check presence of fact tables
+			if collection['facts'] != []:
+				for fact in dir.getFacts():
+					if fact['collection']['id'] == collection['id']:
+						#collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
+						if 'disease' in fact:
+							collFactsDiseases.append(fact['disease']['id']) # Collect all diagnoses from facts
 
-			# TODO: check presence of fact tables
-			# TODO: check that the fact table contains all the diagnoses described in the collection
+				# TODO: check that the fact table contains all the diagnoses described in the collection
+				if collFactsDiseases!= [] and collections.Counter(collFactsDiseases) != collections.Counter(diags):
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection and facts table do not match"))
+			
 			# TODO: check that the fact table contains all the age ranges and biological sex that are described in the collection
 			# TODO: check that the fact table contains all the material types that are described in the collection
 			# TODO: check that the total numbers of samples and donors are filled out

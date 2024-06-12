@@ -77,6 +77,15 @@ class Directory:
             end_time = time.perf_counter()
             log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... all entities retrieved')
+        if 'facts' in cache:
+            self.facts = cache['facts']
+        else:
+            start_time = time.perf_counter()
+            self.facts = session.get(self.__package + "_facts")
+            cache['facts'] = self.facts
+            end_time = time.perf_counter()
+            log.info('   ... retrieved facts in ' + "%0.3f" % (end_time-start_time) + 's')
+        log.info('   ... all entities retrieved')
         self.contactHashmap = {}
 
         log.info('Processing directory data')
@@ -289,6 +298,9 @@ class Directory:
 
     def getNetworks(self):
         return self.networks
+
+    def getFacts(self):
+        return self.facts
 
     def getNetworkNN(self, networkID : str):
         # TODO: review handling of IARC/EU/global collections
