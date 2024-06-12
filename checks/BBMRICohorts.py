@@ -34,6 +34,10 @@ class BBMRICohorts(IPlugin):
 			if 'network' in biobank:
 				for n in biobank['network']:
 					biobank_networks.append(n['id'])
+			collection_networks = []
+			if 'network' in collection:
+				for n in collection['network']:
+					collection_networks.append(n['id'])
 
 			OoM = collection['order_of_magnitude']['id']
 
@@ -101,15 +105,20 @@ class BBMRICohorts(IPlugin):
 					biobank_capabilities.append(c['id'])
 			'''
 			biobank_networks = []
-			matchNetworks=False
 			if 'network' in biobank:
-				if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts' in str(biobank['network']): # IMPROVE CODE
-					for coll in biobank['collections']:
-						if 'network' in coll:
-							if 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts' in coll['network']:
-								matchNetworks=True
-					if not matchNetworks:
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Biobank in BBMRI-Cohorts network but no collections in such network."))
+				for n in biobank['network']:
+					biobank_networks.append(n['id'])
+
+			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
+			collection_networks = set()  # set is sufficient since we only collect all the networks in which collections of a biobank are participating
+			for collection in collections:
+				if 'network' in collection:
+					for n in collection['network']:
+						collection_networks.add(n['id'])
+
+			for network in [BBMRICohortsNetworkName, BBMRICohortsDNANetworkName]:
+				if network in biobank_networks and not network in collection_networks:
+					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
 
 			# TODO: check that if the biobank-level membership in BBMRI-Cohorts network network is provided, there is at least one collection which has the membership in the network
 			
