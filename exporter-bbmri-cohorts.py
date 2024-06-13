@@ -166,10 +166,10 @@ for coll_cohort_dna in bbmri_cohort_dna_coll:
         if collsFactsSamples > 0:
             factsProvided = 'Y'
             df_collFactsSampleNumber.loc[len(df)] = ['BBMRI_Cohort_DNA','Collection',str(coll_cohort_dna['country']['id']),str(coll_cohort_dna['name']),str(coll_cohort_dna['id']),int(collsFactsSamples)]
-        if coll_cohort_dna['id'] in collIDsWARNING:
-            warningProvided = 'Y'
-        if coll_cohort_dna['id'] in collIDsERROR:
-            errorProvided = 'Y'
+    if coll_cohort_dna['id'] in collIDsWARNING:
+        warningProvided = 'Y'
+    if coll_cohort_dna['id'] in collIDsERROR:
+        errorProvided = 'Y'
     log.info('BBMRI_Cohort_DNA' + '\tCollection\t' + str(coll_cohort_dna['country']['id']))
     df.loc[len(df)] = ['BBMRI_Cohort_DNA','Collection',str(coll_cohort_dna['country']['id']),str(nrSampDonProv),str(factsProvided),int(collsFactsSamples),str(errorProvided),str(warningProvided)]
 
