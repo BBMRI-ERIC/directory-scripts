@@ -49,18 +49,6 @@ def checkCollandBB(self, dir, features : list, collection, biobank, warningsList
 	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for {', '.join(features)}")) #TODO: explain it better
 
 
-
-
-'''
-def checkCollandBB(self, dir, feature : str, collection, biobank, warningsList):
-	if feature in collection:
-		if collection[feature] != 'True':
-			# Check biobank
-			if feature in biobank:
-				if collection[feature] != 'True':
-					warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for {feature}")) #TODO: explain it better
-'''
-
 class BBMRICohorts(IPlugin):
 
 	def check(self, dir, args):
