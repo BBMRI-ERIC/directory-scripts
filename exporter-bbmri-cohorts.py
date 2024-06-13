@@ -63,12 +63,13 @@ def addBB2Df(BBList : list, network : str, entity : str, df : pd.DataFrame, df_b
         log.info(network + '\t'+ entity +'\t' + str(biobank_cohort['country']['id']))
     return df, df_bb
 
-def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str, numberSamplesFacts : pd.DataFrame, samplesFactsLabel : str):
+def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str, dfStats2 : pd.DataFrame, statsLabel2 : str, numberSamplesFacts : pd.DataFrame, samplesFactsLabel : str):
     log.info("Outputting warnings in Excel file " + filename)
     writer = pd.ExcelWriter(filename, engine='xlsxwriter')
     dfBiobanks.to_excel(writer, sheet_name=biobanksLabel)
     dfCollections.to_excel(writer, sheet_name=collectionsLabel)
     dfStats.to_excel(writer, sheet_name=statsLabel)
+    dfStats2.to_excel(writer, sheet_name=statsLabel2)
     numberSamplesFacts.to_excel(writer, sheet_name=samplesFactsLabel)
     writer.close()
 
@@ -159,6 +160,7 @@ df, df_bb = addBB2Df(bbmri_cohort_bbcoll, 'BBMRI_Cohort', 'BiobankWithCollection
 df, df_bb = addBB2Df(bbmri_cohort_dna_bbcoll, 'BBMRI_Cohort_DNA', 'BiobankWithCollectionInNetwork', df, df_bb)
 
 # Prepare output
+# Stats1
 countCountries = df.groupby(aggregator).size().reset_index(name='Count')
 
 columns_to_sum = ['nrSamplesFactTables','Count']
@@ -166,4 +168,9 @@ columns_to_group_by = ['Network','Entity','Country','CollWithSampleDonorProvided
 
 statsdf = countCountries.groupby(columns_to_group_by, as_index=False).agg({col: 'sum' for col in columns_to_sum})
 
-outputExcelBiobanksCollections(args.outputXLSX, df_bb, "Biobanks", df_coll, "Collections", statsdf, "Stats", df_collFactsSampleNumber, "NumberOfSamplesFactTable")
+#Stats2 = Only Collections and less columns
+df_onlyColl = df[df['Entity'] == 'Collection']
+df_lessCol = df_onlyColl[['Network','Entity','Country']]
+statsdf2 = df_lessCol.groupby(['Network','Entity','Country']).size().reset_index(name='Count')
+
+outputExcelBiobanksCollections(args.outputXLSX, df_bb, "Biobanks", df_coll, "Collections", statsdf2, "Stats", statsdf, "StatsDetailed", df_collFactsSampleNumber, "NumberOfSamplesFactTable")
