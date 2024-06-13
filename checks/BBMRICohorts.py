@@ -15,6 +15,28 @@ def compareFactsColl(self, dir, factsList, collList, collection, errorDescriptio
 	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
 		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}"))
 
+def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warningsList):
+	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
+	collUnits = set()
+	# gather coll age units
+	for collAUnit in collection['age_unit']:
+		collUnits.add(collAUnit['id'])
+		{i.lower() + 's' for i in collUnits}
+		collUnitsAdapt = {i.lower() + 's' for i in collUnits}
+	if sorted(collUnitsAdapt) != sorted(factsAgeUnits):
+		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}"))
+	else:
+		# Comparison of numbers
+		# TODO, NOTE: not sure what happens when there is more than 1 age unit i.e.: month and year
+		minFactAge = int(min(sorted(factAges)))
+		maxFactAge = int(max(sorted(factAges)))
+		# check if any of age groups is outside of min-max range of the collection:
+		if (minFactAge < collection['age_low']) or (maxFactAge > collection['age_high']):
+			warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Fact table age outside collection age_high age_low range")) #TODO: explain it better
+		if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
+			warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range")) #TODO: explain it better
+
+
 class BBMRICohorts(IPlugin):
 
 	def check(self, dir, args):
@@ -28,6 +50,8 @@ class BBMRICohorts(IPlugin):
 			collFactsSexGroups = set()
 			collFactsMaterialTypes =set() 
 			collsFactsSamples = 0
+			ages = set()
+			ageUnits = set()
 
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
@@ -71,15 +95,6 @@ class BBMRICohorts(IPlugin):
 					else:
 						diags.append(d['id'])
 
-				age_ranges = set()
-				collAges = set()
-				if 'age_range' in collection:
-					for a in collection['age_range']:
-						if re.search('-', a['id']):
-							age_ranges.add(a['id'])
-						else:
-							collAges.add(a['id'])
-
 				collSex = set()
 				for s in collection['sex']:
 						collSex.add(s['id'])
@@ -92,7 +107,15 @@ class BBMRICohorts(IPlugin):
 							if 'disease' in fact:
 								collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
 							if 'age_range' in fact:
-								collFactsAgeGroups.add(fact['age_range']['id'])
+								ages.update(re.findall(r'\d+', fact['age_range']['label']))
+								ageUnits.update(re.findall(r'\((?:\d+-\d+\s)?(.*?)\)', fact['age_range']['label']))
+								# Deal with >80
+								if '>80 years' in ageUnits:
+									# Remove the old value
+									ageUnits.remove('>80 years')
+									# Add the new value
+									ageUnits.add('years')
+								#collFactsAgeGroups.add(fact['age_range']['id'])
 							if 'sex' in fact:
 								collFactsSexGroups.add(fact['sex']['id'])
 							if 'sample_type' in fact:
@@ -110,6 +133,9 @@ class BBMRICohorts(IPlugin):
 					
 						# check that the fact table contains all the age ranges and biological sex that are described in the collection
 						# TODO: age range check needs to be reimplemented - it can't be done as a comparison of arrays as the collection-level information is provided as a min/max age
+						# NOTE: half way implemented. Missing: deal with negative ages and Unknown (we do not have such cases for now, but will be needed)
+						compareAge(self, dir, ages, ageUnits, collection, warnings)
+
 						#compareFactsColl(self, dir, collFactsAgeGroups, collAges, collection, "Age ranges of collection and facts table do not match", warnings)
 						compareFactsColl(self, dir, collFactsSexGroups, collSex, collection, "Sex of collection and facts table do not match", warnings)
 
