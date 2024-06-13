@@ -15,10 +15,17 @@ import pandas as pd
 
 # Internal
 from directory import Directory
-from customwarnings import DataCheckWarning
 from checks.BBMRICohorts import BBMRICohorts
 
 # Functions
+
+def getCollBBNetwork(network, networkname, biobankId, biobank, coll_list : list, bb_list : list, checkedBbsIds : list):
+    if network['id'] == networkname:
+        coll_list.append(collection)
+        if biobankId not in checkedBbsIds:
+            bb_list.append(biobank)
+            checkedBbsIds.append(biobankId)
+    return coll_list, bb_list, checkedBbsIds
 
 def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFrame, df_coll : pd.DataFrame, df_collFactsSampleNumber : pd.DataFrame):
     for coll in collList:
@@ -66,7 +73,9 @@ def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, bi
     writer.close()
 
 
-# Main
+#############
+### Main ####
+#############
 
 cachesList = ['directory', 'geocoding']
 
@@ -103,7 +112,6 @@ else:
 # Retrieve the warnings
 warningsObj = BBMRICohorts()
 warnings = warningsObj.check(dir, args)
-#collIDsWARNING= [war.directoryEntityID for war in warnings]
 collIDsERROR= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.ERROR']
 collIDsWARNING= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.WARNING']
 
@@ -113,14 +121,16 @@ bbmri_cohort_coll=[]
 bbmri_cohort_dna_coll=[]
 bbmri_cohort_bbcoll=[]
 bbmri_cohort_dna_bbcoll=[]
+BBMRICohortsNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts'
+BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA'
 
 for biobank in dir.getBiobanks():
     log.debug("Analyzing collection " + biobank['id'])
     if 'network' in biobank:
         for n in biobank['network']:
-            if n['id'] == 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts':
+            if n['id'] == BBMRICohortsNetworkName:
                 bbmri_cohort_bb.append(biobank)
-            if n['id'] == 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA':
+            if n['id'] == BBMRICohortsDNANetworkName:
                 bbmri_cohort_dna_bb.append(biobank)
 
 checkedBbsIdsCohort=[]
@@ -131,16 +141,8 @@ for collection in dir.getCollections():
     biobank = dir.getBiobankById(biobankId)
     if 'network' in collection:
         for n in collection['network']:
-            if n['id'] == 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts':
-                bbmri_cohort_coll.append(collection)
-                if biobankId not in checkedBbsIdsCohort:
-                    bbmri_cohort_bbcoll.append(biobank)
-                    checkedBbsIdsCohort.append(biobankId)
-            if n['id'] == 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA':
-                bbmri_cohort_dna_coll.append(collection)
-                if biobankId not in checkedBbsIdsCohortDNA:
-                    bbmri_cohort_dna_bbcoll.append(biobank)
-                    checkedBbsIdsCohortDNA.append(biobankId)
+            bbmri_cohort_coll, bbmri_cohort_bbcoll, checkedBbsIdsCohort = getCollBBNetwork(n, BBMRICohortsNetworkName, biobankId, biobank, bbmri_cohort_coll, bbmri_cohort_bbcoll, checkedBbsIdsCohort)
+            bbmri_cohort_dna_bbcoll, bbmri_cohort_dna_bbcoll, checkedBbsIdsCohortDNA = getCollBBNetwork(n, BBMRICohortsDNANetworkName, biobankId, biobank, bbmri_cohort_dna_coll, bbmri_cohort_dna_bbcoll, checkedBbsIdsCohortDNA)
         
 df  = pd.DataFrame(columns = ['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'])
 df_coll  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID'])
@@ -155,7 +157,6 @@ df, df_bb = addBB2Df(bbmri_cohort_bb, 'BBMRI_Cohort', 'Biobank', df, df_bb)
 df, df_bb = addBB2Df(bbmri_cohort_dna_bb, 'BBMRI_Cohort_DNA', 'Biobank', df, df_bb)
 df, df_bb = addBB2Df(bbmri_cohort_bbcoll, 'BBMRI_Cohort', 'BiobankWithCollectionInNetwork', df, df_bb)
 df, df_bb = addBB2Df(bbmri_cohort_dna_bbcoll, 'BBMRI_Cohort_DNA', 'BiobankWithCollectionInNetwork', df, df_bb)
-
 
 # Prepare output
 countCountries = df.groupby(aggregator).size().reset_index(name='Count')
