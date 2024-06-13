@@ -36,6 +36,30 @@ def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warni
 		if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
 			warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range")) #TODO: explain it better
 
+def checkCollandBB(self, dir, features : list, collection, biobank, warningsList):
+	for feature in features:
+		if feature in collection:
+			if collection[feature] == True:
+				return
+			else:
+				# Check biobank
+				if feature in biobank:
+					if collection[feature] == True:
+						return
+	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for {', '.join(features)}")) #TODO: explain it better
+
+
+
+
+'''
+def checkCollandBB(self, dir, feature : str, collection, biobank, warningsList):
+	if feature in collection:
+		if collection[feature] != 'True':
+			# Check biobank
+			if feature in biobank:
+				if collection[feature] != 'True':
+					warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for {feature}")) #TODO: explain it better
+'''
 
 class BBMRICohorts(IPlugin):
 
@@ -46,7 +70,7 @@ class BBMRICohorts(IPlugin):
 		for collection in dir.getCollections():
 			collectionFacts = []
 			collFactsDiseases = set()
-			collFactsAgeGroups = set()
+			#collFactsAgeGroups = set()
 			collFactsSexGroups = set()
 			collFactsMaterialTypes =set() 
 			collsFactsSamples = 0
@@ -98,6 +122,9 @@ class BBMRICohorts(IPlugin):
 				collSex = set()
 				for s in collection['sex']:
 						collSex.add(s['id'])
+
+				# Check commercial use
+				checkCollandBB(self, dir, ['collaboration_commercial','commercial_use'], collection, biobank, warnings)
 
 				# Check presence of fact tables
 				if collection['facts'] != []:
