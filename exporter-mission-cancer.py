@@ -195,7 +195,11 @@ for collection in dir.getCollections():
                     log.debug("Collection %s identified as non-cancer collection due to ORPHA code %s" % (collection['id'], d))
                     non_cancer = True
             else:
-                log.warn("Collection %s has invalid ORPHA code %s" % (d))
+                log.warn("Collection %s has invalid ORPHA code %s" % (collection['id'], d))
+
+    if 'NON_HUMAN' in types:
+        log.info("Non-human collection %s skipped" % (collection['id']))
+        continue
 
     pediatric = False
     pediatricOnly = False
@@ -260,6 +264,7 @@ for collection in dir.getCollections():
                 pediatricCancerOnlyExistingDiagnosed.append(collection)
                 pediatricCancerOnlyBiobanksExistingDiagnosed.add(biobankId)
             if pediatricOnly:
+                log.info(f"Pediatric-only cancer-only collection detected:  {collection['id']}")
                 pediatricOnlyCancerOnlyExistingDiagnosed.append(collection)
                 pediatricOnlyCancerOnlyBiobanksExistingDiagnosed.add(biobankId)
         else:
@@ -311,6 +316,12 @@ pd_cancerExistingDiagnosed = pd.DataFrame(cancerExistingDiagnosed)
 pd_cancerOnlyExistingDiagnosed = pd.DataFrame(cancerOnlyExistingDiagnosed)
 pd_pediatricCancerExistingDiagnosed = pd.DataFrame(pediatricCancerExistingDiagnosed)
 pd_pediatricOnlyCancerExistingDiagnosed = pd.DataFrame(pediatricOnlyCancerExistingDiagnosed)
+pd_pediatricOnlyCancerOnlyExistingDiagnosed = pd.DataFrame(pediatricOnlyCancerOnlyExistingDiagnosed)
+
+pediatricOnlyCancerOnlyBiobanks = []
+for biobankId in pediatricOnlyCancerOnlyBiobanksExistingDiagnosed:
+    pediatricOnlyCancerOnlyBiobanks.append(dir.getBiobankById(biobankId))
+pd_pediatricOnlyCancerOnlyBiobanks = pd.DataFrame(pediatricOnlyCancerOnlyBiobanks)
 
 
 def printCollectionStdout(collectionList: List, headerStr: str):
@@ -382,8 +393,11 @@ if not args.nostdout:
     print("- total of samples advertised in pediatric cancer-relevant collections including OoM estimates: %d" % (
         pediatricCancerCollectionSamplesIncOoM))
 
-for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed): 
+for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed, pd_pediatricOnlyCancerOnlyExistingDiagnosed): 
     pddfutils.tidyCollectionDf(df)
+
+for df in (pd_pediatricOnlyCancerOnlyBiobanks,):
+    pddfutils.tidyBiobankDf(df)
 
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
@@ -392,4 +406,6 @@ if args.outputXLSX is not None:
     pd_cancerOnlyExistingDiagnosed.to_excel(writer, sheet_name='Cancer-only')
     pd_pediatricCancerExistingDiagnosed.to_excel(writer, sheet_name='Pediatric cancer')
     pd_pediatricOnlyCancerExistingDiagnosed.to_excel(writer, sheet_name='Pediatric cancer-only')
+    pd_pediatricOnlyCancerOnlyExistingDiagnosed.to_excel(writer, sheet_name='Ped-only cancer-only')
+    pd_pediatricOnlyCancerOnlyBiobanks.to_excel(writer, sheet_name='Ped-only cancer-only BBs')
     writer.save()
