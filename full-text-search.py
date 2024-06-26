@@ -93,6 +93,16 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
         else:
             return " ".join(filter(None,[entity.get('title_before_name'), entity.get('first_name'), entity.get('last_name'), entity.get('title_after_name')]))
 
+    def getAlsoKnown(entity):
+        # TODO: this is a temporary hack - also_known needs to be properly handled by the Directory class and made accessible here
+        also_known = []
+        for ak in entity.get('also_known'):
+            also_known.append(ak["id"])
+        if also_known:
+            return("\n".join(also_known))
+        else:
+            return("")
+
     for collection in dir.getCollections():
         log.debug("Analyzing collection " + collection['id'])
         biobankId = dir.getCollectionBiobankId(collection['id'])
@@ -123,7 +133,11 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
         contactId = None
         if 'contact' in network:
             contactId = network['contact']['id']
-        writer.add_document(id=network['id'], type=u"NETWORK", name=network.get('name'), description=network.get('description'), acronym=network.get('acronym'), contact_id=contactId, contact_name=getContactFullName(getContact(contactId)), also_known=network.get('also_known'))
+        try:
+            writer.add_document(id=network['id'], type=u"NETWORK", name=network.get('name'), description=network.get('description'), acronym=network.get('acronym'), contact_id=contactId, contact_name=getContactFullName(getContact(contactId)), also_known=getAlsoKnown(network))
+        except Exception as e:
+            pp.pprint(network)
+            raise e
 
     writer.commit()
 
