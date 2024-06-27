@@ -340,57 +340,57 @@ if not args.nostdout:
     printCollectionStdout(cancerProspective, "Cancer Prospective")
     print("\n\n")
     print("Totals:")
-    print("- total of cancer-relevant biobanks: %d" % (len(cancerBiobanks)))
-    print("- total of cancer-relevant collections with existing samples: %d in %d biobanks" % (
+    print("- total of cancer-relevant biobanks: %d biobanks" % (len(cancerBiobanks)))
+    print("- total of cancer-relevant collections with existing samples: %d collections in %d biobanks" % (
     len(cancerExistingDiagnosed), len(cancerBiobanksExistingDiagnosed)))
-    print("- total of cancer-only collections with existing samples: %d in %d biobanks" % (
+    print("- total of cancer-only collections with existing samples: %d collections in %d biobanks" % (
     len(cancerOnlyExistingDiagnosed), len(cancerOnlyBiobanksExistingDiagnosed)))
-    print("- total of cancer-relevant collections with control samples: %d in %d biobanks" % (
+    print("- total of cancer-relevant collections with control samples: %d collections in %d biobanks" % (
     len(cancerExistingControls), len(cancerBiobanksExistingControls)))
-    print("- total of cancer-relevant prospective collections: %d in %d biobanks" % (
+    print("- total of cancer-relevant prospective collections: %d collections in %d biobanks" % (
     len(cancerProspective), len(cancerBiobanksProspective)))
     print("Estimated totals:")
-    print("- total of samples/donors advertised explicitly in cancer-only collections: %d / %d" % (
+    print("- total of samples/donors advertised explicitly in cancer-only collections: %d samples / %d donors" % (
         cancerOnlyCollectionSamplesExplicit, cancerOnlyCollectionDonorsExplicit))
-    print("- total of samples advertised in cancer-only collections including OoM estimates: %d" % (
+    print("- total of samples advertised in cancer-only collections including OoM estimates: %d samples" % (
         cancerOnlyCollectionSamplesIncOoM))
-    print("- total of samples/donors advertised explicitly in cancer-relevant collections: %d / %d" % (
+    print("- total of samples/donors advertised explicitly in cancer-relevant collections: %d samples / %d donors" % (
         cancerCollectionSamplesExplicit, cancerCollectionDonorsExplicit))
-    print("- total of samples advertised in cancer-relevant collections including OoM estimates: %d" % (
+    print("- total of samples advertised in cancer-relevant collections including OoM estimates: %d samples" % (
         cancerCollectionSamplesIncOoM))
     print("\n\n")
-    printCollectionStdout(pediatricCancerExistingDiagnosed, "Pediatric Cancer Diagnosed")
-    printCollectionStdout(pediatricOnlyCancerExistingDiagnosed, "Pediatric Only Cancer Diagnosed")
-    print("\n\n")
+    #printCollectionStdout(pediatricCancerExistingDiagnosed, "Pediatric Cancer Diagnosed")
+    #printCollectionStdout(pediatricOnlyCancerExistingDiagnosed, "Pediatric Only Cancer Diagnosed")
+    #print("\n\n")
     print("Biobanks/collections totals:")
-    print("- total of pediatric cancer-relevant biobanks: %d" % (len(pediatricCancerBiobanks)))
-    print("- total of pediatric cancer-relevant collections with existing samples: %d in %d biobanks" % (
+    print("- total of pediatric cancer-relevant biobanks: %d biobanks" % (len(pediatricCancerBiobanks)))
+    print("- total of pediatric cancer-relevant collections with existing samples: %d collections in %d biobanks" % (
     len(pediatricCancerExistingDiagnosed), len(pediatricCancerBiobanksExistingDiagnosed)))
-    print("- total of pediatric cancer-only collections with existing samples: %d in %d biobanks" % (
+    print("- total of pediatric cancer-only collections with existing samples: %d collections in %d biobanks" % (
     len(pediatricCancerOnlyExistingDiagnosed), len(pediatricCancerOnlyBiobanksExistingDiagnosed)))
-    print("- total of pediatric-only cancer-relevant biobanks: %d" % (len(pediatricOnlyCancerBiobanks)))
-    print("- total of pediatric-only cancer-relevant collections with existing samples: %d in %d biobanks" % (
+    print("- total of pediatric-only cancer-relevant biobanks: %d biobanks" % (len(pediatricOnlyCancerBiobanks)))
+    print("- total of pediatric-only cancer-relevant collections with existing samples: %d collections in %d biobanks" % (
     len(pediatricOnlyCancerExistingDiagnosed), len(pediatricOnlyCancerBiobanksExistingDiagnosed)))
-    print("- total of pediatric-only cancer-only collections with existing samples: %d in %d biobanks" % (
+    print("- total of pediatric-only cancer-only collections with existing samples: %d collections in %d biobanks" % (
     len(pediatricOnlyCancerOnlyExistingDiagnosed), len(pediatricOnlyCancerOnlyBiobanksExistingDiagnosed)))
     print("\n\n")
     print("Estimated sample totals:")
-    print("- total of samples/donors advertised explicitly in pediatric-only cancer-only collections: %d / %d" % (
+    print("- total of samples/donors advertised explicitly in pediatric-only cancer-only collections: %d samples / %d donors" % (
         pediatricOnlyCancerOnlyCollectionSamplesExplicit, pediatricOnlyCancerOnlyCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric-only cancer-only collections including OoM estimates: %d" % (
+    print("- total of samples advertised in pediatric-only cancer-only collections including OoM estimates: %d samples" % (
         pediatricOnlyCancerOnlyCollectionSamplesIncOoM))
-    print("- total of samples/donors advertised explicitly in pediatric-only cancer-relevant collections: %d / %d" % (
+    print("- total of samples/donors advertised explicitly in pediatric-only cancer-relevant collections: %d samples / %d donors" % (
         pediatricOnlyCancerCollectionSamplesExplicit, pediatricOnlyCancerCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric-only cancer-relevant collections including OoM estimates: %d" % (
+    print("- total of samples advertised in pediatric-only cancer-relevant collections including OoM estimates: %d samples" % (
         pediatricOnlyCancerCollectionSamplesIncOoM))
     print("\n")
-    print("- total of samples/donors advertised explicitly in pediatric cancer-only collections: %d / %d" % (
+    print("- total of samples/donors advertised explicitly in pediatric cancer-only collections: %d samples / %d donors" % (
         pediatricCancerOnlyCollectionSamplesExplicit, pediatricCancerOnlyCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric cancer-only collections including OoM estimates: %d" % (
+    print("- total of samples advertised in pediatric cancer-only collections including OoM estimates: %d samples" % (
         pediatricCancerOnlyCollectionSamplesIncOoM))
-    print("- total of samples/donors advertised explicitly in pediatric cancer-relevant collections: %d / %d" % (
+    print("- total of samples/donors advertised explicitly in pediatric cancer-relevant collections: %d samples / %d donors" % (
         pediatricCancerCollectionSamplesExplicit, pediatricCancerCollectionDonorsExplicit))
-    print("- total of samples advertised in pediatric cancer-relevant collections including OoM estimates: %d" % (
+    print("- total of samples advertised in pediatric cancer-relevant collections including OoM estimates: %d samples" % (
         pediatricCancerCollectionSamplesIncOoM))
 
 for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed, pd_pediatricOnlyCancerOnlyExistingDiagnosed): 
