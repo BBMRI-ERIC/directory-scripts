@@ -36,17 +36,29 @@ def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warni
 		if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
 			warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range")) #TODO: explain it better
 
-def checkCollandBB(self, dir, features : list, collection, biobank, warningsList):
-	for feature in features:
-		if feature in collection:
-			if collection[feature] == True:
-				return
-			else:
-				# Check biobank
-				if feature in biobank:
-					if collection[feature] == True:
-						return
-	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for {', '.join(features)}")) #TODO: explain it better
+def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
+
+	def checkAttribute (feature : str, entity : dict, state : bool):
+		if feature in entity:
+			if entity[feature] == state:
+				return True
+		return False
+
+	def formatAttribute (feature : str, entity : dict):
+		if feature in entity:
+			return f'{entity[feature]}'
+		return f'not set'
+
+	if checkAttribute('commercial_use', collection, True):
+		return
+
+	if checkAttribute('collaboration_commercial', biobank, True):
+		# commercial collaboration must not be forbidden on the collection level
+		if not checkAttribute('commercial_use', collection, False):
+			return
+
+	# If we got here, the previous checks failed
+	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for commercial collaboration modes: collection[commercial_use] is {formatAttribute('commercial_use', collection)}, biobank[collaboration_commercial] is {formatAttribute('collaboration_commercial', biobank)}"))
 
 
 class BBMRICohorts(IPlugin):
@@ -112,7 +124,7 @@ class BBMRICohorts(IPlugin):
 						collSex.add(s['id'])
 
 				# Check commercial use
-				checkCollandBB(self, dir, ['collaboration_commercial','commercial_use'], collection, biobank, warnings)
+				checkCollabBB(self, dir, collection, biobank, warnings)
 
 				# Check presence of fact tables
 				if collection['facts'] != []:
