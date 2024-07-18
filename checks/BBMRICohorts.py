@@ -184,9 +184,12 @@ class BBMRICohorts(IPlugin):
 						# check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted (DNA, Peripheral blood cells, Whole Blood)
 						if 'network' in collection:
 							if BBMRICohortsDNANetworkName in collection_networks:
-								requiredMaterialTypes = ['DNA','WHOLE_BLOOD','PERIPHERAL_BLOOD_CELLS']
+								requiredMaterialTypes = ['DNA','WHOLE_BLOOD','PERIPHERAL_BLOOD_CELLS','BUFFY_COAT','CDNA','PLASMA','SERUM']
 								if not any(mat in collFactsMaterialTypes for mat in requiredMaterialTypes):
 									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does not contain any of the expected material types: {','.join(requiredMaterialTypes)})"))
+
+								if 'NAV' in collFactsMaterialTypes:
+									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type"))
 
 				else:
 					if 'network' in collection and (BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks):
