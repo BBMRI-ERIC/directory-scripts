@@ -16,6 +16,7 @@ import pandas as pd
 # Internal
 from directory import Directory
 from checks.BBMRICohorts import BBMRICohorts
+from warningscontainer import WarningsContainer
 
 # Functions
 
@@ -89,7 +90,7 @@ parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_cons
 parser.add_argument('-a', '--aggregator', dest='aggregator', type=str, default=['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'], help='Space-separated list of the aggregators used in stdout. Accepted values: Network Entity Country')
 parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', default='bbmri_cohorts_stats.xlsx',
                     help='output of results into an XLSX with filename provided as parameter')
-parser.add_argument('-o', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
+parser.add_argument('-w', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
@@ -115,6 +116,12 @@ warningsObj = BBMRICohorts()
 warnings = warningsObj.check(dir, args)
 collIDsERROR= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.ERROR']
 collIDsWARNING= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.WARNING']
+if args.warnings and len(warnings) > 0:
+    warningContainer = WarningsContainer()
+    for w in warnings:
+           warningContainer.newWarning(w)
+    warningContainer.dumpWarnings()
+
 
 bbmri_cohort_bb=[]
 bbmri_cohort_dna_bb=[]

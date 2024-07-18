@@ -9,11 +9,11 @@ import time
 from typing import List
 import os.path
 
-import xlsxwriter
 
 from yapsy.PluginManager import PluginManager
 
 from customwarnings import DataCheckWarning
+from warningscontainer import WarningsContainer
 from nncontacts import NNContacts
 from directory import Directory
 
@@ -70,57 +70,6 @@ elif args.verbose:
 else:
     log.basicConfig(format="%(levelname)s: %(message)s")
 
-class WarningsContainer:
-
-    def __init__(self):
-        # TODO
-        self.__warnings = {}
-        self.__warningsNNs = {}
-
-    def newWarning(self, warning : DataCheckWarning):
-        warning_key = ""
-        self.__warningsNNs.setdefault(warning.NN,[]).append(warning)
-        if warning.recipients != "":
-            warning_key = recipients + ", "
-        try: 
-            warning_key += NNContacts.NNtoEmails[warning.NN]
-        except KeyError:
-            warning_key += 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl, a.w.hodselmans@rug.nl'
-        self.__warnings.setdefault(warning_key,[]).append(warning)
-
-    def dumpWarnings(self):
-        for wk in sorted(self.__warnings):
-            print(wk + ":")
-            for w in sorted(self.__warnings[wk], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
-                if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
-                    w.dump()
-            print("")
-
-    def dumpWarningsXLSX(self, filename : List[str]):
-        workbook = xlsxwriter.Workbook(filename[0])
-        bold = workbook.add_format({'bold': True})
-        for nn in sorted(self.__warningsNNs):
-            worksheet = workbook.add_worksheet(nn)
-            worksheet_row = 0
-            worksheet.write_string(worksheet_row, 0, "Entity ID", bold)
-            worksheet.set_column(0,0, 50)
-            worksheet.write_string(worksheet_row, 1, "Entity type", bold)
-            worksheet.set_column(1,1, 10)
-            worksheet.write_string(worksheet_row, 2, "Check", bold)
-            worksheet.set_column(2,2, 20)
-            worksheet.write_string(worksheet_row, 3, "Severity", bold)
-            worksheet.set_column(3,3, 10)
-            worksheet.write_string(worksheet_row, 4, "Message", bold)
-            worksheet.set_column(4,4, 120)
-            for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
-                if not (w.dataCheckID in disabledChecks and w.directoryEntityID in disabledChecks[w.dataCheckID]):
-                    worksheet_row += 1
-                    worksheet.write_string(worksheet_row, 0, w.directoryEntityID)
-                    worksheet.write_string(worksheet_row, 1, w.directoryEntityType.value)
-                    worksheet.write_string(worksheet_row, 2, w.dataCheckID)
-                    worksheet.write_string(worksheet_row, 3, w.level.name)
-                    worksheet.write_string(worksheet_row, 4, w.message)
-        workbook.close()
 
 # Main code
 
@@ -128,7 +77,7 @@ if args.username is not None and args.password is not None:
     dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
     dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
-warningContainer = WarningsContainer()
+warningContainer = WarningsContainer(disabledChecks)
 
 orphacodes = None
 if args.orphacodesfile is not None:
