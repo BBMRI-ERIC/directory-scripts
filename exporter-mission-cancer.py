@@ -80,6 +80,8 @@ cancerCollectionSamplesIncOoM = 0
 cancerOnlyCollectionSamplesExplicit = 0
 cancerOnlyCollectionDonorsExplicit = 0
 cancerOnlyCollectionSamplesIncOoM = 0
+cancerInstitutions = set()
+cancerCountries = set()
 
 pediatricCancerExistingDiagnosed = []
 pediatricCancerOnlyExistingDiagnosed = []
@@ -103,6 +105,8 @@ pediatricOnlyCancerCollectionSamplesIncOoM = 0
 pediatricOnlyCancerOnlyCollectionSamplesExplicit = 0
 pediatricOnlyCancerOnlyCollectionDonorsExplicit = 0
 pediatricOnlyCancerOnlyCollectionSamplesIncOoM = 0
+pediatricCancerInstitutions = set()
+pediatricCancerCountries = set()
 
 for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
@@ -312,6 +316,19 @@ for collection in dir.getCollections():
                 if pediatricOnly:
                     pediatricOnlyCancerOnlyCollectionDonorsExplicit += collection['number_of_donors']
 
+def countCountriesInstitutions(biobanks, institutions : set, countries : set):
+    for biobankId in biobanks:
+        biobank = dir.getBiobankById(biobankId)
+        biobankJuridicalPerson = biobank['juridical_person'].strip()
+        if len(biobankJuridicalPerson) > 0:
+            institutions.add(biobankJuridicalPerson)
+        else:
+            log.warning(f'Identified empty juridical person for biobank {biobankId}')
+        countries.add(biobank['country']['id'])
+
+countCountriesInstitutions(cancerBiobanks, cancerInstitutions, cancerCountries)
+countCountriesInstitutions(pediatricCancerBiobanks, pediatricCancerInstitutions, pediatricCancerCountries)
+
 pd_cancerExistingDiagnosed = pd.DataFrame(cancerExistingDiagnosed)
 pd_cancerOnlyExistingDiagnosed = pd.DataFrame(cancerOnlyExistingDiagnosed)
 pd_pediatricCancerExistingDiagnosed = pd.DataFrame(pediatricCancerExistingDiagnosed)
@@ -340,7 +357,7 @@ if not args.nostdout:
     printCollectionStdout(cancerProspective, "Cancer Prospective")
     print("\n\n")
     print("Totals:")
-    print("- total of cancer-relevant biobanks: %d biobanks" % (len(cancerBiobanks)))
+    print("- total of cancer-relevant biobanks: %d biobanks in %d institutions from %d countries" % (len(cancerBiobanks), len(cancerInstitutions), len(cancerCountries)))
     print("- total of cancer-relevant collections with existing samples: %d collections in %d biobanks" % (
     len(cancerExistingDiagnosed), len(cancerBiobanksExistingDiagnosed)))
     print("- total of cancer-only collections with existing samples: %d collections in %d biobanks" % (
@@ -362,8 +379,8 @@ if not args.nostdout:
     #printCollectionStdout(pediatricCancerExistingDiagnosed, "Pediatric Cancer Diagnosed")
     #printCollectionStdout(pediatricOnlyCancerExistingDiagnosed, "Pediatric Only Cancer Diagnosed")
     #print("\n\n")
-    print("Biobanks/collections totals:")
-    print("- total of pediatric cancer-relevant biobanks: %d biobanks" % (len(pediatricCancerBiobanks)))
+    print("Pediatric biobanks/collections totals:")
+    print("- total of pediatric pediatricCancer-relevant biobanks: %d biobanks in %d institutions from %d countries" % (len(pediatricCancerBiobanks), len(pediatricCancerInstitutions), len(pediatricCancerCountries)))
     print("- total of pediatric cancer-relevant collections with existing samples: %d collections in %d biobanks" % (
     len(pediatricCancerExistingDiagnosed), len(pediatricCancerBiobanksExistingDiagnosed)))
     print("- total of pediatric cancer-only collections with existing samples: %d collections in %d biobanks" % (
