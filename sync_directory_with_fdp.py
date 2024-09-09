@@ -8,6 +8,8 @@ already deployed
 from collections import OrderedDict
 
 import pprint
+from datetime import datetime
+
 from molgenis import client
 from molgenis.client import MolgenisRequestError
 
@@ -58,21 +60,22 @@ def get_missing_biobanks(session, reset, **kwargs):
     """
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
     source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
-    biobanks_with_record_service = []
+    print("Found {}".format(source_records))
+    missing_biobanks = []
     for sr in source_records:
-        add_biobank = False
-        for c in sr["collections"]:
-            if "record_service" in c:
-                add_biobank = True
+        add_biobank = True
+        # for c in sr["collections"]:
+        #     if "record_service" in c:
+        #         add_biobank = True
         if add_biobank:
-            biobanks_with_record_service.append(sr)
+            missing_biobanks.append(sr)
     # if reset is True the missing biobanks are all
     if reset:
-        return biobanks_with_record_service
+        return missing_biobanks
 
     print("Getting ids already present")
     dest_records_ids = [r['identifier'] for r in session.get(FDP_BIOBANK, attributes='identifier')]
-    new_records = [sr for sr in biobanks_with_record_service if sr['id'] not in dest_records_ids]
+    new_records = [sr for sr in missing_biobanks if sr['id'] not in dest_records_ids]
     print("Found {} new records to insert".format(len(new_records)))
     return new_records
 
@@ -85,12 +88,6 @@ def create_records(session, entity, records):
     :params entity: the name of Molgenis entity type of the records to add
     :params records: lists of dictionary with data of the FDP entity to add
     """
-    # with open(f'fdp_data/{entity}.csv', 'w' ) as csvfile:
-    #     writer = csv.DictWriter(csvfile, fieldnames=records[0].keys(), dialect="excel", quotechar="\"")
-    #     writer.writeheader()
-    #     for r in records:
-    #         writer.writerow(r)
-
     created_records = []
     for i in range(0, len(records), 1000):
         try:
@@ -217,7 +214,12 @@ def get_records_to_add(biobank_data, session, directory_prefix):
                 'endpointUrl': rs['url'],
                 'endpointDescription': rs['description'] if 'description' in rs else None,
                 'conformsTo': rs['conformsTo'],
-                'type': rs['type']
+                'type': rs['type'],
+                'issued': datetime.now().isoformat(),
+                'modified': datetime.now().isoformat(),
+                'publisher': 'bbmri',
+                'title': f'Data Service of {collection["name"]}',
+                'language': ['eng-eu']
             })
 
     res = {
@@ -239,29 +241,57 @@ def get_records_to_add(biobank_data, session, directory_prefix):
         FDP_CONTACT: contacts,
         FDP_COLLECTION: [{
             'IRI': f'{directory_prefix}/api/fdp/fdp_Collection/{c["id"]}',
+            'additionalRDFType': "http://www.w3.org/ns/dcat#Dataset",
             'identifier': c['id'],
             'biobank': biobank_data["id"],
+            'publisher': 'bbmri',
             'title': c['name'],
             'description': c['description'] if 'description' in c else None,
-            'theme': [d['id'] for d in c['diagnosis_available']],
-            'type': [t['id'] for t in c['type'] if get_collection_type_ontology_code(t['id']) is not None],
-            'landingPage': f'{directory_prefix}/#/biobank/{c["id"]}',
+            'diseases': [d['id'].replace("urn:miriam:icd:", "ICD10:") for d in c['diagnosis_available']],
+            'theme': 'EU:HEALTH',
+            'type': '',
+            'landingPage': f'{directory_prefix}/#/collection/{c["id"]}',
             'contactPoint': f'{c["contact"]["id"]}' if 'contact' in c else None,
             'service': c['record_service']['id'] if 'record_service' in c else None,
             'vpConnection': 'ejprd-vp-discoverable' if 'record_service' in c else None,
-            'personalData': 'true'
-        } for c in biobank_data['collections'] if
-            'record_service' in c and len(f'{directory_prefix}/#/biobank/{c["id"]}') < 255],
+            'issued': datetime.now().isoformat(),
+            'modified': datetime.now().isoformat(),
+            'personalData': 'true',
+            'version': '',
+            'language': ['eng-eu'],
+            'country': 'EU',
+            'rights': 'restricted',
+            'policy': '', # CRC Cohort 'https://www.bbmri-eric.eu/services/access-policies/',
+            'minAge': c['age_low'] if 'age_low' in c else None,
+            'maxAge': c['age_high'] if 'age_high' in c else None,
+            'numberOfRecords': c['size'] if 'size' in c else None,
+            'numberOfUniqueIndividuals': c['number_of_donors']
+
+        } for c in biobank_data['collections']],
         FDP_IRI: missing_iris,
         FDP_DATA_SERVICE: data_services
     }
     return res
 
 
-def update_catalog(session, new_collections):
-    prev_collections = session.get_by_id(FDP_CATALOG, 'bbmri-directory', attributes='collection')
+def get_collections_in_catalog(session):
+    catalog = session.get_by_id(FDP_CATALOG, 'bbmri-directory', attributes='collection')
+    return [c['identifier'] for c in catalog['collection']]
 
-    collections = set([c['identifier'] for c in prev_collections['collection'] + new_collections])
+
+def reset_catalog(session, collections_to_update):
+    collections_in_catalog = get_collections_in_catalog(session)
+    collections_to_update_ids = list([c['IRI'].split('/')[-1] for c in collections_to_update])
+    for c in collections_in_catalog[:]:
+        if c in collections_to_update_ids:
+            collections_in_catalog.remove(c)
+    session.update_one('fdp_Catalog', 'bbmri-directory', 'collection', collections_in_catalog)
+
+
+def update_catalog(session, new_collections):
+    prev_collections = get_collections_in_catalog(session)
+
+    collections = set(prev_collections + [c['identifier'] for c in new_collections])
 
     session.update_one(FDP_CATALOG, 'bbmri-directory', 'collection', list(collections))
 
@@ -298,14 +328,14 @@ def sync(session, directory_prefix, reset, **kwargs):
 
     # if the reset flag is True, it deletes the old records
     if reset:
-        session.update_one('fdp_Catalog', 'bbmri-directory', 'collection', [])
+        reset_catalog(session, new_records[FDP_COLLECTION])
+
         for k, v in reversed(records.items()):
             if k not in (FDP_IRI, FDP_CONTACT) and len(v) > 0:
                 delete_records(session, k, [i['identifier'] for i in v])
             if k == FDP_CONTACT and len(v) > 0:
                 delete_records(session, k, [i[0] for i in v])
-    pprint.pprint(records)
-    # it creates all the
+
     for k, v in records.items():
         if len(v) > 0:
             if k == FDP_IRI:
