@@ -24,6 +24,7 @@ class Directory:
             cache.clear()
 
         self.__directoryURL = "https://directory.bbmri-eric.eu/api/"
+        self.__directoryURL = "https://directory-backend.molgenis.net/"
         log.info('Retrieving directory content from ' + self.__directoryURL)
         session = molgenis.client.Session(self.__directoryURL)
         if username is not None and password is not None:
