@@ -18,6 +18,7 @@ def compareFactsColl(self, dir, factsList, collList, collection, errorDescriptio
 def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warningsList):
 	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
 	collUnits = set()
+	collUnitsAdapt = set()
 	# gather coll age units
 	for collAUnit in collection['age_unit']:
 		collUnits.add(collAUnit['id'])
@@ -211,6 +212,7 @@ class BBMRICohorts(IPlugin):
 			for network in [BBMRICohortsNetworkName, BBMRICohortsDNANetworkName]:
 				# if network in biobank_networks and not network in collection_networks:
 					# warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
-				 warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobanks are not expected to be part of BBMRI-Cohorts networks, only specific collections must be included. Biobank participates in BBMRI-Cohorts network: {network}."))
+				 if network in biobank_networks:
+					 warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobanks are not expected to be part of BBMRI-Cohorts networks, only specific collections must be included. Biobank participates in BBMRI-Cohorts network: {network}."))
 			
 		return warnings
