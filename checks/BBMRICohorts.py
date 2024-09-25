@@ -209,7 +209,8 @@ class BBMRICohorts(IPlugin):
 						collection_networks.add(n['id'])
 
 			for network in [BBMRICohortsNetworkName, BBMRICohortsDNANetworkName]:
-				if network in biobank_networks and not network in collection_networks:
-					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
+				# if network in biobank_networks and not network in collection_networks:
+					# warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
+				 warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobanks are not expected to be part of BBMRI-Cohorts networks, only specific collections must be included. Biobank participates in BBMRI-Cohorts network: {network}."))
 			
 		return warnings
