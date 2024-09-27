@@ -12,11 +12,15 @@ import pprint
 import argparse
 import logging as log
 import pandas as pd
+import time
+import os.path
 
 # Internal
 from directory import Directory
-from checks.BBMRICohorts import BBMRICohorts
+#from checks.BBMRICohorts import BBMRICohorts
 from warningscontainer import WarningsContainer
+from yapsy.PluginManager import PluginManager
+
 
 # Functions
 
@@ -81,6 +85,16 @@ def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, bi
 
 cachesList = ['directory', 'geocoding']
 
+simplePluginManager = PluginManager()
+simplePluginManager.setPluginPlaces(["checks"])
+simplePluginManager.collectPlugins()
+
+pluginList = []
+for pluginInfo in simplePluginManager.getAllPlugins():
+    pluginList.append(os.path.basename(pluginInfo.path))
+
+remoteCheckList = ['emails', 'geocoding', 'URLs']
+
 #####################
 ## Parse arguments ##
 #####################
@@ -90,6 +104,8 @@ parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_cons
 parser.add_argument('-a', '--aggregator', dest='aggregator', type=str, default=['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'], help='Space-separated list of the aggregators used in stdout. Accepted values: Network Entity Country')
 parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', default='bbmri_cohorts_stats.xlsx',
                     help='output of results into an XLSX with filename provided as parameter')
+parser.add_argument('-XWE', '--output-WE-XLSX', dest='outputWEXLSX', nargs=1, help='output of warnings and errors into XLSX with filename provided as parameter')
+parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
 parser.add_argument('-w', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
@@ -97,12 +113,16 @@ parser.add_argument('-p', '--password', dest='password', help='Password of the a
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
 parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
 parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
+parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
+parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
+parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular check(s)')
 #parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
 
-parser.set_defaults(purgeCaches=[])
+parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 aggregator = args.aggregator
 outputXLSX = args.outputXLSX
+outputWEXLSX = args.outputWEXLSX
 
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
@@ -111,7 +131,8 @@ if args.username is not None and args.password is not None:
 else:
     dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
-# Retrieve the warnings
+
+'''
 warningsObj = BBMRICohorts()
 warnings = warningsObj.check(dir, args)
 collIDsERROR= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.ERROR']
@@ -121,6 +142,7 @@ if args.warnings and len(warnings) > 0:
     for w in warnings:
            warningContainer.newWarning(w)
     warningContainer.dumpWarnings()
+'''
 
 
 bbmri_cohort_bb=[]
@@ -150,11 +172,47 @@ for collection in dir.getCollections():
     if 'network' in collection:
         for n in collection['network']:
             bbmri_cohort_coll, bbmri_cohort_bbcoll, checkedBbsIdsCohort = getCollBBNetwork(n, BBMRICohortsNetworkName, biobankId, biobank, bbmri_cohort_coll, bbmri_cohort_bbcoll, checkedBbsIdsCohort)
-            bbmri_cohort_dna_bbcoll, bbmri_cohort_dna_bbcoll, checkedBbsIdsCohortDNA = getCollBBNetwork(n, BBMRICohortsDNANetworkName, biobankId, biobank, bbmri_cohort_dna_coll, bbmri_cohort_dna_bbcoll, checkedBbsIdsCohortDNA)
+            bbmri_cohort_dna_coll, bbmri_cohort_dna_bbcoll, checkedBbsIdsCohortDNA = getCollBBNetwork(n, BBMRICohortsDNANetworkName, biobankId, biobank, bbmri_cohort_dna_coll, bbmri_cohort_dna_bbcoll, checkedBbsIdsCohortDNA)
         
 df  = pd.DataFrame(columns = ['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'])
 df_coll  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID'])
 df_collFactsSampleNumber  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID','NumberOfSamples'])
+
+# Retrieve the warnings
+warningContainer = WarningsContainer()
+for pluginInfo in simplePluginManager.getAllPlugins():
+    if os.path.basename(pluginInfo.path) in args.disablePlugins:
+        continue
+    simplePluginManager.activatePluginByName(pluginInfo.name)
+    start_time = time.perf_counter()
+    warnings = pluginInfo.plugin_object.check(dir, args)
+    end_time = time.perf_counter()
+    log.info('   ... check finished in ' + "%0.3f" % (end_time-start_time) + 's')
+    collIDsERROR= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.ERROR']
+    collIDsWARNING= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.WARNING']
+    if args.warnings and len(warnings) > 0:
+        for w in warnings:
+            #if w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_coll] or w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_dna_coll]:
+                #warningContainer.newWarning(w)
+            if w.directoryEntityID in [bb['id'] for bb in bbmri_cohort_bb]:
+                warningContainer.newWarning(w)
+            elif w.directoryEntityID in [bb['id'] for bb in bbmri_cohort_dna_bb]:
+                warningContainer.newWarning(w)
+            elif w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_coll]:
+                warningContainer.newWarning(w)
+            elif w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_dna_coll]:
+                warningContainer.newWarning(w)
+            elif w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_bbcoll]:
+                warningContainer.newWarning(w)
+            elif w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_dna_bbcoll]:
+                warningContainer.newWarning(w)
+
+if not args.nostdout:
+    log.info("Outputting warnings on stdout")
+    warningContainer.dumpWarnings()
+if args.outputWEXLSX is not None:
+    log.info("Outputting warnings in Excel file " + args.outputWEXLSX[0])
+    warningContainer.dumpWarningsXLSX(args.outputWEXLSX)
 
 df, df_coll, df_collFactsSampleNumber = addColletion2Df(bbmri_cohort_coll, 'BBMRI_Cohort', 'Collection',df, df_coll, df_collFactsSampleNumber)
 df, df_coll, df_collFactsSampleNumber = addColletion2Df(bbmri_cohort_dna_coll, 'BBMRI_Cohort_DNA', 'Collection',df, df_coll, df_collFactsSampleNumber)
