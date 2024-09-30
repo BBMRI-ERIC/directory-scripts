@@ -13,7 +13,7 @@ BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, warningsList): # TO improve
 	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
-		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}"))
+		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}"))
 
 def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warningsList):
 	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
@@ -176,11 +176,11 @@ class BBMRICohorts(IPlugin):
 								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) is not an integer"))
 							# check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
 							if collsFactsSamples < collection['size']:
-									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the total number of samples in facts table ({collsFactsSamples}) - maybe false positive due to anonymization"))
+									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the total number of samples in facts table ({collsFactsSamples}) - maybe false positive due to anonymization"))
 							elif collsFactsSamples > collection['size']:
-									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the total number of samples in facts table ({collsFactsSamples})"))
+									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the total number of samples in facts table ({collsFactsSamples})"))
 						else:
-							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) not provided"))
+							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) not provided"))
 
 						# check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted (DNA, Peripheral blood cells, Whole Blood)
 						if 'network' in collection:

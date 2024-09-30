@@ -212,7 +212,7 @@ if not args.nostdout:
     warningContainer.dumpWarnings()
 if args.outputWEXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputWEXLSX[0])
-    warningContainer.dumpWarningsXLSX(args.outputWEXLSX)
+    warningContainer.dumpWarningsXLSX(args.outputWEXLSX, allNNs_sheet = True)
 
 df, df_coll, df_collFactsSampleNumber = addColletion2Df(bbmri_cohort_coll, 'BBMRI_Cohort', 'Collection',df, df_coll, df_collFactsSampleNumber)
 df, df_coll, df_collFactsSampleNumber = addColletion2Df(bbmri_cohort_dna_coll, 'BBMRI_Cohort_DNA', 'Collection',df, df_coll, df_collFactsSampleNumber)
