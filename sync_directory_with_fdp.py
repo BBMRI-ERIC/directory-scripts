@@ -248,7 +248,7 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'title': c['name'],
             'description': c['description'] if 'description' in c else None,
             'diseases': [d['id'].replace("urn:miriam:icd:", "ICD10:") for d in c['diagnosis_available']],
-            'theme': 'EU:HEALTH',
+            'theme': ['EU:HEALTH'] + [d['id'] for d in c['diagnosis_available']],
             'type': '',
             'landingPage': f'{directory_prefix}/#/collection/{c["id"]}',
             'contactPoint': f'{c["contact"]["id"]}' if 'contact' in c else None,
@@ -372,4 +372,4 @@ if __name__ == '__main__':
     s = client.Session(args.molgenis_url)
     s.login(args.molgenis_user, args.molgenis_password)
 
-    sync(s, directory_prefix, args.reset)
+    sync(s, directory_prefix, args.reset, q="id==bbmri-eric:ID:EU_BBMRI-ERIC")
