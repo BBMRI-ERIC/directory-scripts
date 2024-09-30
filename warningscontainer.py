@@ -35,9 +35,26 @@ class WarningsContainer:
                     w.dump()
             print("")
 
-    def dumpWarningsXLSX(self, filename : List[str]):
+    def dumpWarningsXLSX(self, filename : List[str], allNNs_sheet: bool = False):
         workbook = xlsxwriter.Workbook(filename[0])
         bold = workbook.add_format({'bold': True})
+
+        if allNNs_sheet:
+            # Create a sheet containing content for all NNs together
+            allNNs_worksheet = workbook.add_worksheet("ALL")
+            allNNs_row = 0
+
+            allNNs_worksheet.write_string(allNNs_row, 0, "Entity ID", bold)
+            allNNs_worksheet.set_column(0,0, 50)
+            allNNs_worksheet.write_string(allNNs_row, 1, "Entity type", bold)
+            allNNs_worksheet.set_column(1,1, 10)
+            allNNs_worksheet.write_string(allNNs_row, 2, "Check", bold)
+            allNNs_worksheet.set_column(2,2, 20)
+            allNNs_worksheet.write_string(allNNs_row, 3, "Severity", bold)
+            allNNs_worksheet.set_column(3,3, 10)
+            allNNs_worksheet.write_string(allNNs_row, 4, "Message", bold)
+            allNNs_worksheet.set_column(4,4, 120)
+
         for nn in sorted(self.__warningsNNs):
             worksheet = workbook.add_worksheet(nn)
             worksheet_row = 0
@@ -59,5 +76,14 @@ class WarningsContainer:
                     worksheet.write_string(worksheet_row, 2, w.dataCheckID)
                     worksheet.write_string(worksheet_row, 3, w.level.name)
                     worksheet.write_string(worksheet_row, 4, w.message)
+
+                    if allNNs_sheet:
+                        # Populate the "ALL" sheet
+                        allNNs_row += 1
+                        allNNs_worksheet.write_string(allNNs_row, 0, w.directoryEntityID)
+                        allNNs_worksheet.write_string(allNNs_row, 1, w.directoryEntityType.value)
+                        allNNs_worksheet.write_string(allNNs_row, 2, w.dataCheckID)
+                        allNNs_worksheet.write_string(allNNs_row, 3, w.level.name)
+                        allNNs_worksheet.write_string(allNNs_row, 4, w.message)
         workbook.close()
 
