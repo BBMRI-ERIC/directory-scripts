@@ -178,7 +178,7 @@ class BBMRICohorts(IPlugin):
 							if collsFactsSamples < collection['size']:
 									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the total number of samples in facts table ({collsFactsSamples}) - maybe false positive due to anonymization"))
 							elif collsFactsSamples > collection['size']:
-									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the total number of samples in facts table ({collsFactsSamples})"))
+									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the total number of samples in facts table ({collsFactsSamples})"))
 						else:
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) not provided"))
 
