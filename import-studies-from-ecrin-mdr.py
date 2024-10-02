@@ -21,77 +21,118 @@ import asyncio
 import csv
 import logging
 import os
-from collections import defaultdict, Counter, OrderedDict
+import sys
+from collections import defaultdict, OrderedDict
 
 import requests
 from molgenis_emx2_pyclient import client
+from molgenis_emx2_pyclient.exceptions import PyclientException
 
 #
-logger = logging.getLogger('ecrin_mdr_importer')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger("ecrin_mdr_importer")
+logger.setLevel(logging.INFO)
 
-fmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 hdlr = logging.StreamHandler()
-hdlr.setLevel(logging.DEBUG)
+hdlr.setLevel(logging.INFO)
 hdlr.setFormatter(fmt)
 logger.addHandler(hdlr)
 
-ECRIN_URL = 'https://newmdr.ecrin.org'
-ECRIN_STUDY_API_ENDPOINT = f'{ECRIN_URL}/api/Study/AllDetails'
-ECRIN_STUDY_URL = f'{ECRIN_URL}/Study'
+ECRIN_URL = "https://newmdr.ecrin.org"
+ECRIN_STUDY_API_ENDPOINT = f"{ECRIN_URL}/api/Study/AllDetails"
+ECRIN_STUDY_URL = f"{ECRIN_URL}/Study"
 
-BBMRI_ALSO_KNOWN_IN = 'AlsoKnownIn'
-BBMRI_STUDY = 'Studies'
-BBMRI_COLLECTION = 'Collections'
+BBMRI_ALSO_KNOWN_IN = "AlsoKnownIn"
+BBMRI_STUDY = "Studies"
+BBMRI_COLLECTION = "Collections"
+BBMRI_STUDY_ID_PREFIX = "bbmri_eric:studyID:"
+BBMRI_AKI_ID_PREFIX = "ecrin-mdr:"
 
 
-def get_study_details(mdr_id):
+def create_output_dir(output_dir):
     """
-    Gets from ECRIN MDR the details of the study with id :mdr_id:
+    Checks whether the directory to store the csv files exists. If not, it creates it
 
-    :param mdr_id: the id of the study
+    :return: the abspath of the directory
     """
-    res = requests.get(f'{ECRIN_STUDY_API_ENDPOINT}/{mdr_id}')
-    if res.status_code == 200:
-        return res.json()
+    if not os.path.isabs(output_dir):
+        absdir = os.path.abspath(os.path.join(os.path.curdir, output_dir))
     else:
-        return None
+        absdir = output_dir
+
+    if not os.path.exists(absdir):
+        os.mkdir(absdir)
+    return absdir
+
+
+def file_exist(file_argument):
+    """
+    ArgumentParser validator to check whether the input file exist
+    """
+    if os.path.exists(file_argument):
+        return file_argument
+    raise argparse.ArgumentTypeError("File {} does not exist".format(file_argument))
+
+
+def get_studies_collections_link(input_file):
+    """
+    Reads the csv file and generates a dictionary with the mapping between the mdr study and the bbmri collection
+    """
+    with open(input_file) as f:
+        reader = csv.DictReader(f)
+        studies_collections = {}
+
+        for match in reader:
+            studies_collections[(match["mdr_id"], match["mdr_title"])] = f"bbmri-eric:ID:{match["collection_id"]}"
+
+        return studies_collections
 
 
 def get_age_unit(min_age, max_age):
     """
-    Maps age unit values of MDR to the ones in BBMRI
+    Maps age unit values of the MDR to the ones in the BBMRI Directory.
     """
     mapping = {
         "Years": "YEAR",
         "Months": "MONTH",
         "Weeks": "WEEK"
     }
-    if min_age is not None and max_age is not None:
-        assert min_age['unit_name'] == max_age['unit_name']
-        unit = min_age['unit_name']
-    elif min_age is not None:
-        unit = min_age['unit_name']
-    elif max_age is not None:
-        unit = max_age['unit_name']
-    else:
-        return None
-    return mapping[unit]
+
+    if min_age and max_age:
+        assert min_age["unit_name"] == max_age["unit_name"]
+    unit = (min_age or max_age).get("unit_name") if (min_age or max_age) else None
+    return mapping.get(unit)
 
 
 def get_sex_value(ecrin_gender_eligibility):
     return {
-        'Male': 'MALE',
-        'Female': 'FEMALE',
-        'Not provided': 'NAV',
-        'All': ['MALE', 'FEMALE']
+        "Male": "MALE",
+        "Female": "FEMALE",
+        "Not provided": "NAV",
+        "All": ["MALE", "FEMALE"]
     }[ecrin_gender_eligibility]
 
 
-def create_directory_records(eric_session, mdr_data, mdr_title, collections_ids):
+def get_study_details_from_ecrin_mdr(mdr_id):
     """
-    Creates the records to be stored in Molgenis
+    Gets the details of the study with id :mdr_id: from the ECRIN MDR
+
+    :param mdr_id: the id of the study
+    :return: a dict with the study details if the study was found, None otherwise
+    """
+    logger.debug("Getting study details")
+    res = requests.get(f"{ECRIN_STUDY_API_ENDPOINT}/{mdr_id}")
+    if res.status_code == 200:
+        return res.json()["full_study"]
+    else:
+        logger.error("Response is %s" % res)
+        return None
+
+
+def create_studies_records(mdr_data, mdr_title):
+    """
+    Creates the records to be stored in EMX2
 
     In particular, it creates two records:
      - study, with data of the ECRIN MDR study
@@ -99,152 +140,121 @@ def create_directory_records(eric_session, mdr_data, mdr_title, collections_ids)
     It also updates the collections linked to the study with the reference to the newly created study
     """
 
-    also_known_id = f'ecrin-mdr:{mdr_data["id"]}'  # internal bbmri id of the "also_known_entity" corresponding to the study
-    study_id = f'bbmri_eric:studyID:{mdr_data["id"]}'  # internal bbmri id of the study
+    also_known_id = f"{BBMRI_AKI_ID_PREFIX}{mdr_data["id"]}"  # internal bbmri id of the "also_known_entity" corresponding to the study
+    study_id = f"{BBMRI_STUDY_ID_PREFIX}{mdr_data["id"]}"  # internal bbmri id of the study
 
     # creates the also known record
     also_known = {
-        'id': also_known_id,
-        'name_system': 'ECRIN MDR',
-        'pid': mdr_data["id"],
-        'url': f'{ECRIN_STUDY_URL}/{mdr_data["id"]}',
-        'national_node': 'EXT',
-        'withdrawn': False,
-        'label': mdr_data["display_title"]
+        "id": also_known_id,
+        "name_system": "ECRIN MDR",
+        "pid": mdr_data["id"],
+        "url": f"{ECRIN_STUDY_URL}/{mdr_data["id"]}",
+        "national_node": "EXT",
+        "label": mdr_data["display_title"]
     }
 
     try:
-        number_of_subject = int(mdr_data['study_enrolment'])
+        number_of_subject = int(mdr_data["study_enrolment"])
     except (ValueError, TypeError):
         number_of_subject = None
     # creates the study record
-    sex = get_sex_value(mdr_data['study_gender_elig']['name'])
+    sex = get_sex_value(mdr_data["study_gender_elig"]["name"])
 
     study = {
-        'id': study_id,
-        'title': mdr_title,
-        'description': mdr_data['brief_description'],
-        'type': mdr_data['study_type']['name'],
-        'number_of_subjects': number_of_subject,
-        'sex': sex if isinstance(sex, str) else ",".join(sex),
-        'age_low': mdr_data['min_age'].get('value') if mdr_data['min_age'] is not None else None,
-        'age_high': mdr_data['max_age'].get('value') if mdr_data['max_age'] is not None else None,
-        'age_unit': get_age_unit(mdr_data['min_age'], mdr_data['max_age']),
-        'also_known': also_known_id,
-        'national_node': 'EXT'
+        "id": study_id,
+        "title": mdr_title,
+        "description": mdr_data["brief_description"],
+        "type": mdr_data["study_type"]["name"],
+        "number_of_subjects": number_of_subject,
+        "sex": sex if isinstance(sex, str) else ",".join(sex),
+        "age_low": mdr_data["min_age"].get("value") if mdr_data["min_age"] is not None else None,
+        "age_high": mdr_data["max_age"].get("value") if mdr_data["max_age"] is not None else None,
+        "age_unit": get_age_unit(mdr_data["min_age"], mdr_data["max_age"]),
+        "also_known": also_known_id,
+        "national_node": "EXT"
     }
-
-    # # Updates the collections with the id of the associated study
-    updated_collections = []
-    for cid in collections_ids:
-        collections = eric_session.get(table='Collections', query_filter=f'id=={cid}', schema='ERIC')
-        studies_ids = set(collections[0]['study'].split(','))
-        studies_ids.add(study_id)
-        collections[0]['study'] = ",".join(studies_ids)
-        updated_collections.append(collections[0])
 
     return {
-        'AlsoKnownIn': also_known,
-        'Studies': study,
-        'Collections': updated_collections
+        "AlsoKnownIn": also_known,
+        "Studies": study
     }
 
 
-def process_study(eric_session, mdr_id, mdr_title, collections_ids):
-    """
-    Function to process a study. It gets study details from MDR and create the corresponding records to be upsert in the
-    Directory.
-    :return: A dict object with keys being the tables of the Directory to be udpated with the records.
-    None if the study couldn't be found
-
-    """
-    logger.info("Processing study %s" % mdr_id)
-    logger.debug("Collections are %s" % collections_ids)
-    logger.debug("Getting study detail")
-    study_detail = get_study_details(mdr_id)
-    if study_detail is None:
-        logger.debug("Couldn't find details for study")
-        return None
-    else:
-        logger.info("Updating directory for study")
-        return create_directory_records(eric_session, study_detail['full_study'], mdr_title, collections_ids)
+def create_collection_records(eric_client, collections):
+    new_collections = []
+    for collection_id, studies_ids in collections.items():
+        collection = eric_client.get(table="Collections", query_filter=f"id=={collection_id}", schema="ERIC")[0]
+        collection["study"] = ",".join(set(collection["study"].split(",")).union(set(studies_ids)))
+        new_collections.append(collection)
+    return new_collections
 
 
-def file_exist(file_argument):
-    """
-    Checks if the file actually exists
-    """
-    if os.path.exists(file_argument):
-        return file_argument
-    raise argparse.ArgumentTypeError("File {} does not exist".format(file_argument))
+async def upload_files_to_directory(emx2_client, entities, output_dir):
+    for k, v in entities.items():
+        logger.info("Created %d records of type %s", len(v), k)
+        with open(f"{output_dir}/{k}.csv", "w") as outfile:
+            fieldnames = list(v[0].keys())
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(v)
+
+    for filename in ("AlsoKnownIn.csv", "Studies.csv", "Collections.csv"):
+        try:
+            await emx2_client.upload_file(file_path=f"{output_dir}/{filename}", schema="ERIC")
+        except PyclientException:
+            logger.error(f"Error uploading {filename}")
+            sys.exit(-1)
 
 
-def count_studies_ids(studies):
-    """
-    Check if there are studies with the same id but different title, in input data
-    """
-    counter = Counter([s[0] for s in studies])
-    return [study_id for study_id in counter if counter[study_id] > 1]
+async def main(input_file, url, username, password, output_dir):
+    studies_collections = get_studies_collections_link(input_file)
+
+    with client.Client(url=url) as emx2_client:
+        emx2_client.signin(username, password)
+        entities = OrderedDict({
+            "AlsoKnownIn": [],
+            "Studies": []
+        })
+        collections_studies = defaultdict(list)
+        failed_studies = []
+        for (mdr_id, mdr_title), collection_id in studies_collections.items():
+            # for collections, we first collect only the ids of the studies
+            logger.info("Processing study %s" % mdr_id)
+            study_details = get_study_details_from_ecrin_mdr(mdr_id)
+            if study_details is None:
+                logger.error("Couldn't find details for study %s" % mdr_id)
+                failed_studies.append(mdr_id)
+            else:
+                logger.debug("Found study details. Creating records")
+                collections_studies[collection_id].append(f"{BBMRI_STUDY_ID_PREFIX}{mdr_id}")
+                records = create_studies_records(study_details, mdr_title)
+                entities["AlsoKnownIn"].append(records["AlsoKnownIn"])
+                entities["Studies"].append(records["Studies"])
+
+        entities["Collections"] = create_collection_records(emx2_client, collections_studies)
+        await upload_files_to_directory(emx2_client, entities, output_dir)
+        logger.error(f"Failed studies {failed_studies}")
 
 
-async def main(input_file, url, username, password):
-    entities = OrderedDict({
-        'AlsoKnownIn': [],
-        'Studies': [],
-        'Collections': []
-    })
-
-    with open(input_file) as f:
-        reader = csv.DictReader(f)
-        studies_collections = defaultdict(list)
-
-        for match in reader:
-            studies_collections[(match["mdr_id"], match["mdr_title"])].append(f"bbmri-eric:ID:{match['collection_id']}")
-        studies_with_different_title = count_studies_ids(studies_collections)
-
-        with client.Client(url=url) as emx2_client:
-            emx2_client.signin(username, password)
-            counter = 0
-            for s, c in studies_collections.items():
-                if counter > 10:
-                    break
-                records = process_study(emx2_client, s[0], s[1], c)
-                if records is None:
-                    logger.error(f"Skipping study {s[0]}")
-                else:
-                    for k, v in records.items():
-                        if isinstance(v, list):
-                            entities[k].extend(v)
-                        else:
-                            entities[k].append(v)
-                        counter += 1
-
-            for k, v in entities.items():
-                with open(f"{k}.csv", "w") as outfile:
-                    fieldnames = list(v[0].keys())
-                    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(v)
-
-            await emx2_client.upload_file(file_path='./AlsoKnownIn.csv', schema='ERIC')
-            await emx2_client.upload_file(file_path='./Studies.csv', schema='ERIC')
-            await emx2_client.upload_file(file_path='./Collections.csv', schema='ERIC')
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input-file", dest="input_file", type=file_exist, required=True,
+    parser.add_argument("--input-file", "-i", dest="input_file", type=file_exist, required=True,
                         help="CSV file with mdr and csv matchings")
-    parser.add_argument('--url', '-u', type=str, required=True, help='the url of the BBMRI directory')
-    parser.add_argument('--username', '-U', type=str, required=True,
-                        help='the user name of the user of the BBMRI directory')
-    parser.add_argument('--password', '-P', type=str, required=True,
-                        help='the password of the user of the BBMRI directory')
+    parser.add_argument("--url", "-u", type=str, required=True, help="the url of the BBMRI directory")
+    parser.add_argument("--username", "-U", type=str, required=True,
+                        help="the user name of the user of the BBMRI directory")
+    parser.add_argument("--password", "-P", type=str, required=True,
+                        help="the password of the user of the BBMRI directory")
+    parser.add_argument("--output-dir", "-o", type=str, required=False,
+                        help="The director that will contain the csv to be uploaded", default="./ecrin-data")
 
     args = parser.parse_args()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+    outdir = create_output_dir(args.output_dir)
+
     try:
-        asyncio.run(main(args.input_file, args.url, args.username, args.password))
+        asyncio.run(main(args.input_file, args.url, args.username, args.password, outdir))
     except KeyboardInterrupt:
         pass
