@@ -19,6 +19,7 @@ For each study in the CSV, the script:
 import argparse
 import asyncio
 import csv
+import json
 import logging
 import os
 import sys
@@ -42,12 +43,23 @@ logger.addHandler(hdlr)
 ECRIN_URL = "https://newmdr.ecrin.org"
 ECRIN_STUDY_API_ENDPOINT = f"{ECRIN_URL}/api/Study/AllDetails"
 ECRIN_STUDY_URL = f"{ECRIN_URL}/Study"
+ECRIN_STUDY_ALTERNATIVE_URL = "https://newmdr.ecrin.org/api/Study/ByRegId/11"
 
 BBMRI_ALSO_KNOWN_IN = "AlsoKnownIn"
 BBMRI_STUDY = "Studies"
 BBMRI_COLLECTION = "Collections"
 BBMRI_STUDY_ID_PREFIX = "bbmri_eric:studyID:"
 BBMRI_AKI_ID_PREFIX = "ecrin-mdr:"
+
+# These MDR IDS, for some reason, cannot be found using the ECRIN Study URL.
+# They can be retrieved using the study identifier.
+MISSING_MDR_IDS = {
+    '2541233': '2021-001072-41',
+    '2541230': '2021-001054-57',
+    '2537617': '2017-004737-85',
+    '2541424': '2021-002327-38',
+    '2541631': '2021-005051-37'
+}
 
 
 def create_output_dir(output_dir):
@@ -126,8 +138,22 @@ def get_study_details_from_ecrin_mdr(mdr_id):
     if res.status_code == 200:
         return res.json()["full_study"]
     else:
-        logger.error("Response is %s" % res)
-        return None
+        logger.info("Failed getting the study with the MDR ID. Using the alternative: %s" % MISSING_MDR_IDS[mdr_id])
+        alternative_id = MISSING_MDR_IDS[mdr_id]
+        res = requests.get(f"{ECRIN_STUDY_ALTERNATIVE_URL}/{alternative_id}")
+        if res.status_code == 200:
+            # The structure of the json of the alternative MDR url is different
+            data = json.loads(res.json()[0])
+            return {
+                "id": data["study_id"],
+                "brief_description": data["description"],
+                "study_enrolment": "",
+                "min_age": {"value": data["min_age"], "unit_name": "YEAR"} if data["min_age"] is not None else None,
+                "max_age": {"value": data["max_age"], "unit_name": "YEAR"} if data["max_age"] is not None else None,
+                "study_type": {"name": data["type_name"]},
+                "study_gender_elig": {"name": data["gender_elig"]},
+                "display_title": data["study_name"]
+            }
 
 
 def create_studies_records(mdr_data, mdr_title):
@@ -142,7 +168,6 @@ def create_studies_records(mdr_data, mdr_title):
 
     also_known_id = f"{BBMRI_AKI_ID_PREFIX}{mdr_data["id"]}"  # internal bbmri id of the "also_known_entity" corresponding to the study
     study_id = f"{BBMRI_STUDY_ID_PREFIX}{mdr_data["id"]}"  # internal bbmri id of the study
-
     # creates the also known record
     also_known = {
         "id": also_known_id,
@@ -183,7 +208,10 @@ def create_studies_records(mdr_data, mdr_title):
 def create_collection_records(eric_client, collections):
     new_collections = []
     for collection_id, studies_ids in collections.items():
-        collection = eric_client.get(table="Collections", query_filter=f"id=={collection_id}", schema="ERIC")[0]
+        try:
+            collection = eric_client.get(table="Collections", query_filter=f"id=={collection_id}", schema="ERIC")[0]
+        except IndexError:
+            logger.error(collection_id)
         collection["study"] = ",".join(set(collection["study"].split(",")).union(set(studies_ids)))
         new_collections.append(collection)
     return new_collections
@@ -225,7 +253,7 @@ async def main(input_file, url, username, password, output_dir):
                 logger.error("Couldn't find details for study %s" % mdr_id)
                 failed_studies.append(mdr_id)
             else:
-                logger.debug("Found study details. Creating records")
+                logger.info("Found study details. Creating records")
                 collections_studies[collection_id].append(f"{BBMRI_STUDY_ID_PREFIX}{mdr_id}")
                 records = create_studies_records(study_details, mdr_title)
                 entities["AlsoKnownIn"].append(records["AlsoKnownIn"])
