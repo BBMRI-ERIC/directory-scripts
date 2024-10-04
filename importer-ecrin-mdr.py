@@ -42,24 +42,14 @@ logger.addHandler(hdlr)
 
 ECRIN_URL = "https://newmdr.ecrin.org"
 ECRIN_STUDY_API_ENDPOINT = f"{ECRIN_URL}/api/Study/AllDetails"
+ECRIN_STUDY_ALTERNATIVE_URL = f"{ECRIN_URL}/api/Study"
 ECRIN_STUDY_URL = f"{ECRIN_URL}/Study"
-ECRIN_STUDY_ALTERNATIVE_URL = "https://newmdr.ecrin.org/api/Study/ByRegId/11"
 
 BBMRI_ALSO_KNOWN_IN = "AlsoKnownIn"
 BBMRI_STUDY = "Studies"
 BBMRI_COLLECTION = "Collections"
 BBMRI_STUDY_ID_PREFIX = "bbmri_eric:studyID:"
 BBMRI_AKI_ID_PREFIX = "ecrin-mdr:"
-
-# These MDR IDS, for some reason, cannot be found using the ECRIN Study URL.
-# They can be retrieved using the study identifier.
-MISSING_MDR_IDS = {
-    '2541233': '2021-001072-41',
-    '2541230': '2021-001054-57',
-    '2537617': '2017-004737-85',
-    '2541424': '2021-002327-38',
-    '2541631': '2021-005051-37'
-}
 
 
 def create_output_dir(output_dir):
@@ -138,9 +128,8 @@ def get_study_details_from_ecrin_mdr(mdr_id):
     if res.status_code == 200:
         return res.json()["full_study"]
     else:
-        logger.info("Failed getting the study with the MDR ID. Using the alternative: %s" % MISSING_MDR_IDS[mdr_id])
-        alternative_id = MISSING_MDR_IDS[mdr_id]
-        res = requests.get(f"{ECRIN_STUDY_ALTERNATIVE_URL}/{alternative_id}")
+        logger.info("Failed getting the study with the MDR ID. ")
+        res = requests.get(f"{ECRIN_STUDY_ALTERNATIVE_URL}/{mdr_id}")
         if res.status_code == 200:
             # The structure of the json of the alternative MDR url is different
             data = json.loads(res.json()[0])
