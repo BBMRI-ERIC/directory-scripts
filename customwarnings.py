@@ -17,7 +17,7 @@ class DataCheckEntityType(Enum):
 
 class DataCheckWarning:
 
-    def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, directoryEntityType : DataCheckEntityType, message : str):
+    def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, directoryEntityType : DataCheckEntityType, message : str, action : str = '', emailTo : str = ''):
         self.dataCheckID = dataCheckID
         self.recipients = recipients
         self.NN = NN
@@ -25,8 +25,10 @@ class DataCheckWarning:
         self.directoryEntityID = directoryEntityID
         self.directoryEntityType = directoryEntityType
         self.message = message
+        self.action = action
+        self.emailTo = emailTo
     
     def dump(self):
-        print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message)
+        print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message + " " + self.action + " " + self.emailTo)
 
 

@@ -54,6 +54,10 @@ class WarningsContainer:
             allNNs_worksheet.set_column(3,3, 10)
             allNNs_worksheet.write_string(allNNs_row, 4, "Message", bold)
             allNNs_worksheet.set_column(4,4, 120)
+            allNNs_worksheet.write_string(allNNs_row, 5, "Action", bold)
+            allNNs_worksheet.set_column(5,5, 120)
+            allNNs_worksheet.write_string(allNNs_row, 6, "Email", bold)
+            allNNs_worksheet.set_column(6,6, 50)
 
         for nn in sorted(self.__warningsNNs):
             worksheet = workbook.add_worksheet(nn)
@@ -68,6 +72,10 @@ class WarningsContainer:
             worksheet.set_column(3,3, 10)
             worksheet.write_string(worksheet_row, 4, "Message", bold)
             worksheet.set_column(4,4, 120)
+            worksheet.write_string(allNNs_row, 5, "Action", bold)
+            worksheet.set_column(5,5, 120)
+            worksheet.write_string(allNNs_row, 6, "Email", bold)
+            worksheet.set_column(6,6, 50)
             for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
                 if not (w.dataCheckID in self.disabledChecks and w.directoryEntityID in self.disabledChecks[w.dataCheckID]):
                     worksheet_row += 1
@@ -76,6 +84,8 @@ class WarningsContainer:
                     worksheet.write_string(worksheet_row, 2, w.dataCheckID)
                     worksheet.write_string(worksheet_row, 3, w.level.name)
                     worksheet.write_string(worksheet_row, 4, w.message)
+                    worksheet.write_string(allNNs_row, 5, w.action)
+                    worksheet.write_string(allNNs_row, 6, w.emailTo)
 
                     if allNNs_sheet:
                         # Populate the "ALL" sheet
@@ -85,5 +95,7 @@ class WarningsContainer:
                         allNNs_worksheet.write_string(allNNs_row, 2, w.dataCheckID)
                         allNNs_worksheet.write_string(allNNs_row, 3, w.level.name)
                         allNNs_worksheet.write_string(allNNs_row, 4, w.message)
+                        allNNs_worksheet.write_string(allNNs_row, 5, w.action)
+                        allNNs_worksheet.write_string(allNNs_row, 6, w.emailTo)
         workbook.close()
 
