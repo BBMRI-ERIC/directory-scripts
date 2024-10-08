@@ -72,9 +72,9 @@ class WarningsContainer:
             worksheet.set_column(3,3, 10)
             worksheet.write_string(worksheet_row, 4, "Message", bold)
             worksheet.set_column(4,4, 120)
-            worksheet.write_string(allNNs_row, 5, "Action", bold)
+            worksheet.write_string(worksheet_row, 5, "Action", bold)
             worksheet.set_column(5,5, 120)
-            worksheet.write_string(allNNs_row, 6, "Email", bold)
+            worksheet.write_string(worksheet_row, 6, "Email", bold)
             worksheet.set_column(6,6, 50)
             for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
                 if not (w.dataCheckID in self.disabledChecks and w.directoryEntityID in self.disabledChecks[w.dataCheckID]):
@@ -84,8 +84,8 @@ class WarningsContainer:
                     worksheet.write_string(worksheet_row, 2, w.dataCheckID)
                     worksheet.write_string(worksheet_row, 3, w.level.name)
                     worksheet.write_string(worksheet_row, 4, w.message)
-                    worksheet.write_string(allNNs_row, 5, w.action)
-                    worksheet.write_string(allNNs_row, 6, w.emailTo)
+                    worksheet.write_string(worksheet_row, 5, w.action)
+                    worksheet.write_string(worksheet_row, 6, w.emailTo)
 
                     if allNNs_sheet:
                         # Populate the "ALL" sheet
