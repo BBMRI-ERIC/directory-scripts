@@ -58,12 +58,15 @@ countryInstitutions = {}
 
 for biobank in dir.getBiobanks():
     biobankId = biobank['id']
-    biobankJuridicalPerson = biobank['juridical_person']
-    biobankCountry = biobank['country']['id']
-    if not biobankCountry in countryInstitutions:
-        countryInstitutions[biobankCountry] = set()
-    log.debug(f"Biobank {biobankId} from institution {biobankJuridicalPerson} added to country {biobankCountry}")
-    countryInstitutions[biobankCountry].add(biobankJuridicalPerson)
+    try:
+        biobankJuridicalPerson = biobank['juridical_person']
+        biobankCountry = biobank['country']['id']
+        if not biobankCountry in countryInstitutions:
+            countryInstitutions[biobankCountry] = set()
+        log.debug(f"Biobank {biobankId} from institution {biobankJuridicalPerson} added to country {biobankCountry}")
+        countryInstitutions[biobankCountry].add(biobankJuridicalPerson)
+    except KeyError:
+        log.error("Biobank " + biobankId + " has no juridical person set!")
 
 if args.verbose:
     for country in sorted(countryInstitutions):

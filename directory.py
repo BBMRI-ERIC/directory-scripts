@@ -14,6 +14,7 @@ class Directory:
     def __init__(self, package='eu_bbmri_eric', purgeCaches=[], debug=False, pp=None, username=None, password=None):
         self.__pp = pp
         self.__package = package
+        
         log.debug('Checking data in package: ' + package)
 
         cache_dir = 'data-check-cache/directory'
@@ -197,23 +198,30 @@ class Directory:
                 for n in c['networks']:
                     self.contactGraph.add_edge('contactID:'+c['id'], n['id'])
 
+        log.info('Checks of directory data as graphs')
+        # now we check if all the edges in the graph are in both directions
+        for e in self.directoryGraph.edges():
+            if not self.directoryGraph.has_edge(e[1],e[0]):
+                #raise Exception('DirectoryStructure', 'directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                log.warning('DirectoryStructure - directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                self.directoryGraph.add_edge(e[1],e[0])
+        for e in self.contactGraph.edges():
+            if not self.contactGraph.has_edge(e[1],e[0]):
+                #raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                log.warning('DirectoryStructure - contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                self.contactGraph.add_edge(e[1],e[0])
+        for e in self.networkGraph.edges():
+            if not self.networkGraph.has_edge(e[1],e[0]):
+                #raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                log.warning('DirectoryStructure - networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                self.networkGraph.add_edge(e[1],e[0])
+
         # now make graphs immutable
         nx.freeze(self.directoryGraph)
         nx.freeze(self.directoryCollectionsDAG)
         nx.freeze(self.contactGraph)
         nx.freeze(self.networkGraph)
 
-        log.info('Checks of directory data as graphs')
-        # now we check if all the edges in the graph are in both directions
-        for e in self.directoryGraph.edges():
-            if not self.directoryGraph.has_edge(e[1],e[0]):
-                raise Exception('DirectoryStructure', 'directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-        for e in self.contactGraph.edges():
-            if not self.contactGraph.has_edge(e[1],e[0]):
-                raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-        for e in self.networkGraph.edges():
-            if not self.networkGraph.has_edge(e[1],e[0]):
-                raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
         # we check that DAG is indeed DAG :-)
         if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
             raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
