@@ -280,6 +280,36 @@ class Directory:
         collection = self.directoryGraph.nodes[collectionID]['data']
         return self.contactHashmap[collection['contact']['id']]
 
+    def isTopLevelCollection(self, collectionID : str):
+        collection = self.directoryGraph.nodes[collectionID]['data']
+        return not 'parent_collection' in collection
+
+    def isCountableCollection(self, collectionID : str, metric : str):
+        assert metric == 'number_of_donors' or metric == 'size' 
+        # note that this is intentionally not implemented for OoM - since OoM is a required parameter and thus any child collection would be double-counted
+        collection = self.directoryGraph.nodes[collectionID]['data']
+        if not (metric in collection and isinstance(collection[metric], int)):
+            return False
+        else:
+            if not 'parent_collection' in collection:
+                return True
+            else:
+                parent = self.getCollectionById(collection['parent_collection']['id'])
+                parent_dist = 1
+                while parent is not None:
+                    if metric in parent and isinstance(parent[metric], int):
+                        log.debug(f'Collection {collectionID} is not countable as it has countable parent {parent["id"]} (distance {parent_dist}) for metric {metric}.')
+                        return False
+                    if 'parent_collection' in parent:
+                        parent = self.getCollectionById(parent['parent_collection']['id'])
+                        parent_dist += 1
+                    else:
+                        if parent_dist > 1:
+                            log.debug(f'Detected collection {collectionID} deeper than 1 from {parent["id"]} (distance {parent_dist}) for metric {metric}.')
+                        parent = None
+                return True
+                
+
     def getCollectionNN(self, collectionID):
         # TODO: handle IARC!
         return self.getBiobankNN(self.getCollectionBiobankId(collectionID))

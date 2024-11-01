@@ -122,16 +122,22 @@ for collection in dir.getCollections():
     log.debug("Types: " + str(types))
 
 
-    allCountries.add(biobank['country']['id'])
+    if biobank['country']['id'] != 'EU':
+        allCountries.add(biobank['country']['id'])
     allCollections.append(collection)
     allBiobanks.add(biobankId)
-    if 'size' in collection and isinstance(collection['size'], int):
+    #if 'size' in collection and isinstance(collection['size'], int) and dir.isTopLevelCollection(collection['id']):
+    if dir.isCountableCollection(collection['id'], 'size'):
+
         allCollectionSamplesExplicit += collection['size']
         allCollectionSamplesIncOoM += collection['size']
     else:
         # Intentionally, the lower bound of the OoM interval is taken - the size of the collection should be in the range of 10**OoM to 10**(OoM+1) - and hence using 10**OoM is a bound nobody can question unless there is a bug in the underlying data. Historically, we used also 0.3*10**(OoM+1).
-        allCollectionSamplesIncOoM += int(10 ** OoM)
-    if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
+        # note that OoM is only counted for top-level collections to avoid double counting - because OoM is mandatory parameter, any child collection has a parent which has OoM filled in
+        if dir.isTopLevelCollection(collection['id']):
+            allCollectionSamplesIncOoM += int(10 ** OoM)
+    #if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int) and dir.isTopLevelCollection(collection['id']):
+    if dir.isCountableCollection(collection['id'], 'number_of_donors'):
         allCollectionDonorsExplicit += collection['number_of_donors']
 
 for biobank in dir.getBiobanks():
