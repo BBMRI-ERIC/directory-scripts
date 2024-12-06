@@ -9,8 +9,10 @@
   - py3dns (on Windows this silently conflicts if dnspython is already installed)
   - requests
   - diskcache
-  - yapsy
+  - yapsy (see below if you run Python 3.12 or higher)
   - whoosh
+  - roman
+  - typing-extensions
 
 ## Installation
 - Verify installation:  
@@ -32,6 +34,14 @@ pip3 install --upgrade certifi
 ``
 - If you want support for checking mappings of ORPHA codes to ICD-10 codes for RD biobanks, you need to get en_product1.xml from
   http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html
+
+- If you have Python 3.12 or higher, for the time being (December, 2024) you need a patched version of yapsy module to deal with instability in the Python - some stable components being removed from the Python core. Here is a quick howto:
+  ``
+git clone https://github.com/AmeyaVS/yapsy.git
+cd yapsy/package
+python -m builD
+pip install --force-reinstall dist/Yapsy-2.0.0-py3-none-any.whl
+``
 
 ## Running the script
 

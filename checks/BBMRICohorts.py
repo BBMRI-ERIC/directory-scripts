@@ -32,10 +32,13 @@ def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warni
 		minFactAge = int(min(sorted(factAges)))
 		maxFactAge = int(max(sorted(factAges)))
 		# check if any of age groups is outside of min-max range of the collection:
-		if (minFactAge < collection['age_low']) or (maxFactAge > collection['age_high']):
-			warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", collection['contact']['email'])) #TODO: explain it better
-		if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
-			warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", collection['contact']['email'])) #TODO: explain it better
+		try:
+			if (minFactAge < collection['age_low']) or (maxFactAge > collection['age_high']):
+				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", collection['contact']['email'])) #TODO: explain it better
+			if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
+				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", collection['contact']['email'])) #TODO: explain it better
+		except KeyError as e:
+			log.info(f"Incomplete age range information for {collection['id']}: " + str(e) + " missing")
 
 def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
 
