@@ -36,17 +36,11 @@ pip3 install --upgrade certifi
   http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html
 
 - If you have Python 3.12 or higher, for the time being (December, 2024) you need a patched version of yapsy module to deal with instability in the Python - some stable components being removed from the Python core. Here is a quick howto:
-  ``
-git clone https://github.com/AmeyaVS/yapsy.git
-``
-  ``
-cd yapsy/package
-``
-  ``
-python -m build
-``
-  ``
-pip install --force-reinstall dist/Yapsy-2.0.0-py3-none-any.whl
+     ``
+     git clone https://github.com/AmeyaVS/yapsy.git
+     cd yapsy/package
+     python -m build
+     pip install --force-reinstall dist/Yapsy-2.0.0-py3-none-any.whl
 ``
 
 ## Running the script
