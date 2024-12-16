@@ -70,6 +70,8 @@ withdrawnBiobanks = set()
 allCollectionSamplesExplicit = 0
 allCollectionDonorsExplicit = 0
 allCollectionSamplesIncOoM = 0
+# OoM Donors
+allCollectionDonorsIncOoM = 0
 allCountries = set()
 
 for collection in dir.getCollections():
@@ -104,6 +106,12 @@ for collection in dir.getCollections():
             biobank_networks.append(n['id'])
 
     OoM = collection['order_of_magnitude']['id']
+    # OoM Donors
+    try:
+        OoMDonors = collection['order_of_magnitude_donors']['id']
+        print(collection['order_of_magnitude_donors'])
+    except KeyError:
+        OoMDonors = None
 
     materials = []
     if 'materials' in collection:
@@ -139,6 +147,11 @@ for collection in dir.getCollections():
     #if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int) and dir.isTopLevelCollection(collection['id']):
     if dir.isCountableCollection(collection['id'], 'number_of_donors'):
         allCollectionDonorsExplicit += collection['number_of_donors']
+        # OoM Donors
+        allCollectionDonorsIncOoM += collection['number_of_donors']
+    else:
+        if dir.isTopLevelCollection(collection['id']) and OoMDonors:
+            allCollectionDonorsIncOoM += int(10 ** OoMDonors)
 
 for biobank in dir.getBiobanks():
     biobankId = biobank['id']
@@ -173,8 +186,8 @@ if not args.nostdout:
     print("Estimated totals:")
     print("- total of samples/donors advertised explicitly in all-relevant collections: %d / %d" % (
         allCollectionSamplesExplicit, allCollectionDonorsExplicit))
-    print("- total of samples advertised in all-relevant collections including OoM estimates: %d" % (
-        allCollectionSamplesIncOoM))
+    print("- total of samples/donors advertised in all-relevant collections including OoM estimates: %d / %d" % (
+        allCollectionSamplesIncOoM, allCollectionDonorsIncOoM))
 
 for df in (pd_allCollections, pd_withdrawnCollections):
     pddfutils.tidyCollectionDf(df)
@@ -186,7 +199,7 @@ def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, bi
     writer = pd.ExcelWriter(filename, engine='xlsxwriter')
     dfBiobanks.to_excel(writer, sheet_name=biobanksLabel)
     dfCollections.to_excel(writer, sheet_name=collectionsLabel)
-    writer.save()
+    writer.close()
 
 if args.outputXLSX is not None:
     outputExcelBiobanksCollections(args.outputXLSX[0], pd_allBiobanks, "Biobanks", pd_allCollections, "Collections")
