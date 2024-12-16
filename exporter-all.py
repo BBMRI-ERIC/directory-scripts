@@ -46,7 +46,7 @@ parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_cons
                     help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList,
                     help='disable particular long remote checks')
-parser.add_argument('-FT', '--filter-coll-type', dest='filterCollType', nargs=1,
+parser.add_argument('-F', '--filter-coll-type', dest='filterCollType', nargs=1,
                     help='filter by the collection type provided as parameter (only one type allowed)')
 parser.set_defaults(disableChecksRemote=[], disablePlugins=[], purgeCaches=[])
 args = parser.parse_args()
