@@ -143,4 +143,4 @@ if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
     pd_cohortCollections.to_excel(writer, sheet_name='Cohort collections',index=False)
-    writer.save()
+    writer.close()
