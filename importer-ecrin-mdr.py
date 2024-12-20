@@ -1,19 +1,22 @@
 """
-Script that imports the ECRIN MDR studies into the BBMRI Directory.
+Script that imports the ECRIN MDR studies into the BBMRI Directory Staging area.
 The studies are associated to one or more collections. When a Study and a Collection are associated it means that
-the Colection was created in the context of the Study
+the Collection was created in the context of the Study
 
 It gets in input:
     - a CSV file with three columns mdr_id,mdr_title,collection_id containing the id of the study in ECRIN, its title and
       the id of the corresponding collection in the directory
     - the url of the Directory where to store the data
-    - the username and the password of the user with insert rights in the Directory
+    - the username and the password of the user or alternatively the token with insert rights in the Directory
+    - the name of the schema to use as
+    - whether to directly upload the generated data or just create the csv files
 
 For each study in the CSV, the script:
   - gets the study information from the ECRIN MDR
-  - creates a Study record in the Directory
+  - creates a Study record
   - creates an AlsoKnownIn record with the link to the study in ECRIN MDR
   - updates the Collection with the reference to the associated Study
+The CSVs are grouped in the generated National Nodes directories
 """
 
 import argparse
@@ -191,14 +194,14 @@ def create_records(mdr_data, mdr_title, national_node):
     return also_known, study
 
 
-def get_collection_data_from_directory(eric_client, collection_id):
+def get_collection_data_from_directory(eric_client, schema, collection_id):
     try:
-        return eric_client.get(table="Collections", query_filter=f"id=={collection_id}", schema="BBMRI-ERIC")[0]
+        return eric_client.get(table="Collections", query_filter=f"id=={collection_id}", schema=schema)[0]
     except IndexError:
         logger.error(collection_id)
 
 
-async def upload_files_to_directory(emx2_client, entities_by_national_node, output_dir):
+async def save_and_upload_files_to_directory(emx2_client, entities_by_national_node, schema, upload_data, output_dir):
     for nn, entities in entities_by_national_node.items():
         if nn != "UK":
             nn_dir = f"{output_dir}/{nn}"
@@ -212,17 +215,17 @@ async def upload_files_to_directory(emx2_client, entities_by_national_node, outp
                     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(v)
+            if upload_data:
+                for filename in (f"AlsoKnownIn.csv", f"Studies.csv", f"Collections.csv"):
+                    try:
+                        await emx2_client.upload_file(file_path=f"{nn_dir}/{filename}", schema=f"{schema}-{nn}")
+                    except PyclientException as ex:
+                        logger.error(ex)
+                        logger.error(f"Error uploading {filename}")
+                        sys.exit(-1)
 
-            for filename in (f"AlsoKnownIn.csv", f"Studies.csv", f"Collections.csv"):
-                try:
-                    await emx2_client.upload_file(file_path=f"{nn_dir}/{filename}", schema=f"BBMRI-{nn}")
-                except PyclientException as ex:
-                    logger.error(ex)
-                    logger.error(f"Error uploading {filename}")
-                    sys.exit(-1)
 
-
-async def main(input_file, url, username, password, token, output_dir):
+async def main(input_file, url, username, password, token, schema, output_dir, upload_data):
     studies_collections = get_studies_collections_link(input_file)
 
     with client.Client(url=url) as emx2_client:
@@ -241,7 +244,7 @@ async def main(input_file, url, username, password, token, output_dir):
                 failed_studies.append(mdr_id)
             else:
                 if collections.get(collection_id) is None:
-                    collections[collection_id] = get_collection_data_from_directory(emx2_client, collection_id)
+                    collections[collection_id] = get_collection_data_from_directory(emx2_client, schema, collection_id)
                 national_node = collections[collection_id]["national_node"]
                 logger.info("Found study details. Creating records")
                 aki, study = create_records(study_details, mdr_title, national_node)
@@ -253,7 +256,7 @@ async def main(input_file, url, username, password, token, output_dir):
         for cid, collection in collections.items():
             entities_by_national_node[collection['national_node']]["Collections"].append(collection)
 
-        await upload_files_to_directory(emx2_client, entities_by_national_node, output_dir)
+        await save_and_upload_files_to_directory(emx2_client, entities_by_national_node, schema, upload_data, output_dir)
         logger.error(f"Failed studies {failed_studies}")
 
 
@@ -270,6 +273,9 @@ if __name__ == "__main__":
                         help="The director that will contain the csv to be uploaded", default="./ecrin-data")
     parser.add_argument("--token", "-t", type=str, required=False,
                         help="Token to use to write in Molgenis EMX2")
+    parser.add_argument("--schema", "-s", type=str, required=False, default="ERIC", help="name of the Molgenis schema")
+    parser.add_argument("--upload-data", "-d", action="store_true",
+                        help="flag to activate or not the upload of the generated data. If false it just creates the csv files")
 
     args = parser.parse_args()
     loop = asyncio.new_event_loop()
@@ -278,6 +284,6 @@ if __name__ == "__main__":
     outdir = create_output_dir(args.output_dir)
 
     try:
-        asyncio.run(main(args.input_file, args.url, args.username, args.password, args.token, outdir))
+        asyncio.run(main(args.input_file, args.url, args.username, args.password, args.token, args.schema, outdir, args.upload_data))
     except KeyboardInterrupt:
         pass
