@@ -12,8 +12,10 @@ class BiobankFields(IPlugin):
 		warnings = []
 		log.info("Running biobank fields checks (BiobankFields)")
 		for biobank in dir.getBiobanks():
-			if not 'juridical_person' in biobank or re.search('^\s*$', biobank['juridical_person']) or re.search('^\s*N/?A\s*$', biobank['juridical_person']):
+			if not 'juridical_person' in biobank or re.search('^\s*$', biobank['juridical_person']):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Missing juridical person ('juridical_person' attribute is empty)"))
+			elif re.search('^\s*N/?A\s*$', biobank['juridical_person'], re.IGNORECASE) or re.search('^\s*To be filled', biobank['juridical_person'], re.IGNORECASE) or re.search('\bunknown\b', biobank['juridical_person'], re.IGNORECASE):
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, "Invalid juridical person ('juridical_person' attribute has an invalid value - offending value: '" + biobank['juridical_person'] + "')"))
 
 #			if(not 'head_firstname' in biobank or re.search('^\s*$', biobank['head_firstname']) or 
 #					not 'head_lastname' in biobank or re.search('^\s*$', biobank['head_lastname'])):
