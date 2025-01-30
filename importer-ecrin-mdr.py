@@ -231,7 +231,7 @@ async def main(input_file, url, username, password, token, schema, output_dir, u
     with client.Client(url=url) as emx2_client:
         if token is not None:
             emx2_client.set_token(token)
-        else:
+        elif username is not None and password is not None:
             emx2_client.signin(username, password)
         entities_by_national_node = defaultdict(lambda: defaultdict(list))
         collections = {}
