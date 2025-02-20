@@ -4,6 +4,20 @@ It gets the data of biobanks and collections from a Molgenis instance of the Dir
 converted one into another Molgenis instance. The Molgenis instance can be the same or different. The destination
 instance needs the FDP EMX model and the "bbmri-directory" FDP_Catalog (i.e., the FDP Catalog with data of the directory)
 already deployed
+
+--------------------------------------------------------------------------------------------------------------------------
+
+Authors
+
+ - Vittorio Meloni <vittorio.meloni@crs4.it>
+
+Acknowledgments:
+
+This work has been partially funded by the following sources:
+
+ - The European Joint Programme on Rare Disease (EJPRD) project (grant agreement N. 825575);
+
+and has evolved within the context of the BBMRI-ERIC Common Service IT.
 """
 from collections import OrderedDict
 
