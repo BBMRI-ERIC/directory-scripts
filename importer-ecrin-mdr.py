@@ -20,6 +20,10 @@ The CSVs are grouped in the generated National Nodes directories
 
 ------------------------------------------------------------------------------
 
+Authors:
+
+  - Vittorio Meloni <vittorio.meloni@crs4.it>
+
 Acknowledgments:
 
   - This work has been partially funded by the EOSC Future project (EU H2020 programme, grant agreement N. 101017536)
