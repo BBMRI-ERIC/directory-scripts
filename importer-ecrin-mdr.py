@@ -17,6 +17,12 @@ For each study in the CSV, the script:
   - creates an AlsoKnownIn record with the link to the study in ECRIN MDR
   - updates the Collection with the reference to the associated Study
 The CSVs are grouped in the generated National Nodes directories
+
+------------------------------------------------------------------------------
+
+Acknowledgments:
+
+  - This work has been partially funded by the EOSC Future project (EU H2020 programme, grant agreement N. 101017536)
 """
 
 import argparse
