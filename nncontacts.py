@@ -22,7 +22,7 @@ class NNContacts:
             'NL' : 'e.j.van.enckevort@rug.nl, m.a.swertz@gmail.com, tieneke.schaaij-visser@lygature.org',
             'NO' : 'vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no',
             'PL' : 'dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl, andrzej.strug@gumed.edu.pl, aklis@bee2code.com',
-            'SE' : 'tobias.sjoblom@igp.uu.se',
+            'SE' : 'anna.beskow@uppsalabiobank.uu.se, nils.hailer@uu.se',
             'TR' : 'nese.atabey@ibg.edu.tr',
             'IARC' : 'kozlakidisz@iarc.fr',
             }

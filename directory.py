@@ -333,7 +333,11 @@ class Directory:
 
     def getContactNN(self, contactID : str):
         # TODO: handle IARC!
-        return self.contactHashmap[contactID]['country']['id']
+        # XXX: exception handling is a temporary hack to circumvent a problem with missing contact
+        try:
+            return self.contactHashmap[contactID]['country']['id']
+        except:
+            return ""
 
     def getNetworks(self):
         return self.networks
