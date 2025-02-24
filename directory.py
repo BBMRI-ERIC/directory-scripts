@@ -1,20 +1,20 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 import logging
-import logging
 import os.path
 import time
 
-from molgenis_emx2_pyclient import Client
 import networkx as nx
 from diskcache import Cache
-
+from molgenis_emx2_pyclient import Client
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
 
 class Directory:
 
-    def __init__(self, schema="ERIC", purgeCaches=[], debug=False, pp=None, username=None, password=None, token: str = None):
+    def __init__(self, schema="ERIC", purgeCaches=None, debug=False, pp=None, username=None, password=None, token: str = None):
+        if purgeCaches is None:
+            purgeCaches = list()
         self.__pp = pp
         self.__package = schema
         log.debug('Checking data in schema: ' + schema)
@@ -43,47 +43,40 @@ class Directory:
             self.biobanks = cache['biobanks']
         else:
             start_time = time.perf_counter()
-            # TODO: remove exception handling once BBMRI.uk staging has been fixed
-            try:
-                # self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,capabilities')
-                self.biobanks = session.get_graphql(table="Biobanks")
-            except:
-                log.warning("Using work-around for inconsistence in the database structure.")
-                self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country')
+            self.biobanks = session.get_graphql(table="Biobanks")
             cache['biobanks'] = self.biobanks
             end_time = time.perf_counter()
             log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
+
         log.info('   ... retrieving collections')
         if 'collections' in cache:
             self.collections = cache['collections']
         else:
             start_time = time.perf_counter()
-            # self.collections = session.get(self.__package + "_collections", expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
             self.collections = session.get_graphql(table="Collections")
-            #self.collections = session.get(self.__package + "_collections", num=2000, expand=[])
             cache['collections'] = self.collections
             end_time = time.perf_counter()
             if debug and self.__pp is not None:
                 for c in self.collections:
                     pp.pprint(c)
             log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
+
         log.info('   ... retrieving contacts')
         if 'contacts' in cache:
             self.contacts = cache['contacts']
         else:
             start_time = time.perf_counter()
-            # self.contacts = session.get(self.__package + "_persons", num=2000, expand='biobanks,collections,country')
             self.contacts = session.get_graphql(table="Persons")
             cache['contacts'] = self.contacts
             end_time = time.perf_counter()
             log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
+
         log.info('   ... retrieving networks')
         if 'networks' in cache:
             self.networks = cache['networks']
         else:
             start_time = time.perf_counter()
-            # self.networks = session.get(self.__package + "_networks", num=2000, expand='contact')
-            self.networks = session.get("Networks")
+            self.networks = session.get_graphql("Networks")
             cache['networks'] = self.networks
             end_time = time.perf_counter()
             log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -104,7 +97,7 @@ class Directory:
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
             # XXX temporary hack -- adding contactID prefix
             #self.contactGraph.add_node(c['id'], data=c)
-            self.contactGraph.add_node('contactID:'+c['id'], data=c)
+            self.contactGraph.add_node(c['id'], data=c)
             self.contactHashmap[c['id']] = c
         for b in self.biobanks:
             if self.directoryGraph.has_node(b['id']):
@@ -138,16 +131,15 @@ class Directory:
 
         # check forward pointers from biobanks
         for b in self.biobanks:
-            if b.get('collections'):
-                for c in b['collections']:
-                    if not self.directoryGraph.has_node(c['id']):
-                        raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
+            for c in b.get('collections', []):
+                if not self.directoryGraph.has_node(c['id']):
+                    raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
         # add biobank contact and network edges
         for b in self.biobanks:
             if 'contact' in b:
-                self.contactGraph.add_edge(b['id'],'contactID:'+b['contact']['id'])
-            if 'networks' in c:
-                for n in c['networks']:
+                self.contactGraph.add_edge(b['id'],b['contact']['id'])
+            for c in b.get('contacts', []):
+                for n in c.get('networks', []):
                     self.networkGraph.add_edge(b['id'], n['id'])
 
         # now we have all the collections created and checked duplicates, so we create edges
@@ -161,13 +153,12 @@ class Directory:
                 self.directoryGraph.add_edge(c['id'], c['biobank']['id'])
                 self.directoryGraph.add_edge(c['biobank']['id'], c['id'])
                 self.directoryCollectionsDAG.add_edge(c['biobank']['id'], c['id'])
-            if 'sub_collections' in c:
-                # some of root collections of a biobank
-                for sb in c['sub_collections']:
-                    self.directoryGraph.add_edge(c['id'], sb['id'])
-                    self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
+            # some of root collections of a biobank
+            for sb in c.get('sub_collections', []):
+                self.directoryGraph.add_edge(c['id'], sb['id'])
+                self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
             if 'contact' in c:
-                self.contactGraph.add_edge(c['id'],'contactID:'+c['contact']['id'])
+                self.contactGraph.add_edge(c['id'],c['contact']['id'])
             if 'networks' in c:
                 for n in c['networks']:
                     self.networkGraph.add_edge(c['id'], n['id'])
@@ -180,9 +171,9 @@ class Directory:
             # TODO remove once the datamodel is fixed
             if 'contacts' in n:
                 for c in n['contacts']:
-                    self.contactGraph.add_edge(n['id'], 'contactID:'+c['id'])
+                    self.contactGraph.add_edge(n['id'], c['id'])
             if 'contact' in n:
-                self.contactGraph.add_edge(n['id'], 'contactID:'+n['contact']['id'])
+                self.contactGraph.add_edge(n['id'], n['contact']['id'])
             if 'collections' in n:
                 for c in n['collections']:
                     self.networkGraph.add_edge(n['id'], c['id'])
@@ -191,13 +182,13 @@ class Directory:
         for c in self.contacts:
             if 'biobanks' in c:
                 for b in c['biobanks']:
-                    self.contactGraph.add_edge('contactID:'+c['id'], b['id'])
+                    self.contactGraph.add_edge(c['id'], b['id'])
             if 'collections' in c:
                 for coll in c['collections']:
-                    self.contactGraph.add_edge('contactID:'+c['id'], coll['id'])
+                    self.contactGraph.add_edge(c['id'], coll['id'])
             if 'networks' in c:
                 for n in c['networks']:
-                    self.contactGraph.add_edge('contactID:'+c['id'], n['id'])
+                    self.contactGraph.add_edge(c['id'], n['id'])
 
         # now make graphs immutable
         nx.freeze(self.directoryGraph)
