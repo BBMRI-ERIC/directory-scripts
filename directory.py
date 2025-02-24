@@ -1,6 +1,6 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
-
-import logging as log
+import logging
+import logging
 import os.path
 import time
 
@@ -9,12 +9,15 @@ import networkx as nx
 from diskcache import Cache
 
 
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger("BBMRI Directory")
+
 class Directory:
 
-    def __init__(self, schema='eu_bbmri_eric', purgeCaches=[], debug=False, pp=None, username=None, password=None, token: str = None):
+    def __init__(self, schema="ERIC", purgeCaches=[], debug=False, pp=None, username=None, password=None, token: str = None):
         self.__pp = pp
         self.__package = schema
-        log.debug('Checking data in package: ' + schema)
+        log.debug('Checking data in schema: ' + schema)
 
         cache_dir = 'data-check-cache/directory'
         if not os.path.exists(cache_dir):
@@ -23,9 +26,9 @@ class Directory:
         if 'directory' in purgeCaches:
             cache.clear()
 
-        self.__directoryURL = "https://directory-acc.molgenis.net/api/"
+        self.__directoryURL = "https://directory-acc.molgenis.net/"
         log.info('Retrieving directory content from ' + self.__directoryURL)
-        session = Client(self.__directoryURL)
+        session = Client(self.__directoryURL, schema=schema)
         if username is not None and password is not None:
             log.info("Logging in to MOLGENIS with a user account.")
             log.debug('username: ' + username)
@@ -42,7 +45,8 @@ class Directory:
             start_time = time.perf_counter()
             # TODO: remove exception handling once BBMRI.uk staging has been fixed
             try:
-                self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,capabilities')
+                # self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country,capabilities')
+                self.biobanks = session.get_graphql(table="Biobanks")
             except:
                 log.warning("Using work-around for inconsistence in the database structure.")
                 self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country')
@@ -54,7 +58,8 @@ class Directory:
             self.collections = cache['collections']
         else:
             start_time = time.perf_counter()
-            self.collections = session.get(self.__package + "_collections", expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
+            # self.collections = session.get(self.__package + "_collections", expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
+            self.collections = session.get_graphql(table="Collections")
             #self.collections = session.get(self.__package + "_collections", num=2000, expand=[])
             cache['collections'] = self.collections
             end_time = time.perf_counter()
@@ -67,7 +72,8 @@ class Directory:
             self.contacts = cache['contacts']
         else:
             start_time = time.perf_counter()
-            self.contacts = session.get(self.__package + "_persons", num=2000, expand='biobanks,collections,country')
+            # self.contacts = session.get(self.__package + "_persons", num=2000, expand='biobanks,collections,country')
+            self.contacts = session.get_graphql(table="Persons")
             cache['contacts'] = self.contacts
             end_time = time.perf_counter()
             log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -76,7 +82,8 @@ class Directory:
             self.networks = cache['networks']
         else:
             start_time = time.perf_counter()
-            self.networks = session.get(self.__package + "_networks", num=2000, expand='contact')
+            # self.networks = session.get(self.__package + "_networks", num=2000, expand='contact')
+            self.networks = session.get("Networks")
             cache['networks'] = self.networks
             end_time = time.perf_counter()
             log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -131,9 +138,10 @@ class Directory:
 
         # check forward pointers from biobanks
         for b in self.biobanks:
-            for c in b['collections']:
-                if not self.directoryGraph.has_node(c['id']):
-                    raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
+            if b.get('collections'):
+                for c in b['collections']:
+                    if not self.directoryGraph.has_node(c['id']):
+                        raise Exception('DirectoryStructure', 'Biobank refers non-existent collection ID: ' + c['id'])
         # add biobank contact and network edges
         for b in self.biobanks:
             if 'contact' in b:
