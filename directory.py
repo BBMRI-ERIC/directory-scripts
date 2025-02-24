@@ -11,10 +11,10 @@ from diskcache import Cache
 
 class Directory:
 
-    def __init__(self, package='eu_bbmri_eric', purgeCaches=[], debug=False, pp=None, username=None, password=None):
+    def __init__(self, schema='eu_bbmri_eric', purgeCaches=[], debug=False, pp=None, username=None, password=None, token: str = None):
         self.__pp = pp
-        self.__package = package
-        log.debug('Checking data in package: ' + package)
+        self.__package = schema
+        log.debug('Checking data in package: ' + schema)
 
         cache_dir = 'data-check-cache/directory'
         if not os.path.exists(cache_dir):
@@ -23,14 +23,18 @@ class Directory:
         if 'directory' in purgeCaches:
             cache.clear()
 
-        self.__directoryURL = "https://directory-emx2-acc.molgenis.net/api/"
+        self.__directoryURL = "https://directory-acc.molgenis.net/api/"
         log.info('Retrieving directory content from ' + self.__directoryURL)
         session = Client(self.__directoryURL)
         if username is not None and password is not None:
             log.info("Logging in to MOLGENIS with a user account.")
             log.debug('username: ' + username)
             log.debug('password: ' + password)
-            session.login(username, password)
+            session.signin(username, password)
+        elif token is not None:
+            session.set_token(token)
+        else:
+            log.warning("Continuing without authorization.")
         log.info('   ... retrieving biobanks')
         if 'biobanks' in cache:
             self.biobanks = cache['biobanks']
