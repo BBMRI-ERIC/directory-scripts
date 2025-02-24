@@ -96,7 +96,6 @@ class Directory:
             if self.contactGraph.has_node(c['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
             # XXX temporary hack -- adding contactID prefix
-            #self.contactGraph.add_node(c['id'], data=c)
             self.contactGraph.add_node(c['id'], data=c)
             self.contactHashmap[c['id']] = c
         for b in self.biobanks:
@@ -137,7 +136,7 @@ class Directory:
         # add biobank contact and network edges
         for b in self.biobanks:
             if 'contact' in b:
-                self.contactGraph.add_edge(b['id'],b['contact']['id'])
+                self.contactGraph.add_edge(b['id'], b['contact']['id'])
             for c in b.get('contacts', []):
                 for n in c.get('networks', []):
                     self.networkGraph.add_edge(b['id'], n['id'])
@@ -159,36 +158,29 @@ class Directory:
                 self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
             if 'contact' in c:
                 self.contactGraph.add_edge(c['id'],c['contact']['id'])
-            if 'networks' in c:
-                for n in c['networks']:
-                    self.networkGraph.add_edge(c['id'], n['id'])
+            for n in c.get('networks', []):
+                self.networkGraph.add_edge(c['id'], n['id'])
 
         # processing network edges
         for n in self.networks:
-            if 'biobanks' in n:
-                for b in n['biobanks']:
-                    self.networkGraph.add_edge(n['id'], b['id'])
+            for b in n.get('biobanks', []):
+                self.networkGraph.add_edge(n['id'], b['id'])
             # TODO remove once the datamodel is fixed
-            if 'contacts' in n:
-                for c in n['contacts']:
-                    self.contactGraph.add_edge(n['id'], c['id'])
+            for c in n.get('contacts', []):
+                self.contactGraph.add_edge(n['id'], c['id'])
             if 'contact' in n:
                 self.contactGraph.add_edge(n['id'], n['contact']['id'])
-            if 'collections' in n:
-                for c in n['collections']:
-                    self.networkGraph.add_edge(n['id'], c['id'])
+            for c in n.get('collections', []):
+                self.networkGraph.add_edge(n['id'], c['id'])
 
         # processing edges from contacts
         for c in self.contacts:
-            if 'biobanks' in c:
-                for b in c['biobanks']:
-                    self.contactGraph.add_edge(c['id'], b['id'])
-            if 'collections' in c:
-                for coll in c['collections']:
-                    self.contactGraph.add_edge(c['id'], coll['id'])
-            if 'networks' in c:
-                for n in c['networks']:
-                    self.contactGraph.add_edge(c['id'], n['id'])
+            for b in c.get('biobanks', []):
+                self.contactGraph.add_edge(c['id'], b['id'])
+            for coll in c.get('collections', []):
+                self.contactGraph.add_edge(c['id'], coll['id'])
+            for n in c.get('networks', []):
+                self.contactGraph.add_edge(c['id'], n['id'])
 
         # now make graphs immutable
         nx.freeze(self.directoryGraph)
