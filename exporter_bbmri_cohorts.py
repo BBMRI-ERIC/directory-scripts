@@ -52,9 +52,9 @@ outputXLSX = args.outputXLSX
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
 if args.username is not None and args.password is not None:
-    dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+    dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
-    dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+    dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 bbmri_cohort_bb=[]
 bbmri_cohort_dna_bb=[]
