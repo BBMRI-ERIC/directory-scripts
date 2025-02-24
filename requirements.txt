@@ -1,0 +1,8 @@
+Yapsy~=1.12.2
+certifi~=2025.1.31
+diskcache~=5.6.3
+geopy~=2.4.1
+networkx~=3.4.2
+pandas~=2.2.3
+dms2dec~=0.1
+flatten-json~=0.1.14
