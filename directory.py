@@ -236,7 +236,7 @@ class Directory:
             #pp.pprint(data)
         #biobank = data[biobankID]
         biobank = self.directoryGraph.nodes[biobankID]['data']
-        return biobank['country']['id']
+        return biobank['country']
 
     def getCollections(self):
         return self.collections
@@ -297,5 +297,6 @@ class Directory:
             NN = "EU"
         return NN
 
+    @staticmethod
     def getListOfEntityAttributeIds(entity, key : str):
-        return [ element['id'] for element in entity[key] ] if key in entity else []
+        return entity.get(key, [])

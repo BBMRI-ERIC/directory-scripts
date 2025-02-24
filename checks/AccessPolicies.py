@@ -25,11 +25,10 @@ class AccessPolicies(IPlugin):
 			DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use')
 			data_categories = []
 			other_data = False
-			if 'data_categories' in collection:
-				for c in collection['data_categories']:
-					data_categories.append(c['id'])
-					if ('BIOLOGICAL_SAMPLES' != c['id'] and 'IMAGING_DATA' != c['id']):
-						other_data = True
+			for c in collection.get('data_categories', []):
+				data_categories.append(c)
+				if c not in ['BIOLOGICAL_SAMPLES', 'IMAGING_DATA']:
+					other_data = True
 
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
