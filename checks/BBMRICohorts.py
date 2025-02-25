@@ -156,11 +156,14 @@ class BBMRICohorts(IPlugin):
 								collsFactsSamples += fact['number_of_samples']
 							if 'number_of_donors' in fact:
 								collsFactsDonors += fact['number_of_donors']
+
+					# TODO: should these check be generic and not just for BBMRI Cohorts?
 					if collsFactsSamples > 0 or collsFactsDonors > 0:
 						if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
 							log.info(f"Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
 						if BBMRICohortsNetworkName in biobank_networks or BBMRICohortsDNANetworkName in biobank_networks:
 							log.info(f"Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
+						# TODO: check this only for human collections?
 						if collsFactsDonors == 0:
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"fact table information has 0 donors/patients"))
 
