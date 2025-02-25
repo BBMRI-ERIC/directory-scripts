@@ -82,16 +82,17 @@ class Directory:
             cache['networks'] = self.networks
             end_time = time.perf_counter()
             log.info(f'   ... retrieved {len(self.networks)} networks in ' + "%0.3f" % (end_time-start_time) + 's')
-        log.info('   ... all entities retrieved')
         if 'facts' in cache:
             self.facts = cache['facts']
+            log.info(f'   ... retrieved {len(self.facts)} networks from cache')
         else:
             start_time = time.perf_counter()
             self.facts = session.get(self.__package + "_facts")
             cache['facts'] = self.facts
             end_time = time.perf_counter()
-            log.info('   ... retrieved facts in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info(f'   ... retrieved {len(self.facts)} facts in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... all entities retrieved')
+
         self.contactHashmap = {}
 
         log.info('Processing directory data')
@@ -104,7 +105,7 @@ class Directory:
         # Graph linking networks to biobanks/collections
         self.networkGraph = nx.DiGraph()
         for c in self.contacts:
-            log.debug(f'Processing contact {c["id"]} into the contact graph')
+            log.debug(f'Processing contact {c["id"]} into the graph')
             if self.contactGraph.has_node(c['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
             # XXX temporary hack -- adding contactID prefix
@@ -113,6 +114,7 @@ class Directory:
             self.contactHashmap[c['id']] = c
             log.debug(f'Contact {c["id"]} added into contactHashmap')
         for b in self.biobanks:
+            log.debug(f'Processing biobank {b["id"]} into the graph')
             if self.directoryGraph.has_node(b['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in directoryGraph: ' + b['id'])
             self.directoryGraph.add_node(b['id'], data=b)
@@ -124,6 +126,7 @@ class Directory:
                 raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + b['id'])
             self.networkGraph.add_node(b['id'], data=b)
         for c in self.collections:
+            log.debug(f'Processing collection {c["id"]} into the graph')
             if self.directoryGraph.has_node(c['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found: ' + c['id'])
             self.directoryGraph.add_node(c['id'], data=c)
@@ -135,12 +138,14 @@ class Directory:
                 raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + c['id'])
             self.networkGraph.add_node(c['id'], data=c)
         for n in self.networks:
+            log.debug(f'Processing network {n["id"]} into the graph')
             if self.contactGraph.has_node(n['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + n['id'])
             self.contactGraph.add_node(n['id'], data=n)
             if self.networkGraph.has_node(n['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + n['id'])
             self.networkGraph.add_node(n['id'], data=n)
+        # TODO: process facts into the graph
 
         # check forward pointers from biobanks
         for b in self.biobanks:
