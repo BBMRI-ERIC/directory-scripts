@@ -197,7 +197,12 @@ class BBMRICohorts(IPlugin):
 
 				else:
 					if 'network' in collection and (BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks):
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact']['email']))
+						BBMRICohortsList = set()
+						if (BBMRICohortsNetworkName in collection_networks):
+							BBMRICohortsList.add(BBMRICohortsNetworkName)
+						if (BBMRICohortsDNANetworkName in collection_networks):
+							BBMRICohortsList.add(BBMRICohortsDNANetworkName)
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact']['email']))
 
 		for biobank in dir.getBiobanks():
 			biobank_networks = []
