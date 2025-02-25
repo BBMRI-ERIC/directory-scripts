@@ -36,6 +36,7 @@ class Directory:
         log.info('   ... retrieving biobanks')
         if 'biobanks' in cache:
             self.biobanks = cache['biobanks']
+            log.info(f'   ... retrieved {len(self.biobanks)} biobanks from cache')
         else:
             start_time = time.perf_counter()
             # TODO: remove exception handling once BBMRI.uk staging has been fixed
@@ -46,10 +47,11 @@ class Directory:
                 self.biobanks = session.get(self.__package + "_biobanks", expand='contact,collections,country')
             cache['biobanks'] = self.biobanks
             end_time = time.perf_counter()
-            log.info('   ... retrieved biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info(f'   ... retrieved {len(self.biobanks)} biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... retrieving collections')
         if 'collections' in cache:
             self.collections = cache['collections']
+            log.info(f'   ... retrieved {len(self.collections)} collections from cache')
         else:
             start_time = time.perf_counter()
             self.collections = session.get(self.__package + "_collections", expand='biobank,contact,network,parent_collection,sub_collections,type,materials,order_of_magnitude,data_categories,diagnosis_available,imaging_modality,image_dataset_type')
@@ -59,25 +61,27 @@ class Directory:
             if debug and self.__pp is not None:
                 for c in self.collections:
                     pp.pprint(c)
-            log.info('   ... retrieved collections in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info(f'   ... retrieved {len(self.collections)} collections in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... retrieving contacts')
         if 'contacts' in cache:
             self.contacts = cache['contacts']
+            log.info(f'   ... retrieved {len(self.contacts)} contacts from cache')
         else:
             start_time = time.perf_counter()
-            self.contacts = session.get(self.__package + "_persons", num=2000, expand='biobanks,collections,country')
+            self.contacts = session.get(self.__package + "_persons", expand='biobanks,collections,country')
             cache['contacts'] = self.contacts
             end_time = time.perf_counter()
-            log.info('   ... retrieved contacts in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info(f'   ... retrieved {len(self.contacts)} contacts in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... retrieving networks')
         if 'networks' in cache:
             self.networks = cache['networks']
+            log.info(f'   ... retrieved {len(self.networks)} networks from cache')
         else:
             start_time = time.perf_counter()
-            self.networks = session.get(self.__package + "_networks", num=2000, expand='contact')
+            self.networks = session.get(self.__package + "_networks", expand='contact')
             cache['networks'] = self.networks
             end_time = time.perf_counter()
-            log.info('   ... retrieved networks in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info(f'   ... retrieved {len(self.networks)} networks in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... all entities retrieved')
         if 'facts' in cache:
             self.facts = cache['facts']
@@ -100,12 +104,14 @@ class Directory:
         # Graph linking networks to biobanks/collections
         self.networkGraph = nx.DiGraph()
         for c in self.contacts:
+            log.debug(f'Processing contact {c["id"]} into the contact graph')
             if self.contactGraph.has_node(c['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
             # XXX temporary hack -- adding contactID prefix
             #self.contactGraph.add_node(c['id'], data=c)
             self.contactGraph.add_node('contactID:'+c['id'], data=c)
             self.contactHashmap[c['id']] = c
+            log.debug(f'Contact {c["id"]} added into contactHashmap')
         for b in self.biobanks:
             if self.directoryGraph.has_node(b['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in directoryGraph: ' + b['id'])
@@ -333,11 +339,7 @@ class Directory:
 
     def getContactNN(self, contactID : str):
         # TODO: handle IARC!
-        # XXX: exception handling is a temporary hack to circumvent a problem with missing contact
-        try:
-            return self.contactHashmap[contactID]['country']['id']
-        except:
-            return ""
+        return self.contactHashmap[contactID]['country']['id']
 
     def getNetworks(self):
         return self.networks
