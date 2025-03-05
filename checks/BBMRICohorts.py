@@ -163,11 +163,12 @@ class BBMRICohorts(IPlugin):
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"fact table information has 0 donors/patients"))
 						else:
 							kAnonymityViolatingList = []
+							kAnonymityLimit = 5
 							for f in dir.getCollectionFacts(collection['id']):
-								if 'number_of_donors' in f and f['number_of_donors'] > 0 and f['number_of_donors'] < 10:
+								if 'number_of_donors' in f and f['number_of_donors'] > 0 and f['number_of_donors'] < kAnonymityLimit:
 									kAnonymityViolatingList.append([f['id'], f"{f['number_of_donors']} donor(s)"])
 							if kAnonymityViolatingList:
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"the following records of fact table violates 10-anonymity: {kAnonymityViolatingList}"))
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}"))
 
 						# check that the fact table contains all the diagnoses described in the collection
 						compareFactsColl(self, dir, collFactsDiseases, diags, collection, "Diagnoses of collection and facts table do not match", "Check diagnosis entries of the collection description with diagnoses from the facts table and correct as necessary", warnings)
