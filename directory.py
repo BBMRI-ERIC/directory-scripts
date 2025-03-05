@@ -145,7 +145,13 @@ class Directory:
             if self.networkGraph.has_node(n['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + n['id'])
             self.networkGraph.add_node(n['id'], data=n)
-        # TODO: process facts into the graph
+
+        self.collectionFactMap = {}
+        for f in self.facts:
+            if not f['collection']['id'] in self.collectionFactMap:
+                self.collectionFactMap[f['collection']['id']] = [ f ]
+            else:
+                self.collectionFactMap[f['collection']['id']].append(f)
 
         # check forward pointers from biobanks
         for b in self.biobanks:
@@ -351,6 +357,9 @@ class Directory:
 
     def getFacts(self):
         return self.facts
+
+    def getCollectionFacts(self, collectionID : str):
+        return self.collectionFactMap[collectionID]
 
     def getNetworkNN(self, networkID : str):
         # TODO: review handling of IARC/EU/global collections

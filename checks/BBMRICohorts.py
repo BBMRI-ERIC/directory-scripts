@@ -84,10 +84,6 @@ class BBMRICohorts(IPlugin):
 
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
-			biobank_capabilities = []
-			if 'capabilities' in biobank:
-				for c in biobank['capabilities']:
-					biobank_capabilities.append(c['id'])
 			biobank_networks = []
 			if 'network' in biobank:
 				for n in biobank['network']:
@@ -133,29 +129,28 @@ class BBMRICohorts(IPlugin):
 
 				# Check presence of fact tables
 				if collection['facts'] != []:
-					for fact in dir.getFacts():
-						if fact['collection']['id'] == collection['id']:
-							collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
-							if 'disease' in fact:
-								collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
-							if 'age_range' in fact:
-								ages.update(re.findall(r'\d+', fact['age_range']['label']))
-								ageUnits.update(re.findall(r'\((?:\d+-\d+\s)?(.*?)\)', fact['age_range']['label']))
-								# Deal with >80
-								if '>80 years' in ageUnits:
-									# Remove the old value
-									ageUnits.remove('>80 years')
-									# Add the new value
-									ageUnits.add('years')
-								#collFactsAgeGroups.add(fact['age_range']['id'])
-							if 'sex' in fact:
-								collFactsSexGroups.add(fact['sex']['id'])
-							if 'sample_type' in fact:
-								collFactsMaterialTypes.add(fact['sample_type']['id'])
-							if 'number_of_samples' in fact:
-								collsFactsSamples += fact['number_of_samples']
-							if 'number_of_donors' in fact:
-								collsFactsDonors += fact['number_of_donors']
+					for fact in dir.getCollectionFacts(collection['id']):
+						collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
+						if 'disease' in fact:
+							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
+						if 'age_range' in fact:
+							ages.update(re.findall(r'\d+', fact['age_range']['label']))
+							ageUnits.update(re.findall(r'\((?:\d+-\d+\s)?(.*?)\)', fact['age_range']['label']))
+							# Deal with >80
+							if '>80 years' in ageUnits:
+								# Remove the old value
+								ageUnits.remove('>80 years')
+								# Add the new value
+								ageUnits.add('years')
+							#collFactsAgeGroups.add(fact['age_range']['id'])
+						if 'sex' in fact:
+							collFactsSexGroups.add(fact['sex']['id'])
+						if 'sample_type' in fact:
+							collFactsMaterialTypes.add(fact['sample_type']['id'])
+						if 'number_of_samples' in fact:
+							collsFactsSamples += fact['number_of_samples']
+						if 'number_of_donors' in fact:
+							collsFactsDonors += fact['number_of_donors']
 
 					# TODO: should these check be generic and not just for BBMRI Cohorts?
 					if collsFactsSamples > 0 or collsFactsDonors > 0:
@@ -166,6 +161,13 @@ class BBMRICohorts(IPlugin):
 						# TODO: check this only for human collections?
 						if collsFactsDonors == 0:
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"fact table information has 0 donors/patients"))
+						else:
+							kAnonymityViolatingList = []
+							for f in dir.getCollectionFacts(collection['id']):
+								if 'number_of_donors' in f and f['number_of_donors'] > 0 and f['number_of_donors'] < 10:
+									kAnonymityViolatingList.append([f['id'], f"{f['number_of_donors']} donor(s)"])
+							if kAnonymityViolatingList:
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"the following records of fact table violates 10-anonymity: {kAnonymityViolatingList}"))
 
 						# check that the fact table contains all the diagnoses described in the collection
 						compareFactsColl(self, dir, collFactsDiseases, diags, collection, "Diagnoses of collection and facts table do not match", "Check diagnosis entries of the collection description with diagnoses from the facts table and correct as necessary", warnings)
@@ -181,6 +183,7 @@ class BBMRICohorts(IPlugin):
 						# check that the fact table contains all the material types that are described in the collection
 						compareFactsColl(self, dir, collFactsMaterialTypes, materials, collection, "Material types of collection and facts table do not match", "Check material types of the collection description with material types from the facts table and correct as necessary", warnings)
 
+						# TODO: check presence of 0-order and 1-order aggregates (i.e., all stars and all-but-one stars records)
 
 						if 'size' in collection:
 							if not isinstance(collection['size'], int):
