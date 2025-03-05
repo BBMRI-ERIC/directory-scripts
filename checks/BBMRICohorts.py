@@ -187,19 +187,32 @@ class BBMRICohorts(IPlugin):
 						# TODO: check presence of 0-order and 1-order aggregates (i.e., all stars and all-but-one stars records)
 						collectionFacts = dir.getCollectionFacts(collection['id'])
 						if collectionFacts:
-							aggregates = {i: 0 for i in range(1,5)}
-							for f in collectionFacts:
-								starCount = 0
-								for i in ['sex', 'age_range', 'sample_type', 'disease']:
-									if i in f and f[i] == '*':
-										starCount += 1
-								if starCount > 0:
-										aggregates[starCount] += 1
-							if aggregates[4] != 1:
+							fact_keys = ['sex', 'age_range', 'sample_type', 'disease']
+							# note that the fact table contains dicts as values with ontological description of the value, hence only selecting id attribute from the dict
+							fact_values = { key: list(set(f.get(key).get('id') for f in collectionFacts if f.get(key) is not None)) for key in fact_keys }
+							# this is a structure for debugging in case we need to see the structure of the dict
+							#fact_values = { key: set(frozenset(f.get(key).items()) if isinstance(f.get(key), dict) else f.get(key)
+							#				            for f in collectionFacts if f.get(key) is not None
+							#					        ) for key in fact_keys }
+							#log.info(f'fact_values: {fact_values}')
+							aggregates = dict(py_collections.Counter(
+								    [ sum(1 for key in fact_keys if f.get(key) == '*') for f in collectionFacts ]
+									))
+							aggregates = { k: 0 if k not in aggregates else aggregates[k] for k in range(0,len(fact_keys)+1)  }
+							#log.info(f'aggregates: {aggregates}')
+							if not 4 in aggregates or aggregates[4] != 1:
 								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-star aggregate: {aggregates[4]}"))
-							if aggregates[3] < 1:
-								# XXX: this is insufficient check - we should probably issue at least an information warning about missing values in each of the dimensions - not an easy thing to do (would require comparing all possible values from rest of the fact table and from the collection description
+							if not 3 in aggregates or aggregates[3] < 1:
 								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-but-one-star aggregate: {aggregates[3]}"))
+							else:
+								# TODO: this needs to be tested once the fact table checks are applied to all the fact tables and not only the ones which are in the cohorts!! (CRC-Cohort contains this star data)
+								for fk in fact_values:
+									for v in fact_values[fk]:
+										rows = [ f for f in collectionFacts if f.get(fk) is not None and f.get(fk).get('id') == v and (sum(1 for key in fact_keys if f.get(key) == '*')) == 3]
+										if rows:
+											log.info(f'3-star rows found for {fk} value {v}: {rows}')
+										else:
+											warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-but-one-star aggregate for {fk} value {v}: {aggregates[3]}"))
 
 
 						if 'size' in collection:
