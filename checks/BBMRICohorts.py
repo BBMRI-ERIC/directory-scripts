@@ -185,6 +185,22 @@ class BBMRICohorts(IPlugin):
 						compareFactsColl(self, dir, collFactsMaterialTypes, materials, collection, "Material types of collection and facts table do not match", "Check material types of the collection description with material types from the facts table and correct as necessary", warnings)
 
 						# TODO: check presence of 0-order and 1-order aggregates (i.e., all stars and all-but-one stars records)
+						collectionFacts = dir.getCollectionFacts(collection['id'])
+						if collectionFacts:
+							aggregates = {i: 0 for i in range(1,5)}
+							for f in collectionFacts:
+								starCount = 0
+								for i in ['sex', 'age_range', 'sample_type', 'disease']:
+									if i in f and f[i] == '*':
+										starCount += 1
+								if starCount > 0:
+										aggregates[starCount] += 1
+							if aggregates[4] != 1:
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-star aggregate: {aggregates[4]}"))
+							if aggregates[3] < 1:
+								# XXX: this is insufficient check - we should probably issue at least an information warning about missing values in each of the dimensions - not an easy thing to do (would require comparing all possible values from rest of the fact table and from the collection description
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-but-one-star aggregate: {aggregates[3]}"))
+
 
 						if 'size' in collection:
 							if not isinstance(collection['size'], int):
