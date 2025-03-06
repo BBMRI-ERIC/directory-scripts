@@ -20,10 +20,6 @@ class COVID(IPlugin):
 		for collection in dir.getCollections():
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
-			biobank_capabilities = []
-			if 'capabilities' in biobank:
-				for c in biobank['capabilities']:
-					biobank_capabilities.append(c['id'])
 			biobank_covid = []
 			if 'covid19biobank' in biobank:
 				for c in biobank['covid19biobank']:
@@ -140,10 +136,6 @@ class COVID(IPlugin):
 
 
 		for biobank in dir.getBiobanks():
-			biobank_capabilities = []
-			if 'capabilities' in biobank:
-				for c in biobank['capabilities']:
-					biobank_capabilities.append(c['id'])
 			biobank_covid = []
 			if 'covid19biobank' in biobank:
 				for c in biobank['covid19biobank']:
