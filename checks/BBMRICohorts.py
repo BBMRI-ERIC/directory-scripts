@@ -200,11 +200,15 @@ class BBMRICohorts(IPlugin):
 									))
 							aggregates = { k: 0 if k not in aggregates else aggregates[k] for k in range(0,len(fact_keys)+1)  }
 							#log.info(f'aggregates: {aggregates}')
+							# This is a basic check for all-aggregated value in the fact table - there is only one.
 							if not 4 in aggregates or aggregates[4] != 1:
 								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-star aggregate: {aggregates[4]}"))
+							# This is a basic check that there is at least one row for aggregates[3]. It could be ommitted and have only the more detailed checks below, which start to be applied once the user introduces their first aggregate[3] row. 
+							# TODO: What is better from UX perspective - keep or remove this simple one?
 							if not 3 in aggregates or aggregates[3] < 1:
 								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"missing all-but-one-star aggregate: {aggregates[3]}"))
 							else:
+								# This is more advanced check: for all the values that are present in the table (and are not suppressed by the k-anonymity), there should be also corresponding line in the aggregates[3]. However, it does not hold vice versa, due to k-anonymity suppression, there can be other lines in aggregates[3], which are not visible in the fully decomposed lines due to the k-anonymity caused suppression.
 								# TODO: this needs to be tested once the fact table checks are applied to all the fact tables and not only the ones which are in the cohorts!! (CRC-Cohort contains this star data)
 								for fk in fact_values:
 									for v in fact_values[fk]:
