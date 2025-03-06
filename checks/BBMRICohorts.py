@@ -10,7 +10,7 @@ from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntit
 BBMRICohortsNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts'
 BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA'
 
-
+'''
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, actionDescription, warningsList): # TO improve
 	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
 		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, collection['contact']['email']))
@@ -39,7 +39,7 @@ def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warni
 				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", collection['contact']['email'])) #TODO: explain it better
 		except KeyError as e:
 			log.info(f"Incomplete age range information for {collection['id']}: " + str(e) + " missing")
-
+'''
 def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
 
 	def checkAttribute (feature : str, entity : dict, state : bool):
@@ -72,34 +72,41 @@ class BBMRICohorts(IPlugin):
 		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 
 		for collection in dir.getCollections():
+			'''
 			collectionFacts = []
 			collFactsDiseases = set()
 			#collFactsAgeGroups = set()
 			collFactsSexGroups = set()
 			collFactsMaterialTypes =set() 
-			collsFactsSamples = 0
-			collsFactsDonors = 0
+
+			
 			ages = set()
 			ageUnits = set()
+			'''
+			collsFactsSamples = 0
+			collsFactsDonors = 0
 
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
+			
 			biobank_networks = []
 			if 'network' in biobank:
 				for n in biobank['network']:
 					biobank_networks.append(n['id'])
+			
 			collection_networks = []
 			if 'network' in collection:
 				for n in collection['network']:
 					collection_networks.append(n['id'])
-
+			
 			if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
 				OoM = collection['order_of_magnitude']['id']
-
+				'''
 				materials = []
 				if 'materials' in collection:
 					for m in collection['materials']:
 						materials.append(m['id'])
+				'''
 				
 				data_categories = []
 				if 'data_categories' in collection:
@@ -110,7 +117,7 @@ class BBMRICohorts(IPlugin):
 				if 'type' in collection:
 					for t in collection['type']:
 						types.append(t['id'])
-							
+				'''		
 				diags = []
 				diag_ranges = []
 
@@ -119,17 +126,20 @@ class BBMRICohorts(IPlugin):
 						diag_ranges.append(d['id'])
 					else:
 						diags.append(d['id'])
+				
 
 				collSex = set()
 				for s in collection['sex']:
 						collSex.add(s['id'])
-
+				'''
 				# Check commercial use
 				checkCollabBB(self, dir, collection, biobank, warnings)
-
+				
 				# Check presence of fact tables
 				if collection['facts'] != []:
+					
 					for fact in dir.getCollectionFacts(collection['id']):
+						'''
 						collectionFacts.append(fact) # We collect here all the facts for a given collection (maybe not needed)
 						if 'disease' in fact:
 							collFactsDiseases.add(fact['disease']['id']) # Collect all diagnoses from facts
@@ -147,17 +157,19 @@ class BBMRICohorts(IPlugin):
 							collFactsSexGroups.add(fact['sex']['id'])
 						if 'sample_type' in fact:
 							collFactsMaterialTypes.add(fact['sample_type']['id'])
+						'''
 						if 'number_of_samples' in fact:
 							collsFactsSamples += fact['number_of_samples']
 						if 'number_of_donors' in fact:
 							collsFactsDonors += fact['number_of_donors']
-
+					
 					# TODO: should these check be generic and not just for BBMRI Cohorts?
 					if collsFactsSamples > 0 or collsFactsDonors > 0:
 						if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
 							log.info(f"Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
 						if BBMRICohortsNetworkName in biobank_networks or BBMRICohortsDNANetworkName in biobank_networks:
 							log.info(f"Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
+						'''
 						# TODO: check this only for human collections?
 						if collsFactsDonors == 0:
 							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"fact table information has 0 donors/patients"))
@@ -239,7 +251,7 @@ class BBMRICohorts(IPlugin):
 
 								if 'NAV' in collFactsMaterialTypes:
 									warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type", collection['contact']['email']))
-
+						'''
 				else:
 					if 'network' in collection and (BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks):
 						BBMRICohortsList = set()
@@ -248,7 +260,7 @@ class BBMRICohorts(IPlugin):
 						if (BBMRICohortsDNANetworkName in collection_networks):
 							BBMRICohortsList.add(BBMRICohortsDNANetworkName)
 						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact']['email']))
-
+				
 		for biobank in dir.getBiobanks():
 			biobank_networks = []
 			if 'network' in biobank:
@@ -267,5 +279,4 @@ class BBMRICohorts(IPlugin):
 					# warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
 				 if network in biobank_networks:
 					 warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobanks are not expected to be part of BBMRI-Cohorts networks, only specific collections must be included. Biobank participates in BBMRI-Cohorts network: {network}.", "Remove BBMRI Cohorts/BBMRI Cohorts DNA network from the Biobank entry, check which collections shall be flagged with the networks BBMRI Cohorts / BBMRI Cohorts DNA and flag them", biobank['contact']['email']))
-			
 		return warnings
