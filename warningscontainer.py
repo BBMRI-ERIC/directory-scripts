@@ -85,7 +85,8 @@ class WarningsContainer:
                     worksheet.write_string(worksheet_row, 3, w.level.name)
                     worksheet.write_string(worksheet_row, 4, w.message)
                     worksheet.write_string(worksheet_row, 5, w.action)
-                    worksheet.write_string(worksheet_row, 6, w.emailTo)
+                    #TODO: Solve emailTO, IN THE MEANTIME IT IS NOT ADDED!!:
+                    #worksheet.write_string(worksheet_row, 6, w.emailTo)
 
                     if allNNs_sheet:
                         # Populate the "ALL" sheet

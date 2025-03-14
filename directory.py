@@ -87,7 +87,7 @@ class Directory:
             log.info(f'   ... retrieved {len(self.facts)} networks from cache')
         else:
             start_time = time.perf_counter()
-            self.facts = session.get(self.__package + "_facts")
+            self.facts = session.get_graphql("CollectionFacts")
             cache['facts'] = self.facts
             end_time = time.perf_counter()
             log.info(f'   ... retrieved {len(self.facts)} facts in ' + "%0.3f" % (end_time-start_time) + 's')
@@ -341,7 +341,9 @@ class Directory:
 
     def getContactNN(self, contactID : str):
         # TODO: handle IARC!
-        return self.contactHashmap[contactID]['country']['id']
+        #return self.contactHashmap[contactID]['country']['id'] # EMX2 change: Country only contains the ID now, so:
+        return self.contactHashmap[contactID]['country']
+
 
     def getNetworks(self):
         return self.networks
@@ -367,3 +369,7 @@ class Directory:
     @staticmethod
     def getListOfEntityAttributeIds(entity, key : str):
         return [ element['id'] for element in entity[key] ] if key in entity else []
+
+    @staticmethod
+    def getListOfEntityAttributes(entity, key : str):
+        return [ element for element in entity[key] ] if key in entity else []

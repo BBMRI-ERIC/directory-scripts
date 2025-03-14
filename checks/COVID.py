@@ -29,33 +29,42 @@ class COVID(IPlugin):
 				for n in biobank['network']:
 					biobank_networks.append(n['id'])
 
-			OoM = collection['order_of_magnitude']['id']
+			#OoM = collection['order_of_magnitude']['id']  # EMX2 OoM does not have ID, then:
+			OoM = int(collection['order_of_magnitude'])
 
 			materials = []
 			if 'materials' in collection:
 				for m in collection['materials']:
-					materials.append(m['id'])
+					#materials.append(m['id']) # EMX2 materials does not have ID, then:
+					materials.append(m)
 			
 			data_categories = []
 			if 'data_categories' in collection:
 				for c in collection['data_categories']:
-					data_categories.append(c['id'])
+					#data_categories.append(c['id']) # EMX2 data_categories does not have ID, then:
+					data_categories.append(c)
 
 			types = []
 			if 'type' in collection:
 				for t in collection['type']:
-					types.append(t['id'])
+					#types.append(t['id']) # EMX2 types does not have ID, then:
+					types.append(t)
                         
 			diags = []
 			diag_ranges = []
 			covid_diag = False
 			covid_control = False
 
-			for d in collection['diagnosis_available']:
-				if re.search('-', d['id']):
-					diag_ranges.append(d['id'])
-				else:
-					diags.append(d['id'])
+			# TODO: Raise a warning here if needed
+			try:
+				for d in collection['diagnosis_available']:
+					#if re.search('-', d['id']): # EMX2 collection['diagnosis_available'] has name but not id (this applies to all times we call d in this loop)
+					if re.search('-', d['name']):
+							diag_ranges.append(d['name'])
+					else:
+							diags.append(d['name'])
+			except KeyError:
+					continue
 
 			for d in diags+diag_ranges:
 				# ICD-10

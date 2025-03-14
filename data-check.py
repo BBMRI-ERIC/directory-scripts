@@ -58,7 +58,7 @@ parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
-parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
+parser.add_argument('-P', '--package', dest='package', default='ERIC', help='MOLGENIS Package that contains the data (default ERIC).')
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()

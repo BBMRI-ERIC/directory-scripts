@@ -29,6 +29,9 @@ class DataCheckWarning:
         self.emailTo = emailTo
     
     def dump(self):
-        print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message + " " + self.action + " " + self.emailTo)
+        #print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message + " " + self.action + " " + self.emailTo)
+        #TODO: Solve emailTO, IN THE MEANTIME IT IS NOT ADDED!!:
+        print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message + " " + self.action)
+
 
 

@@ -20,9 +20,12 @@ class AccessPolicies(IPlugin):
 
 		for collection in dir.getCollections():
 
-			materials = Directory.getListOfEntityAttributeIds(collection, 'materials')
-			collection_types = Directory.getListOfEntityAttributeIds(collection, 'type')
-			DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use')
+			#materials = Directory.getListOfEntityAttributeIds(collection, 'materials') EMX2 materials do not have id, then:
+			materials = [ material for material in collection['materials'] ] if 'materials' in collection else []
+			#collection_types = Directory.getListOfEntityAttributeIds(collection, 'type') # EMX2 types does not have ID, then:
+			collection_types = Directory.getListOfEntityAttributes(collection, 'type')
+			#DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use') # EMX2 types does not have ID, then:
+			DUOs = Directory.getListOfEntityAttributes(collection, 'data_use')
 			data_categories = []
 			other_data = False
 			for c in collection.get('data_categories', []):

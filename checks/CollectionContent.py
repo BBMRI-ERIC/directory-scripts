@@ -14,10 +14,14 @@ class CollectionContent(IPlugin):
 		log.info("Running collection content checks (CollectionContent)")
 		orphacodes = dir.getOrphaCodesMapper()
 		for collection in dir.getCollections():
-			OoM = collection['order_of_magnitude']['id']
-			materials = Directory.getListOfEntityAttributeIds(collection, 'materials')
-			data_categories = Directory.getListOfEntityAttributeIds(collection, 'data_categories')
-			types = Directory.getListOfEntityAttributeIds(collection, 'type')
+			#OoM = collection['order_of_magnitude']['id'] # EMX2 OoM does not have ID, then:
+			OoM = int(collection['order_of_magnitude'])
+			#materials = Directory.getListOfEntityAttributeIds(collection, 'materials') EMX2 materials do not have id, then:
+			materials = Directory.getListOfEntityAttributes(collection, 'materials')
+			#data_categories = Directory.getListOfEntityAttributeIds(collection, 'data_categories') # EMX2 data_categories does not have ID, then:
+			data_categories = Directory.getListOfEntityAttributes(collection, 'data_categories')
+			#types = Directory.getListOfEntityAttributeIds(collection, 'type') # EMX2 types does not have ID, then:
+			types = Directory.getListOfEntityAttributes(collection, 'type')
 
 			diags = []
 			diags_icd10 = []
@@ -25,17 +29,18 @@ class CollectionContent(IPlugin):
 			if 'diagnosis_available' in collection:
 				diag_ranges = []
 				for d in collection['diagnosis_available']:
-					diags.append(d['id'])
-					if re.search('-', d['id']):
-						diag_ranges.append(d['id'])
-					if re.search('^urn:miriam:icd:', d['id']):
-						diags_icd10.append(re.sub('^urn:miriam:icd:','',d['id']))
-					elif re.search('^ORPHA:', d['id']): 
+					#diags.append(d['id'])  # EMX2 collection['diagnosis_available'] has name but not id (this applies to all times we call d in this loop)
+					diags.append(d['name'])
+					if re.search('-', d['name']):
+						diag_ranges.append(d['name'])
+					if re.search('^urn:miriam:icd:', d['name']):
+						diags_icd10.append(re.sub('^urn:miriam:icd:','',d['name']))
+					elif re.search('^ORPHA:', d['name']):
 						if dir.issetOrphaCodesMapper():
 							if orphacodes.isValidOrphaCode(d):
-								diags_orpha.append(re.sub('^ORPHA:', '', d['id']))
+								diags_orpha.append(re.sub('^ORPHA:', '', d['name']))
 							else:
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid ORPHA code found: %s" % (d['id'])))
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Invalid ORPHA code found: %s" % (d['name'])))
 				if diag_ranges:
 					warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges)))
 
@@ -101,12 +106,14 @@ class CollectionContent(IPlugin):
 			modalities = []
 			if 'imaging_modality' in collection:
 				for m in collection['imaging_modality']:
-					modalities.append(m['id'])
+					#modalities.append(m['id']) # EMX2 imaging_modality does not have id, then:
+					modalities.append(m)
 
 			image_dataset_types = []
 			if 'image_dataset_type' in collection:
 				for idt in collection['image_dataset_type']:
-					image_dataset_types.append(idt['id'])
+					#image_dataset_types.append(idt['id']) # EMX2 image_dataset_type does not have id, then:
+					image_dataset_types.append(idt) # TODO: Check if this is OK!!
 
 			if 'IMAGING_DATA' in data_categories:
 				if len(modalities) < 1:
