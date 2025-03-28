@@ -14,7 +14,7 @@ BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, actionDescription, warningsList): # TO improve
 	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
-		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, collection['contact']))
+		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email']))
 
 def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warningsList):
 	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
@@ -26,7 +26,7 @@ def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warni
 		{i.lower() + 's' for i in collUnits}
 		collUnitsAdapt = {i.lower() + 's' for i in collUnits}
 	if sorted(collUnitsAdapt) != sorted(factsAgeUnits):
-		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", collection['contact']))  # TODO: add email
+		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 	else:
 		# Comparison of numbers
 		# TODO, NOTE: not sure what happens when there is more than 1 age unit i.e.: month and year
@@ -35,9 +35,9 @@ def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warni
 		# check if any of age groups is outside of min-max range of the collection:
 		try:
 			if (minFactAge < collection['age_low']) or (maxFactAge > collection['age_high']):
-				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", collection['contact'])) #TODO: explain it better and add email
+				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email'])) #TODO: explain it better
 			if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
-				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", collection['contact'])) #TODO: explain it better and add email
+				warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email'])) #TODO: explain it better
 		except KeyError as e:
 			log.info(f"Incomplete age range information for {collection['id']}: " + str(e) + " missing")
 
@@ -187,24 +187,24 @@ class FactTables(IPlugin):
 
 					if 'size' in collection:
 						if not isinstance(collection['size'], int):
-							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) is not an integer", collection['contact'])) # TODO: add email
+							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) is not an integer", dir.getCollectionContact(collection['id'])['email']))
 						# check that the total numbers of samples is matching total number of samples in the fact table (donor's are not aggregable)
 						if collsFactsSamples < collection['size']:
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the total number of samples in facts table ({collsFactsSamples}) - maybe false positive due to anonymization", "Check size information of the collection description with the cummulated number from the facts table and correct as necessary", collection['contact'])) # TODO: add email
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the total number of samples in facts table ({collsFactsSamples}) - maybe false positive due to anonymization", "Check size information of the collection description with the cummulated number from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 						elif collsFactsSamples > collection['size']:
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the total number of samples in facts table ({collsFactsSamples})", "Check size information of the collection description with the cummulated number from the facts table and correct as necessary", collection['contact'])) # TODO: add email
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the total number of samples in facts table ({collsFactsSamples})", "Check size information of the collection description with the cummulated number from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 					else:
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) not provided", "Add size attribute to the collection", collection['contact'])) # TODO: add email
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, "Collection size attribute (number of samples) not provided", "Add size attribute to the collection", dir.getCollectionContact(collection['id'])['email']))
 
 					# check that if the DNA network, the fact table contains liquid materials from which DNA can be extracted (DNA, Peripheral blood cells, Whole Blood)
 					if 'network' in collection:
 						if BBMRICohortsDNANetworkName in collection_networks:
 							requiredMaterialTypes = ['DNA','WHOLE_BLOOD','PERIPHERAL_BLOOD_CELLS','BUFFY_COAT','CDNA','PLASMA','SERUM']
 							if not any(mat in collFactsMaterialTypes for mat in requiredMaterialTypes):
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does not contain any of the expected material types: {','.join(requiredMaterialTypes)})", collection['contact']))  # TODO: add email
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does not contain any of the expected material types: {','.join(requiredMaterialTypes)})", dir.getCollectionContact(collection['id'])['email']))
 
 							if 'NAV' in collFactsMaterialTypes:
-								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type", collection['contact']))  # TODO: add email
+								warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type", dir.getCollectionContact(collection['id'])['email']))
 			'''
 			else:
 				if 'network' in collection and (BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks):

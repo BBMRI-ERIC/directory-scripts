@@ -32,7 +32,7 @@ def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
 			return
 
 	# If we got here, the previous checks failed
-	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for commercial collaboration modes: collection[commercial_use] is {formatAttribute('commercial_use', collection)}, biobank[collaboration_commercial] is {formatAttribute('collaboration_commercial', biobank)}", "Check if this is true (that both are false): if so, remove the networks BBMRI Cohorts/BBMRI Cohorts DNA , otherwise correct the value of commercial availibility", collection['contact'])) # TODO: add email
+	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for commercial collaboration modes: collection[commercial_use] is {formatAttribute('commercial_use', collection)}, biobank[collaboration_commercial] is {formatAttribute('collaboration_commercial', biobank)}", "Check if this is true (that both are false): if so, remove the networks BBMRI Cohorts/BBMRI Cohorts DNA , otherwise correct the value of commercial availibility", dir.getCollectionContact(collection['id'])['email']))
 
 
 class BBMRICohorts(IPlugin):
@@ -103,7 +103,7 @@ class BBMRICohorts(IPlugin):
 							BBMRICohortsList.add(BBMRICohortsNetworkName)
 						if (BBMRICohortsDNANetworkName in collection_networks):
 							BBMRICohortsList.add(BBMRICohortsDNANetworkName)
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact'])) # TODO: add email
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", dir.getCollectionContact(collection['id'])['email']))
 				
 		for biobank in dir.getBiobanks():
 			biobank_networks = []
