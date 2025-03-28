@@ -9,7 +9,7 @@ import os
 import __main__ 
 
 from yapsy.IPlugin import IPlugin
-#from validate_email import validate_email
+from validate_email import validate_email
 from diskcache import Cache
 
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
