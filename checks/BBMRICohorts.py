@@ -79,31 +79,31 @@ class BBMRICohorts(IPlugin):
 				checkCollabBB(self, dir, collection, biobank, warnings)
 				
 				# Check presence of fact tables
-				if 'facts' in collection.keys(): # TODO: if not, raise an error?
-					if collection['facts'] != []:
-						
-						for fact in dir.getCollectionFacts(collection['id']):
+				if 'facts' in collection.keys() and collection['facts'] != []: # TODO: if not, raise an error? # EMX2 change
+					#if collection['facts'] != []:
+					
+					for fact in dir.getCollectionFacts(collection['id']):
 
-							if 'number_of_samples' in fact:
-								collsFactsSamples += fact['number_of_samples']
-							if 'number_of_donors' in fact:
-								collsFactsDonors += fact['number_of_donors']
-						
-						# TODO: should these check be generic and not just for BBMRI Cohorts?
-						if collsFactsSamples > 0 or collsFactsDonors > 0:
-							if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
-								log.info(f"Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
-							if BBMRICohortsNetworkName in biobank_networks or BBMRICohortsDNANetworkName in biobank_networks:
-								log.info(f"Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
+						if 'number_of_samples' in fact:
+							collsFactsSamples += fact['number_of_samples']
+						if 'number_of_donors' in fact:
+							collsFactsDonors += fact['number_of_donors']
+					
+					# TODO: should these check be generic and not just for BBMRI Cohorts?
+					if collsFactsSamples > 0 or collsFactsDonors > 0:
+						if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
+							log.info(f"Hooooray, we have found BBMRI Cohorts collection with the fact table populated: {collection['id']}")
+						if BBMRICohortsNetworkName in biobank_networks or BBMRICohortsDNANetworkName in biobank_networks:
+							log.info(f"Hooooray, we have found BBMRI Cohorts biobank with a collection with the fact table populated: {collection['id']}")
 
-					else:
-						if 'network' in collection and (BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks):
-							BBMRICohortsList = set()
-							if (BBMRICohortsNetworkName in collection_networks):
-								BBMRICohortsList.add(BBMRICohortsNetworkName)
-							if (BBMRICohortsDNANetworkName in collection_networks):
-								BBMRICohortsList.add(BBMRICohortsDNANetworkName)
-							warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact'])) # TODO: add email
+				else:
+					if 'network' in collection and (BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks):
+						BBMRICohortsList = set()
+						if (BBMRICohortsNetworkName in collection_networks):
+							BBMRICohortsList.add(BBMRICohortsNetworkName)
+						if (BBMRICohortsDNANetworkName in collection_networks):
+							BBMRICohortsList.add(BBMRICohortsDNANetworkName)
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact'])) # TODO: add email
 				
 		for biobank in dir.getBiobanks():
 			biobank_networks = []

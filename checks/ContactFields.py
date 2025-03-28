@@ -2,14 +2,14 @@
 
 import re
 import logging as log
-import DNS
+#import DNS
 import os
 
 # this is ugly and only for assertive programming
 import __main__ 
 
 from yapsy.IPlugin import IPlugin
-from validate_email import validate_email
+#from validate_email import validate_email
 from diskcache import Cache
 
 from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType

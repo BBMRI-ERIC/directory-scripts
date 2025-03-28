@@ -26,7 +26,8 @@ class Directory:
         if 'directory' in purgeCaches:
             cache.clear()
 
-        self.__directoryURL = "https://directory-acc.molgenis.net/"
+        #self.__directoryURL = "https://directory-acc.molgenis.net/"
+        self.__directoryURL = "https://directory.bbmri-eric.eu"
         log.info('Retrieving directory content from ' + self.__directoryURL)
         session = Client(self.__directoryURL, schema=schema)
         if username is not None and password is not None:
