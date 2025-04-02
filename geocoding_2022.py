@@ -24,10 +24,6 @@ from flatten_json import flatten
 # Internal
 from directory import Directory
 
-#import sys
-#sys.stdout.reconfigure(encoding='utf-8') # NOTE: Needed on Windows to redirect strout
-
-
 cachesList = ['directory', 'geocoding']
 
 #####################
@@ -76,6 +72,11 @@ if 'biobanksCountrySkip' in config['Skip country']:
     biobanksCountrySkip = config['Skip country']['biobanksCountrySkip'].split(',')
 else:
     biobanksCountrySkip = []
+
+if 'biobanksIDSkip' in config['Skip ID']:
+    biobanksIDSkip = config['Skip ID']['biobanksIDSkip'].split(',')
+else:
+    biobanksIDSkip = []
 
 ###############
 ## Functions ##
@@ -237,20 +238,25 @@ if args.printDf:
 # Iterate dataframe rows
 for index, biobank in filtered_df.iterrows():
 
-    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip:
+    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip and biobank['id'] not in biobanksIDSkip:
         biobankDict = {}
         # Biobank properties:
         biobankPropertiesDict = {}
         if 'biobankID' in biobankInputFeatures:
             biobankPropertiesDict['biobankID'] = biobank['id']
         if 'biobankSize' in biobankInputFeatures:
-            try:
-                # Get a list of column names for order of magnitude
-                collections_order_of_magnitude_id_columns = list(filtered_df.filter(regex='collections-[0-9]*-order_of_magnitude-id', axis=1).columns)
-                # Within those columns get the one with the maximum value
-                biobankPropertiesDict['biobankSize'] = int(biobank[collections_order_of_magnitude_id_columns].max())
-            except ValueError:
-                pass
+            OoM = []
+            # Get collections IDs:
+            collIDs = list(filtered_df.filter(regex='collections-[0-9]*-id', axis=1).columns)
+            for collID in collIDs:
+                if not isinstance(biobank[collID], float):
+                    # Within those columns get the one with the maximum value
+                    collection = dir.getCollectionById(biobank[collID])
+                    if collection and 'order_of_magnitude' in collection:
+                        OoM.append(int(collection['order_of_magnitude']))
+            if OoM:
+                biobankPropertiesDict['biobankSize'] = int(max(OoM))
+
         if 'biobankName' in biobankInputFeatures:
             biobankPropertiesDict['biobankName'] = biobank['name']
         if 'biobankType' in biobankInputFeatures:
@@ -306,7 +312,7 @@ for index, biobank in filtered_df.iterrows():
         #elif biobank['contact-_href']: #EMX2:
         elif biobank['contact-id']:
             personsContacts = dir.getContacts()
-            lookForCoordinatesFeatures = ['address', 'zip', 'city']
+            lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
             location = lookForCoordinates(biobank['contact-id'], personsContacts, lookForCoordinatesFeatures)
             if location:
                 biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
