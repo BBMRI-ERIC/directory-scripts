@@ -117,4 +117,4 @@ if not args.nostdout:
     warningContainer.dumpWarnings()
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
-    warningContainer.dumpWarningsXLSX(args.outputXLSX)
+    warningContainer.dumpWarningsXLSX(args.outputXLSX, True)
