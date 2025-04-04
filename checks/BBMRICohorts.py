@@ -32,7 +32,7 @@ def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
 			return
 
 	# If we got here, the previous checks failed
-	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for commercial collaboration modes: collection[commercial_use] is {formatAttribute('commercial_use', collection)}, biobank[collaboration_commercial] is {formatAttribute('collaboration_commercial', biobank)}", "Check if this is true (that both are false): if so, remove the networks BBMRI Cohorts/BBMRI Cohorts DNA , otherwise correct the value of commercial availibility", collection['contact']['email']))
+	warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection and biobank are not available for commercial collaboration modes: collection[commercial_use] is {formatAttribute('commercial_use', collection)}, biobank[collaboration_commercial] is {formatAttribute('collaboration_commercial', biobank)}", "Check if this is true (that both are false): if so, remove the networks BBMRI Cohorts/BBMRI Cohorts DNA , otherwise correct the value of commercial availibility", dir.getCollectionContact(collection['id'])['email']))
 
 
 class BBMRICohorts(IPlugin):
@@ -60,23 +60,27 @@ class BBMRICohorts(IPlugin):
 					collection_networks.append(n['id'])
 			
 			if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
-				OoM = collection['order_of_magnitude']['id']
+				#OoM = collection['order_of_magnitude']['id']  # EMX2 OoM does not have ID, then:
+				OoM = int(collection['order_of_magnitude'])
 				
 				data_categories = []
 				if 'data_categories' in collection:
 					for c in collection['data_categories']:
-						data_categories.append(c['id'])
+						#data_categories.append(c['id']) # EMX2 data_categories does not have ID, then:
+						data_categories.append(c)
 
 				types = []
 				if 'type' in collection:
 					for t in collection['type']:
-						types.append(t['id'])
+						#types.append(t['id']) # EMX2 types does not have ID, then:
+						types.append(t)
 
 				# Check commercial use
 				checkCollabBB(self, dir, collection, biobank, warnings)
 				
 				# Check presence of fact tables
-				if collection['facts'] != []:
+				if 'facts' in collection.keys() and collection['facts'] != []: # TODO: if not, raise an error? # EMX2 change
+					#if collection['facts'] != []:
 					
 					for fact in dir.getCollectionFacts(collection['id']):
 
@@ -99,7 +103,7 @@ class BBMRICohorts(IPlugin):
 							BBMRICohortsList.add(BBMRICohortsNetworkName)
 						if (BBMRICohortsDNANetworkName in collection_networks):
 							BBMRICohortsList.add(BBMRICohortsDNANetworkName)
-						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", collection['contact']['email']))
+						warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, f"Collection in BBMRI cohorts {BBMRICohortsList} but the fact table is missing", "Prepare the facts table for the collection and upload", dir.getCollectionContact(collection['id'])['email']))
 				
 		for biobank in dir.getBiobanks():
 			biobank_networks = []

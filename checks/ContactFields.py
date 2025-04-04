@@ -2,7 +2,7 @@
 
 import re
 import logging as log
-import DNS
+#import DNS
 import os
 
 # this is ugly and only for assertive programming

@@ -24,10 +24,6 @@ from flatten_json import flatten
 # Internal
 from directory import Directory
 
-#import sys
-#sys.stdout.reconfigure(encoding='utf-8') # NOTE: Needed on Windows to redirect strout
-
-
 cachesList = ['directory', 'geocoding']
 
 #####################
@@ -41,7 +37,7 @@ parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='de
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
 parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
 parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
-parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
+parser.add_argument('-P', '--package', dest='package', default='ERIC', help='MOLGENIS Package that contains the data (default ERIC).')
 parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
 parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 #parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
@@ -77,36 +73,63 @@ if 'biobanksCountrySkip' in config['Skip country']:
 else:
     biobanksCountrySkip = []
 
+if 'biobanksIDSkip' in config['Skip ID']:
+    biobanksIDSkip = config['Skip ID']['biobanksIDSkip'].split(',')
+else:
+    biobanksIDSkip = []
+
 ###############
 ## Functions ##
 ###############
 
-def lookForCoordinates(biobank, lookForCoordinatesFeatures):
+def lookForCoordinates(contactID, personsContacts, lookForCoordinatesFeatures):
     '''
     Look for coordinates based on biobank contact.
 
     NOTE: Address fails a lot, maybe only by first field? But the separator is not consistent.
     '''
-    lookBy = []
-    for locFeature in lookForCoordinatesFeatures:
-        if not pd.isna(biobank[locFeature]):
-                lookBy.append(biobank[locFeature])
-    location = geolocator.geocode(', '.join(lookBy))
-    if location:
-        log.debug('Coordinates from: '+ ', '.join(lookBy))
-        return location
-    # If location not found, remove specific fields and retain general ones.
-    else:
-        places = 1
-        while places<len(lookBy):
+    for contact in personsContacts:
+        if contact['id'] == contactID:
 
-            location = geolocator.geocode(', '.join(lookBy[places:len(lookBy)+1]))
-            
+            lookBy = []
+            for locFeature in lookForCoordinatesFeatures:
+                if locFeature in contact.keys():
+                        lookBy.append(contact[locFeature])
+            location = geolocator.geocode(', '.join(lookBy))
             if location:
-                log.debug('Coordinates from: '+ ', '.join(lookBy[places:len(lookBy)+1]))
+                log.debug('Coordinates from: '+ ', '.join(lookBy))
                 return location
-            places += 1
+            # If location not found, remove specific fields and retain general ones.
+            else:
+                places = 1
+                while places<len(lookBy):
 
+                    location = geolocator.geocode(', '.join(lookBy[places:len(lookBy)+1]))
+                    
+                    if location:
+                        log.debug('Coordinates from: '+ ', '.join(lookBy[places:len(lookBy)+1]))
+                        return location
+                    places += 1
+
+
+def dmm_to_dd(coord: str):
+    "Convert coordinates in DMM format to decimal degrees"
+    pattern = r'([NSWE])(\d+) (\d+\.\d+)'
+    match = re.match(pattern, coord)
+
+    if not match:
+        raise ValueError(f"Invalid coordinate format: {coord}")
+
+    direction, degrees, minutes = match.groups()
+
+    # Convert to decimal degrees
+    decimal_degrees = int(degrees) + float(minutes) / 60
+
+    # Apply negative sign for South and West coordinates
+    if direction in ['S', 'W']:
+        decimal_degrees *= -1
+
+    return decimal_degrees
 
 def disableSSLCheck():
     ctx = ssl.create_default_context()
@@ -135,9 +158,9 @@ def sendEmail(sender, receivers, message):
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
 if args.username is not None and args.password is not None:
-	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+	dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
-	dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+	dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 # Initialize main dictionary
 features = {}
@@ -215,25 +238,32 @@ if args.printDf:
 # Iterate dataframe rows
 for index, biobank in filtered_df.iterrows():
 
-    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip:
+    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip and biobank['id'] not in biobanksIDSkip:
         biobankDict = {}
         # Biobank properties:
         biobankPropertiesDict = {}
         if 'biobankID' in biobankInputFeatures:
             biobankPropertiesDict['biobankID'] = biobank['id']
         if 'biobankSize' in biobankInputFeatures:
-            try:
-                # Get a list of column names for order of magnitude
-                collections_order_of_magnitude_id_columns = list(filtered_df.filter(regex='collections-[0-9]*-order_of_magnitude-id', axis=1).columns)
-                # Within those columns get the one with the maximum value
-                biobankPropertiesDict['biobankSize'] = int(biobank[collections_order_of_magnitude_id_columns].max())
-            except ValueError:
-                pass
+            OoM = []
+            # Get collections IDs:
+            collIDs = list(filtered_df.filter(regex='collections-[0-9]*-id', axis=1).columns)
+            for collID in collIDs:
+                if not isinstance(biobank[collID], float):
+                    # Within those columns get the one with the maximum value
+                    collection = dir.getCollectionById(biobank[collID])
+                    if collection and 'order_of_magnitude' in collection:
+                        OoM.append(int(collection['order_of_magnitude']))
+            if OoM:
+                biobankPropertiesDict['biobankSize'] = int(max(OoM))
+
         if 'biobankName' in biobankInputFeatures:
             biobankPropertiesDict['biobankName'] = biobank['name']
         if 'biobankType' in biobankInputFeatures:
             biobankPropertiesDict['biobankType'] = 'biobank' ### DEFAULT
-
+        # TODO: Check this
+        biobankCOVID = []
+        '''
         if 'covid19biobank' in biobankInputFeatures and 'capabilities' in biobank.keys():
             biobankCOVID = []
             # For each capabilities-_href column, look for covid19 information and store it in the dictionary:
@@ -246,7 +276,7 @@ for index, biobank in filtered_df.iterrows():
                         biobankCOVIDDict['name']=biobank['capabilities-'+str(idx)+'-label']
                         biobankCOVID.append(biobankCOVIDDict)
             biobankPropertiesDict['biobankCOVID'] = biobankCOVID
-
+        '''
         #New 0106
         network_columns = list(filtered_df.filter(regex='network-[0-9]*-_href', axis=1).columns)
         if not biobankCOVID and 'COVID19' in str(biobank[network_columns].values):
@@ -274,12 +304,16 @@ for index, biobank in filtered_df.iterrows():
             #if '°' in biobank['longitude'] or '°' in biobank['latitude'] or '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
             if any(x in biobank['longitude'] for x in dmsSymbols) or any(x in biobank['latitude'] for x in dmsSymbols):
                 biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
+            elif any(i in biobank['longitude'] for i in ['N', 'E', 'S', 'W']) or any(i in biobank['latitude'] for i in ['N', 'E', 'S', 'W']):
+                biobankGeometryDict['coordinates'] = [dmm_to_dd(biobank['longitude']), dmm_to_dd(biobank['latitude'])]
             else:
                 biobankGeometryDict['coordinates'] = [float(re.sub(r',', r'.', biobank['longitude'])), float(re.sub(r',', r'.', biobank['latitude']))]
             log.info(biobank['name'] + ': Coordinates provided')
-        elif biobank['contact-_href']:
-            lookForCoordinatesFeatures = ['contact-address', 'contact-zip', 'contact-city', 'contact-country-name']
-            location = lookForCoordinates(biobank, lookForCoordinatesFeatures)
+        #elif biobank['contact-_href']: #EMX2:
+        elif biobank['contact-id']:
+            personsContacts = dir.getContacts()
+            lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
+            location = lookForCoordinates(biobank['contact-id'], personsContacts, lookForCoordinatesFeatures)
             if location:
                 biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
                 log.info(biobank['name'] + ": geodecoding done ")
