@@ -18,14 +18,8 @@ def compareFactsColl(self, dir, factsList, collList, collection, errorDescriptio
 
 def compareAge(self, dir, factAges : set, factsAgeUnits : set, collection, warningsList):
 	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
-	collUnits = set()
-	collUnitsAdapt = set()
-	# gather coll age units
-	for collAUnit in collection['age_unit']:
-		collUnits.add(collAUnit)
-		{i.lower() + 's' for i in collUnits}
-		collUnitsAdapt = {i.lower() + 's' for i in collUnits}
-	if sorted(collUnitsAdapt) != sorted(factsAgeUnits):
+	collUnitsAdapt = collection['age_unit'].lower() + 's'
+	if collUnitsAdapt != str((',').join(sorted(factsAgeUnits))):
 		warningsList.append(DataCheckWarning(self.__class__.__name__, "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 	else:
 		# Comparison of numbers
@@ -138,7 +132,7 @@ class FactTables(IPlugin):
 					# check that the fact table contains all the age ranges and biological sex that are described in the collection
 					# TODO: age range check needs to be reimplemented - it can't be done as a comparison of arrays as the collection-level information is provided as a min/max age
 					# NOTE: half way implemented. Missing: deal with negative ages and Unknown (we do not have such cases for now, but will be needed)
-					if 'age_unit' in collection.keys(): # TODO: if not, raise a warning?
+					if 'age_unit' in collection.keys() and ageUnits: # TODO: if not, raise a warning?
 						compareAge(self, dir, ages, ageUnits, collection, warnings)
 
 					#compareFactsColl(self, dir, collFactsAgeGroups, collAges, collection, "Age ranges of collection and facts table do not match", warnings)
