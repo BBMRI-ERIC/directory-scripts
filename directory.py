@@ -289,6 +289,10 @@ class Directory:
         collection = self.directoryGraph.nodes[collectionID]['data']
         return self.contactHashmap[collection['contact']['id']]
 
+    def getBiobankContact(self, biobankID : str):
+        biobank = self.directoryGraph.nodes[biobankID]['data']
+        return self.contactHashmap[biobank['contact']['id']]
+
     def isTopLevelCollection(self, collectionID : str):
         collection = self.directoryGraph.nodes[collectionID]['data']
         return not 'parent_collection' in collection
