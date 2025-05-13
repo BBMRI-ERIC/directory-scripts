@@ -11,6 +11,8 @@ import os.path
 
 
 from yapsy.PluginManager import PluginManager
+from yapsy.IPlugin import IPlugin
+import inspect
 
 from customwarnings import DataCheckWarning
 from warningscontainer import WarningsContainer
@@ -32,7 +34,22 @@ class ExtendAction(argparse.Action):
         items.extend(values)
         setattr(namespace, self.dest, items)
 
-simplePluginManager = PluginManager()
+
+class SafePluginManager(PluginManager):
+    def isCorrectPlugin(self, candidate, category_name):
+        try:
+            module = candidate.load()
+            for element in vars(module).values():
+                if inspect.isclass(element) and issubclass(element, self.categories_interfaces[category_name]):
+                    return True
+            return False
+        except Exception:
+            return False
+
+log.getLogger('yapsy').setLevel(log.INFO)
+
+#simplePluginManager = PluginManager()
+simplePluginManager = SafePluginManager(categories_filter={"Default": IPlugin})
 simplePluginManager.setPluginPlaces(["checks"])
 simplePluginManager.collectPlugins()
 
