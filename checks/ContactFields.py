@@ -71,7 +71,7 @@ class ContactFields(IPlugin):
 						log.error(log_message)
 
 			if(not 'phone' in contact or re.search('^\s*$', contact['phone'])):
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Missing phone for contact ('phone' attribute is empty'"))
+				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, "Missing phone for contact ('phone' attribute is empty)"))
 			elif(not re.search('^\+(?:[0-9]??){6,14}[0-9]$', contact['phone'])):
 				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, "Phone number for contact does not conform to the E.123 international standard (means starts with + sign, no spaces) - offending phone number in 'phone' attribute: " + contact['phone']))
 		return warnings
