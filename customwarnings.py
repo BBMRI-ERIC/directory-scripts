@@ -17,13 +17,14 @@ class DataCheckEntityType(Enum):
 
 class DataCheckWarning:
 
-    def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, directoryEntityType : DataCheckEntityType, message : str, action : str = '', emailTo : str = ''):
+    def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, directoryEntityType : DataCheckEntityType, directoryEntityWithdrawn : str, message : str, action : str = '', emailTo : str = ''):
         self.dataCheckID = dataCheckID
         self.recipients = recipients
         self.NN = NN
         self.level = level
         self.directoryEntityID = directoryEntityID
         self.directoryEntityType = directoryEntityType
+        self.directoryEntityWithdrawn = directoryEntityWithdrawn
         self.message = message
         self.action = action
         self.emailTo = emailTo

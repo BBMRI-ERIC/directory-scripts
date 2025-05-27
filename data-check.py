@@ -117,4 +117,10 @@ if not args.nostdout:
     warningContainer.dumpWarnings()
 if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
-    warningContainer.dumpWarningsXLSX(args.outputXLSX, True)
+    allBiobanks = {}
+    allCollections = {}
+    for biobank in dir.getBiobanks():
+        allBiobanks[biobank['id']] = str(biobank['withdrawn'])
+    for collection in dir.getCollections():
+        allCollections[collection['id']] = str(collection['withdrawn'])
+    warningContainer.dumpWarningsXLSX(args.outputXLSX, allBiobanks, allCollections, True)
