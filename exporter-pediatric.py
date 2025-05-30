@@ -84,32 +84,32 @@ for collection in dir.getCollections():
     biobank_capabilities = []
     if 'capabilities' in biobank:
         for c in biobank['capabilities']:
-            biobank_capabilities.append(c['id'])
+            biobank_capabilities.append(c)
     biobank_covid = []
     if 'covid19biobank' in biobank:
         for c in biobank['covid19biobank']:
-            biobank_covid.append(c['id'])
+            biobank_covid.append(c)
     biobank_networks = []
     if 'network' in biobank:
         for n in biobank['network']:
             biobank_networks.append(n['id'])
 
-    OoM = collection['order_of_magnitude']['id']
+    OoM = collection['order_of_magnitude']
 
     materials = []
     if 'materials' in collection:
         for m in collection['materials']:
-            materials.append(m['id'])
+            materials.append(m)
 
     data_categories = []
     if 'data_categories' in collection:
         for c in collection['data_categories']:
-            data_categories.append(c['id'])
+            data_categories.append(c)
 
     types = []
     if 'type' in collection:
         for t in collection['type']:
-            types.append(t['id'])
+            types.append(t)
     log.debug("Types: " + str(types))
 
     diags = []
@@ -119,16 +119,17 @@ for collection in dir.getCollections():
     cancer_prospective = False
     non_cancer = False
 
-    for d in collection['diagnosis_available']:
-        if re.search('-', d['id']):
-            diag_ranges.append(d['id'])
-        else:
-            diags.append(d['id'])
+    if 'diagnosis_available' in collection:
+        for d in collection['diagnosis_available']:
+            if re.search('-', d['name']):
+                diag_ranges.append(d['name'])
+            else:
+                diags.append(d['name'])
 
-    if diag_ranges:
-        log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
+        if diag_ranges:
+            log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
 
-    log.debug(str(collection['diagnosis_available']))
+        log.debug(str(collection['diagnosis_available']))
 
     for d in diags + diag_ranges:
         if re.search(r'^urn:miriam:icd:', d):
@@ -181,7 +182,7 @@ for collection in dir.getCollections():
         if len(age_units) < 1:
             log.warning("Age units missing for %s"%(collection['id']))
         else:
-            age_unit = age_units[0]['id']
+            age_unit = age_units[0]
 
     age_max = 18
     if age_unit == "MONTH":

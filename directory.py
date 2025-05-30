@@ -7,7 +7,7 @@ import networkx as nx
 from diskcache import Cache
 from molgenis_emx2_pyclient import Client
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
 
 class Directory:
