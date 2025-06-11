@@ -85,6 +85,11 @@ for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
     biobankId = dir.getCollectionBiobankId(collection['id'])
     biobank = dir.getBiobankById(biobankId)
+
+    # Add contact info
+    if 'contact' in collection:
+        collection['contact'] = dir.getContact(collection['contact']['id'])
+
     biobank_capabilities = []
     if 'capabilities' in biobank:
         for c in biobank['capabilities']:
@@ -98,38 +103,40 @@ for collection in dir.getCollections():
         for n in biobank['network']:
             biobank_networks.append(n['id'])
 
-    OoM = collection['order_of_magnitude']['id']
+    OoM = int(collection['order_of_magnitude'])
 
     materials = []
     if 'materials' in collection:
         for m in collection['materials']:
-            materials.append(m['id'])
+            materials.append(m)
 
     data_categories = []
     if 'data_categories' in collection:
         for c in collection['data_categories']:
-            data_categories.append(c['id'])
+            data_categories.append(c)
 
     types = []
     if 'type' in collection:
         for t in collection['type']:
-            types.append(t['id'])
+            types.append(t)
     log.debug("Types: " + str(types))
 
     diags = []
     diag_ranges = []
     obesity = False
 
-    for d in collection['diagnosis_available']:
-        if re.search('-', d['id']):
-            diag_ranges.append(d['id'])
-        else:
-            diags.append(d['id'])
+    if 'diagnosis_available' in collection:
+        for d in collection['diagnosis_available']:
+            if re.search('-', d['name']):
+                diag_ranges.append(d['name'])
+            else:
+                diags.append(d['name'])
+
+        log.debug(str(collection['diagnosis_available']))
 
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
 
-    log.debug(str(collection['diagnosis_available']))
 
     for d in diags + diag_ranges:
         if re.search(r'^urn:miriam:icd:', d):
@@ -161,7 +168,7 @@ for collection in dir.getCollections():
         if len(age_units) < 1:
             log.warning("Age units missing for %s"%(collection['id']))
         else:
-            age_unit = age_units[0]['id']
+            age_unit = age_units[0]
 
     age_max = 18
     if age_unit == "MONTH":
@@ -188,7 +195,7 @@ for collection in dir.getCollections():
                 pediatric = True
             if 'age_high' in collection and collection['age_high'] < age_max:
                 pediatricOnly = True
-                log.debug("Pediatric-only collection detected: %s, age range: %d-%d, diags: %s"%(collection['id'], collection.get('age_low'), collection.get('age_high'), diags + diag_ranges))
+                log.debug("Pediatric-only collection detected: %s, age high: %d, diags: %s"%(collection['id'], collection.get('age_high'), diags + diag_ranges))
 
     if pediatricOnly and obesity:
         log.info(f"Pediatric-only collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
@@ -264,4 +271,4 @@ if args.outputXLSX is not None:
     pd_collectionsPediatricOnlyObesityDiagnosed.to_excel(writer, sheet_name='Pediatric-only obesity')
     pd_collectionsPediatricObesityDiagnosed.to_excel(writer, sheet_name='Pediatric obesity')
     pd_collectionsObesityDiagnosed.to_excel(writer, sheet_name='Obesity')
-    writer.save()
+    writer.close()
