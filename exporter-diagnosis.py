@@ -96,22 +96,22 @@ for collection in dir.getCollections():
         for n in biobank['network']:
             biobank_networks.append(n['id'])
 
-    OoM = collection['order_of_magnitude']['id']
+    OoM = int(collection['order_of_magnitude'])
 
     materials = []
     if 'materials' in collection:
         for m in collection['materials']:
-            materials.append(m['id'])
+            materials.append(m)
 
     data_categories = []
     if 'data_categories' in collection:
         for c in collection['data_categories']:
-            data_categories.append(c['id'])
+            data_categories.append(c)
 
     types = []
     if 'type' in collection:
         for t in collection['type']:
-            types.append(t['id'])
+            types.append(t)
     log.debug("Types: " + str(types))
 
     diags = []
@@ -121,15 +121,16 @@ for collection in dir.getCollections():
     cancer_prospective = False
     non_cancer = False
 
-    for d in collection['diagnosis_available']:
-        if re.search('-', d['id']):
-            diag_ranges.append(d['id'])
-        else:
-            diags.append(d['id'])
+    if 'diagnosis_available' in collection:
+        for d in collection['diagnosis_available']:
+            if re.search('-', d['name']):
+                diag_ranges.append(d['name'])
+            else:
+                diags.append(d['name'])
+
+        log.debug(str(collection['diagnosis_available']))
 
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
-
-    log.debug(str(collection['diagnosis_available']))
 
 
