@@ -60,7 +60,7 @@ for biobank in dir.getBiobanks():
     biobankId = biobank['id']
     try:
         biobankJuridicalPerson = biobank['juridical_person']
-        biobankCountry = biobank['country']['id']
+        biobankCountry = biobank['country']
         if not biobankCountry in countryInstitutions:
             countryInstitutions[biobankCountry] = set()
         log.debug(f"Biobank {biobankId} from institution {biobankJuridicalPerson} added to country {biobankCountry}")
@@ -82,4 +82,4 @@ if args.outputXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
     pd_countryInstitutions.to_excel(writer, sheet_name='Institutions')
-    writer.save()
+    writer.close()
