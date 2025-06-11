@@ -79,6 +79,9 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
         log.debug("Analyzing collection " + collection['id'])
         biobankId = dir.getCollectionBiobankId(collection['id'])
         biobank = dir.getBiobankById(biobankId)
+        
+        if 'contact' in collection:
+            collection['contact'] = dir.getContact(collection['contact']['id'])
 
         collection_withdrawn = False
         if 'withdrawn' in collection and collection['withdrawn']:
@@ -106,32 +109,31 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
             for n in biobank['network']:
                 biobank_networks.append(n['id'])
 
-        OoM = collection['order_of_magnitude']['id']
+        OoM = int(collection['order_of_magnitude'])
         # OoM Donors
         try:
-            OoMDonors = collection['order_of_magnitude_donors']['id']
+            OoMDonors = int(collection['order_of_magnitude_donors'])
         except KeyError:
             OoMDonors = None
 
         materials = []
         if 'materials' in collection:
             for m in collection['materials']:
-                materials.append(m['id'])
+                materials.append(m)
 
         data_categories = []
         if 'data_categories' in collection:
             for c in collection['data_categories']:
-                data_categories.append(c['id'])
+                data_categories.append(c)
 
         types = []
         if 'type' in collection:
             for t in collection['type']:
-                types.append(t['id'])
+                types.append(t)
         log.debug("Types: " + str(types))
 
-
-        if biobank['country']['id'] != 'EU':
-            allCountries.add(biobank['country']['id'])
+        if biobank['country'] != 'EU':
+            allCountries.add(biobank['country'])
         allCollections.append(collection)
         allBiobanks.add(biobankId)
         #if 'size' in collection and isinstance(collection['size'], int) and dir.isTopLevelCollection(collection['id']):
@@ -157,6 +159,8 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
 def analyseBBs():
     for biobank in dir.getBiobanks():
         biobankId = biobank['id']
+        if 'contact' in biobank:
+            biobank['contact'] = dir.getContact(biobank['contact']['id'])
         log.debug("Analyzing biobank " + biobankId)
         if not biobankId in allBiobanks and not biobankId in withdrawnBiobanks:
             log.info("   Biobank without any collection identified: " + biobankId)

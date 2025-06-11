@@ -20,19 +20,27 @@ def extractContactDetails (df : pd.DataFrame):
 def linearizeStructures (df : pd.DataFrame, rules : list):
     for (col, attr) in rules:
         if col in df:
-            df[col] = df[col].map(lambda v: ",".join(map(lambda x: x[attr] if type(x) is dict and attr in x else x, (v if type(v) is list else [v]))) if v and (type(v) is dict or type(v) is list) else "")
+            #df[col] = df[col].map(lambda v: ",".join(map(lambda x: x[attr] if type(x) is dict and attr in x else x, (v if type(v) is list else [v]))) if v and (type(v) is dict or type(v) is list) else "")
+            # Allow those values that do not have id:
+            df[col] = df[col].map(lambda v: ",".join(str(x.get(attr, '')) if isinstance(x, dict) and attr else str(x) for x in (v if isinstance(v, list) else [v])) if v else "")
 
 def tidyCollectionDf (df : pd.DataFrame):
     assert isinstance(df, pd.DataFrame)
-    linearizeStructures(df, [('country','id'),('biobank','name'),('network','name'),('parent_collection','id')])
+    linearizeStructures(df, [('country',''),('biobank','name'),('network','name'),('parent_collection','id')])
     for col in ('order_of_magnitude','order_of_magnitude_donors'):
         if col in df:
             df[col] = df[col].map(lambda x: "%d (%s)"%(x['id'],x['size']) if type(x) is dict else x)
-    for col in ('type','also_known','data_categories','quality','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures','sub_collections','data_use'):
+    for col in ('type','data_categories','categories','sex','age_unit','body_part_examined','imaging_modality','image_dataset_type','materials','storage_temperatures', 'data_use','access_fee','access_joint_project','combined_quality','sop'):
         if col in df:
-            df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) )
+            df[col] = df[col].map(lambda x: ",".join([e for e in x]) if isinstance(x, list) else x)
+    for col in ('also_known','quality','sub_collections','combined_network','studies'):
+        if col in df:
+            df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) if isinstance(x, list) else x)
     if 'diagnosis_available' in df:
-        df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['id']) for e in x]) )
+        df['diagnosis_available'] = df['diagnosis_available'].map(lambda x: ",".join([re.sub('^urn:miriam:icd:','',e['name']) for e in x]) if isinstance(x, list) else x)
+    for col in ('national_node','head'): # Get values from dictionaries that are dict
+        if col in df:
+            df[col] = df[col].map(lambda x: ",".join([x['id']]) if isinstance(x, dict) else x)
     extractContactDetails(df)
     df.sort_values(by=['country','id'],ascending=True,inplace=True)
 
@@ -43,6 +51,12 @@ def tidyBiobankDf (df : pd.DataFrame):
     for col in ['it_support_available', 'it_staff_size', 'is_available', 'his_available', 'partner_charter_signed', 'collections','contact']:
         if col in df:
             del df[col]
+    for col in ('national_node','head'): # Get values from dictionaries that are not lists
+        if col in df:
+            df[col] = df[col].map(lambda x: ",".join([x['id']]) if isinstance(x, dict) else x)
+    for col in ['also_known']:
+        if col in df:
+            df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) if isinstance(x, list) else x)
     assert isinstance(df, pd.DataFrame)
     df.sort_values(by=['country','id'],ascending=True,inplace=True)
             
