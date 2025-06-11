@@ -2,18 +2,14 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
 import pprint
-import re
 import argparse
 import logging as log
 from builtins import str, isinstance, len, set, int
 from typing import List
-import json
 
 import pandas as pd
 
 from directory import Directory
-from orphacodes import OrphaCodes
-from icd10codeshelper import ICD10CodesHelper
 import pddfutils
 
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
@@ -96,41 +92,12 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
         if collection_withdrawn:
             continue
 
-        biobank_capabilities = []
-        if 'capabilities' in biobank:
-            for c in biobank['capabilities']:
-                biobank_capabilities.append(c['id'])
-        biobank_covid = []
-        if 'covid19biobank' in biobank:
-            for c in biobank['covid19biobank']:
-                biobank_covid.append(c['id'])
-        biobank_networks = []
-        if 'network' in biobank:
-            for n in biobank['network']:
-                biobank_networks.append(n['id'])
-
         OoM = int(collection['order_of_magnitude'])
         # OoM Donors
         try:
             OoMDonors = int(collection['order_of_magnitude_donors'])
         except KeyError:
             OoMDonors = None
-
-        materials = []
-        if 'materials' in collection:
-            for m in collection['materials']:
-                materials.append(m)
-
-        data_categories = []
-        if 'data_categories' in collection:
-            for c in collection['data_categories']:
-                data_categories.append(c)
-
-        types = []
-        if 'type' in collection:
-            for t in collection['type']:
-                types.append(t)
-        log.debug("Types: " + str(types))
 
         if biobank['country'] != 'EU':
             allCountries.add(biobank['country'])
