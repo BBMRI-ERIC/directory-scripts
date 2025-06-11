@@ -266,4 +266,4 @@ if args.outputXLSX is not None:
     writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
     pd_pediatricExistingDiagnosed.to_excel(writer, sheet_name='Pediatric')
     pd_pediatricOnlyExistingDiagnosed.to_excel(writer, sheet_name='Pediatric-only')
-    writer.save()
+    writer.close()
