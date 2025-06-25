@@ -42,11 +42,16 @@ parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_cons
                     help='disable all long remote checks (email address testing, geocoding, URLs')
 parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList,
                     help='disable particular long remote checks')
-parser.add_argument('-F', '--filter-coll-type', dest='filterCollType', nargs=1,
-                    help='filter by the collection type provided as parameter (only one type allowed)')
-parser.set_defaults(disableChecksRemote=[], disablePlugins=[], purgeCaches=[])
+parser.add_argument('-FCT', '--filter-coll-type', dest='filterCollType', nargs='+', action='extend',
+                    help='filter by the collection types in the data model, each of them between quotes ("") and separated by a space. E.g.: -FCT "CASE_CONTROL" "LONGITUDINAL" "DISEASE_SPECIFIC"') # TODO: Till now it uses the terms from the data model, different from the ones displayed in Directory
+parser.add_argument('-FMT', '--filter-material-type', dest='filterMatType', nargs='+', action='extend',
+                    help='filter by the material types in the data model, each of them between quotes ("") and separated by a space. E.g.: -FCT "SERUM" "SAMPLE"') # TODO: Till now it uses the terms from the data model, different from the ones displayed in Directory
+
+
+parser.set_defaults(disableChecksRemote=[], disablePlugins=[], purgeCaches=[], filterCollType=[], filterMatType=[])
 args = parser.parse_args()
-filterCollType = args.filterCollType[0] if args.filterCollType else None #NOTE: only one type accepted for now
+filterCollType = args.filterCollType
+filterMatType = args.filterMatType
 
 if args.debug:
     log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
@@ -159,12 +164,23 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-if filterCollType:
+if filterCollType and filterMatType:
     for collection in dir.getCollections():
         if 'parent_collection' in collection:
             continue
-        if filterCollType in str(collection['type']):
+        if 'materials' in collection and any(t in collection['type'] for t in filterCollType) and any(m in collection['materials'] for m in filterMatType):
             targetColls.append(collection)
+    allCollections, withdrawnCollections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM, allBiobanks = analyseCollections(targetColls, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM)
+elif filterCollType or filterMatType:
+    for collection in dir.getCollections():
+        if 'parent_collection' in collection:
+            continue
+        if 'materials' in collection:
+            if any(t in collection['type'] for t in filterCollType) or any(m in collection['materials'] for m in filterMatType):
+                targetColls.append(collection)
+        else:
+            if any(t in collection['type'] for t in filterCollType):
+                targetColls.append(collection)
     allCollections, withdrawnCollections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM, allBiobanks = analyseCollections(targetColls, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM)
 else:
     for collection in dir.getCollections():
