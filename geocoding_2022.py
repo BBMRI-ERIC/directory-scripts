@@ -238,7 +238,7 @@ if args.printDf:
 # Iterate dataframe rows
 for index, biobank in filtered_df.iterrows():
 
-    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip and biobank['id'] not in biobanksIDSkip:
+    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip and biobank['id'] not in biobanksIDSkip and biobank['withdrawn'] == False:
         biobankDict = {}
         # Biobank properties:
         biobankPropertiesDict = {}
