@@ -126,6 +126,11 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
         else:
             if dir.isTopLevelCollection(collection['id']) and OoMDonors:
                 allCollectionDonorsIncOoM += int(10 ** OoMDonors)
+
+        # Print also the Directory URL:
+        if not 'directoryURL' in collection:
+            collection['directoryURL'] = 'https://directory.bbmri-eric.eu/ERIC/directory/#/collection/' + collection['id']
+
     return allCollections, withdrawnCollections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM, allBiobanks
 
 def analyseBBs():
