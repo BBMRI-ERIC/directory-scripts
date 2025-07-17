@@ -50,6 +50,10 @@ class Directory:
             end_time = time.perf_counter()
             log.info(f'   ... retrieved {len(self.biobanks)} biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... retrieving collections')
+
+        self.qualBBtable = session.get(table = 'QualityInfoBiobanks', as_df= True)
+        self.qualColltable = session.get(table = 'QualityInfoCollections', as_df= True)
+        
         if 'collections' in cache:
             self.collections = cache['collections']
             log.info(f'   ... retrieved {len(self.collections)} collections from cache')
@@ -252,6 +256,12 @@ class Directory:
 
     def getBiobanks(self):
         return self.biobanks
+    
+    def getQualBB(self):
+        return self.qualBBtable
+    
+    def getQualColl(self):
+        return self.qualColltable
 
     def getBiobankById(self, biobankId : str):
         for b in self.biobanks:
