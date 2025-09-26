@@ -1,0 +1,9 @@
+[Core]
+Name = Check that subcollections belong to the same network as their parent collections
+Module = SubcollectionNetworkMembership
+
+[Documentation]
+Author = Hessel Haagsma
+Version = 1.0
+Description = Check that subcollections belong to the same network as their parent collections
+
