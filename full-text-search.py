@@ -96,8 +96,9 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
     def getAlsoKnown(entity):
         # TODO: this is a temporary hack - also_known needs to be properly handled by the Directory class and made accessible here
         also_known = []
-        for ak in entity.get('also_known'):
-            also_known.append(ak["id"])
+        if entity.get('also_known'):
+            for ak in entity.get('also_known'):
+                also_known.append(ak["id"])
         if also_known:
             return("\n".join(also_known))
         else:
