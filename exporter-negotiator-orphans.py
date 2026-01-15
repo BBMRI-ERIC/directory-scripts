@@ -158,6 +158,10 @@ for collection in dir.getCollections():
     biobank_id = collection['biobank']['id']
     biobank_to_collections.setdefault(biobank_id, []).append(collection_id)
 
+biobank_map_all = {}
+for biobank in dir.getBiobanks():
+    biobank_map_all[biobank['id']] = biobank
+
 for collection_id in collection_map_active:
     if collection_id not in rows_by_collection:
         log.warning("Collection %s not found in input XLSX", collection_id)
@@ -227,6 +231,12 @@ for collection_id, row in rows_by_collection.items():
         result['parent_collection'] = collection['parent_collection']['id']
     nn_code = get_nn_for_collection(collection_id, collection)
     if collection:
+        if collection.get('withdrawn'):
+            log.warning("Withdrawn collection %s present in output input set", collection_id)
+        biobank_id = collection['biobank']['id']
+        biobank = biobank_map_all.get(biobank_id)
+        if biobank and biobank.get('withdrawn'):
+            log.warning("Collection %s belongs to withdrawn biobank %s and is present in output input set", collection_id, biobank_id)
         country_code = dir.getCollectionNN(collection_id)
     else:
         country_code = get_country_code_from_id(collection_id)
@@ -285,6 +295,22 @@ if not df_output.empty:
         inplace=True,
     )
 
+output_collection_ids = {row['resource_source_id'] for row in output_rows}
+for collection_id in collection_map_active:
+    if collection_id not in output_collection_ids:
+        log.warning("Directory collection %s not present in output", collection_id)
+
+output_biobank_ids = set()
+for collection_id in output_collection_ids:
+    collection = collection_map_all.get(collection_id)
+    if collection:
+        output_biobank_ids.add(collection['biobank']['id'])
+for biobank_id, biobank in biobank_map_all.items():
+    if biobank.get('withdrawn'):
+        continue
+    if biobank_id not in output_biobank_ids:
+        log.warning("Active Directory biobank %s not present in output", biobank_id)
+
 if not args.nostdout:
     print(df_output.to_csv(sep="\t", index=False))
 
@@ -326,4 +352,33 @@ if args.outputXLSX:
     if not df_biobanks.empty:
         df_biobanks.sort_values(by=['country_code', 'biobank_id'], inplace=True)
     df_biobanks.to_excel(writer, sheet_name='biobanks_summary', index=False)
+    if not df_biobanks.empty:
+        nn_groups = []
+        for nn, group in df_biobanks.groupby('nn'):
+            nn_groups.append({
+                'nn': nn,
+                'sum_biobanks': len(group),
+                'sum_biobanks_without_missing_reps': int((group['collections_without_reps'] == 0).sum()),
+                'sum_biobanks_missing_and_with_reps': int(((group['collections_without_reps'] != 0) & (group['collections_with_reps'] != 0)).sum()),
+                'sum_biobanks_without_reps': int((group['collections_with_reps'] == 0).sum()),
+                'sum_collections_with_reps': int(group['collections_with_reps'].sum()),
+                'sum_collections_without_reps': int(group['collections_without_reps'].sum()),
+                'sum_collections_auto_by_biobank': int(group['collections_auto_by_biobank'].sum()),
+                'sum_collections_auto_by_parent': int(group['collections_auto_by_parent'].sum()),
+            })
+        df_nn = pd.DataFrame(nn_groups)
+        df_nn.sort_values(by=['nn'], inplace=True)
+        totals = {
+            'nn': 'TOTAL',
+            'sum_biobanks': int(df_biobanks.shape[0]),
+            'sum_biobanks_without_missing_reps': int((df_biobanks['collections_without_reps'] == 0).sum()),
+            'sum_biobanks_missing_and_with_reps': int(((df_biobanks['collections_without_reps'] != 0) & (df_biobanks['collections_with_reps'] != 0)).sum()),
+            'sum_biobanks_without_reps': int((df_biobanks['collections_with_reps'] == 0).sum()),
+            'sum_collections_with_reps': int(df_biobanks['collections_with_reps'].sum()),
+            'sum_collections_without_reps': int(df_biobanks['collections_without_reps'].sum()),
+            'sum_collections_auto_by_biobank': int(df_biobanks['collections_auto_by_biobank'].sum()),
+            'sum_collections_auto_by_parent': int(df_biobanks['collections_auto_by_parent'].sum()),
+        }
+        df_nn = pd.concat([pd.DataFrame([totals]), df_nn], ignore_index=True)
+        df_nn.to_excel(writer, sheet_name='nn_summary', index=False)
     writer.close()
