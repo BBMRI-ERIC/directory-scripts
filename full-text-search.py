@@ -9,6 +9,7 @@ import argparse
 import logging as log
 import time
 from typing import List
+import os
 import os.path
 
 from directory import Directory
@@ -18,6 +19,7 @@ from whoosh.fields import *
 from whoosh.analysis import *
 from whoosh.query import *
 from whoosh.support.charset import accent_map
+from whoosh.util import filelock
 
 cachesList = ['directory', 'index']
 typeList = ['COLLECTION', 'BIOBANK', 'CONTACT', 'NETWORK']
@@ -56,11 +58,52 @@ else:
 
 indexdir = "indexdir"
 
+def _patch_whoosh_lockf():
+    try:
+        import fcntl  # type: ignore
+    except Exception:
+        return
+
+    class LockfLock(filelock.LockBase):
+        def acquire(self, blocking=False):
+            flags = os.O_CREAT | os.O_WRONLY
+            self.fd = os.open(self.filename, flags)
+            mode = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
+            try:
+                fcntl.lockf(self.fd, mode)
+                self.locked = True
+                return True
+            except OSError:
+                os.close(self.fd)
+                self.fd = None
+                return False
+
+        def release(self):
+            if self.fd is None:
+                raise Exception("Lock was not acquired")
+            fcntl.lockf(self.fd, fcntl.LOCK_UN)
+            os.close(self.fd)
+            self.fd = None
+
+    filelock.FcntlLock = LockfLock
+    filelock.FileLock = LockfLock
+    try:
+        import whoosh.writing as writing
+    except Exception:
+        return
+    writing.FileLock = LockfLock
+    try:
+        import whoosh.filedb.filestore as filestore
+    except Exception:
+        return
+    filestore.FileLock = LockfLock
+
 
 # purging directory cache means the index cache should be purged as well - data has to be refreshed in the index, too
 if 'directory' in args.purgeCaches and 'index' not in args.purgeCaches:
         args.purgeCaches.append('index')
 if 'index' in args.purgeCaches or not os.path.exists(indexdir):
+    _patch_whoosh_lockf()
     dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
     log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
