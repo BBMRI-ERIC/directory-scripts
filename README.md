@@ -15,6 +15,12 @@
   - typing-extensions
   - openpyxl
 
+## Modules
+- If you run into GraphQL errors when retrieving data from the Directory, upgrade the client with:
+  ``
+  pip3 install --upgrade molgenis-emx2-pyclient
+  ``
+
 ## Installation
 - Verify installation:  
   ``
@@ -44,53 +50,124 @@ pip3 install --upgrade certifi
      pip install --force-reinstall dist/Yapsy-2.0.0-py3-none-any.whl
 ``
 
-## Running the script
+## Data quality checks
 
-The simples way to run is like this:  
+The simplest way to run the default validation suite is:  
 ``
 python3 data-check.py
 ``
 
-If you want to purge all caches (directory as well as remote checks) and output the results to both stdout and XLSX, use:  
+Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ``
 python3 data-check.py --purge-all-caches -X test_results.xlsx
 ``
 
-If you want to purge just the directory cache and output just to XLSX, and be a little bit more verbose use:  
+Purge only the directory cache and output to XLSX only, with verbose logging:  
 ``
 python3 data-check.py -v --purge-cache directory -N -X test_results.xlsx
 ``
 
-If you have en_product1.xml with ORPHA code mappings (http://www.orphadata.org/cgi-bin/rare_free.html), you run the extended checks using  
+Enable ORPHA-to-ICD checks (requires en_product1.xml):  
 ``
 python3 data-check.py -O en_product1.xml
 ``
 
-If you need to debug what the heck is happening...  
+Debug mode with fresh caches:  
 ``
 python3 data-check.py -d --purge-all-caches
 ``
 
-# Additional helper scripts
+## Searching in the Directory
 
-- **get-contacts.py** - contact generator for use in Negotiator invitation pipeline  
+- **full-text-search.py** - full text search of the Directory using Whoosh with [Lucene search syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html).
+  - `./full-text-search.py 'bbmri-eric:ID:UK_GBR-1-101'`
+  - `./full-text-search.py '"Cell therapy"~3'` (note shell escaping of quotes)
+  - `./full-text-search.py '*420*'`
+  - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
+  - `./full-text-search.py 'myID' | perl -ne "while(<>) {if(m/^.*?'id':\\s+'(.+?)'.*$/) {print \\$1 . \"\\n\";}}"`
+
+## Exporters
+
+- **exporter-all.py** - exports all biobanks/collections with aggregate counts and optional filters; can output withdrawn entities.  
+``
+python3 exporter-all.py -X all.xlsx
+``
+- **exporter-bbmri-cohorts.py** - BBMRI Cohorts network statistics plus warnings/errors aggregation.  
+``
+python3 exporter-bbmri-cohorts.py -X bbmri_cohorts_stats.xlsx -XWE bbmri_cohorts_warnings.xlsx
+``
+- **exporter-cohorts.py** - lists COHORT/POPULATION_BASED collections and summaries per country/biobank.  
+``
+python3 exporter-cohorts.py -X cohorts.xlsx
+``
+- **exporter-country.py** - counts biobanks/collections per country (stdout or XLSX).  
+``
+python3 exporter-country.py
+``
+- **exporter-covid.py** - COVID-related collections/biobanks with sample/donor totals.  
+``
+python3 exporter-covid.py -X covid.xlsx
+``
+- **exporter-diagnosis.py** - diagnosis inspection utility (development-focused logging).  
+``
+python3 exporter-diagnosis.py -d > diagnosis-exporter.log 2>&1
+``
+- **exporter-ecraid.py** - ECRAID-relevant collections (BSL2/3 and pathogen material) and institutions.  
+``
+python3 exporter-ecraid.py -X ecraid.xlsx
+``
+- **exporter-institutions.py** - lists juridical persons (institutions) per country.  
+``
+python3 exporter-institutions.py -X institutions.xlsx
+``
+- **exporter-mission-cancer.py** - cancer and pediatric-cancer analytics using ICD/ORPHA mapping.  
+``
+python3 exporter-mission-cancer.py -O en_product1.xml -X mission-cancer.xlsx
+``
+- **exporter-negotiator-orphans.py** - finds collections with Negotiator representatives and auto-population candidates.  
+``
+python3 exporter-negotiator-orphans.py negotiator_reps.xlsx -X negotiator_orphans.xlsx
+``
+- **exporter-obesity.py** - obesity collections (including pediatric segmentation) with sample totals.  
+``
+python3 exporter-obesity.py -X obesity.xlsx
+``
+- **exporter-pediatric.py** - pediatric and pediatric-only collections based on age ranges.  
+``
+python3 exporter-pediatric.py -X pediatric.xlsx
+``
+- **exporter-quality-label.py** - quality label export for biobanks/collections and combined labels.  
+``
+python3 exporter-quality-label.py
+``
+
+## Additional helper scripts
+
+- **get-contacts.py** - contact generator for Negotiator invitation pipelines.  
 ``
 ./get-contacts.py --purge-all-caches -X contacts.xlsx
 ``
-- **covid-exporter.py** - statistics generator for COVID-19 biobanks
-- **mission-cancer-exporter.py** - statistics generator for cancer biobanks
-- **pediatric-exporter.py** - statistics generator for pediatric biobanks/collections
-- **diagnosis-exporter.py** - dumper of diagnosis information from the directory, used for development purposes only  
-  - `./diagnosis-exporter.py -d >diagnosis-exporter.log 2>&1`
-- **full-text-search.py** - fulltext search of the Directory using Whoosh library with [Lucene search syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html). Information in [Whoosh documentation](https://whoosh.readthedocs.io/en/latest/querylang.html). Examples of use:
-  - `./full-text-search.py 'bbmri-eric:ID:UK_GBR-1-101'`
-  - `./full-text-search.py '"Cell therapy"~3'`<br>
-     Note that this uses escaping of double quote characters - we assume it's being run from Bourne shell or Bash.
-  - `./full-text-search.py '*420*'`
-  - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
-  - `./full-text-search.py 'myID' | perl -ne "while(<>) {if(m/^.*?'id':\s+'(.+?)'.*$/) {print \$1 . \"\n\";}}"`
-- **exporter-negotiator-orphans.py** - identifies collections with representatives and collections that can be auto-populated via biobank or parent collection representatives  
+- **COVID19DataPortal_XMLFromBBMRIDirectory.py** - builds COVID-19 Data Portal XML from Directory collections.  
 ``
-./exporter-negotiator-orphans.py negotiator_reps.xlsx -X negotiator_orphans.xlsx
+python3 COVID19DataPortal_XMLFromBBMRIDirectory.py -x bbmriDirectory_Covid19DataPortal.xml
 ``
-  
+- **add_orphacodes.py** - adds OrphaCodes to a Directory EMX export.  
+``
+python3 add_orphacodes.py -d directory.xlsx -O en_product1.xml -o directory-with-orpha.xlsx
+``
+- **directory-stats.py** - legacy biobank size estimation stats.  
+``
+python3 directory-stats.py -N
+``
+- **directory-tables-modifier.py** - import/delete records in staging tables using CSV and .env credentials.  
+``
+python3 directory-tables-modifier.py -schema ERIC --csvImportData Biobanks.csv
+``
+- **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
+``
+python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson
+``
+- **install_certifi.py** - refreshes root certificates for Directory access.  
+``
+python3 install_certifi.py
+``

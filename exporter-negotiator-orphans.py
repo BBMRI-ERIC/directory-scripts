@@ -5,6 +5,7 @@ import argparse
 import logging as log
 import os.path
 import pprint
+import re
 
 import pandas as pd
 
@@ -64,6 +65,22 @@ def get_parent_chain_ids(collection, collection_map):
         parents.append(parent_id)
         current = parent
     return parents
+
+
+def get_nn_from_biobank_id(biobank_id):
+    if not biobank_id:
+        return ""
+    match = re.search(r'ID:([^_]+)_', str(biobank_id))
+    if match:
+        return match.group(1)
+    return ""
+
+
+def get_nn_for_collection(collection_id, collection):
+    if collection:
+        biobank_id = collection['biobank']['id']
+        return get_nn_from_biobank_id(biobank_id)
+    return get_country_code_from_id(collection_id)
 
 
 parser = argparse.ArgumentParser()
@@ -208,12 +225,14 @@ for collection_id, row in rows_by_collection.items():
     })
     if collection and 'parent_collection' in collection:
         result['parent_collection'] = collection['parent_collection']['id']
+    nn_code = get_nn_for_collection(collection_id, collection)
     if collection:
         country_code = dir.getCollectionNN(collection_id)
     else:
         country_code = get_country_code_from_id(collection_id)
 
     output_rows.append({
+        'nn': nn_code,
         'country_code': country_code,
         'network_name': row.get('network_name', ''),
         'biobank_name': row.get('biobank_name', ''),
@@ -244,6 +263,7 @@ for collection_id, collection in collection_map_active.items():
 
     if collection_id not in rows_by_collection:
         output_rows.append({
+            'nn': get_nn_from_biobank_id(collection['biobank']['id']),
             'country_code': dir.getCollectionNN(collection_id),
             'network_name': row.get('network_name', ''),
             'biobank_name': row.get('biobank_name', ''),
@@ -293,6 +313,7 @@ if args.outputXLSX:
             if result['auto_by_parent']:
                 auto_by_parent_count += 1
         biobank_rows.append({
+            'nn': get_nn_from_biobank_id(biobank_id),
             'country_code': dir.getBiobankNN(biobank_id),
             'biobank_name': biobank.get('name', '') if biobank else '',
             'biobank_id': biobank_id,
