@@ -13,6 +13,7 @@
   - whoosh
   - roman
   - typing-extensions
+  - openpyxl
 
 ## Installation
 - Verify installation:  
@@ -88,4 +89,8 @@ python3 data-check.py -d --purge-all-caches
   - `./full-text-search.py '*420*'`
   - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
   - `./full-text-search.py 'myID' | perl -ne "while(<>) {if(m/^.*?'id':\s+'(.+?)'.*$/) {print \$1 . \"\n\";}}"`
+- **exporter-negotiator-orphans.py** - identifies collections with representatives and collections that can be auto-populated via biobank or parent collection representatives  
+``
+./exporter-negotiator-orphans.py negotiator_reps.xlsx -X negotiator_orphans.xlsx
+``
   
