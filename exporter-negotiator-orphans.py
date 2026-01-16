@@ -149,14 +149,20 @@ for _, row in df_input.iterrows():
 collection_map_all = {}
 collection_map_active = {}
 biobank_to_collections = {}
+biobank_to_collections_all = {}
+biobank_to_collections_withdrawn = {}
+biobank_to_collections_active = {}
 for collection in dir.getCollections():
     collection_id = collection['id']
     collection_map_all[collection_id] = collection
+    biobank_id = collection['biobank']['id']
+    biobank_to_collections_all.setdefault(biobank_id, []).append(collection_id)
     if collection.get('withdrawn'):
+        biobank_to_collections_withdrawn.setdefault(biobank_id, []).append(collection_id)
         continue
     collection_map_active[collection_id] = collection
-    biobank_id = collection['biobank']['id']
     biobank_to_collections.setdefault(biobank_id, []).append(collection_id)
+    biobank_to_collections_active.setdefault(biobank_id, []).append(collection_id)
 
 biobank_map_all = {}
 for biobank in dir.getBiobanks():
@@ -173,7 +179,7 @@ for collection_id in rows_by_collection:
 biobank_uniform_reps = {}
 for biobank_id, collection_ids in biobank_to_collections.items():
     rep_sets = [reps_by_collection.get(cid, set()) for cid in collection_ids if reps_by_collection.get(cid, set())]
-    if not rep_sets:
+    if len(rep_sets) < 2:
         continue
     first = rep_sets[0]
     if all(rep_set == first for rep_set in rep_sets):
@@ -309,7 +315,23 @@ for biobank_id, biobank in biobank_map_all.items():
     if biobank.get('withdrawn'):
         continue
     if biobank_id not in output_biobank_ids:
-        log.warning("Active Directory biobank %s not present in output", biobank_id)
+        total_collections = len(biobank_to_collections_all.get(biobank_id, []))
+        withdrawn_collections = len(biobank_to_collections_withdrawn.get(biobank_id, []))
+        active_collections = len(biobank_to_collections_active.get(biobank_id, []))
+        if total_collections == 0:
+            reason = "no collections"
+        elif active_collections == 0:
+            reason = "only withdrawn collections"
+        else:
+            reason = "active collections"
+        log.warning(
+            "Active Directory biobank %s not present in output (%s, total=%d, withdrawn=%d, active=%d)",
+            biobank_id,
+            reason,
+            total_collections,
+            withdrawn_collections,
+            active_collections,
+        )
 
 if not args.nostdout:
     print(df_output.to_csv(sep="\t", index=False))
@@ -318,7 +340,6 @@ if args.outputXLSX:
     filename = args.outputXLSX[0]
     log.info("Outputting results to Excel file " + filename)
     writer = pd.ExcelWriter(filename, engine='xlsxwriter')
-    df_output.to_excel(writer, sheet_name='negotiator_orphans', index=False)
     biobank_rows = []
     for biobank_id, collection_ids in biobank_to_collections.items():
         biobank = dir.getBiobankById(biobank_id)
@@ -351,7 +372,6 @@ if args.outputXLSX:
     df_biobanks = pd.DataFrame(biobank_rows)
     if not df_biobanks.empty:
         df_biobanks.sort_values(by=['country_code', 'biobank_id'], inplace=True)
-    df_biobanks.to_excel(writer, sheet_name='biobanks_summary', index=False)
     if not df_biobanks.empty:
         nn_groups = []
         for nn, group in df_biobanks.groupby('nn'):
@@ -380,5 +400,117 @@ if args.outputXLSX:
             'sum_collections_auto_by_parent': int(df_biobanks['collections_auto_by_parent'].sum()),
         }
         df_nn = pd.concat([pd.DataFrame([totals]), df_nn], ignore_index=True)
-        df_nn.to_excel(writer, sheet_name='nn_summary', index=False)
+        column_map = {
+            'nn': 'National Node\n(staging area)',
+            'sum_biobanks': 'Number of biobanks',
+            'sum_biobanks_without_missing_reps': 'Number of biobanks completely represented in the Negotiator',
+            'sum_biobanks_missing_and_with_reps': 'Number of biobanks partially represented in the Negotiator',
+            'sum_biobanks_without_reps': 'Number of biobanks not represented in the Negotiator at all',
+            'sum_collections_with_reps': 'Number of collections with assigned representatives',
+            'sum_collections_without_reps': 'Number of collections without assigned representatives',
+            'sum_collections_auto_by_parent': 'Number of collections which can be assigned representatives from their parent',
+            'sum_collections_auto_by_biobank': 'Number of collections which potentially could be assigned representatives from other collections',
+        }
+        output_columns = [
+            'nn',
+            'sum_biobanks',
+            'sum_biobanks_without_missing_reps',
+            'sum_biobanks_missing_and_with_reps',
+            'sum_biobanks_without_reps',
+            'sum_collections_with_reps',
+            'sum_collections_without_reps',
+            'sum_collections_auto_by_parent',
+            'sum_collections_auto_by_biobank',
+        ]
+        df_nn = df_nn[output_columns].rename(columns=column_map)
+        workbook = writer.book
+        ws_summary = workbook.add_worksheet('nn_summary')
+        writer.sheets['nn_summary'] = ws_summary
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#000000',
+            'font_color': '#FFFFFF',
+        })
+        total_base = {
+            'bold': True,
+            'bg_color': '#EC6607',
+        }
+        row_white_base = {'bg_color': '#FFFFFF'}
+        row_blue_base = {'bg_color': '#E6EEF6'}
+
+        old_headers = output_columns
+        ws_summary.write_row(0, 0, old_headers)
+        ws_summary.set_row(0, None, None, {'hidden': True})
+        ws_summary.write_row(1, 0, list(df_nn.columns), header_format)
+
+        last_row_index = len(df_nn) - 1
+        last_col_index = len(output_columns) - 1
+
+        def border_flags(is_top=False, is_bottom=False, is_left=False, is_right=False):
+            flags = {}
+            if is_top:
+                flags['top'] = 2
+            if is_bottom:
+                flags['bottom'] = 2
+            if is_left:
+                flags['left'] = 2
+            if is_right:
+                flags['right'] = 2
+            return flags
+
+        def make_format(base, italic=False, bold=False, borders=None):
+            fmt = dict(base)
+            if italic:
+                fmt['italic'] = True
+            if bold:
+                fmt['bold'] = True
+            if borders:
+                fmt.update(borders)
+            return workbook.add_format(fmt)
+
+        header_formats = []
+        for col_idx in range(len(output_columns)):
+            borders = border_flags(
+                is_top=True,
+                is_bottom=True,
+                is_left=(col_idx == 0),
+                is_right=(col_idx == last_col_index),
+            )
+            header_formats.append(make_format({
+                'bg_color': '#000000',
+                'font_color': '#FFFFFF',
+                'bold': True,
+                'text_wrap': True,
+            }, borders=borders))
+        for col_idx, value in enumerate(list(df_nn.columns)):
+            ws_summary.write(1, col_idx, value, header_formats[col_idx])
+
+        for i, row in enumerate(df_nn.itertuples(index=False), start=0):
+            excel_row = i + 2
+            is_total = i == 0
+            is_last = i == last_row_index
+            use_blue = i % 2 == 1
+            for col_idx, value in enumerate(row):
+                borders = border_flags(
+                    is_top=is_total,
+                    is_bottom=is_total or is_last,
+                    is_left=(col_idx == 0),
+                    is_right=(col_idx == last_col_index),
+                )
+                if is_total:
+                    base = total_base
+                    fmt = make_format(base, italic=(col_idx == 0), bold=True, borders=borders)
+                else:
+                    base = row_blue_base if use_blue else row_white_base
+                    fmt = make_format(base, italic=(col_idx == 0), borders=borders)
+                ws_summary.write(excel_row, col_idx, value, fmt)
+        header_labels = list(df_nn.columns)
+        for col_idx, label in enumerate(header_labels):
+            words = label.replace("\n", " ").split()
+            longest = max((len(w) for w in words), default=10)
+            width = min(max(longest + 2, 12), 30)
+            ws_summary.set_column(col_idx, col_idx, width)
+
+    df_output.to_excel(writer, sheet_name='negotiator_orphans', index=False)
+    df_biobanks.to_excel(writer, sheet_name='biobanks_summary', index=False)
     writer.close()
