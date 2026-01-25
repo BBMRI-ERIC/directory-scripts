@@ -45,7 +45,7 @@
 - XLSX inputs are typically read with pandas; ensure `openpyxl` is installed for `read_excel` compatibility.
 - Directory API access requires network access; account for this when running in sandboxed environments.
 - When deriving NN from IDs, the common pattern is `ID:XX_...` (XX can be multi-letter like `EXT`).
-- Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings.
+- Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 
 ## Testing Guidelines
 - No dedicated unit test suite is present; validation is primarily exercised via `data-check.py`.
