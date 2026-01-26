@@ -11,6 +11,8 @@ import pandas as pd
 
 from directory import Directory
 
+QUALITY_LABELS = {'accredited', 'eric'}
+
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -33,6 +35,23 @@ def parse_email_list(raw_value):
         if item:
             emails.append(item)
     return set(emails)
+
+def _normalize_quality_value(value):
+    if isinstance(value, dict):
+        return value.get('id', '')
+    return value if value is not None else ''
+
+
+def _extract_quality_values(value):
+    values = []
+    if value is None:
+        return values
+    if isinstance(value, list):
+        for item in value:
+            values.append(_normalize_quality_value(item))
+    else:
+        values.append(_normalize_quality_value(value))
+    return values
 
 
 def get_country_code_from_id(collection_id):
@@ -109,6 +128,26 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+
+qual_col_df = dir.getQualColl()
+collection_quality_ids = set()
+if isinstance(qual_col_df, pd.DataFrame) and not qual_col_df.empty:
+    if 'assess_level_col' in qual_col_df.columns and 'collection' in qual_col_df.columns:
+        for _, row in qual_col_df.iterrows():
+            if _normalize_quality_value(row.get('assess_level_col')) in QUALITY_LABELS:
+                collection_id = _normalize_quality_value(row.get('collection'))
+                if collection_id:
+                    collection_quality_ids.add(collection_id)
+
+biobank_quality_ids = set()
+qual_bb_df = dir.getQualBB()
+if isinstance(qual_bb_df, pd.DataFrame) and not qual_bb_df.empty:
+    if 'assess_level_bio' in qual_bb_df.columns and 'biobank' in qual_bb_df.columns:
+        for _, row in qual_bb_df.iterrows():
+            if _normalize_quality_value(row.get('assess_level_bio')) in QUALITY_LABELS:
+                biobank_id = _normalize_quality_value(row.get('biobank'))
+                if biobank_id:
+                    biobank_quality_ids.add(biobank_id)
 
 df_input = pd.read_excel(args.input_xlsx)
 required_columns = [
@@ -213,6 +252,22 @@ for collection_id, collection in collection_map_active.items():
     if 'parent_collection' in collection:
         parent_collection_id = collection['parent_collection']['id']
 
+    has_collection_quality = collection_id in collection_quality_ids
+    has_ancestor_quality = False
+    for parent_id in get_parent_chain_ids(collection, collection_map_all):
+        if parent_id in collection_quality_ids:
+            has_ancestor_quality = True
+            break
+    has_biobank_quality = biobank_id in biobank_quality_ids
+
+    missing_reps_with_collection_quality = False
+    if not with_reps and (has_collection_quality or has_ancestor_quality):
+        missing_reps_with_collection_quality = True
+
+    missing_reps_with_biobank_quality = False
+    if not with_reps and not missing_reps_with_collection_quality and has_biobank_quality:
+        missing_reps_with_biobank_quality = True
+
     collection_results[collection_id] = {
         'with_reps': with_reps,
         'auto_by_biobank': inferred_by_biobank,
@@ -220,6 +275,11 @@ for collection_id, collection in collection_map_active.items():
         'representatives_emails': reps_list,
         'number_of_registered_representatives': len(reps),
         'parent_collection': parent_collection_id,
+        'collection_has_quality': has_collection_quality,
+        'ancestor_has_quality': has_ancestor_quality,
+        'biobank_has_quality': has_biobank_quality,
+        'missing_reps_with_collection_quality': missing_reps_with_collection_quality,
+        'missing_reps_with_biobank_quality': missing_reps_with_biobank_quality,
     }
 
 output_rows = []
@@ -232,6 +292,9 @@ for collection_id, row in rows_by_collection.items():
         'representatives_emails': ";".join(sorted(reps_by_collection.get(collection_id, set()))),
         'number_of_registered_representatives': len(reps_by_collection.get(collection_id, set())),
         'parent_collection': "",
+        'collection_has_quality': False,
+        'ancestor_has_quality': False,
+        'biobank_has_quality': False,
     })
     if collection and 'parent_collection' in collection:
         result['parent_collection'] = collection['parent_collection']['id']
@@ -257,6 +320,9 @@ for collection_id, row in rows_by_collection.items():
         'parent_collection': result['parent_collection'],
         'representatives_emails': result['representatives_emails'],
         'number_of_registered_representatives': result['number_of_registered_representatives'],
+        'collection_has_quality': result['collection_has_quality'],
+        'ancestor_has_quality': result['ancestor_has_quality'],
+        'biobank_has_quality': result['biobank_has_quality'],
         'with_reps': result['with_reps'],
         'auto_by_biobank': result['auto_by_biobank'],
         'auto_by_parent': result['auto_by_parent'],
@@ -288,6 +354,9 @@ for collection_id, collection in collection_map_active.items():
             'parent_collection': result['parent_collection'],
             'representatives_emails': result['representatives_emails'],
             'number_of_registered_representatives': result['number_of_registered_representatives'],
+            'collection_has_quality': result['collection_has_quality'],
+            'ancestor_has_quality': result['ancestor_has_quality'],
+            'biobank_has_quality': result['biobank_has_quality'],
             'with_reps': result['with_reps'],
             'auto_by_biobank': result['auto_by_biobank'],
             'auto_by_parent': result['auto_by_parent'],
@@ -347,6 +416,8 @@ if args.outputXLSX:
         without_reps_count = 0
         auto_by_biobank_count = 0
         auto_by_parent_count = 0
+        missing_reps_with_collection_quality = 0
+        missing_reps_with_biobank_quality = 0
         for collection_id in collection_ids:
             result = collection_results.get(collection_id)
             if result is None:
@@ -359,6 +430,10 @@ if args.outputXLSX:
                 auto_by_biobank_count += 1
             if result['auto_by_parent']:
                 auto_by_parent_count += 1
+            if result['missing_reps_with_collection_quality']:
+                missing_reps_with_collection_quality += 1
+            if result['missing_reps_with_biobank_quality']:
+                missing_reps_with_biobank_quality += 1
         biobank_rows.append({
             'nn': get_nn_from_biobank_id(biobank_id),
             'country_code': dir.getBiobankNN(biobank_id),
@@ -368,6 +443,8 @@ if args.outputXLSX:
             'collections_without_reps': without_reps_count,
             'collections_auto_by_biobank': auto_by_biobank_count,
             'collections_auto_by_parent': auto_by_parent_count,
+            'collections_without_reps_with_collection_quality': missing_reps_with_collection_quality,
+            'collections_without_reps_with_biobank_quality': missing_reps_with_biobank_quality,
         })
     df_biobanks = pd.DataFrame(biobank_rows)
     if not df_biobanks.empty:
@@ -383,6 +460,8 @@ if args.outputXLSX:
                 'sum_biobanks_without_reps': int((group['collections_with_reps'] == 0).sum()),
                 'sum_collections_with_reps': int(group['collections_with_reps'].sum()),
                 'sum_collections_without_reps': int(group['collections_without_reps'].sum()),
+                'sum_collections_without_reps_with_collection_quality': int(group['collections_without_reps_with_collection_quality'].sum()),
+                'sum_collections_without_reps_with_biobank_quality': int(group['collections_without_reps_with_biobank_quality'].sum()),
                 'sum_collections_auto_by_biobank': int(group['collections_auto_by_biobank'].sum()),
                 'sum_collections_auto_by_parent': int(group['collections_auto_by_parent'].sum()),
             })
@@ -396,6 +475,8 @@ if args.outputXLSX:
             'sum_biobanks_without_reps': int((df_biobanks['collections_with_reps'] == 0).sum()),
             'sum_collections_with_reps': int(df_biobanks['collections_with_reps'].sum()),
             'sum_collections_without_reps': int(df_biobanks['collections_without_reps'].sum()),
+            'sum_collections_without_reps_with_collection_quality': int(df_biobanks['collections_without_reps_with_collection_quality'].sum()),
+            'sum_collections_without_reps_with_biobank_quality': int(df_biobanks['collections_without_reps_with_biobank_quality'].sum()),
             'sum_collections_auto_by_biobank': int(df_biobanks['collections_auto_by_biobank'].sum()),
             'sum_collections_auto_by_parent': int(df_biobanks['collections_auto_by_parent'].sum()),
         }
@@ -408,6 +489,8 @@ if args.outputXLSX:
             'sum_biobanks_without_reps': 'Number of biobanks not represented in the Negotiator at all',
             'sum_collections_with_reps': 'Number of collections with assigned representatives',
             'sum_collections_without_reps': 'Number of collections without assigned representatives',
+            'sum_collections_without_reps_with_collection_quality': 'Number of Q-labeled collections without assigned representatives',
+            'sum_collections_without_reps_with_biobank_quality': 'Number of other collections from Q-labeled biobanks without assigned representatives',
             'sum_collections_auto_by_parent': 'Number of collections which can be assigned representatives from their parent',
             'sum_collections_auto_by_biobank': 'Number of collections which potentially could be assigned representatives from other collections',
         }
@@ -419,6 +502,8 @@ if args.outputXLSX:
             'sum_biobanks_without_reps',
             'sum_collections_with_reps',
             'sum_collections_without_reps',
+            'sum_collections_without_reps_with_collection_quality',
+            'sum_collections_without_reps_with_biobank_quality',
             'sum_collections_auto_by_parent',
             'sum_collections_auto_by_biobank',
         ]
@@ -511,6 +596,6 @@ if args.outputXLSX:
             width = min(max(longest + 2, 12), 30)
             ws_summary.set_column(col_idx, col_idx, width)
 
-    df_output.to_excel(writer, sheet_name='negotiator_orphans', index=False)
+    df_output.to_excel(writer, sheet_name='negotiator_collection_stats', index=False)
     df_biobanks.to_excel(writer, sheet_name='biobanks_summary', index=False)
     writer.close()
