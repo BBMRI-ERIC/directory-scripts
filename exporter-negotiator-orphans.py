@@ -582,6 +582,7 @@ if args.outputXLSX:
         for col_idx, value in enumerate(list(df_nn.columns)):
             ws_summary.write(1, col_idx, value, header_formats[col_idx])
 
+        red_columns = {3, 4, 5, 7, 8, 9}
         for i, row in enumerate(df_nn.itertuples(index=False), start=0):
             excel_row = i + 2
             is_total = i == 0
@@ -594,12 +595,18 @@ if args.outputXLSX:
                     is_left=(col_idx == 0),
                     is_right=(col_idx == last_col_index),
                 )
+                needs_red = False
+                if col_idx in red_columns and isinstance(value, (int, float)) and value != 0:
+                    needs_red = True
                 if is_total:
-                    base = total_base
+                    base = dict(total_base)
                     fmt = make_format(base, italic=(col_idx == 0), bold=True, borders=borders)
                 else:
-                    base = row_blue_base if use_blue else row_white_base
+                    base = dict(row_blue_base if use_blue else row_white_base)
                     fmt = make_format(base, italic=(col_idx == 0), borders=borders)
+                if needs_red:
+                    base['font_color'] = '#FF0000'
+                    fmt = make_format(base, italic=(col_idx == 0), bold=True, borders=borders)
                 ws_summary.write(excel_row, col_idx, value, fmt)
         header_labels = list(df_nn.columns)
         for col_idx, label in enumerate(header_labels):
