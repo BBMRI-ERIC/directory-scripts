@@ -410,7 +410,12 @@ if args.outputXLSX:
     log.info("Outputting results to Excel file " + filename)
     writer = pd.ExcelWriter(filename, engine='xlsxwriter')
     biobank_rows = []
-    for biobank_id, collection_ids in biobank_to_collections.items():
+    # Include biobanks without any collections: biobank_to_collections is derived from iterating
+    # active (non-withdrawn) collections, which misses biobanks that have no collections at all.
+    for biobank_id, biobank_stub in biobank_map_all.items():
+        if biobank_stub.get('withdrawn'):
+            continue
+        collection_ids = biobank_to_collections.get(biobank_id, [])
         biobank = dir.getBiobankById(biobank_id)
         with_reps_count = 0
         without_reps_count = 0
@@ -439,6 +444,7 @@ if args.outputXLSX:
             'country_code': dir.getBiobankNN(biobank_id),
             'biobank_name': biobank.get('name', '') if biobank else '',
             'biobank_id': biobank_id,
+            'total_collections': len(biobank_to_collections_all.get(biobank_id, [])),
             'collections_with_reps': with_reps_count,
             'collections_without_reps': without_reps_count,
             'collections_auto_by_biobank': auto_by_biobank_count,
@@ -452,12 +458,14 @@ if args.outputXLSX:
     if not df_biobanks.empty:
         nn_groups = []
         for nn, group in df_biobanks.groupby('nn'):
+            active_collections = group['collections_with_reps'] + group['collections_without_reps']
             nn_groups.append({
                 'nn': nn,
                 'sum_biobanks': len(group),
-                'sum_biobanks_without_missing_reps': int((group['collections_without_reps'] == 0).sum()),
-                'sum_biobanks_missing_and_with_reps': int(((group['collections_without_reps'] != 0) & (group['collections_with_reps'] != 0)).sum()),
-                'sum_biobanks_without_reps': int((group['collections_with_reps'] == 0).sum()),
+                'sum_biobanks_without_missing_reps': int(((active_collections > 0) & (group['collections_without_reps'] == 0)).sum()),
+                'sum_biobanks_missing_and_with_reps': int(((active_collections > 0) & (group['collections_without_reps'] != 0) & (group['collections_with_reps'] != 0)).sum()),
+                'sum_biobanks_without_reps': int(((active_collections > 0) & (group['collections_with_reps'] == 0)).sum()),
+                'sum_biobanks_without_collections': int((group['total_collections'] == 0).sum()),
                 'sum_collections_with_reps': int(group['collections_with_reps'].sum()),
                 'sum_collections_without_reps': int(group['collections_without_reps'].sum()),
                 'sum_collections_without_reps_with_collection_quality': int(group['collections_without_reps_with_collection_quality'].sum()),
@@ -467,12 +475,14 @@ if args.outputXLSX:
             })
         df_nn = pd.DataFrame(nn_groups)
         df_nn.sort_values(by=['nn'], inplace=True)
+        active_collections_all = df_biobanks['collections_with_reps'] + df_biobanks['collections_without_reps']
         totals = {
             'nn': 'TOTAL',
             'sum_biobanks': int(df_biobanks.shape[0]),
-            'sum_biobanks_without_missing_reps': int((df_biobanks['collections_without_reps'] == 0).sum()),
-            'sum_biobanks_missing_and_with_reps': int(((df_biobanks['collections_without_reps'] != 0) & (df_biobanks['collections_with_reps'] != 0)).sum()),
-            'sum_biobanks_without_reps': int((df_biobanks['collections_with_reps'] == 0).sum()),
+            'sum_biobanks_without_missing_reps': int(((active_collections_all > 0) & (df_biobanks['collections_without_reps'] == 0)).sum()),
+            'sum_biobanks_missing_and_with_reps': int(((active_collections_all > 0) & (df_biobanks['collections_without_reps'] != 0) & (df_biobanks['collections_with_reps'] != 0)).sum()),
+            'sum_biobanks_without_reps': int(((active_collections_all > 0) & (df_biobanks['collections_with_reps'] == 0)).sum()),
+            'sum_biobanks_without_collections': int((df_biobanks['total_collections'] == 0).sum()),
             'sum_collections_with_reps': int(df_biobanks['collections_with_reps'].sum()),
             'sum_collections_without_reps': int(df_biobanks['collections_without_reps'].sum()),
             'sum_collections_without_reps_with_collection_quality': int(df_biobanks['collections_without_reps_with_collection_quality'].sum()),
@@ -487,6 +497,7 @@ if args.outputXLSX:
             'sum_biobanks_without_missing_reps': 'Number of biobanks completely represented in the Negotiator',
             'sum_biobanks_missing_and_with_reps': 'Number of biobanks partially represented in the Negotiator',
             'sum_biobanks_without_reps': 'Number of biobanks not represented in the Negotiator at all',
+            'sum_biobanks_without_collections': 'Number of biobanks without collections',
             'sum_collections_with_reps': 'Number of collections with assigned representatives',
             'sum_collections_without_reps': 'Number of collections without assigned representatives',
             'sum_collections_without_reps_with_collection_quality': 'Number of Q-labeled collections without assigned representatives',
@@ -500,6 +511,7 @@ if args.outputXLSX:
             'sum_biobanks_without_missing_reps',
             'sum_biobanks_missing_and_with_reps',
             'sum_biobanks_without_reps',
+            'sum_biobanks_without_collections',
             'sum_collections_with_reps',
             'sum_collections_without_reps',
             'sum_collections_without_reps_with_collection_quality',

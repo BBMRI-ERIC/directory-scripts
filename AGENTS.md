@@ -46,11 +46,15 @@
 - Directory API access requires network access; account for this when running in sandboxed environments.
 - When deriving NN from IDs, the common pattern is `ID:XX_...` (XX can be multi-letter like `EXT`).
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
+- XLSX schema note (`exporter-negotiator-orphans.py`):
+  - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.
+  - `biobanks_summary` includes `total_collections` and now includes active biobanks even if they have 0 collections.
 
 ## Testing Guidelines
 - No dedicated unit test suite is present; validation is primarily exercised via `data-check.py`.
 - When adding a check, include a `checks/<Name>.py` plugin and matching `checks/<Name>.yapsy-plugin`.
 - Use targeted runs with `--disable-plugins` and cache flags to validate new checks efficiently.
+- Cache guidance for local testing: avoid `--purge-cache directory` unless you suspect recent Directory content changes may affect results; prefer reusing the existing cache to keep comparisons stable and runs faster.
 
 ## Commit & Pull Request Guidelines
 - Commit messages are short, present-tense summaries (for example “Adapted exporter-quality-label.py…” or “updates”).
