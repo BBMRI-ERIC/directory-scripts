@@ -33,4 +33,10 @@ class DataCheckWarning:
         print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message + " " + self.action + " " + self.emailTo)
 
 
+def make_check_id(plugin, suffix: str) -> str:
+    plugin_name = plugin if isinstance(plugin, str) else plugin.__class__.__name__
+    if not suffix:
+        return plugin_name
+    return f"{plugin_name}:{suffix}"
+
 

@@ -4,7 +4,7 @@
 import logging as log
 
 from yapsy.IPlugin import IPlugin
-from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType
+from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 from directory import Directory
 
 
@@ -26,7 +26,7 @@ class SubcollectionNetworkMembership(IPlugin):
                         if "network" not in collection or network not in collection["network"]:
                             warnings.append(
                                 DataCheckWarning(
-                                    self.__class__.__name__,
+                                    make_check_id(self, "SubcollectionPartNetworkNetwork"),
                                     "",
                                     directory.getCollectionNN(collection["id"]),
                                     DataCheckWarningLevel.WARNING,

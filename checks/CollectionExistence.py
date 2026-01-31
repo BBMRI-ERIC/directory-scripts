@@ -3,7 +3,7 @@
 import logging as log
 
 from yapsy.IPlugin import IPlugin
-from customwarnings import DataCheckWarningLevel,DataCheckWarning,DataCheckEntityType
+from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 
 class CollectionExistence(IPlugin):
 	def check(self, dir, args):
@@ -12,5 +12,5 @@ class CollectionExistence(IPlugin):
 		for biobank in dir.getBiobanks():
 			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
 			if len(collections.edges) < 1:
-				warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing at least one collection for biobank"))
+				warnings.append(DataCheckWarning(make_check_id(self, "LeastOneCollectionBiobank"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing at least one collection for biobank"))
 		return warnings
