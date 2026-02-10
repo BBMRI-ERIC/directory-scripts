@@ -15,12 +15,6 @@
   - typing-extensions
   - openpyxl
 
-## Modules
-- If you run into GraphQL errors when retrieving data from the Directory, upgrade the client with:
-  ``
-  pip3 install --upgrade molgenis-emx2-pyclient
-  ``
-
 ## Installation
 - Verify installation:  
   ``
@@ -33,8 +27,12 @@ nameserver 8.8.8.8
 ``
 - Download the MOLGENIS Python API library:  
   ``
-pip3 install molgenis-py-client
+pip3 install molgenis-emx2-pyclient dotenv molgenis-emx2-directory-client
 ``
+If you run into GraphQL errors when retrieving data from the Directory, upgrade the client with:
+  ``
+  pip3 install --upgrade molgenis-emx2-pyclient
+  ``
 - Install/update root certificates (also check install_certifi.py script)  
   ``
 pip3 install --upgrade certifi
