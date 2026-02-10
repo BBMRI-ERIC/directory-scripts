@@ -157,10 +157,6 @@ python3 add_orphacodes.py -d directory.xlsx -O en_product1.xml -o directory-with
 ``
 python3 directory-stats.py -N
 ``
-- **directory-tables-modifier.py** - import/delete records in staging tables using CSV and .env credentials.  
-``
-python3 directory-tables-modifier.py -schema ERIC --csvImportData Biobanks.csv
-``
 - **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
 ``
 python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson
@@ -169,3 +165,60 @@ python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson
 ``
 python3 install_certifi.py
 ``
+
+## Directory tables modifier (critical)
+
+`directory-tables-modifier.py` modifies staging tables. This is a sensitive component: always verify schema, input files, and intended records before applying changes.
+
+Key safety points:
+- Requires `.env` with `TARGET`, `USERNAME`, `PASSWORD`.
+- Default schema is `ERIC` (override with `-s/--schema`).
+- Deletions always require interactive confirmation unless `-f/--force` is used.
+- Use `-n/--dry-run` to preview changes without modifying data.
+- `-v/--verbose` shows record-level details; `-d/--debug` adds connection/auth details.
+- Exit codes: `0` success, `2` input error, `3` aborted, `1` runtime error.
+
+### Import records
+- Use `-i/--import-data` with `-T/--import-table` (recommended).
+- Format auto-detects by extension; override with `-I/--import-format csv|tsv` if the filename is wrong or missing an extension.
+
+Examples:
+``
+python3 directory-tables-modifier.py -i Biobanks.csv -T Biobanks
+``
+``
+python3 directory-tables-modifier.py -i Collections.data -T Collections -I csv -n -v
+``
+
+### Delete records (table contents only)
+- Provide `-x/--delete-data` with `-t/--delete-table`.
+- Deletes only matching records, not the whole table.
+- Requires interactive confirmation unless `-f/--force` is set.
+
+Examples:
+``
+python3 directory-tables-modifier.py -x delete.tsv -t Collections
+``
+``
+python3 directory-tables-modifier.py -x delete.tsv -t Collections -f
+``
+
+### Facts export and deletion
+- Export facts to CSV/TSV without modifying: `-e/--export-facts`.
+- Filter by fact ID regex (`-R/--fact-id-regex`) and/or collection IDs (`-C/--collection-id`).
+- Delete facts with `-F/--delete-facts` plus the same filters (confirmation required).
+
+Examples:
+``
+python3 directory-tables-modifier.py -e facts.tsv
+``
+``
+python3 directory-tables-modifier.py -e facts.csv -R '^FACT_' -C BB_001 -C BB_002
+``
+``
+python3 directory-tables-modifier.py -F -R '^FACT_' -C BB_001 -f
+``
+
+### TSV parsing overrides
+If TSV files use non-standard quoting/escaping, adjust with:
+- `--tsvQuoteChar`, `--tsvEscapeChar`, `--tsvQuoting`, `--tsvNoDoublequote`.

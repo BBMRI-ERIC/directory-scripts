@@ -24,14 +24,15 @@ password = os.getenv("PASSWORD")
 # Get args from stdin
 parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in BBMRI Directory staging area. Make sure you have an .env file in this folder, containing: TARGET=target URL, USERNAME and PASSWORD.")
 
-parser.add_argument("-s", "--schema", type=str, required=True, help="Schema")
+parser.add_argument("-s", "--schema", type=str, default="ERIC", help="Schema (default: ERIC).")
 parser.add_argument("-schema", dest="schema", type=str, help=argparse.SUPPRESS)
 
-parser.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the csv/tsv file containing the records to modify/add. The filename MUST be: TableName.csv or TableName.tsv", default=None)
+parser.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the CSV/TSV file containing the records to modify/add.", default=None)
+parser.add_argument("-T", "--import-table", dest="import_table", type=str, help="Target table name for import (recommended).", default=None)
 parser.add_argument("--csvImportData", dest="import_data", type=str, help=argparse.SUPPRESS)
-parser.add_argument("-x", "--delete-data", dest="delete_data", type=str, help="Path to the csv/tsv file containing the records to delete", default=None)
+parser.add_argument("-x", "--delete-data", dest="delete_data", type=str, help="Path to the CSV/TSV file containing the records to delete.", default=None)
 parser.add_argument("--csvDeleteData", dest="delete_data", type=str, help=argparse.SUPPRESS)
-parser.add_argument("-t", "--delete-table", dest="delete_table", type=str, help="Table name. Only required when deleting data.", default=None)
+parser.add_argument("-t", "--delete-table", dest="delete_table", type=str, help="Table name for deleting records (table contents only).", default=None)
 parser.add_argument("--delTable", dest="delete_table", type=str, help=argparse.SUPPRESS)
 parser.add_argument("-I", "--import-format", dest="import_format", choices=["auto", "csv", "tsv"], default="auto", help="Import format override (csv/tsv). Default: auto by extension.")
 parser.add_argument("-D", "--delete-format", dest="delete_format", choices=["auto", "csv", "tsv"], default="auto", help="Delete file format override (csv/tsv). Default: auto by extension.")
@@ -55,6 +56,7 @@ args = parser.parse_args()
 # Get args to variables
 schema = args.schema
 csvImportData = args.import_data
+import_table_override = args.import_table
 csvDeleteData = args.delete_data
 delTable = args.delete_table
 tsvQuoteChar = args.tsvQuoteChar
@@ -243,16 +245,26 @@ def report_column_mismatches(session, schema, table, df):
 
 def summarize_import(session, schema, table, df):
     if df is None:
-        return
+        return None
     report_column_mismatches(session, schema, table, df)
     id_column = resolve_id_column(df)
     if id_column is None:
         logging.warning("Import file does not include an ID column; unable to compare with server data.")
-        return
+        return {
+            "total": len(df.index),
+            "new": None,
+            "update": None,
+            "has_existing": False,
+        }
     file_ids = set(df[id_column].astype(str))
     existing_ids = fetch_existing_ids(session, schema, table)
     if existing_ids is None:
-        return
+        return {
+            "total": len(df.index),
+            "new": None,
+            "update": None,
+            "has_existing": False,
+        }
     new_ids = sorted(file_ids - existing_ids)
     update_ids = sorted(file_ids & existing_ids)
     logging.info("Import summary for %s::%s: %s new, %s updates.", schema, table, len(new_ids), len(update_ids))
@@ -261,6 +273,12 @@ def summarize_import(session, schema, table, df):
             logging.info("New IDs: %s", new_ids)
         if update_ids:
             logging.info("Update IDs: %s", update_ids)
+    return {
+        "total": len(df.index),
+        "new": new_ids,
+        "update": update_ids,
+        "has_existing": True,
+    }
 
 
 def summarize_delete(session, schema, table, df):
@@ -355,7 +373,7 @@ async def sync_directory():
             logging.debug("Schema set to %s.", schema)
 
         #########################################################
-        # UPLOAD CSV/TSV. Args: CSV/TSV path (the name MUST be: TableName.csv or TableName.tsv), schema.
+        # UPLOAD CSV/TSV. Args: CSV/TSV path, schema, and table name (use --import-table).
         #########################################################
         # Behaviour: 
         # If the CSV contains rows with the same ID that the ones that are already in the staging area, the entire row in replaced by the one in the CSV (no need to delete it first from the staging are, it is just rewritten).
@@ -372,7 +390,13 @@ async def sync_directory():
                     logging.info("Planned import from file %s (record details unavailable).", csvImportData)
                 else:
                     raise InputError("Import format could not be determined. Use --import-format or a .csv/.tsv file.")
-            import_table = import_path.stem if resolved_format in {"csv", "tsv"} else import_path.name
+            import_table = import_table_override
+            if import_table is None and resolved_format in {"csv", "tsv"}:
+                import_table = import_path.stem or None
+                if import_table:
+                    logging.warning("Import table not specified; using file name %s. Use --import-table to be explicit.", import_table)
+            if resolved_format in {"csv", "tsv"} and not import_table:
+                raise InputError("Import table is required for CSV/TSV input. Use --import-table.")
             data = None
             if resolved_format in {"csv", "tsv"}:
                 try:
@@ -383,9 +407,38 @@ async def sync_directory():
                 logging.info("Planned import from file %s (record details unavailable).", csvImportData)
             else:
                 log_records("Planned import", import_table, data)
+            import_summary = None
             if data is not None:
-                summarize_import(session, schema, import_table, data)
-            if dry_run:
+                import_summary = summarize_import(session, schema, import_table, data)
+            skip_import = False
+            if data is not None and data.empty:
+                logging.info("Import file contains no records. Skipping import for %s.", csvImportData)
+                skip_import = True
+            if not dry_run and not skip_import:
+                needs_confirmation = False
+                if resolved_format in {"csv", "tsv"}:
+                    if data is None:
+                        needs_confirmation = True
+                    else:
+                        if import_summary is None:
+                            needs_confirmation = True
+                        elif import_summary["new"] is None or import_summary["update"] is None:
+                            needs_confirmation = True
+                        elif (len(import_summary["new"]) + len(import_summary["update"])) > 0:
+                            needs_confirmation = True
+                else:
+                    needs_confirmation = True
+                if needs_confirmation:
+                    if import_summary and import_summary["new"] is not None and import_summary["update"] is not None:
+                        confirm_action(
+                            f"Proceed with importing {import_summary['total']} record(s) into {import_table}? "
+                            f"({len(import_summary['new'])} new, {len(import_summary['update'])} updates)"
+                        )
+                    else:
+                        confirm_action(f"Proceed with importing data into {import_table}?")
+            if skip_import:
+                pass
+            elif dry_run:
                 logging.info("Dry run enabled. Skipping import for %s.", csvImportData)
             elif resolved_format == "tsv":
                 logging.info("Importing TSV data from %s into table %s", csvImportData, import_table)
@@ -494,6 +547,8 @@ def validate_inputs():
         import_path = Path(csvImportData)
         if not import_path.exists():
             raise InputError(f"Import file not found: {csvImportData}")
+        if import_format in {"csv", "tsv"} and not import_table_override and not import_path.stem:
+            raise InputError("Import table is required for CSV/TSV input. Use --import-table.")
         if import_format in {"csv", "tsv"} and import_path.suffix.lower() not in {".csv", ".tsv", ".tab", ""}:
             logging.warning("Import format forced to %s for file %s.", import_format, csvImportData)
     if csvDeleteData:
