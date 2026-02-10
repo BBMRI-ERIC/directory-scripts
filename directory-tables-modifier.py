@@ -34,6 +34,7 @@ parser.add_argument("-x", "--delete-data", dest="delete_data", type=str, help="P
 parser.add_argument("--csvDeleteData", dest="delete_data", type=str, help=argparse.SUPPRESS)
 parser.add_argument("-t", "--delete-table", dest="delete_table", type=str, help="Table name for deleting records (table contents only).", default=None)
 parser.add_argument("--delTable", dest="delete_table", type=str, help=argparse.SUPPRESS)
+parser.add_argument("-N", "--national-node", dest="national_node", type=str, help="Set national_node for all imported rows when missing in the file.", default=None)
 parser.add_argument("-I", "--import-format", dest="import_format", choices=["auto", "csv", "tsv"], default="auto", help="Import format override (csv/tsv). Default: auto by extension.")
 parser.add_argument("-D", "--delete-format", dest="delete_format", choices=["auto", "csv", "tsv"], default="auto", help="Delete file format override (csv/tsv). Default: auto by extension.")
 parser.add_argument("-e", "--export-facts", dest="export_facts", type=str, help="Export facts to a CSV/TSV file without modifying them.", default=None)
@@ -57,6 +58,7 @@ args = parser.parse_args()
 schema = args.schema
 csvImportData = args.import_data
 import_table_override = args.import_table
+national_node = args.national_node
 csvDeleteData = args.delete_data
 delTable = args.delete_table
 tsvQuoteChar = args.tsvQuoteChar
@@ -202,6 +204,16 @@ def resolve_collection_column(df):
             return col
     for col in df.columns:
         if "collection" in col.lower():
+            return col
+    return None
+
+
+def resolve_column_case_insensitive(df, column_name):
+    if column_name in df.columns:
+        return column_name
+    target = column_name.lower()
+    for col in df.columns:
+        if col.lower() == target:
             return col
     return None
 
@@ -403,6 +415,17 @@ async def sync_directory():
                     data = load_dataframe_for_file(import_path, resolved_format)
                 except Exception as exc:
                     logging.warning("Failed to read import file %s for record details: %s", csvImportData, exc)
+            added_national_node = False
+            if national_node and resolved_format in {"csv", "tsv"}:
+                if data is None:
+                    raise InputError("national_node was provided but the import file could not be parsed.")
+                column_name = resolve_column_case_insensitive(data, "national_node")
+                if column_name is None:
+                    data["national_node"] = national_node
+                    logging.info("Added national_node=%s to %s imported record(s).", national_node, len(data.index))
+                    added_national_node = True
+                else:
+                    logging.warning("Import file already contains %s column; --national-node will be ignored.", column_name)
             if data is None and resolved_format in {"csv", "tsv"}:
                 logging.info("Planned import from file %s (record details unavailable).", csvImportData)
             else:
@@ -447,7 +470,7 @@ async def sync_directory():
                 session.save_table(table=import_table, schema=schema, data=data)
             elif resolved_format == "csv":
                 logging.info("Importing data from %s", csvImportData)
-                if import_path.suffix.lower() == ".csv":
+                if import_path.suffix.lower() == ".csv" and not added_national_node:
                     await session.upload_file(csvImportData, schema)
                 else:
                     if data is None:

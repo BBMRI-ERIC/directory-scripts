@@ -181,6 +181,7 @@ Key safety points:
 ### Import records
 - Use `-i/--import-data` with `-T/--import-table` (recommended).
 - Format auto-detects by extension; override with `-I/--import-format csv|tsv` if the filename is wrong or missing an extension.
+- Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
 
 Examples:
 ``
@@ -188,6 +189,9 @@ python3 directory-tables-modifier.py -i Biobanks.csv -T Biobanks
 ``
 ``
 python3 directory-tables-modifier.py -i Collections.data -T Collections -I csv -n -v
+``
+``
+python3 directory-tables-modifier.py -i Biobanks.tsv -T Biobanks -N BBMRI-EU
 ``
 
 ### Delete records (table contents only)
