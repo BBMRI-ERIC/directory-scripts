@@ -166,7 +166,7 @@ python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson
 python3 install_certifi.py
 ``
 
-## Directory tables modifier (critical)
+## Directory tables modifier (use with caution!)
 
 `directory-tables-modifier.py` modifies staging tables. This is a sensitive component: always verify schema, input files, and intended records before applying changes.
 
