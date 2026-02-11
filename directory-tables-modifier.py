@@ -17,15 +17,19 @@ from molgenis_emx2.directory_client.directory_client import DirectorySession
 # Get credentials from .env
 load_dotenv()
 
-target = os.getenv("TARGET")
-username = os.getenv("USERNAME")
-password = os.getenv("PASSWORD")
+target = os.getenv("DIRECTORYTARGET")
+username = os.getenv("DIRECTORYUSERNAME")
+password = os.getenv("DIRECTORYPASSWORD")
 
 # Get args from stdin
-parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in BBMRI Directory staging area. Make sure you have an .env file in this folder, containing: TARGET=target URL, USERNAME and PASSWORD.")
+parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in BBMRI Directory staging area. Make sure you have an .env file in this folder, containing: DIRECTORYTARGET, DIRECTORYUSERNAME, DIRECTORYPASSWORD.")
 
 parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU).")
 parser.add_argument("-schema", dest="schema", type=str, help=argparse.SUPPRESS)
+
+parser.add_argument("--directory-target", dest="directory_target", type=str, help="Directory base URL (overrides DIRECTORYTARGET env var).", default=None)
+parser.add_argument("--directory-username", dest="directory_username", type=str, help="Directory username (overrides DIRECTORYUSERNAME env var).", default=None)
+parser.add_argument("--directory-password", dest="directory_password", type=str, help="Directory password (overrides DIRECTORYPASSWORD env var).", default=None)
 
 parser.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the CSV/TSV file containing the records to modify/add.", default=None)
 parser.add_argument("-T", "--import-table", dest="import_table", type=str, help="Target table name for import (recommended).", default=None)
@@ -77,6 +81,12 @@ export_facts = args.export_facts
 delete_facts = args.delete_facts
 fact_id_regex = args.fact_id_regex
 collection_ids = args.collection_ids
+if args.directory_target:
+    target = args.directory_target
+if args.directory_username:
+    username = args.directory_username
+if args.directory_password:
+    password = args.directory_password
 
 FACTS_TABLE = "CollectionFacts"
 
@@ -467,15 +477,56 @@ async def sync_directory():
                 logging.info("Importing TSV data from %s into table %s", csvImportData, import_table)
                 if data is None:
                     data = read_tsv_as_dataframe(import_path)
-                session.save_table(table=import_table, schema=schema, data=data)
+                try:
+                    session.save_table(table=import_table, schema=schema, data=data)
+                except Exception as exc:
+                    if (not national_node) and "national_node" in str(exc).lower():
+                        logging.warning(
+                            "Import failed due to missing national_node. Using schema %s as fallback for all rows.",
+                            schema,
+                        )
+                        column_name = resolve_column_case_insensitive(data, "national_node")
+                        if column_name is None:
+                            data["national_node"] = schema
+                        session.save_table(table=import_table, schema=schema, data=data)
+                    else:
+                        raise
             elif resolved_format == "csv":
                 logging.info("Importing data from %s", csvImportData)
                 if import_path.suffix.lower() == ".csv" and not added_national_node:
-                    await session.upload_file(csvImportData, schema)
+                    try:
+                        await session.upload_file(csvImportData, schema)
+                    except Exception as exc:
+                        if (not national_node) and "national_node" in str(exc).lower():
+                            logging.warning(
+                                "Import failed due to missing national_node. Using schema %s as fallback for all rows.",
+                                schema,
+                            )
+                            if data is None:
+                                data = read_csv_as_dataframe(import_path)
+                            column_name = resolve_column_case_insensitive(data, "national_node")
+                            if column_name is None:
+                                data["national_node"] = schema
+                            session.save_table(table=import_table, schema=schema, data=data)
+                        else:
+                            raise
                 else:
                     if data is None:
                         data = read_csv_as_dataframe(import_path)
-                    session.save_table(table=import_table, schema=schema, data=data)
+                    try:
+                        session.save_table(table=import_table, schema=schema, data=data)
+                    except Exception as exc:
+                        if (not national_node) and "national_node" in str(exc).lower():
+                            logging.warning(
+                                "Import failed due to missing national_node. Using schema %s as fallback for all rows.",
+                                schema,
+                            )
+                            column_name = resolve_column_case_insensitive(data, "national_node")
+                            if column_name is None:
+                                data["national_node"] = schema
+                            session.save_table(table=import_table, schema=schema, data=data)
+                        else:
+                            raise
             else:
                 logging.info("Importing data from %s", csvImportData)
                 await session.upload_file(csvImportData, schema)
@@ -561,9 +612,9 @@ def setup_logging():
 
 def validate_inputs():
     if not target:
-        raise InputError("TARGET is not set. Define it in the .env file.")
+        raise InputError("DIRECTORYTARGET is not set. Define it in the .env file or pass --directory-target.")
     if not username or not password:
-        raise InputError("USERNAME or PASSWORD is not set. Define them in the .env file.")
+        raise InputError("DIRECTORYUSERNAME or DIRECTORYPASSWORD is not set. Define them in the .env file or pass --directory-username/--directory-password.")
     if schema.strip().upper() == "ERIC":
         logging.warning(
             "Schema ERIC should not be edited with this script; it is auto-populated nightly from per-node staging areas."

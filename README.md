@@ -171,7 +171,7 @@ python3 install_certifi.py
 `directory-tables-modifier.py` modifies staging tables. This is a sensitive component: always verify schema, input files, and intended records before applying changes.
 
 Key safety points:
-- Requires `.env` with `TARGET`, `USERNAME`, `PASSWORD`.
+- Requires `.env` with `DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD` (or pass CLI overrides).
 - Schema is required (`-s/--schema`) and corresponds to the staging area name shown in the Molgenis Navigator (for example `BBMRI-EU`).
 - Deletions always require interactive confirmation unless `-f/--force` is used.
 - Use `-n/--dry-run` to preview changes without modifying data.
@@ -182,6 +182,10 @@ Key safety points:
 - Use `-i/--import-data` with `-T/--import-table` (recommended).
 - Format auto-detects by extension; override with `-I/--import-format csv|tsv` if the filename is wrong or missing an extension.
 - Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
+- If Molgenis rejects an import due to a missing `national_node` and `-N` is not set, the script falls back to `-s/--schema` as the `national_node` and warns.
+
+Federated login note:
+- If you use federated login (LifeScience Login/AAI) in the Directory UI, set a local password for API use: Directory web interface → Sign in → Account (top right) → Update password.
 
 Examples:
 ``
