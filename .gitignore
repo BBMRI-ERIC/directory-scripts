@@ -1,3 +1,5 @@
 # ignore cache 
 /data-check-cache
 /data-check-cache/*
+# ignore setup of environment variables
+.env
