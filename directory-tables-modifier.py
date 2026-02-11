@@ -564,6 +564,11 @@ def validate_inputs():
         raise InputError("TARGET is not set. Define it in the .env file.")
     if not username or not password:
         raise InputError("USERNAME or PASSWORD is not set. Define them in the .env file.")
+    if schema.strip().upper() == "ERIC":
+        logging.warning(
+            "Schema ERIC should not be edited with this script; it is auto-populated nightly from per-node staging areas."
+        )
+        confirm_action("Proceed anyway with schema ERIC?")
     if not (csvImportData or csvDeleteData or delete_facts or export_facts):
         raise InputError("No action specified. Provide import, delete, delete-facts, or export-facts options.")
     if csvImportData:
