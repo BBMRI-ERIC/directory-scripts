@@ -45,6 +45,7 @@ action_group.add_argument("-x", "--delete-data", dest="delete_data", nargs="?", 
 action_group.add_argument("-e", "--export-data", dest="export_data", type=str, help="Export table data to a CSV/TSV file without modifying it.", default=None)
 
 parser.add_argument("--delete-filter-only", dest="delete_filter_only", action="store_true", help="Allow deletion using -R/-C filters without a delete file.")
+parser.add_argument("--export-on-delete", dest="export_on_delete", type=str, help="Export (backup) rows that will be deleted to CSV/TSV before deletion.", default=None)
 
 parser.add_argument("-N", "--national-node", dest="national_node", type=str, help="Set national_node for all imported rows when missing in the file.", default=None)
 parser.add_argument("-F", "--file-format", dest="file_format", choices=["auto", "csv", "tsv"], default="auto", help="File format override (csv/tsv). Default: auto by extension.")
@@ -69,6 +70,7 @@ exportData = args.export_data
 export_action = args.export_data is not None
 import_action = args.import_data is not None
 delete_filter_only = args.delete_filter_only
+export_on_delete = args.export_on_delete
 national_node = args.national_node
 tsvQuoteChar = args.tsvQuoteChar
 tsvEscapeChar = args.tsvEscapeChar
@@ -584,6 +586,13 @@ async def sync_directory():
                         delete_data = None
                 if delete_data is not None:
                     log_records("Planned delete", table_name, delete_data)
+                    if export_on_delete:
+                        backup_path = Path(export_on_delete)
+                        backup_format = detect_format(backup_path, file_format)
+                        if backup_format is None:
+                            raise InputError("Export-on-delete format could not be determined. Use --file-format or a .csv/.tsv filename.")
+                        export_table_data(delete_data, backup_path, backup_format)
+                        logging.info("Exported %s record(s) slated for deletion to %s.", len(delete_data.index), backup_path)
                     summarize_delete(session, schema, table_name, delete_data, id_column_override)
                     if delete_data.empty:
                         logging.info("Delete file contains no records. Skipping delete for %s.", csvDeleteData)
@@ -607,6 +616,13 @@ async def sync_directory():
                     logging.info("No records matched the delete filters.")
                 else:
                     log_records("Planned delete", table_name, filtered)
+                    if export_on_delete:
+                        backup_path = Path(export_on_delete)
+                        backup_format = detect_format(backup_path, file_format)
+                        if backup_format is None:
+                            raise InputError("Export-on-delete format could not be determined. Use --file-format or a .csv/.tsv filename.")
+                        export_table_data(filtered, backup_path, backup_format)
+                        logging.info("Exported %s record(s) slated for deletion to %s.", len(filtered.index), backup_path)
                     id_column = resolve_id_column(filtered, id_column_override)
                     if id_column is None:
                         raise InputError("Delete requires an ID column named 'id' or --id-column.")
@@ -686,6 +702,12 @@ def validate_inputs():
             raise InputError(f"Export directory not found: {export_path.parent}")
         if file_format in {"csv", "tsv"} and export_path.suffix.lower() not in {".csv", ".tsv", ".tab", ""}:
             logging.warning("File format forced to %s for file %s.", file_format, exportData)
+    if export_on_delete:
+        export_path = Path(export_on_delete)
+        if not export_path.parent.exists():
+            raise InputError(f"Export-on-delete directory not found: {export_path.parent}")
+        if file_format in {"csv", "tsv"} and export_path.suffix.lower() not in {".csv", ".tsv", ".tab", ""}:
+            logging.warning("File format forced to %s for file %s.", file_format, export_on_delete)
 
 
 def main():

@@ -209,6 +209,7 @@ python3 directory-tables-modifier.py -s ERIC -T Collections -i Collections.tsv -
 - Deletes only matching records, not the whole table.
 - Requires interactive confirmation unless `-f/--force` is set.
 - To delete by filters only (no file), use `-x --delete-filter-only` together with `-R` and/or `-C`.
+- Use `--export-on-delete <file>` to back up the rows that will be deleted.
 
 Examples:
 ``
@@ -219,6 +220,9 @@ python3 directory-tables-modifier.py -s ERIC -T Collections -x delete.tsv -f
 ``
 ``
 python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -x --delete-filter-only -R '^FACT_' -C BB_001
+``
+``
+python3 directory-tables-modifier.py -s ERIC -T Collections -x delete.tsv --export-on-delete delete-backup.tsv
 ``
 
 ### Export records
