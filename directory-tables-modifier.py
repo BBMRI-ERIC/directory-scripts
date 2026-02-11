@@ -24,7 +24,7 @@ password = os.getenv("PASSWORD")
 # Get args from stdin
 parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in BBMRI Directory staging area. Make sure you have an .env file in this folder, containing: TARGET=target URL, USERNAME and PASSWORD.")
 
-parser.add_argument("-s", "--schema", type=str, default="ERIC", help="Schema (default: ERIC).")
+parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU).")
 parser.add_argument("-schema", dest="schema", type=str, help=argparse.SUPPRESS)
 
 parser.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the CSV/TSV file containing the records to modify/add.", default=None)

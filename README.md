@@ -172,7 +172,7 @@ python3 install_certifi.py
 
 Key safety points:
 - Requires `.env` with `TARGET`, `USERNAME`, `PASSWORD`.
-- Default schema is `ERIC` (override with `-s/--schema`).
+- Schema is required (`-s/--schema`) and corresponds to the staging area name shown in the Molgenis Navigator (for example `BBMRI-EU`).
 - Deletions always require interactive confirmation unless `-f/--force` is used.
 - Use `-n/--dry-run` to preview changes without modifying data.
 - `-v/--verbose` shows record-level details; `-d/--debug` adds connection/auth details.
@@ -185,13 +185,13 @@ Key safety points:
 
 Examples:
 ``
-python3 directory-tables-modifier.py -i Biobanks.csv -T Biobanks
+python3 directory-tables-modifier.py -s ERIC -i Biobanks.csv -T Biobanks
 ``
 ``
-python3 directory-tables-modifier.py -i Collections.data -T Collections -I csv -n -v
+python3 directory-tables-modifier.py -s ERIC -i Collections.data -T Collections -I csv -n -v
 ``
 ``
-python3 directory-tables-modifier.py -i Biobanks.tsv -T Biobanks -N BBMRI-EU
+python3 directory-tables-modifier.py -s ERIC -i Biobanks.tsv -T Biobanks -N BBMRI-EU
 ``
 
 ### Delete records (table contents only)
@@ -201,10 +201,10 @@ python3 directory-tables-modifier.py -i Biobanks.tsv -T Biobanks -N BBMRI-EU
 
 Examples:
 ``
-python3 directory-tables-modifier.py -x delete.tsv -t Collections
+python3 directory-tables-modifier.py -s ERIC -x delete.tsv -t Collections
 ``
 ``
-python3 directory-tables-modifier.py -x delete.tsv -t Collections -f
+python3 directory-tables-modifier.py -s ERIC -x delete.tsv -t Collections -f
 ``
 
 ### Facts export and deletion
@@ -214,13 +214,13 @@ python3 directory-tables-modifier.py -x delete.tsv -t Collections -f
 
 Examples:
 ``
-python3 directory-tables-modifier.py -e facts.tsv
+python3 directory-tables-modifier.py -s ERIC -e facts.tsv
 ``
 ``
-python3 directory-tables-modifier.py -e facts.csv -R '^FACT_' -C BB_001 -C BB_002
+python3 directory-tables-modifier.py -s ERIC -e facts.csv -R '^FACT_' -C BB_001 -C BB_002
 ``
 ``
-python3 directory-tables-modifier.py -F -R '^FACT_' -C BB_001 -f
+python3 directory-tables-modifier.py -s ERIC -F -R '^FACT_' -C BB_001 -f
 ``
 
 ### TSV parsing overrides

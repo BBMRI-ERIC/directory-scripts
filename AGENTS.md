@@ -45,6 +45,11 @@
 - XLSX inputs are typically read with pandas; ensure `openpyxl` is installed for `read_excel` compatibility.
 - Directory API access requires network access; account for this when running in sandboxed environments.
 - When deriving NN from IDs, the common pattern is `ID:XX_...` (XX can be multi-letter like `EXT`).
+- `directory-tables-modifier.py` requires an explicit schema (`-s/--schema`) and treats table deletion as content deletion only (no dropping tables).
+- For `directory-tables-modifier.py`, prefer explicit `--import-table`; CSV/TSV format is auto-detected but can be overridden with `--import-format`/`--delete-format`/`--export-format`.
+- `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
+- Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.
+- Facts tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--fact-id-regex`, `--collection-id`) and should always be documented in `README.md` with examples.
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.
@@ -57,7 +62,7 @@
 - Cache guidance for local testing: avoid `--purge-cache directory` unless you suspect recent Directory content changes may affect results; prefer reusing the existing cache to keep comparisons stable and runs faster.
 
 ## Commit & Pull Request Guidelines
-- Commit messages are short, present-tense summaries (for example “Adapted exporter-quality-label.py…” or “updates”).
+- Commit messages are short, present-tense summaries (for example “Adapted exporter-quality-label.py…” or “updates”) and should include a comprehensive description of changes in the commit message body.
 - For PRs, include a concise description, the command(s) run, and attach or reference generated artifacts (such as XLSX reports) when relevant.
 - Link related issues/tickets when available and call out any cache or data dependencies.
 
