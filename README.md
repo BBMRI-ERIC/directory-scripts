@@ -240,3 +240,48 @@ python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.csv -R 
 ### TSV parsing overrides
 If TSV files use non-standard quoting/escaping, adjust with:
 - `--tsvQuoteChar`, `--tsvEscapeChar`, `--tsvQuoting`, `--tsvNoDoublequote`.
+
+### Worked examples (sanitized)
+The following are adapted from real runs. Collection IDs are masked consistently as `bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE`.
+
+Dry-run delete of facts for one collection (no file, filter-only): 
+previews the exact rows that would be deleted, without changing data. Uses `-C` to target a single collection and `-n` to ensure no writes.
+``
+./directory-tables-modifier.py -s BBMRI-EU -v -T CollectionFacts -N BBMRI-EU -x --delete-filter-only -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE -n
+``
+
+Delete facts for one collection (no file, filter-only): 
+removes only the matching fact rows; confirmation is required unless `-f` is used.
+``
+./directory-tables-modifier.py -s BBMRI-EU -v -T CollectionFacts -N BBMRI-EU -x --delete-filter-only -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE
+``
+
+Import facts with forced approval: 
+imports all rows in `facts.tsv` into `CollectionFacts` without interactive prompts (`-f`).
+``
+./directory-tables-modifier.py -s BBMRI-EU -i facts.tsv -v -T CollectionFacts -N BBMRI-EU -f
+``
+
+Export facts for comparison: 
+exports the current `CollectionFacts` table to a TSV for review or diffing.
+``
+./directory-tables-modifier.py -s BBMRI-EU -e facts-cmp.tsv -v -T CollectionFacts -N BBMRI-EU
+``
+
+Export filtered facts for one collection: 
+exports only rows for the specified collection to inspect changes in isolation.
+``
+./directory-tables-modifier.py -s BBMRI-EU -e facts-cmp.tsv -v -T CollectionFacts -N BBMRI-EU -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE
+``
+
+Dry-run delete using a file plus a collection filter: 
+previews deleting only the filtered rows listed in `facts-cmp.tsv`.
+``
+./directory-tables-modifier.py -s BBMRI-EU -v -T CollectionFacts -N BBMRI-EU -x facts-cmp.tsv -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE -n
+``
+ 
+Delete using a file plus a collection filter:
+deletes only matching rows from the file and collection filter; confirmation is required.
+``
+./directory-tables-modifier.py -s BBMRI-EU -v -T CollectionFacts -N BBMRI-EU -x facts-cmp.tsv -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE
+``
