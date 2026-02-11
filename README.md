@@ -173,15 +173,18 @@ python3 install_certifi.py
 Key safety points:
 - Requires `.env` with `DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD` (or pass CLI overrides).
 - Schema is required (`-s/--schema`) and corresponds to the staging area name shown in the Molgenis Navigator (for example `BBMRI-EU`).
+- Table name is required for import, delete, and export (`-T/--table`).
+- Actions are mutually exclusive: import (`-i`), delete (`-x`), export (`-e`).
 - Deletions always require interactive confirmation unless `-f/--force` is used.
 - Use `-n/--dry-run` to preview changes without modifying data.
 - `-v/--verbose` shows record-level details; `-d/--debug` adds connection/auth details.
 - Exit codes: `0` success, `2` input error, `3` aborted, `1` runtime error.
 
 ### Import records
-- Use `-i/--import-data` with `-T/--import-table` (recommended).
-- Format auto-detects by extension; override with `-I/--import-format csv|tsv` if the filename is wrong or missing an extension.
+- Use `-i/--import-data` with `-T/--table`.
+- Format auto-detects by extension; override with `-F/--file-format csv|tsv` if the filename is wrong or missing an extension.
 - Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
+- Use `-R/--id-regex` and/or `-C/--collection-id` to import only matching rows (defaults to `id`/`collection` columns; override with `--id-column`/`--collection-column`).
 - If Molgenis rejects an import due to a missing `national_node` and `-N` is not set, the script falls back to `-s/--schema` as the `national_node` and warns.
 
 Federated login note:
@@ -189,42 +192,45 @@ Federated login note:
 
 Examples:
 ``
-python3 directory-tables-modifier.py -s ERIC -i Biobanks.csv -T Biobanks
+python3 directory-tables-modifier.py -s ERIC -T Biobanks -i Biobanks.csv
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -i Collections.data -T Collections -I csv -n -v
+python3 directory-tables-modifier.py -s ERIC -T Collections -i Collections.data -F csv -n -v
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -i Biobanks.tsv -T Biobanks -N BBMRI-EU
+python3 directory-tables-modifier.py -s ERIC -T Biobanks -i Biobanks.tsv -N BBMRI-EU
+``
+``
+python3 directory-tables-modifier.py -s ERIC -T Collections -i Collections.tsv -R '^COLL_' -C BB_001
 ``
 
 ### Delete records (table contents only)
-- Provide `-x/--delete-data` with `-t/--delete-table`.
+- Provide `-x/--delete-data` with `-T/--table`.
 - Deletes only matching records, not the whole table.
 - Requires interactive confirmation unless `-f/--force` is set.
+- To delete by filters only (no file), use `-x --delete-filter-only` together with `-R` and/or `-C`.
 
 Examples:
 ``
-python3 directory-tables-modifier.py -s ERIC -x delete.tsv -t Collections
+python3 directory-tables-modifier.py -s ERIC -T Collections -x delete.tsv
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -x delete.tsv -t Collections -f
+python3 directory-tables-modifier.py -s ERIC -T Collections -x delete.tsv -f
+``
+``
+python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -x --delete-filter-only -R '^FACT_' -C BB_001
 ``
 
-### Facts export and deletion
-- Export facts to CSV/TSV without modifying: `-e/--export-facts`.
-- Filter by fact ID regex (`-R/--fact-id-regex`) and/or collection IDs (`-C/--collection-id`).
-- Delete facts with `-F/--delete-facts` plus the same filters (confirmation required).
+### Export records
+- Export table data to CSV/TSV without modifying: `-e/--export-data`.
+- Filter by ID regex (`-R/--id-regex`) and/or collection IDs (`-C/--collection-id`).
 
 Examples:
 ``
-python3 directory-tables-modifier.py -s ERIC -e facts.tsv
+python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.tsv
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -e facts.csv -R '^FACT_' -C BB_001 -C BB_002
-``
-``
-python3 directory-tables-modifier.py -s ERIC -F -R '^FACT_' -C BB_001 -f
+python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.csv -R '^FACT_' -C BB_001 -C BB_002
 ``
 
 ### TSV parsing overrides
