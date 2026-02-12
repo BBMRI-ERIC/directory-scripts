@@ -530,7 +530,7 @@ if args.outputXLSX:
         })
         total_base = {
             'bold': True,
-            'bg_color': '#EC6607',
+            'bg_color': '#FDD3B5',
         }
         row_white_base = {'bg_color': '#FFFFFF'}
         row_blue_base = {'bg_color': '#E6EEF6'}
@@ -605,7 +605,7 @@ if args.outputXLSX:
                     base = dict(row_blue_base if use_blue else row_white_base)
                     fmt = make_format(base, italic=(col_idx == 0), borders=borders)
                 if needs_red:
-                    base['font_color'] = '#FF0000'
+                    base['font_color'] = '#CE0000'
                     fmt = make_format(base, italic=(col_idx == 0), bold=True, borders=borders)
                 ws_summary.write(excel_row, col_idx, value, fmt)
         header_labels = list(df_nn.columns)
