@@ -1,0 +1,4 @@
+interface:
+  display_name: "Assertive Quality Gate"
+  short_description: "Enforce assertive coding, testing, docs, and check quality."
+  default_prompt: "Apply the quality gate: verify assertions, docstrings, pytest coverage, and check warning quality before push/review/test outcomes."
