@@ -83,6 +83,8 @@
 - Prioritize reusable modules (especially `directory.py`) for defensive checks, docstrings, and regression tests.
 - If `checks/` changes, verify `make_check_id(...)` identifiers are meaningful and `DataCheckWarning(...)` messages are actionable.
 - For new or changed checks, keep machine-readable `CHECK_DOCS` metadata next to the implementation when the check has non-obvious business context, and keep severity/entity/field declarations aligned with emitted `DataCheckWarning(...)` calls.
+- `CHECK_DOCS` must be written as complete manual-facing documentation, not just as extracted-code hints: provide concrete `fields`, a clean generic `summary`, and a practical `fix` whenever the warning text is dynamic, partial, or emitted from helper logic that the AST extractor cannot follow.
+- Do not assume that adding `CHECK_DOCS` alone is enough; after changing check documentation metadata, verify the rendered/manual-facing result through `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py` and inspect the generated `checks-doc.tex` / `CHECKS.md` output for the affected checks.
 - Member-area consistency logic is subtle: member-country institutions may appear only in non-member areas as a reviewed exception, but the same institution must not be duplicated across member and non-member/global areas; `EU` is only an exception for hosting location, not for duplicate institutions.
 
 ## Commit & Pull Request Guidelines
@@ -94,6 +96,7 @@
 - Maintain and expand documentation alongside code changes; updates are required for new checks, exporters, or API changes.
 - Keep `README.md` accurate and add per-script usage examples as interfaces evolve.
 - If a change also affects the Directory Data Manager manual tooling, update the corresponding files in `../BBMRI-ERIC-Directory-Data-Manager-Manual/` as a coordinated follow-up; that repo contains the check-documentation generator and is not updated automatically by changes here.
+- When `CHECK_DOCS.fields` differ from AST-extracted fields by design, document the real intended fields explicitly and validate that the manual generator uses the documented fields rather than falling back to `None explicitly detected`.
 
 ## Security & Configuration Tips
 - Keep credentials out of the repo; prefer CLI flags (`-u`, `-p`) or local config files not committed.
