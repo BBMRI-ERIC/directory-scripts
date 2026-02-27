@@ -16,7 +16,7 @@ from diskcache import Cache
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
+CHECK_DOCS = {'BG:BBLatInvalid': {'entity': 'BIOBANK',
                                              'fields': ['latitude', 'longitude'],
                                              'severity': 'ERROR',
                                              'summary': 'Invalid biobank latitude '
@@ -26,7 +26,7 @@ CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
                                                         'around - the surrounding '
                                                         'quotes are added in this '
                                                         "report): offending value ''"},
- 'BiobankGeo:BiobankLongitudeDecimalNumber': {'entity': 'BIOBANK',
+ 'BG:BBLonInvalid': {'entity': 'BIOBANK',
                                               'fields': ['latitude', 'longitude'],
                                               'severity': 'ERROR',
                                               'summary': 'Invalid biobank longitude '
@@ -36,7 +36,7 @@ CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
                                                          'around - the surrounding '
                                                          'quotes are added in this '
                                                          "report): offending value ''"},
- 'BiobankGeo:CollectionLatitudeDecimalNumber': {'entity': 'COLLECTION',
+ 'BG:CollLatInvalid': {'entity': 'COLLECTION',
                                                 'fields': ['latitude', 'longitude'],
                                                 'severity': 'ERROR',
                                                 'summary': 'Invalid collection '
@@ -47,7 +47,7 @@ CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
                                                            'the surrounding quotes are '
                                                            'added in this report): '
                                                            "offending value ''"},
- 'BiobankGeo:CollectionLongitudeDecimalNumber': {'entity': 'COLLECTION',
+ 'BG:CollLonInvalid': {'entity': 'COLLECTION',
                                                  'fields': ['latitude', 'longitude'],
                                                  'severity': 'ERROR',
                                                  'summary': 'Invalid collection '
@@ -59,14 +59,14 @@ CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
                                                             'quotes are added in this '
                                                             'report): offending value '
                                                             "''"},
- 'BiobankGeo:GeographicalCoordinatesLatitude': {'entity': 'BIOBANK',
+ 'BG:BBCoordsMissing': {'entity': 'BIOBANK',
                                                 'fields': ['latitude', 'longitude'],
                                                 'severity': 'INFO',
                                                 'summary': 'Missing geographical '
                                                            "coordinates ('latitude "
                                                            "and/or 'longitude' "
                                                            'attributes are empty)'},
- 'BiobankGeo:GeolocationBiobankLikelyOutside': {'entity': 'BIOBANK',
+ 'BG:BBOutsideCountry': {'entity': 'BIOBANK',
                                                 'fields': ['address',
                                                            'country',
                                                            'country_code',
@@ -81,7 +81,7 @@ CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
                                                            'geographical coordinates '
                                                            "'latitude'={biobank['latitude']} "
                                                            "'longitude'={biobank['longitude']}"},
- 'BiobankGeo:GeolocationCollectionLikely': {'entity': 'COLLECTION',
+ 'BG:CollOutsideCountry': {'entity': 'COLLECTION',
                                             'fields': ['address',
                                                        'country',
                                                        'country_code',
@@ -96,19 +96,20 @@ CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
                                                        'coordinates '
                                                        "'latitude'={collection['latitude']} "
                                                        "'longitude'={collection['longitude']}"},
- 'BiobankGeo:ReverseGeocodingBiobankLocation': {'entity': 'BIOBANK',
+ 'BG:BBRevGeoFail': {'entity': 'BIOBANK',
                                                 'fields': ['latitude', 'longitude'],
                                                 'severity': 'WARNING',
                                                 'summary': 'Reverse geocoding of the '
                                                            'biobank  location failed '
                                                            '()'},
- 'BiobankGeo:ReverseGeocodingCollection': {'entity': 'COLLECTION',
+ 'BG:CollRevGeoFail': {'entity': 'COLLECTION',
                                            'fields': ['latitude', 'longitude'],
                                            'severity': 'WARNING',
                                            'summary': 'Reverse geocoding of the '
                                                       'collection  location failed ()'}}
 
 class BiobankGeo(IPlugin):
+	CHECK_ID_PREFIX = "BG"
 
 	def check(self, dir, args):
 		warnings = []
@@ -134,9 +135,9 @@ class BiobankGeo(IPlugin):
 			if 'latitude' in biobank and not re.search('^\s*$', biobank['latitude']) and 'longitude' in biobank and not re.search('^\s*$', biobank['longitude']):
 				# we check before doing any convenience substitutions 
 				if not re.search (geocoords_pattern, biobank['latitude']):
-					warnings.append(DataCheckWarning(make_check_id(self, "BiobankLatitudeDecimalNumber"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Invalid biobank latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + biobank['latitude'] + "'"))
+					warnings.append(DataCheckWarning(make_check_id(self, "BBLatInvalid"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Invalid biobank latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + biobank['latitude'] + "'"))
 				if not re.search (geocoords_pattern, biobank['longitude']):
-					warnings.append(DataCheckWarning(make_check_id(self, "BiobankLongitudeDecimalNumber"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Invalid biobank longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + biobank['longitude'] + "'"))
+					warnings.append(DataCheckWarning(make_check_id(self, "BBLonInvalid"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Invalid biobank longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + biobank['longitude'] + "'"))
 				# this is for convenience - if there are commas used instead of periods, we should still do the remaining checks
 				biobank['latitude'] = re.sub(r',', r'.', biobank['latitude'])
 				biobank['longitude'] = re.sub(r',', r'.', biobank['longitude'])
@@ -154,21 +155,21 @@ class BiobankGeo(IPlugin):
 							logMessage += " -> OK"
 							if ((biobank['country']['id'] != "IARC" and biobank['country']['id'] != "EU") and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
-								warnings.append(DataCheckWarning(make_check_id(self, "GeolocationBiobankLikelyOutside"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Geolocation of the biobank is likely outside of its country " + biobank['country']['id'] + "; biobank seems to be in " + country_code.upper() + f" based on geographical coordinates 'latitude'={biobank['latitude']} 'longitude'={biobank['longitude']}"))
+								warnings.append(DataCheckWarning(make_check_id(self, "BBOutsideCountry"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Geolocation of the biobank is likely outside of its country " + biobank['country']['id'] + "; biobank seems to be in " + country_code.upper() + f" based on geographical coordinates 'latitude'={biobank['latitude']} 'longitude'={biobank['longitude']}"))
 						except Exception as e:
 							logMessage += " -> failed (" + str(e) + ")"
-							warnings.append(DataCheckWarning(make_check_id(self, "ReverseGeocodingBiobankLocation"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Reverse geocoding of the biobank  location failed (" + str(e) + ")"))
+							warnings.append(DataCheckWarning(make_check_id(self, "BBRevGeoFail"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Reverse geocoding of the biobank  location failed (" + str(e) + ")"))
 						log.info(logMessage)
 			else:
-				warnings.append(DataCheckWarning(make_check_id(self, "GeographicalCoordinatesLatitude"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing geographical coordinates ('latitude and/or 'longitude' attributes are empty)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBCoordsMissing"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.INFO, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing geographical coordinates ('latitude and/or 'longitude' attributes are empty)"))
 
 		for collection in dir.getCollections():
 			if 'latitude' in collection and not re.search('^\s*$', collection['latitude']) and 'longitude' in collection and not re.search('^\s*$', collection['longitude']):
 				# we check before doing any convenience substitutions 
 				if not re.search (geocoords_pattern, collection['latitude']):
-					warnings.append(DataCheckWarning(make_check_id(self, "CollectionLatitudeDecimalNumber"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Invalid collection latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + collection['latitude'] + "'"))
+					warnings.append(DataCheckWarning(make_check_id(self, "CollLatInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Invalid collection latitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + collection['latitude'] + "'"))
 				if not re.search (geocoords_pattern, collection['longitude']):
-					warnings.append(DataCheckWarning(make_check_id(self, "CollectionLongitudeDecimalNumber"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Invalid collection longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + collection['longitude'] + "'"))
+					warnings.append(DataCheckWarning(make_check_id(self, "CollLonInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Invalid collection longitude (should be a decimal number with period without any spaces or stray characters around - the surrounding quotes are added in this report): offending value '" + collection['longitude'] + "'"))
 				# this is for convenience - if there are commas used instead of periods, we should still do the remaining checks
 				collection['latitude'] = re.sub(r',', r'.', collection['latitude'])
 				collection['longitude'] = re.sub(r',', r'.', collection['longitude'])
@@ -188,10 +189,10 @@ class BiobankGeo(IPlugin):
 							biobank = dir.getBiobankById(biobankId)
 							if ((biobank['country']['id'] != "IARC" and biobank['country']['id'] != "EU") and country_code.upper() != biobank['country']['id'] and 
 									not (country_code.upper() == "GB" and biobank['country']['id'] == "UK")):
-								warnings.append(DataCheckWarning(make_check_id(self, "GeolocationCollectionLikely"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Geolocation of the collection is likely outside of its country " + collection['country']['id'] + "; collection seems to be in " + country_code.upper() + f" based on geographical coordinates 'latitude'={collection['latitude']} 'longitude'={collection['longitude']}"))
+								warnings.append(DataCheckWarning(make_check_id(self, "CollOutsideCountry"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Geolocation of the collection is likely outside of its country " + collection['country']['id'] + "; collection seems to be in " + country_code.upper() + f" based on geographical coordinates 'latitude'={collection['latitude']} 'longitude'={collection['longitude']}"))
 						except Exception as e:
 							logMessage += " -> failed (" + str(e) + ")"
-							warnings.append(DataCheckWarning(make_check_id(self, "ReverseGeocodingCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Reverse geocoding of the collection  location failed (" + str(e) + ")"))
+							warnings.append(DataCheckWarning(make_check_id(self, "CollRevGeoFail"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Reverse geocoding of the collection  location failed (" + str(e) + ")"))
 						log.info(logMessage)
 
 		cache.close()

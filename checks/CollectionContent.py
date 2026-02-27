@@ -132,17 +132,23 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                              'not marked as rare '
                                                              'disease (RD) collection'},
  'CC:OrphaNeedsIcd': {'entity': 'COLLECTION',
-                                                        'fields': [],
+                                                        'fields': ['diagnosis_available'],
+                                                        'fix': 'Add the relevant '
+                                                               'ICD-10 diagnosis '
+                                                               'codes alongside the '
+                                                               'existing ORPHA codes '
+                                                               'so the collection can '
+                                                               'also be found by '
+                                                               'users searching via '
+                                                               'ICD-10.',
                                                         'severity': 'WARNING',
-                                                        'summary': 'ORPHA code '
-                                                                   'diagnoses '
-                                                                   'specified, but no '
-                                                                   'ICD-10 equivalents '
-                                                                   'provided, thus '
-                                                                   'making collection '
-                                                                   'impossible to find '
-                                                                   'for users using '
-                                                                   'ICD-10 codes'},
+                                                        'summary': 'The collection '
+                                                                   'uses ORPHA '
+                                                                   'diagnosis codes '
+                                                                   'but does not '
+                                                                   'provide matching '
+                                                                   'ICD-10 diagnosis '
+                                                                   'values.'},
  'CC:OrphaInvalid': {'entity': 'COLLECTION',
                                        'fields': ['diagnosis_available', 'name'],
                                        'severity': 'ERROR',

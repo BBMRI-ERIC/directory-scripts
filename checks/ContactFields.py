@@ -16,43 +16,43 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'ContactFields:EmailContactEmailAttributeEmpty': {'entity': 'CONTACT',
+CHECK_DOCS = {'CTF:EmailMissing': {'entity': 'CONTACT',
                                                    'fields': ['email'],
                                                    'severity': 'ERROR',
                                                    'summary': 'Missing email for '
                                                               "contact ('email' "
                                                               'attribute is empty)'},
- 'ContactFields:EmailContactOffendingEmail': {'entity': 'CONTACT',
+ 'CTF:EmailInvalid': {'entity': 'CONTACT',
                                               'fields': ['email'],
                                               'severity': 'WARNING',
                                               'summary': 'Email for contact is invalid '
                                                          "- offending  'email' "
                                                          'attribute value: '},
- 'ContactFields:EmailContactSeemsUnreachable': {'entity': 'CONTACT',
+ 'CTF:EmailUnreachable': {'entity': 'CONTACT',
                                                 'fields': ['email'],
                                                 'severity': 'WARNING',
                                                 'summary': 'Email for contact seems to '
                                                            'be unreachable because of '
                                                            'missing DNS MX record'},
- 'ContactFields:FirstNameContactFirstName': {'entity': 'CONTACT',
+ 'CTF:FirstNameMissing': {'entity': 'CONTACT',
                                              'fields': ['first_name'],
                                              'severity': 'WARNING',
                                              'summary': 'Missing first name for '
                                                         "contact ('first_name' "
                                                         'attribute is empty)'},
- 'ContactFields:LastNameContactLastNameAttribute': {'entity': 'CONTACT',
+ 'CTF:LastNameMissing': {'entity': 'CONTACT',
                                                     'fields': ['last_name'],
                                                     'severity': 'WARNING',
                                                     'summary': 'Missing last name for '
                                                                "contact ('last_name' "
                                                                'attribute is empty)'},
- 'ContactFields:PhoneContactPhoneAttributeEmpty': {'entity': 'CONTACT',
+ 'CTF:PhoneMissing': {'entity': 'CONTACT',
                                                    'fields': ['phone'],
                                                    'severity': 'WARNING',
                                                    'summary': 'Missing phone for '
                                                               "contact ('phone' "
                                                               "attribute is empty'"},
- 'ContactFields:PhoneNumberContactDoesConformE': {'entity': 'CONTACT',
+ 'CTF:PhoneInvalid': {'entity': 'CONTACT',
                                                   'fields': ['phone'],
                                                   'severity': 'ERROR',
                                                   'summary': 'Phone number for contact '
@@ -64,6 +64,7 @@ CHECK_DOCS = {'ContactFields:EmailContactEmailAttributeEmpty': {'entity': 'CONTA
                                                              "in 'phone' attribute: "}}
 
 class ContactFields(IPlugin):
+	CHECK_ID_PREFIX = "CTF"
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running contact fields checks (ContactFields)")
@@ -83,13 +84,13 @@ class ContactFields(IPlugin):
 			
 		for contact in dir.getContacts():
 			if(not 'first_name' in contact or re.search('^\s*$', contact['first_name'])):
-				warnings.append(DataCheckWarning(make_check_id(self, "FirstNameContactFirstName"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing first name for contact ('first_name' attribute is empty)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "FirstNameMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing first name for contact ('first_name' attribute is empty)"))
 			if(not 'last_name' in contact or re.search('^\s*$', contact['last_name'])):
-				warnings.append(DataCheckWarning(make_check_id(self, "LastNameContactLastNameAttribute"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing last name for contact ('last_name' attribute is empty)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "LastNameMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing last name for contact ('last_name' attribute is empty)"))
 			if(not 'email' in contact or re.search('^\s*$', contact['email'])):
-				warnings.append(DataCheckWarning(make_check_id(self, "EmailContactEmailAttributeEmpty"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing email for contact ('email' attribute is empty)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "EmailMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing email for contact ('email' attribute is empty)"))
 			elif(not validate_email(contact['email'])):
-				warnings.append(DataCheckWarning(make_check_id(self, "EmailContactOffendingEmail"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact is invalid - offending  'email' attribute value: " + contact['email']))
+				warnings.append(DataCheckWarning(make_check_id(self, "EmailInvalid"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact is invalid - offending  'email' attribute value: " + contact['email']))
 			else:
 				# This is pretty dramatic test and should be used sparingly
 				if ValidateEmails:
@@ -108,7 +109,7 @@ class ContactFields(IPlugin):
 						else:
 							if(not validate_email(contact_email,check_mx=True)):
 								log_message += " -> failed"
-								warning = DataCheckWarning(make_check_id(self, "EmailContactSeemsUnreachable"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact seems to be unreachable because of missing DNS MX record")
+								warning = DataCheckWarning(make_check_id(self, "EmailUnreachable"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact seems to be unreachable because of missing DNS MX record")
 								warnings.append(warning)
 								cache[contact_email] = { 'valid' : False, 'warning' : warning }
 							else:
@@ -120,7 +121,7 @@ class ContactFields(IPlugin):
 						log.error(log_message)
 
 			if(not 'phone' in contact or re.search('^\s*$', contact['phone'])):
-				warnings.append(DataCheckWarning(make_check_id(self, "PhoneContactPhoneAttributeEmpty"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing phone for contact ('phone' attribute is empty'"))
+				warnings.append(DataCheckWarning(make_check_id(self, "PhoneMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing phone for contact ('phone' attribute is empty'"))
 			elif(not re.search('^\+(?:[0-9]??){6,14}[0-9]$', contact['phone'])):
-				warnings.append(DataCheckWarning(make_check_id(self, "PhoneNumberContactDoesConformE"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Phone number for contact does not conform to the E.123 international standard (means starts with + sign, no spaces) - offending phone number in 'phone' attribute: " + contact['phone']))
+				warnings.append(DataCheckWarning(make_check_id(self, "PhoneInvalid"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Phone number for contact does not conform to the E.123 international standard (means starts with + sign, no spaces) - offending phone number in 'phone' attribute: " + contact['phone']))
 		return warnings

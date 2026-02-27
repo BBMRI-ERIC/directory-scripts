@@ -12,11 +12,19 @@ covidProspectiveCollectionIdPattern =  '.*:COVID19PROSPECTIVE$'
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
 CHECK_DOCS = {'C19:BBNetMissing': {'entity': 'BIOBANK',
-                                          'fields': [],
+                                          'fields': ['network'],
+                                          'fix': 'If the biobank really hosts a '
+                                                 'COVID-19 collection, add the '
+                                                 'COVID-19 network to the biobank. '
+                                                 'Otherwise review the collection '
+                                                 'diagnosis coding or remove the '
+                                                 'collection from the COVID-19 '
+                                                 'dataset.',
                                           'severity': 'ERROR',
-                                          'summary': 'Biobank contains COVID '
-                                                     'collection  but not marked as '
-                                                     'part of '},
+                                          'summary': 'A biobank has at least one '
+                                                     'COVID-19 collection, but the '
+                                                     'biobank is not linked to the '
+                                                     'BBMRI-ERIC COVID-19 network.'},
  'C19:BBCovidCapMissing': {'entity': 'BIOBANK',
                                            'fields': ['covid19'],
                                            'severity': 'ERROR',
@@ -66,9 +74,17 @@ CHECK_DOCS = {'C19:BBNetMissing': {'entity': 'BIOBANK',
                                                      'collect" does not have '
                                                      'COVID19PROSPECTIVE label'},
  'C19:TypeMissing': {'entity': 'COLLECTION',
-                                  'fields': [],
+                                  'fields': ['type'],
+                                  'fix': 'Set at least one collection type. For '
+                                         'COVID-19 collections, make sure the type '
+                                         'assignment matches the actual collection '
+                                         'role, such as DISEASE_SPECIFIC and, when '
+                                         'applicable, PROSPECTIVE_COLLECTION.',
                                   'severity': 'ERROR',
-                                  'summary': 'Collection type not provided'},
+                                  'summary': 'The collection has no type assigned, '
+                                             'so COVID-19-specific validation cannot '
+                                             'determine how it should be '
+                                             'classified.'},
  'C19:CovidDiagMissing': {'entity': 'COLLECTION',
                                           'fields': ['id'],
                                           'severity': 'ERROR',
@@ -113,14 +129,19 @@ CHECK_DOCS = {'C19:BBNetMissing': {'entity': 'BIOBANK',
                                                      'must have PROSPECTIVE_COLLECTION '
                                                      'as one of its types'},
  'C19:DiagRange': {'entity': 'COLLECTION',
-                                           'fields': [],
+                                           'fields': ['diagnosis_available'],
+                                           'fix': 'Replace diagnosis ranges with '
+                                                  'explicit diagnosis terms or codes '
+                                                  'that the Directory search can '
+                                                  'index correctly. Do not encode '
+                                                  'ranges as diagnosis values for '
+                                                  'COVID-19 collections.',
                                            'severity': 'ERROR',
-                                           'summary': 'It seems that diagnoses '
-                                                      'contains range - this will '
-                                                      'render the diagnosis search '
-                                                      'ineffective for the given '
-                                                      'collection. Violating diagnosis '
-                                                      'term(s): '},
+                                           'summary': 'The collection uses diagnosis '
+                                                      'range values in '
+                                                      "'diagnosis_available', which "
+                                                      'prevents reliable COVID-19 '
+                                                      'search and filtering.'},
  'C19:BslFlagMissing': {'entity': 'COLLECTION',
                                        'fields': ['id'],
                                        'severity': 'WARNING',

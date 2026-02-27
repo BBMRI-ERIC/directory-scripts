@@ -7,17 +7,18 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'OrphanedCollections:OrphanedCollection': {'entity': 'COLLECTION',
+CHECK_DOCS = {'OC:Orphan': {'entity': 'COLLECTION',
                                             'fields': ['id'],
                                             'severity': 'ERROR',
                                             'summary': 'Orphaned collection'}}
 
 class OrphanedCollections(IPlugin):
+	CHECK_ID_PREFIX = "OC"
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running orphaned collection checks (OrphanedCollections)")
 		for collection in dir.getCollections():
 			collections = dir.getGraphBiobankCollectionsFromCollection(collection['id'])
 			if len(collections.edges) < 1:
-				warnings.append(DataCheckWarning(make_check_id(self, "OrphanedCollection"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Orphaned collection"))
+				warnings.append(DataCheckWarning(make_check_id(self, "Orphan"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Orphaned collection"))
 		return warnings

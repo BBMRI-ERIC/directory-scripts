@@ -17,14 +17,14 @@ def descriptionTooShort(s : str) -> bool:
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'SemiemptyFields:DescriptionBiobankDescription': {'entity': 'BIOBANK',
+CHECK_DOCS = {'SE:BBDescMissing': {'entity': 'BIOBANK',
                                                    'fields': ['description'],
                                                    'severity': 'WARNING',
                                                    'summary': 'Missing description for '
                                                               "biobank ('description' "
                                                               'attribute is empty for '
                                                               'the biobank)'},
- 'SemiemptyFields:DescriptionCollectionDescription': {'entity': 'COLLECTION',
+ 'SE:CollDescMissing': {'entity': 'COLLECTION',
                                                       'fields': ['description'],
                                                       'severity': 'WARNING',
                                                       'summary': 'Missing description '
@@ -32,21 +32,21 @@ CHECK_DOCS = {'SemiemptyFields:DescriptionBiobankDescription': {'entity': 'BIOBA
                                                                  "('description' "
                                                                  'attribute is empty '
                                                                  'for the collection)'},
- 'SemiemptyFields:NameBiobankNameAttributeEmpty': {'entity': 'BIOBANK',
+ 'SE:BBNameMissing': {'entity': 'BIOBANK',
                                                    'fields': ['name'],
                                                    'severity': 'ERROR',
                                                    'summary': 'Missing name for '
                                                               "biobank ('name' "
                                                               'attribute is empty for '
                                                               'the biobank)'},
- 'SemiemptyFields:NameCollectionNameAttributeEmpty': {'entity': 'COLLECTION',
+ 'SE:CollNameMissing': {'entity': 'COLLECTION',
                                                       'fields': ['name'],
                                                       'severity': 'ERROR',
                                                       'summary': 'Missing name for '
                                                                  "collection ('name' "
                                                                  'attribute is empty '
                                                                  'for the biobank)'},
- 'SemiemptyFields:SuspiciouslyShortDescription': {'entity': 'BIOBANK',
+ 'SE:BBDescShort': {'entity': 'BIOBANK',
                                                   'fields': ['description'],
                                                   'severity': 'WARNING',
                                                   'summary': 'Suspiciously short '
@@ -56,7 +56,7 @@ CHECK_DOCS = {'SemiemptyFields:DescriptionBiobankDescription': {'entity': 'BIOBA
                                                              'has less than '
                                                              '{str(minDescWords)} '
                                                              'words)'},
- 'SemiemptyFields:SuspiciouslyShortDescription2': {'entity': 'COLLECTION',
+ 'SE:CollDescShort': {'entity': 'COLLECTION',
                                                    'fields': ['description'],
                                                    'severity': 'WARNING',
                                                    'summary': 'Suspiciously short '
@@ -70,24 +70,25 @@ CHECK_DOCS = {'SemiemptyFields:DescriptionBiobankDescription': {'entity': 'BIOBA
                                                               'words)'}}
 
 class SemiemptyFields(IPlugin):
+	CHECK_ID_PREFIX = "SE"
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running empty or semi-empty fields checks (SemiemptyFields)")
 		for biobank in dir.getBiobanks():
 			if not 'description' in biobank or re.search('^\s*$', biobank['description']) or re.search('^\s*N/?A\s*$', biobank['description']):
-				warnings.append(DataCheckWarning(make_check_id(self, "DescriptionBiobankDescription"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing description for biobank ('description' attribute is empty for the biobank)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBDescMissing"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing description for biobank ('description' attribute is empty for the biobank)"))
 			if 'description' in biobank and descriptionTooShort(biobank['description']):
-				warnings.append(DataCheckWarning(make_check_id(self, "SuspiciouslyShortDescription"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), f"Suspiciously short description for biobank ('description' attribute {biobank['description']} has less than {str(minDescWords)} words)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBDescShort"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), f"Suspiciously short description for biobank ('description' attribute {biobank['description']} has less than {str(minDescWords)} words)"))
 			if not 'name' in biobank or re.search('^\s*$', biobank['name']) or re.search('^\s*N/?A\s*$', biobank['name']):
-				warnings.append(DataCheckWarning(make_check_id(self, "NameBiobankNameAttributeEmpty"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing name for biobank ('name' attribute is empty for the biobank)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBNameMissing"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing name for biobank ('name' attribute is empty for the biobank)"))
 
 		for collection in dir.getCollections():
 			if not 'description' in collection or re.search('^\s*$', collection['description']) or re.search('^\s*N/?A\s*$', collection['description']):
-				warnings.append(DataCheckWarning(make_check_id(self, "DescriptionCollectionDescription"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Missing description for collection ('description' attribute is empty for the collection)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "CollDescMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Missing description for collection ('description' attribute is empty for the collection)"))
 			if 'description' in collection and descriptionTooShort(collection['description']):
-				warnings.append(DataCheckWarning(make_check_id(self, "SuspiciouslyShortDescription2"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Suspiciously short description for collection ('description' attribute {collection['description']} has less than {str(minDescWords)} words)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "CollDescShort"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Suspiciously short description for collection ('description' attribute {collection['description']} has less than {str(minDescWords)} words)"))
 			if not 'name' in collection or re.search('^\s*$', collection['name']) or re.search('^\s*N/?A\s*$', collection['name']):
-				warnings.append(DataCheckWarning(make_check_id(self, "NameCollectionNameAttributeEmpty"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Missing name for collection ('name' attribute is empty for the biobank)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "CollNameMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Missing name for collection ('name' attribute is empty for the biobank)"))
 
 
 		return warnings

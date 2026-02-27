@@ -46,3 +46,21 @@ def test_check_docs_metadata_matches_all_plugins():
     assert documented_checks["BBF:JuridicalMissing"][
         "fields"
     ] == ["juridical_person"]
+    assert documented_checks["BCO:AccessConflict"]["fields"] == [
+        "commercial_use",
+        "network",
+    ]
+    assert documented_checks["BCO:BBNetFlag"]["fields"] == ["network"]
+    assert documented_checks["C19:BBNetMissing"]["fields"] == ["network"]
+    assert documented_checks["C19:TypeMissing"]["fields"] == ["type"]
+    assert documented_checks["C19:DiagRange"]["fields"] == ["diagnosis_available"]
+    assert documented_checks["CC:OrphaNeedsIcd"]["fields"] == [
+        "diagnosis_available"
+    ]
+    assert documented_checks["FT:CollFactsMismatch"]["fields"] == [
+        "diagnosis_available",
+        "facts",
+        "id",
+        "materials",
+        "sex",
+    ]

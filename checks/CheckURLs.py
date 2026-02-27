@@ -83,28 +83,29 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'CheckURLs:BiobankUrl': {'entity': 'BIOBANK',
+CHECK_DOCS = {'URL:BBInvalid': {'entity': 'BIOBANK',
                           'fields': ['url'],
                           'severity': 'ERROR',
                           'summary': 'Biobank URL'},
- 'CheckURLs:DataAccessUrlCollection': {'entity': 'COLLECTION',
+ 'URL:CollDataInvalid': {'entity': 'COLLECTION',
                                        'fields': ['data_access_uri'],
                                        'severity': 'ERROR',
                                        'summary': 'Data access URL for collection'},
- 'CheckURLs:ImageAccessUrlCollection': {'entity': 'COLLECTION',
+ 'URL:CollImageInvalid': {'entity': 'COLLECTION',
                                         'fields': ['image_access_uri'],
                                         'severity': 'ERROR',
                                         'summary': 'Image access URL for collection'},
- 'CheckURLs:SampleAccessUrlCollection': {'entity': 'COLLECTION',
+ 'URL:CollSampleInvalid': {'entity': 'COLLECTION',
                                          'fields': ['sample_access_uri'],
                                          'severity': 'ERROR',
                                          'summary': 'Sample access URL for collection'},
- 'CheckURLs:Url': {'entity': 'BIOBANK',
+ 'URL:BBMissing': {'entity': 'BIOBANK',
                    'fields': ['url'],
                    'severity': 'WARNING',
                    'summary': 'Missing URL'}}
 
 class CheckURLs(IPlugin):
+	CHECK_ID_PREFIX = "URL"
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running URL checks (CheckURLs)")
@@ -123,10 +124,10 @@ class CheckURLs(IPlugin):
 		log.info("Testing biobank URLs")
 		for biobank in dir.getBiobanks():
 			if not 'url' in biobank or re.search('^\s*$', biobank['url']):
-				warnings.append(DataCheckWarning(make_check_id(self, "Url"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing URL"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBMissing"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Missing URL"))
 			else:
 				URLwarnings = testURL(biobank['url'], 
-						DataCheckWarning(make_check_id(self, "BiobankUrl"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank URL")
+						DataCheckWarning(make_check_id(self, "BBInvalid"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank URL")
 						)
 				warnings += URLwarnings
 
@@ -135,18 +136,18 @@ class CheckURLs(IPlugin):
 			# non-existence of access URIs is tested in the access policy checks - here we only check validity of the URL if it exists
 			if 'data_access_uri' in collection and not re.search('^\s*$', collection['data_access_uri']):
 				URLwarnings = testURL(collection['data_access_uri'],
-						DataCheckWarning(make_check_id(self, "DataAccessUrlCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Data access URL for collection")
+						DataCheckWarning(make_check_id(self, "CollDataInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Data access URL for collection")
 						)
 				warnings += URLwarnings
 
 			if 'sample_access_uri' in collection and not re.search('^\s*$', collection['sample_access_uri']):
 				URLwarnings = testURL(collection['sample_access_uri'],
-						DataCheckWarning(make_check_id(self, "SampleAccessUrlCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Sample access URL for collection")
+						DataCheckWarning(make_check_id(self, "CollSampleInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Sample access URL for collection")
 						)
 				warnings += URLwarnings
 			if 'image_access_uri' in collection and not re.search('^\s*$', collection['image_access_uri']):
 				URLwarnings = testURL(collection['image_access_uri'],
-						DataCheckWarning(make_check_id(self, "ImageAccessUrlCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Image access URL for collection")
+						DataCheckWarning(make_check_id(self, "CollImageInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Image access URL for collection")
 						)
 				warnings += URLwarnings
 

@@ -183,12 +183,25 @@ CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
                                        'the fact table does specified the NAV '
                                        '(not-available) material type'},
  'FT:CollFactsMismatch': {'entity': 'COLLECTION',
-                                            'fields': [],
+                                            'fields': ['diagnosis_available',
+                                                       'facts',
+                                                       'id',
+                                                       'materials',
+                                                       'sex'],
+                                            'fix': 'Align the collection-level '
+                                                   'descriptors with the fact '
+                                                   'sheet. Check diagnoses, sex, '
+                                                   'and material type values on the '
+                                                   'collection record against the '
+                                                   'values present in the fact '
+                                                   'table and correct whichever '
+                                                   'side is wrong.',
                                             'severity': 'WARNING',
-                                            'summary': ' - collection information: '
-                                                       '{sorted(collList)} - fact '
-                                                       'information: '
-                                                       '{sorted(factsList)}'},
+                                            'summary': 'The fact sheet and the main '
+                                                       'collection record describe '
+                                                       'different diagnoses, sex '
+                                                       'groups, or material '
+                                                       'types.'},
  'FT:SizeInvalid': {'entity': 'COLLECTION',
                                               'fields': ['donors_present',
                                                          'facts',
