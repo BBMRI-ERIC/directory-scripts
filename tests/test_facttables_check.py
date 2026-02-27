@@ -75,6 +75,6 @@ def test_facttables_check_reports_all_star_consistency_warnings():
     warnings = plugin.check(FactTablesDirectoryStub(), args=None)
     warning_ids = {warning.dataCheckID for warning in warnings}
 
-    assert "FactTables:AllStarSamplesMismatchCollectionSize" in warning_ids
-    assert "FactTables:AllStarDonorsMismatchCollectionDonors" in warning_ids
-    assert "FactTables:AllStarAggregateAggregates4" in warning_ids
+    assert "FT:AllStarSizeGap" in warning_ids
+    assert "FT:AllStarDonorGap" in warning_ids
+    assert "FT:AllStarMissing" in warning_ids

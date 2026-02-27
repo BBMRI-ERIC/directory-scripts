@@ -10,7 +10,7 @@ from directory import Directory
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'SubcollectionNetworkMembership:SubcollectionPartNetworkNetwork': {'entity': 'COLLECTION',
+CHECK_DOCS = {'SNM:SubcollNetMissing': {'entity': 'COLLECTION',
                                                                     'fields': ['id',
                                                                                'network',
                                                                                'parent_collection'],
@@ -30,6 +30,7 @@ CHECK_DOCS = {'SubcollectionNetworkMembership:SubcollectionPartNetworkNetwork': 
 
 class SubcollectionNetworkMembership(IPlugin):
     """Check whether subcollections belong to the same network as their parent collections"""
+    CHECK_ID_PREFIX = "SNM"
 
     def check(self, directory: Directory, _):
         """Do the actual checking"""
@@ -46,7 +47,7 @@ class SubcollectionNetworkMembership(IPlugin):
                         if "network" not in collection or network not in collection["network"]:
                             warnings.append(
                                 DataCheckWarning(
-                                    make_check_id(self, "SubcollectionPartNetworkNetwork"),
+                                    make_check_id(self, "SubcollNetMissing"),
                                     "",
                                     directory.getCollectionNN(collection["id"]),
                                     DataCheckWarningLevel.WARNING,

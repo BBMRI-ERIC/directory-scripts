@@ -38,11 +38,11 @@ def test_check_docs_metadata_matches_all_plugins():
         for check in plugin["checks"]
     }
     assert documented_checks[
-        "MemberAreaConsistency:InstitutionOnlyInNonMemberArea"
+        "MAC:MemberNonMember"
     ]["severity"] == "WARNING"
     assert documented_checks[
-        "MemberAreaConsistency:InstitutionDuplicatedAcrossMemberAndOtherArea"
+        "MAC:MemberDupOtherArea"
     ]["entity"] == "BIOBANK"
-    assert documented_checks["BiobankFields:JuridicalPersonJuridicalPerson"][
+    assert documented_checks["BBF:JuridicalMissing"][
         "fields"
     ] == ["juridical_person"]

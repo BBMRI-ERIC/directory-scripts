@@ -11,13 +11,13 @@ covidProspectiveCollectionIdPattern =  '.*:COVID19PROSPECTIVE$'
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
+CHECK_DOCS = {'C19:BBNetMissing': {'entity': 'BIOBANK',
                                           'fields': [],
                                           'severity': 'ERROR',
                                           'summary': 'Biobank contains COVID '
                                                      'collection  but not marked as '
                                                      'part of '},
- 'COVID:BiobankContainsCovidCollection2': {'entity': 'BIOBANK',
+ 'C19:BBCovidCapMissing': {'entity': 'BIOBANK',
                                            'fields': ['covid19'],
                                            'severity': 'ERROR',
                                            'summary': 'Biobank contains COVID '
@@ -25,26 +25,26 @@ CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
                                                       '"covid19" attribute in '
                                                       '"capabilities" section of '
                                                       'attributes'},
- 'COVID:BiobankHasCovid19Among': {'entity': 'BIOBANK',
+ 'C19:BBAttrNeedsNet': {'entity': 'BIOBANK',
                                   'fields': ['covid19'],
                                   'severity': 'ERROR',
                                   'summary': 'Biobank has covid19 among covid19biobank '
                                              'attributes but is not part of '},
- 'COVID:BiobankHasCovid19Among2': {'entity': 'BIOBANK',
+ 'C19:CapNeedsContent': {'entity': 'BIOBANK',
                                    'fields': ['covid19', 'id'],
                                    'severity': 'ERROR',
                                    'summary': 'Biobank has covid19 among capabilities '
                                               'but has no relevant services nor any '
                                               'collection of COVID-19 samples nor any '
                                               'collection of COVID-19 controls'},
- 'COVID:BiobankHasProspectiveCovid19': {'entity': 'BIOBANK',
+ 'C19:BBProsCollNoAttr': {'entity': 'BIOBANK',
                                         'fields': ['id'],
                                         'severity': 'ERROR',
                                         'summary': 'Biobank has prospective COVID-19 '
                                                    'collection defined but '
                                                    'ProspectiveCollections is not '
                                                    'among covid19biobank attributes'},
- 'COVID:BiobankHasProspectivecollections': {'entity': 'BIOBANK',
+ 'C19:BBProsAttrNoColl': {'entity': 'BIOBANK',
                                             'fields': ['id'],
                                             'severity': 'WARNING',
                                             'summary': 'Biobank has '
@@ -53,66 +53,66 @@ CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
                                                        'has no prospective collection '
                                                        'defined (collection ID '
                                                        "matching '' regex pattern)"},
- 'COVID:BiobankPartDoesHaveCovid19Among': {'entity': 'BIOBANK',
+ 'C19:BBNetNeedsAttr': {'entity': 'BIOBANK',
                                            'fields': ['covid19'],
                                            'severity': 'ERROR',
                                            'summary': 'Biobank is part of  but does '
                                                       'not have covid19 among '
                                                       'covid19biobank attributes'},
- 'COVID:CollectionHavingAbilityCollect': {'entity': 'COLLECTION',
+ 'C19:AbilityNeedsPros': {'entity': 'COLLECTION',
                                           'fields': ['id', 'name'],
                                           'severity': 'ERROR',
                                           'summary': 'Collection having "ability to '
                                                      'collect" does not have '
                                                      'COVID19PROSPECTIVE label'},
- 'COVID:CollectionTypeProvided': {'entity': 'COLLECTION',
+ 'C19:TypeMissing': {'entity': 'COLLECTION',
                                   'fields': [],
                                   'severity': 'ERROR',
                                   'summary': 'Collection type not provided'},
- 'COVID:Covid19CollectionMissesCovid19': {'entity': 'COLLECTION',
+ 'C19:CovidDiagMissing': {'entity': 'COLLECTION',
                                           'fields': ['id'],
                                           'severity': 'ERROR',
                                           'summary': 'COVID19 collection misses '
                                                      'COVID-19 diagnosis filled in'},
- 'COVID:Covid19prospectiveCollection': {'entity': 'COLLECTION',
+ 'C19:ProsDataMissing': {'entity': 'COLLECTION',
                                         'fields': ['id'],
                                         'severity': 'ERROR',
                                         'summary': 'COVID19PROSPECTIVE collection '
                                                    'misses COVID-19 diagnosis or '
                                                    'COVID-19 controls filled in'},
- 'COVID:ExistingCovid19CollectionsMust': {'entity': 'COLLECTION',
+ 'C19:NeedsDisease': {'entity': 'COLLECTION',
                                           'fields': ['id'],
                                           'severity': 'ERROR',
                                           'summary': 'Existing COVID-19 collections '
                                                      'must have DISEASE_SPECIFIC as '
                                                      'one of its types'},
- 'COVID:ProspectiveCollectionType': {'entity': 'COLLECTION',
+ 'C19:ProsOoMNonZero': {'entity': 'COLLECTION',
                                      'fields': ['id', 'order_of_magnitude'],
                                      'severity': 'WARNING',
                                      'summary': 'Prospective collection type '
                                                 'represents capability of setting up '
                                                 'prospective collections - hence it '
                                                 'should have zero order of magnitude'},
- 'COVID:ProspectiveCollectionType2': {'entity': 'COLLECTION',
+ 'C19:AbilityOoMNonZero': {'entity': 'COLLECTION',
                                       'fields': ['id', 'name', 'order_of_magnitude'],
                                       'severity': 'WARNING',
                                       'summary': 'Prospective collection type '
                                                  'represents capability of setting up '
                                                  'prospective collections - hence it '
                                                  'should have zero order of magnitude'},
- 'COVID:ProspectiveCovid19Collections': {'entity': 'COLLECTION',
+ 'C19:ProsNeedsDisease': {'entity': 'COLLECTION',
                                          'fields': ['id'],
                                          'severity': 'ERROR',
                                          'summary': 'Prospective COVID-19 collections '
                                                     'must have DISEASE_SPECIFIC as one '
                                                     'of its types'},
- 'COVID:ProspectiveCovid19Collections2': {'entity': 'COLLECTION',
+ 'C19:ProsNeedsType': {'entity': 'COLLECTION',
                                           'fields': ['id'],
                                           'severity': 'ERROR',
                                           'summary': 'Prospective COVID-19 collections '
                                                      'must have PROSPECTIVE_COLLECTION '
                                                      'as one of its types'},
- 'COVID:SeemsDiagnosesContainsRangeWill': {'entity': 'COLLECTION',
+ 'C19:DiagRange': {'entity': 'COLLECTION',
                                            'fields': [],
                                            'severity': 'ERROR',
                                            'summary': 'It seems that diagnoses '
@@ -121,7 +121,7 @@ CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
                                                       'ineffective for the given '
                                                       'collection. Violating diagnosis '
                                                       'term(s): '},
- 'COVID:SituationCollectionContains': {'entity': 'COLLECTION',
+ 'C19:BslFlagMissing': {'entity': 'COLLECTION',
                                        'fields': ['id'],
                                        'severity': 'WARNING',
                                        'summary': 'Suspect situation: collection '
@@ -129,7 +129,7 @@ CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
                                                   '(nasal/throat swabs, faeces) while '
                                                   'the parent biobank does not '
                                                   'indicate BSL2 nor BSL3 available'},
- 'COVID:SupectMaterialTypesExistingCovid': {'entity': 'COLLECTION',
+ 'C19:MaterialsSuspect': {'entity': 'COLLECTION',
                                             'fields': ['id'],
                                             'severity': 'WARNING',
                                             'summary': 'Supect material types: '
@@ -144,6 +144,7 @@ CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
                                                        'THROAT_SWAB'}}
 
 class COVID(IPlugin):
+	CHECK_ID_PREFIX = "C19"
 	def check(self, dir, args):
 		warnings = []
 		log.info("Running COVID content checks (COVID)")
@@ -233,36 +234,36 @@ class COVID(IPlugin):
 					biobankHasCovidControls[biobank['id']] = False
 
 			if (covid_diag or covid_control) and diag_ranges:
-				warning = DataCheckWarning(make_check_id(self, "SeemsDiagnosesContainsRangeWill"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
+				warning = DataCheckWarning(make_check_id(self, "DiagRange"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "It seems that diagnoses contains range - this will render the diagnosis search ineffective for the given collection. Violating diagnosis term(s): " + '; '.join(diag_ranges))
 				warnings.append(warning)
 
 			if covid_diag or covid_control:
 				if not covidNetworkName in biobank_networks:
-					warnings.append(DataCheckWarning(make_check_id(self, "BiobankContainsCovidCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank contains COVID collection " + collection['id'] + ' but not marked as part of ' + covidNetworkName))
+					warnings.append(DataCheckWarning(make_check_id(self, "BBNetMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank contains COVID collection " + collection['id'] + ' but not marked as part of ' + covidNetworkName))
 				if not 'covid19' in biobank_capabilities:
-					warnings.append(DataCheckWarning(make_check_id(self, "BiobankContainsCovidCollection2"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank contains COVID collection " + collection['id'] + ' but does not have "covid19" attribute in "capabilities" section of attributes'))
+					warnings.append(DataCheckWarning(make_check_id(self, "BBCovidCapMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank contains COVID collection " + collection['id'] + ' but does not have "covid19" attribute in "capabilities" section of attributes'))
 
 
 			if len(types) < 1:
-				warnings.append(DataCheckWarning(make_check_id(self, "CollectionTypeProvided"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection type not provided"))
+				warnings.append(DataCheckWarning(make_check_id(self, "TypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection type not provided"))
                         
 			if re.search(covidProspectiveCollectionIdPattern, collection['id']):
 				biobankHasCovidProspectiveCollection[biobank['id']] = True
 				if not 'DISEASE_SPECIFIC' in types:
-					warnings.append(DataCheckWarning(make_check_id(self, "ProspectiveCovid19Collections"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
+					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
 				if not 'PROSPECTIVE_COLLECTION' in types:
-					warnings.append(DataCheckWarning(make_check_id(self, "ProspectiveCovid19Collections2"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types"))
+					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types"))
 				if OoM and OoM > 0:
-					warnings.append(DataCheckWarning(make_check_id(self, "ProspectiveCollectionType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
+					warnings.append(DataCheckWarning(make_check_id(self, "ProsOoMNonZero"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
 				if not covid_diag and not covid_control:
-					warnings.append(DataCheckWarning(make_check_id(self, "Covid19prospectiveCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19PROSPECTIVE collection misses COVID-19 diagnosis or COVID-19 controls filled in"))
+					warnings.append(DataCheckWarning(make_check_id(self, "ProsDataMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19PROSPECTIVE collection misses COVID-19 diagnosis or COVID-19 controls filled in"))
 
 			if re.search('^Ability to collect', collection['name']) and (covid_diag or covid_control):
 				if not re.search(covidProspectiveCollectionIdPattern, collection['id']):
-					warnings.append(DataCheckWarning(make_check_id(self, "CollectionHavingAbilityCollect"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), 'Collection having "ability to collect" does not have COVID19PROSPECTIVE label'))
+					warnings.append(DataCheckWarning(make_check_id(self, "AbilityNeedsPros"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), 'Collection having "ability to collect" does not have COVID19PROSPECTIVE label'))
 					# only report the following if it hasn't been reported above (hence only if the COVID19PROSPECTIVE does not match)
 					if OoM and OoM > 0:
-						warnings.append(DataCheckWarning(make_check_id(self, "ProspectiveCollectionType2"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
+						warnings.append(DataCheckWarning(make_check_id(self, "AbilityOoMNonZero"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
 			
 			# also find other prospective collections containing COVID-19
 			if not re.search(covidProspectiveCollectionIdPattern, collection['id']) and covid_diag and 'PROSPECTIVE_COLLECTION' in types:
@@ -272,13 +273,13 @@ class COVID(IPlugin):
 
 			if re.search('.*:COVID19$', collection['id']):
 				if not 'DISEASE_SPECIFIC' in types:
-					warnings.append(DataCheckWarning(make_check_id(self, "ExistingCovid19CollectionsMust"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
+					warnings.append(DataCheckWarning(make_check_id(self, "NeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
 				if not 'DNA' in materials and not 'PATHOGEN' in materials and not 'PERIPHERAL_BLOOD_CELLS' in materials and not 'PLASMA' in materials and not 'RNA' in materials and not 'SALIVA' in materials and not 'SERUM' in materials and not 'WHOLE_BLOOD' in materials and not 'FECES' in materials and not 'BUFFY_COAT' in materials and not 'NASAL_SWAB' in materials and not 'THROAT_SWAB' in materials:
-					warnings.append(DataCheckWarning(make_check_id(self, "SupectMaterialTypesExistingCovid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Supect material types: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB"))
+					warnings.append(DataCheckWarning(make_check_id(self, "MaterialsSuspect"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Supect material types: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB"))
 				if 'NASAL_SWAB' in materials or 'THROAT_SWAB' in materials or 'FECES' in materials and not ('BSL2' in biobank_covid or 'BSL3' in biobank_covid):
-					warnings.append(DataCheckWarning(make_check_id(self, "SituationCollectionContains"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Suspect situation: collection contains infectious material (nasal/throat swabs, faeces) while the parent biobank does not indicate BSL2 nor BSL3 available"))
+					warnings.append(DataCheckWarning(make_check_id(self, "BslFlagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Suspect situation: collection contains infectious material (nasal/throat swabs, faeces) while the parent biobank does not indicate BSL2 nor BSL3 available"))
 				if not covid_diag:
-					warnings.append(DataCheckWarning(make_check_id(self, "Covid19CollectionMissesCovid19"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19 collection misses COVID-19 diagnosis filled in"))
+					warnings.append(DataCheckWarning(make_check_id(self, "CovidDiagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19 collection misses COVID-19 diagnosis filled in"))
 
 
 		for biobank in dir.getBiobanks():
@@ -289,9 +290,9 @@ class COVID(IPlugin):
 					biobank_networks.append(n['id'])
 
 			if covidNetworkName in biobank_networks and not 'covid19' in biobank_capabilities:
-				warnings.append(DataCheckWarning(make_check_id(self, "BiobankPartDoesHaveCovid19Among"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank is part of " + covidNetworkName + " but does not have covid19 among covid19biobank attributes"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBNetNeedsAttr"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank is part of " + covidNetworkName + " but does not have covid19 among covid19biobank attributes"))
 			if 'covid19' in biobank_capabilities and not covidNetworkName in biobank_networks:
-				warnings.append(DataCheckWarning(make_check_id(self, "BiobankHasCovid19Among"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has covid19 among covid19biobank attributes but is not part of " + covidNetworkName))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBAttrNeedsNet"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has covid19 among covid19biobank attributes but is not part of " + covidNetworkName))
 
 			# This is a simple check if the biobank has other services than just the attribute of being a covid19 biobank
 			other_covid_services = False
@@ -300,12 +301,12 @@ class COVID(IPlugin):
 					other_covid_services = True
 
 			if 'covid19' in biobank_capabilities and not (biobank['id'] in biobankHasCovidCollection or biobank['id'] in biobankHasCovidControls or other_covid_services):
-				warnings.append(DataCheckWarning(make_check_id(self, "BiobankHasCovid19Among2"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has covid19 among capabilities but has no relevant services nor any collection of COVID-19 samples nor any collection of COVID-19 controls"))
+				warnings.append(DataCheckWarning(make_check_id(self, "CapNeedsContent"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has covid19 among capabilities but has no relevant services nor any collection of COVID-19 samples nor any collection of COVID-19 controls"))
 	
 			if 'ProspectiveCollections' in biobank_capabilities and not biobank['id'] in biobankHasCovidProspectiveCollection:
-				warnings.append(DataCheckWarning(make_check_id(self, "BiobankHasProspectivecollections"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBProsAttrNoColl"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)"))
 
 			if biobank['id'] in biobankHasCovidProspectiveCollection and not 'ProspectiveCollections' in biobank_covid:
-				warnings.append(DataCheckWarning(make_check_id(self, "BiobankHasProspectiveCovid19"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has prospective COVID-19 collection defined but ProspectiveCollections is not among covid19biobank attributes"))
+				warnings.append(DataCheckWarning(make_check_id(self, "BBProsCollNoAttr"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has prospective COVID-19 collection defined but ProspectiveCollections is not among covid19biobank attributes"))
 
 		return warnings

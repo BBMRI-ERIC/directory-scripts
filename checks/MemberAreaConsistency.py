@@ -22,7 +22,7 @@ from nncontacts import NNContacts
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the DataCheckWarning calls below.
 CHECK_DOCS = {
-    "MemberAreaConsistency:BiobankStagingAreaMismatchesCountry": {
+    "MAC:IsoStageMismatch": {
         "severity": "ERROR",
         "entity": "BIOBANK",
         "fields": ["country", "id"],
@@ -30,7 +30,7 @@ CHECK_DOCS = {
         "background": "Non-member exceptions apply only to dedicated non-member/global areas such as EXT or EU. A staging prefix that itself looks like a country code must match the biobank country.",
         "fix": "Use the member-country staging area that matches the biobank country, or correct the country attribute if the biobank is assigned to the wrong node.",
     },
-    "MemberAreaConsistency:InstitutionOnlyInNonMemberArea": {
+    "MAC:MemberNonMember": {
         "severity": "WARNING",
         "entity": "BIOBANK",
         "fields": ["country", "id", "juridical_person"],
@@ -38,7 +38,7 @@ CHECK_DOCS = {
         "background": "Such records can be legitimate when they are outside the national node scope but participate through an exemption, for example rare-disease or pandemic-related inclusion. They still require manual review.",
         "fix": "Move the institution to the member-country staging area if it belongs to the node. Otherwise confirm that the non-member placement is intentional and justified.",
     },
-    "MemberAreaConsistency:InstitutionDuplicatedAcrossMemberAndOtherArea": {
+    "MAC:MemberDupOtherArea": {
         "severity": "ERROR",
         "entity": "BIOBANK",
         "fields": ["country", "id", "juridical_person"],
@@ -51,6 +51,7 @@ CHECK_DOCS = {
 
 class MemberAreaConsistency(IPlugin):
     """Check that member-country institutions are not duplicated into non-member areas."""
+    CHECK_ID_PREFIX = "MAC"
 
     @staticmethod
     def _normalize_country(value) -> str:
@@ -117,7 +118,7 @@ class MemberAreaConsistency(IPlugin):
             ):
                 warnings.append(
                     DataCheckWarning(
-                        make_check_id(self, "BiobankStagingAreaMismatchesCountry"),
+                        make_check_id(self, "IsoStageMismatch"),
                         "",
                         country,
                         DataCheckWarningLevel.ERROR,
@@ -174,7 +175,7 @@ class MemberAreaConsistency(IPlugin):
                         DataCheckWarning(
                             make_check_id(
                                 self,
-                                "InstitutionDuplicatedAcrossMemberAndOtherArea",
+                                "MemberDupOtherArea",
                             ),
                             "",
                             record["country"],
@@ -190,7 +191,7 @@ class MemberAreaConsistency(IPlugin):
                 else:
                     warnings.append(
                         DataCheckWarning(
-                            make_check_id(self, "InstitutionOnlyInNonMemberArea"),
+                            make_check_id(self, "MemberNonMember"),
                             "",
                             record["country"],
                             DataCheckWarningLevel.WARNING,
@@ -212,7 +213,7 @@ class MemberAreaConsistency(IPlugin):
                     DataCheckWarning(
                         make_check_id(
                             self,
-                            "InstitutionDuplicatedAcrossMemberAndOtherArea",
+                            "MemberDupOtherArea",
                         ),
                         "",
                         record["country"],

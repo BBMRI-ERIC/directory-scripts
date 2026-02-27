@@ -18,33 +18,34 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 
 BBMRICohortsNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts'
 BBMRICohortsDNANetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:BBMRI-Cohorts_DNA'
+CHECK_ID_PREFIX = "FT"
 
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, actionDescription, warningsList): # TO improve
 	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
-		warningsList.append(DataCheckWarning(make_check_id(self, "CollectionInformationSorted"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email']))
+		warningsList.append(DataCheckWarning(make_check_id(self, "CollFactsMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email']))
 
 
 def compareAge(self, dir, factAges: set, factsAgeUnits: set, collection, warningsList):
 	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
 	collUnitsAdapt = collection['age_unit'].lower() + 's'
 	if collUnitsAdapt != str((',').join(sorted(factsAgeUnits))):
-		warningsList.append(DataCheckWarning(make_check_id(self, "CheckAgeUnitInformation"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+		warningsList.append(DataCheckWarning(make_check_id(self, "AgeUnitMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 	else:
 		minFactAge = int(min(sorted(factAges)))
 		maxFactAge = int(max(sorted(factAges)))
 		try:
 			if (minFactAge < collection['age_low']) or (maxFactAge > collection['age_high']):
-				warningsList.append(DataCheckWarning(make_check_id(self, "CheckAgeRangeCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+				warningsList.append(DataCheckWarning(make_check_id(self, "AgeRangeMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 			if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
-				warningsList.append(DataCheckWarning(make_check_id(self, "CheckAgeInformationCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+				warningsList.append(DataCheckWarning(make_check_id(self, "AgeRangeBroad"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 		except KeyError as e:
 			log.info(f"Incomplete age range information for {collection['id']}: " + str(e) + " missing")
 
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
-CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
+CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
                                            'fields': ['donors_present',
                                                       'facts',
                                                       'id',
@@ -55,20 +56,20 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                            'summary': 'Collection size attribute '
                                                       '(number of samples) not '
                                                       'provided'},
- 'FactTables:AllOneStarAggregateAggregates3': {'entity': 'COLLECTION',
+ 'FT:OneStarMissing': {'entity': 'COLLECTION',
                                                'fields': ['donors_present',
                                                           'facts',
                                                           'id'],
                                                'severity': 'WARNING',
                                                'summary': 'missing all-but-one-star '
                                                           'aggregate: {aggregates[3]}'},
- 'FactTables:AllOneStarAggregateFkValueV': {'entity': 'COLLECTION',
+ 'FT:OneStarValue': {'entity': 'COLLECTION',
                                             'fields': ['donors_present', 'facts', 'id'],
                                             'severity': 'INFO',
                                             'summary': 'missing all-but-one-star '
                                                        'aggregate for {fk} value '
                                                        '{value}: {aggregates[3]}'},
- 'FactTables:AllStarAggregateAggregates4': {'entity': 'COLLECTION',
+ 'FT:AllStarMissing': {'entity': 'COLLECTION',
                                             'fields': ['all_star_rows',
                                                        'donors_present',
                                                        'facts',
@@ -77,7 +78,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                             'summary': 'Expected exactly one all-star '
                                                        'aggregate row, found '
                                                        "{fact_sheet['all_star_rows']}."},
- 'FactTables:AllStarDonorsMismatchCollectionDonors': {'entity': 'COLLECTION',
+ 'FT:AllStarDonorGap': {'entity': 'COLLECTION',
                                                       'fields': ['code',
                                                                  'donors_present',
                                                                  'facts',
@@ -88,8 +89,8 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                              'number_of_donors.',
                                                       'severity': 'WARNING',
                                                       'summary': 'Check '
-                                                                 'FactTables:AllStarDonorsMismatchCollectionDonors'},
- 'FactTables:AllStarSamplesMismatchCollectionSize': {'entity': 'COLLECTION',
+                                                                 'FT:AllStarDonorGap'},
+ 'FT:AllStarSizeGap': {'entity': 'COLLECTION',
                                                      'fields': ['code',
                                                                 'donors_present',
                                                                 'facts',
@@ -99,8 +100,8 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                             'collection size.',
                                                      'severity': 'WARNING',
                                                      'summary': 'Check '
-                                                                'FactTables:AllStarSamplesMismatchCollectionSize'},
- 'FactTables:CheckAgeInformationCollection': {'entity': 'COLLECTION',
+                                                                'FT:AllStarSizeGap'},
+ 'FT:AgeRangeBroad': {'entity': 'COLLECTION',
                                               'fields': ['age_high',
                                                          'age_low',
                                                          'age_unit'],
@@ -111,7 +112,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                               'severity': 'WARNING',
                                               'summary': 'Collection ages outside '
                                                          'facts age range'},
- 'FactTables:CheckAgeRangeCollection': {'entity': 'COLLECTION',
+ 'FT:AgeRangeMismatch': {'entity': 'COLLECTION',
                                         'fields': ['age_high', 'age_low', 'age_unit'],
                                         'fix': 'Check age range of the collection '
                                                'description with ages from the facts '
@@ -119,7 +120,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                         'severity': 'WARNING',
                                         'summary': 'Fact table age outside collection '
                                                    'age_high age_low range'},
- 'FactTables:CheckAgeUnitInformation': {'entity': 'COLLECTION',
+ 'FT:AgeUnitMismatch': {'entity': 'COLLECTION',
                                         'fields': ['age_unit'],
                                         'fix': 'Check age unit information of the '
                                                'collection description with age units '
@@ -130,7 +131,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                    "{collection['age_unit']} while the "
                                                    'age unit in the fact table is '
                                                    '{factsAgeUnits}'},
- 'FactTables:CheckSizeInformationCollection': {'entity': 'COLLECTION',
+ 'FT:SizeAboveAllStar': {'entity': 'COLLECTION',
                                                'fields': ['all_star_number_of_samples',
                                                           'donors_present',
                                                           'facts',
@@ -148,7 +149,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                           'greater than the all-star '
                                                           'aggregate number_of_samples '
                                                           '({all_star_samples})'},
- 'FactTables:CheckSizeInformationCollection2': {'entity': 'COLLECTION',
+ 'FT:SizeBelowAllStar': {'entity': 'COLLECTION',
                                                 'fields': ['all_star_number_of_samples',
                                                            'donors_present',
                                                            'facts',
@@ -168,27 +169,27 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                            'aggregate '
                                                            'number_of_samples '
                                                            '({all_star_samples})'},
- 'FactTables:Collection': {'entity': 'COLLECTION',
+ 'FT:DnaMaterials': {'entity': 'COLLECTION',
                            'fields': ['donors_present', 'facts', 'id', 'network'],
                            'severity': 'ERROR',
                            'summary': 'Collection in {BBMRICohortsDNANetworkName} but '
                                       'the fact table does not contain any of the '
                                       'expected material types: '
                                       "{','.join(requiredMaterialTypes)})"},
- 'FactTables:Collection2': {'entity': 'COLLECTION',
+ 'FT:DnaNavPresent': {'entity': 'COLLECTION',
                             'fields': ['donors_present', 'facts', 'id', 'network'],
                             'severity': 'ERROR',
                             'summary': 'Collection in {BBMRICohortsDNANetworkName} but '
                                        'the fact table does specified the NAV '
                                        '(not-available) material type'},
- 'FactTables:CollectionInformationSorted': {'entity': 'COLLECTION',
+ 'FT:CollFactsMismatch': {'entity': 'COLLECTION',
                                             'fields': [],
                                             'severity': 'WARNING',
                                             'summary': ' - collection information: '
                                                        '{sorted(collList)} - fact '
                                                        'information: '
                                                        '{sorted(factsList)}'},
- 'FactTables:CollectionSizeAttributeNumber': {'entity': 'COLLECTION',
+ 'FT:SizeInvalid': {'entity': 'COLLECTION',
                                               'fields': ['donors_present',
                                                          'facts',
                                                          'id',
@@ -197,7 +198,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                               'summary': 'Collection size attribute '
                                                          '(number of samples) is not '
                                                          'an integer'},
- 'FactTables:FactTableInformationHas0Donors': {'entity': 'COLLECTION',
+ 'FT:DonorsZero': {'entity': 'COLLECTION',
                                                'fields': ['all_star_number_of_donors',
                                                           'donors_present',
                                                           'facts',
@@ -205,7 +206,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                'severity': 'WARNING',
                                                'summary': 'fact table information has '
                                                           '0 donors/patients'},
- 'FactTables:LenKanonymityviolatinglist': {'entity': 'COLLECTION',
+ 'FT:KAnonViolation': {'entity': 'COLLECTION',
                                            'fields': ['all_star_number_of_donors',
                                                       'donors_present',
                                                       'facts',
@@ -218,6 +219,7 @@ CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
                                                       '{kAnonymityViolatingList}'}}
 
 class FactTables(IPlugin):
+	CHECK_ID_PREFIX = "FT"
 
 	def check(self, dir, args):
 		warnings = []
@@ -286,7 +288,7 @@ class FactTables(IPlugin):
 					log.info(f"Hooooray, we have found BBMRI fact table populated: {collection['id']}")
 
 					if all_star_donors == 0 or (all_star_donors is None and not fact_sheet['donors_present']):
-						warnings.append(DataCheckWarning(make_check_id(self, "FactTableInformationHas0Donors"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "fact table information has 0 donors/patients"))
+						warnings.append(DataCheckWarning(make_check_id(self, "DonorsZero"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "fact table information has 0 donors/patients"))
 					else:
 						kAnonymityViolatingList = []
 						kAnonymityLimit = 5
@@ -294,7 +296,7 @@ class FactTables(IPlugin):
 							if 'number_of_donors' in f and f['number_of_donors'] > 0 and f['number_of_donors'] < kAnonymityLimit:
 								kAnonymityViolatingList.append([f['id'], f"{f['number_of_donors']} donor(s)"])
 						if kAnonymityViolatingList:
-							warnings.append(DataCheckWarning(make_check_id(self, "LenKanonymityviolatinglist"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}"))
+							warnings.append(DataCheckWarning(make_check_id(self, "KAnonViolation"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}"))
 
 					compareFactsColl(self, dir, collFactsDiseases, diags, collection, "Diagnoses of collection and facts table do not match", "Check diagnosis entries of the collection description with diagnoses from the facts table and correct as necessary", warnings)
 
@@ -310,9 +312,9 @@ class FactTables(IPlugin):
 					))
 					aggregates = {k: 0 if k not in aggregates else aggregates[k] for k in range(0, len(FACT_DIMENSION_KEYS) + 1)}
 					if fact_sheet['all_star_rows'] != 1:
-						warnings.append(DataCheckWarning(make_check_id(self, "AllStarAggregateAggregates4"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Expected exactly one all-star aggregate row, found {fact_sheet['all_star_rows']}."))
+						warnings.append(DataCheckWarning(make_check_id(self, "AllStarMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Expected exactly one all-star aggregate row, found {fact_sheet['all_star_rows']}."))
 					if aggregates[3] < 1:
-						warnings.append(DataCheckWarning(make_check_id(self, "AllOneStarAggregateAggregates3"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"missing all-but-one-star aggregate: {aggregates[3]}"))
+						warnings.append(DataCheckWarning(make_check_id(self, "OneStarMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"missing all-but-one-star aggregate: {aggregates[3]}"))
 					else:
 						for fk in fact_values:
 							for value in fact_values[fk]:
@@ -320,29 +322,29 @@ class FactTables(IPlugin):
 								if rows:
 									log.info(f'3-star rows found for {fk} value {value}: {rows}')
 								else:
-									warnings.append(DataCheckWarning(make_check_id(self, "AllOneStarAggregateFkValueV"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"missing all-but-one-star aggregate for {fk} value {value}: {aggregates[3]}"))
+									warnings.append(DataCheckWarning(make_check_id(self, "OneStarValue"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"missing all-but-one-star aggregate for {fk} value {value}: {aggregates[3]}"))
 
 					for fact_warning in fact_sheet['warnings']:
 						if fact_warning['code'] == 'all_star_samples_mismatch':
-							warnings.append(DataCheckWarning(make_check_id(self, "AllStarSamplesMismatchCollectionSize"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), fact_warning['message'], "Check the all-star aggregate row and collection size."))
+							warnings.append(DataCheckWarning(make_check_id(self, "AllStarSizeGap"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), fact_warning['message'], "Check the all-star aggregate row and collection size."))
 						elif fact_warning['code'] == 'all_star_donors_mismatch':
-							warnings.append(DataCheckWarning(make_check_id(self, "AllStarDonorsMismatchCollectionDonors"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), fact_warning['message'], "Check the all-star aggregate row and collection number_of_donors."))
+							warnings.append(DataCheckWarning(make_check_id(self, "AllStarDonorGap"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), fact_warning['message'], "Check the all-star aggregate row and collection number_of_donors."))
 
 					if 'size' in collection:
 						if not isinstance(collection['size'], int):
-							warnings.append(DataCheckWarning(make_check_id(self, "CollectionSizeAttributeNumber"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection size attribute (number of samples) is not an integer", dir.getCollectionContact(collection['id'])['email']))
+							warnings.append(DataCheckWarning(make_check_id(self, "SizeInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection size attribute (number of samples) is not an integer", dir.getCollectionContact(collection['id'])['email']))
 						if isinstance(all_star_samples, int) and all_star_samples < collection['size']:
-							warnings.append(DataCheckWarning(make_check_id(self, "CheckSizeInformationCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the all-star aggregate number_of_samples ({all_star_samples})", "Check size information of the collection description with the all-star row from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+							warnings.append(DataCheckWarning(make_check_id(self, "SizeAboveAllStar"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Value of the collection size attribute (number of samples - {collection['size']}) is greater than the all-star aggregate number_of_samples ({all_star_samples})", "Check size information of the collection description with the all-star row from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 						elif isinstance(all_star_samples, int) and all_star_samples > collection['size']:
-							warnings.append(DataCheckWarning(make_check_id(self, "CheckSizeInformationCollection2"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the all-star aggregate number_of_samples ({all_star_samples})", "Check size information of the collection description with the all-star row from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+							warnings.append(DataCheckWarning(make_check_id(self, "SizeBelowAllStar"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Value of the collection size attribute (number of samples - {collection['size']}) is smaller than the all-star aggregate number_of_samples ({all_star_samples})", "Check size information of the collection description with the all-star row from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
 					else:
-						warnings.append(DataCheckWarning(make_check_id(self, "AddSizeAttributeCollection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection size attribute (number of samples) not provided", "Add size attribute to the collection", dir.getCollectionContact(collection['id'])['email']))
+						warnings.append(DataCheckWarning(make_check_id(self, "SizeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection size attribute (number of samples) not provided", "Add size attribute to the collection", dir.getCollectionContact(collection['id'])['email']))
 
 					if 'network' in collection and BBMRICohortsDNANetworkName in collection_networks:
 						requiredMaterialTypes = ['DNA', 'WHOLE_BLOOD', 'PERIPHERAL_BLOOD_CELLS', 'BUFFY_COAT', 'CDNA', 'PLASMA', 'SERUM']
 						if not any(mat in collFactsMaterialTypes for mat in requiredMaterialTypes):
-							warnings.append(DataCheckWarning(make_check_id(self, "Collection"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection in {BBMRICohortsDNANetworkName} but the fact table does not contain any of the expected material types: {','.join(requiredMaterialTypes)})", dir.getCollectionContact(collection['id'])['email']))
+							warnings.append(DataCheckWarning(make_check_id(self, "DnaMaterials"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection in {BBMRICohortsDNANetworkName} but the fact table does not contain any of the expected material types: {','.join(requiredMaterialTypes)})", dir.getCollectionContact(collection['id'])['email']))
 
 						if 'NAV' in collFactsMaterialTypes:
-							warnings.append(DataCheckWarning(make_check_id(self, "Collection2"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type", dir.getCollectionContact(collection['id'])['email']))
+							warnings.append(DataCheckWarning(make_check_id(self, "DnaNavPresent"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type", dir.getCollectionContact(collection['id'])['email']))
 		return warnings

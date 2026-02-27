@@ -80,7 +80,7 @@ def test_member_area_consistency_check_distinguishes_warning_and_error_cases():
 
     assert (
         warnings_by_id["bbmri-eric:ID:EXT_DE_NONMEMBER_ONLY"].dataCheckID
-        == "MemberAreaConsistency:InstitutionOnlyInNonMemberArea"
+        == "MAC:MemberNonMember"
     )
     assert warnings_by_id[
         "bbmri-eric:ID:EXT_DE_NONMEMBER_ONLY"
@@ -88,19 +88,19 @@ def test_member_area_consistency_check_distinguishes_warning_and_error_cases():
 
     assert (
         warnings_by_id["bbmri-eric:ID:EXT_DE_DUPLICATE"].dataCheckID
-        == "MemberAreaConsistency:InstitutionDuplicatedAcrossMemberAndOtherArea"
+        == "MAC:MemberDupOtherArea"
     )
     assert warnings_by_id["bbmri-eric:ID:EXT_DE_DUPLICATE"].level.name == "ERROR"
 
     assert (
         warnings_by_id["bbmri-eric:ID:EU_DE_DUPLICATE"].dataCheckID
-        == "MemberAreaConsistency:InstitutionDuplicatedAcrossMemberAndOtherArea"
+        == "MAC:MemberDupOtherArea"
     )
     assert warnings_by_id["bbmri-eric:ID:EU_DE_DUPLICATE"].level.name == "ERROR"
 
     assert (
         warnings_by_id["bbmri-eric:ID:AT_WRONG_PREFIX"].dataCheckID
-        == "MemberAreaConsistency:BiobankStagingAreaMismatchesCountry"
+        == "MAC:IsoStageMismatch"
     )
     assert warnings_by_id["bbmri-eric:ID:AT_WRONG_PREFIX"].level.name == "ERROR"
 

@@ -34,9 +34,15 @@ class DataCheckWarning:
 
 
 def make_check_id(plugin, suffix: str) -> str:
-    plugin_name = plugin if isinstance(plugin, str) else plugin.__class__.__name__
+    if isinstance(plugin, str):
+        plugin_name = plugin
+    else:
+        plugin_name = getattr(plugin, "CHECK_ID_PREFIX", None)
+        if not plugin_name:
+            plugin_name = getattr(plugin.__class__, "CHECK_ID_PREFIX", None)
+        if not plugin_name:
+            plugin_name = plugin.__class__.__name__
     if not suffix:
         return plugin_name
     return f"{plugin_name}:{suffix}"
-
 
