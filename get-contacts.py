@@ -8,19 +8,25 @@ from typing import List
 import pprint
 import re
 import string
-import argparse
 import logging as log
 import time
 from typing import List
 import os.path
-from nameparser import HumanName
 
 import xlsxwriter
 
+from cli_common import (
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_purge_cache_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 from nncontacts import NNContacts
 
-cachesList = ['directory', 'emails', 'geocoding', 'URLs']
+cachesList = ['directory']
 
 # if some nodes don't want to get the invitations
 #turnedOffNNs = {'UK'}
@@ -28,36 +34,21 @@ turnedOffNNs = {}
 
 pp = pprint.PrettyPrinter(indent=4)
 
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
-
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
+parser = build_parser()
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
+add_no_stdout_argument(parser)
 parser.add_argument('-n', '--negotiator-invitation', dest='negotiator', action='store_true', help='output compatible with Negotiator invitation system')
 parser.add_argument('-e', '--unique-emails', dest='emails', action='store_true', help='sort contacts by unique emails')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+add_purge_cache_arguments(parser, cachesList)
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 
 if args.negotiator and not args.outputXLSX:
-    raise Exception('Negotiator-compatible output must produce Excel output, hence -X or --output-XLSX must be provided, too')
+    raise Exception('Negotiator-compatible output must produce Excel output, hence -X or --output-xlsx must be provided, too')
 
 
 # Main code
@@ -160,6 +151,8 @@ else:
     activeContacts = set()
 
     def initContact (contactId : str):
+        from nameparser import HumanName
+
         assert contactId not in activeContacts
         activeContacts.add(contactId)
         contact = dir.getContact(contactId)
@@ -169,7 +162,7 @@ else:
         name = name.translate(str.maketrans('', '', '@'))
         name = HumanName(name.lower().strip())
         name.capitalize()
-        if re.search('^(\w\.)+$', name.first):
+        if re.search(r'^(\w\.)+$', name.first):
             name.first = name.first.upper()
         contactsToNames[contactId] = name.__str__()
 
@@ -233,4 +226,3 @@ else:
         else:
             for c in activeContacts:
                 print("%s\t%s\t%s\t%s\t%s"%(c, contactsToEmails[c], contactsToNames[c], ",".join(contactsToCollections[c]) if c in contactsToCollections else "", ",".join(contactsToBiobanks[c]) if c in contactsToBiobanks else ""))
-

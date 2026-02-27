@@ -2,63 +2,54 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
 import pprint
-import argparse
 import logging as log
 from builtins import str, isinstance, len, set, int
 from typing import List
 
 import pandas as pd
 
+from cli_common import (
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_optional_xlsx_output_argument,
+    add_purge_cache_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 import pddfutils
+from xlsxutils import write_xlsx_tables
 
-cachesList = ['directory', 'emails', 'geocoding', 'URLs']
+cachesList = ['directory']
 
 pp = pprint.PrettyPrinter(indent=4)
 
 
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        from builtins import getattr, setattr
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
-
-
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
-                    help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                    help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1,
-                    help='output of results into an XLSX with filename provided as parameter')
-parser.add_argument('--output-XLSX-withdrawn', dest='outputXLSXwithdrawn', nargs=1,
-                    help='output withdrawn biobanks and collections into an XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true',
-                    help='no output of results into stdout (default: enabled)')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList,
-                    help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList,
-                    help='disable particular long remote checks')
-parser.add_argument('-FCT', '--filter-coll-type', dest='filterCollType', nargs='+', action='extend',
+parser = build_parser()
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
+add_optional_xlsx_output_argument(
+    parser,
+    dest='outputXLSXwithdrawn',
+    long_option='--output-xlsx-withdrawn',
+    legacy_long_options=['--output-XLSX-withdrawn'],
+    help_text='write withdrawn biobanks and collections to the provided XLSX file',
+)
+add_no_stdout_argument(parser)
+add_purge_cache_arguments(parser, cachesList)
+parser.add_argument('-FCT', '--filter-collection-type', '--filter-coll-type', dest='filterCollType', nargs='+', action='extend',
                     help='filter by the collection types in the data model, each of them between quotes ("") and separated by a space. E.g.: -FCT "CASE_CONTROL" "LONGITUDINAL" "DISEASE_SPECIFIC"') # TODO: Till now it uses the terms from the data model, different from the ones displayed in Directory
 parser.add_argument('-FMT', '--filter-material-type', dest='filterMatType', nargs='+', action='extend',
                     help='filter by the material types in the data model, each of them between quotes ("") and separated by a space. E.g.: -FCT "SERUM" "SAMPLE"') # TODO: Till now it uses the terms from the data model, different from the ones displayed in Directory
 
 
-parser.set_defaults(disableChecksRemote=[], disablePlugins=[], purgeCaches=[], filterCollType=[], filterMatType=[])
+parser.set_defaults(purgeCaches=[], filterCollType=[], filterMatType=[])
 args = parser.parse_args()
 filterCollType = args.filterCollType
 filterMatType = args.filterMatType
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 
 ### Initialize variables
@@ -156,11 +147,13 @@ def printCollectionStdout(collectionList: List):
     log.info("\n\n")
 
 def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str):
-    log.info("Outputting warnings in Excel file " + filename)
-    writer = pd.ExcelWriter(filename, engine='xlsxwriter')
-    dfBiobanks.to_excel(writer, sheet_name=biobanksLabel)
-    dfCollections.to_excel(writer, sheet_name=collectionsLabel)
-    writer.close()
+    write_xlsx_tables(
+        filename,
+        [
+            (dfBiobanks, biobanksLabel),
+            (dfCollections, collectionsLabel),
+        ],
+    )
 
 ### Main
 

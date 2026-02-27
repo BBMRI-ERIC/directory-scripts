@@ -10,18 +10,21 @@ Script for creating geoJSON
 # External
 import pprint
 import re
-import argparse
 import json
 import configparser
-import geopy.geocoders
-from dms2dec.dms_convert import dms2dec
 import ssl
 import logging as log
 import smtplib
-import pandas as pd
-from flatten_json import flatten
 
 # Internal
+from cli_common import (
+    add_directory_auth_arguments,
+    add_directory_schema_argument,
+    add_logging_arguments,
+    add_purge_cache_arguments,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 
 cachesList = ['directory', 'geocoding']
@@ -30,28 +33,24 @@ cachesList = ['directory', 'geocoding']
 ## Parse arguments ##
 #####################
 
-parser = argparse.ArgumentParser()
+parser = build_parser()
 parser.add_argument('configFile', help='Provide config file') #NOTE: Provide better description.
-parser.add_argument('-o', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
-parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
-parser.add_argument('-P', '--package', dest='package', default='ERIC', help='MOLGENIS Package that contains the data (default ERIC).')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
-parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
-#parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
+parser.add_argument('-o', '--out-name', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
+add_logging_arguments(parser)
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default='ERIC')
+add_purge_cache_arguments(parser, cachesList)
+parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
-# Set logs:
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
+
+import geopy.geocoders
+import pandas as pd
+from dms2dec.dms_convert import dms2dec
+from flatten_json import flatten
 
 
 # Parse config file
@@ -158,9 +157,9 @@ def sendEmail(sender, receivers, message):
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
 if args.username is not None and args.password is not None:
-	dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+	dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
-	dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+	dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 # Initialize main dictionary
 features = {}

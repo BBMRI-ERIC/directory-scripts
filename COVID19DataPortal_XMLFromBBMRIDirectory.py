@@ -9,30 +9,37 @@ Script for creating XML for COVID19DataPortal from Directory collections
 
 # External
 import pprint
-import argparse
 import xml.etree.ElementTree as ET
 
 # Internal
+from cli_common import (
+    add_directory_auth_arguments,
+    add_directory_schema_argument,
+    add_logging_arguments,
+    add_purge_cache_arguments,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 
-cachesList = ['directory', 'geocoding']
+cachesList = ['directory']
 
 #####################
 ## Parse arguments ##
 #####################
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
-parser.add_argument('-o', '--outName', dest='outNameExcludedBiobanks', default='bbmri-directory-missing-COVID19DataPortal-Values.tsv', help='Output file name')
-parser.add_argument('-x', '--outNameXML', dest='outXML', default='bbmriDirectory_Covid19DataPortal.xml', help='Output XML name')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
-parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
-parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
+parser = build_parser()
+add_purge_cache_arguments(parser, cachesList)
+parser.add_argument('-o', '--out-name', '--outName', dest='outNameExcludedBiobanks', default='bbmri-directory-missing-COVID19DataPortal-Values.tsv', help='Output file name')
+parser.add_argument('-x', '--out-xml', '--outNameXML', dest='outXML', default='bbmriDirectory_Covid19DataPortal.xml', help='Output XML name')
+add_logging_arguments(parser)
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default='eu_bbmri_eric')
 
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
+
+configure_logging(args)
 
 # Open output tsv file (did not add the path as option, so it always writes in the working directory):
 outFile = open(args.outNameExcludedBiobanks, 'w')
@@ -41,9 +48,9 @@ outFile = open(args.outNameExcludedBiobanks, 'w')
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
 if args.username is not None and args.password is not None:
-    dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
-    dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 
 ### Functions

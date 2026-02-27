@@ -9,17 +9,30 @@ BBMRI-ERIC Directory Cohorts
 
 # External
 import pprint
-import argparse
 import logging as log
 import pandas as pd
 import time
 import os.path
 
 # Internal
+from cli_common import (
+    add_directory_auth_arguments,
+    add_directory_schema_argument,
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_optional_xlsx_output_argument,
+    add_plugin_disable_argument,
+    add_purge_cache_arguments,
+    add_remote_check_disable_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 #from checks.BBMRICohorts import BBMRICohorts
 from warningscontainer import WarningsContainer
 from yapsy.PluginManager import PluginManager
+from xlsxutils import write_xlsx_tables
 
 
 # Functions
@@ -69,14 +82,16 @@ def addBB2Df(BBList : list, network : str, entity : str, df : pd.DataFrame, df_b
     return df, df_bb
 
 def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str, dfStats2 : pd.DataFrame, statsLabel2 : str, numberSamplesFacts : pd.DataFrame, samplesFactsLabel : str):
-    log.info("Outputting warnings in Excel file " + filename)
-    writer = pd.ExcelWriter(filename, engine='xlsxwriter')
-    dfBiobanks.to_excel(writer, sheet_name=biobanksLabel)
-    dfCollections.to_excel(writer, sheet_name=collectionsLabel)
-    dfStats.to_excel(writer, sheet_name=statsLabel)
-    dfStats2.to_excel(writer, sheet_name=statsLabel2)
-    numberSamplesFacts.to_excel(writer, sheet_name=samplesFactsLabel)
-    writer.close()
+    write_xlsx_tables(
+        filename,
+        [
+            (dfBiobanks, biobanksLabel),
+            (dfCollections, collectionsLabel),
+            (dfStats, statsLabel),
+            (dfStats2, statsLabel2),
+            (numberSamplesFacts, samplesFactsLabel),
+        ],
+    )
 
 
 #############
@@ -99,24 +114,30 @@ remoteCheckList = ['emails', 'geocoding', 'URLs']
 ## Parse arguments ##
 #####################
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (directory and geocoding)')
-parser.add_argument('-a', '--aggregator', dest='aggregator', type=str, default=['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'], help='Space-separated list of the aggregators used in stdout. Accepted values: Network Entity Country')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', default='bbmri_cohorts_stats.xlsx',
-                    help='output of results into an XLSX with filename provided as parameter')
-parser.add_argument('-XWE', '--output-WE-XLSX', dest='outputWEXLSX', nargs=1, help='output of warnings and errors into XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
+parser = build_parser()
+add_purge_cache_arguments(parser, cachesList)
+parser.add_argument('-a', '--aggregator', dest='aggregator', nargs='+', default=['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'], help='Space-separated list of the aggregators used in stdout. Accepted values: Network Entity Country')
+add_xlsx_output_argument(
+    parser,
+    default_filename='bbmri_cohorts_stats.xlsx',
+    help_text='write results to the provided XLSX file',
+)
+add_optional_xlsx_output_argument(
+    parser,
+    dest='outputWEXLSX',
+    short_option='-XWE',
+    long_option='--warnings-xlsx',
+    legacy_long_options=['--output-WE-XLSX'],
+    help_text='write warnings and errors to the provided XLSX file',
+)
+add_no_stdout_argument(parser)
 parser.add_argument('-w', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
-parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
-parser.add_argument('-P', '--package', dest='package', default='eu_bbmri_eric', help='MOLGENIS Package that contains the data (default eu_bbmri_eric).')
-parser.add_argument('--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
-parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
-parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular check(s)')
-#parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
+add_logging_arguments(parser)
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default='eu_bbmri_eric')
+parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
+add_remote_check_disable_arguments(parser, remoteCheckList)
+add_plugin_disable_argument(parser, pluginList)
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
@@ -124,12 +145,14 @@ aggregator = args.aggregator
 outputXLSX = args.outputXLSX
 outputWEXLSX = args.outputWEXLSX
 
+configure_logging(args)
+
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
 if args.username is not None and args.password is not None:
-    dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
-    dir = Directory(package=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 
 '''
@@ -212,7 +235,7 @@ if not args.nostdout:
     warningContainer.dumpWarnings()
 if args.outputWEXLSX is not None:
     log.info("Outputting warnings in Excel file " + args.outputWEXLSX[0])
-    warningContainer.dumpWarningsXLSX(args.outputWEXLSX, allNNs_sheet = True)
+    warningContainer.dumpWarningsXLSX(args.outputWEXLSX, {}, {}, allNNs_sheet = True)
 
 df, df_coll, df_collFactsSampleNumber = addColletion2Df(bbmri_cohort_coll, 'BBMRI_Cohort', 'Collection',df, df_coll, df_collFactsSampleNumber)
 df, df_coll, df_collFactsSampleNumber = addColletion2Df(bbmri_cohort_dna_coll, 'BBMRI_Cohort_DNA', 'Collection',df, df_coll, df_collFactsSampleNumber)
@@ -238,4 +261,4 @@ df_onlyColl = df[df['Entity'] == 'Collection']
 df_lessCol = df_onlyColl[['Network','Entity','Country']]
 statsdf2 = df_lessCol.groupby(['Network','Entity','Country']).size().reset_index(name='Count')
 
-outputExcelBiobanksCollections(args.outputXLSX, df_bb, "Biobanks", df_coll, "Collections", statsdf2, "Stats", statsdf, "StatsDetailed", df_collFactsSampleNumber, "NumberOfSamplesFactTable")
+outputExcelBiobanksCollections(args.outputXLSX[0], df_bb, "Biobanks", df_coll, "Collections", statsdf2, "Stats", statsdf, "StatsDetailed", df_collFactsSampleNumber, "NumberOfSamplesFactTable")

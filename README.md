@@ -57,6 +57,21 @@ The simplest way to run the default validation suite is:
 python3 data-check.py
 ``
 
+Common CLI conventions across validation/export tools:
+- `-v` / `--verbose` for progress logging, `-d` / `--debug` for debug logging
+- `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
+- `-N` / `--no-stdout` to suppress normal stdout output
+- `--purge-cache ...` and `--purge-all-caches` for cache purging
+- `-P` / `--schema` for Directory-backed tools that need an explicit schema/staging area
+
+Cache scope is now tool-specific:
+- exporters that only read the Directory expose only the `directory` cache
+- `full-text-search.py` exposes `directory` and `index`
+- `geocoding_2022.py` exposes `directory` and `geocoding`
+- `data-check.py` keeps the full QC cache and check/plugin control surface
+
+Legacy long option spellings remain accepted where needed, but the normalized lowercase kebab-case variants are preferred in documentation and automation.
+
 Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ``
 python3 data-check.py --purge-all-caches -X test_results.xlsx

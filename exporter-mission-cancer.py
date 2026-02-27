@@ -3,7 +3,6 @@
 
 import pprint
 import re
-import argparse
 import logging as log
 from builtins import str, isinstance, len, set, int
 from typing import List
@@ -11,50 +10,36 @@ import json
 
 import pandas as pd
 
+from cli_common import (
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_purge_cache_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
 import pddfutils
+from xlsxutils import write_xlsx_tables
 
-cachesList = ['directory', 'emails', 'geocoding', 'URLs']
+cachesList = ['directory']
 
 pp = pprint.PrettyPrinter(indent=4)
 
 
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        from builtins import getattr, setattr
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
-
-
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
-                    help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                    help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1,
-                    help='output of results into XLSX with filename provided as parameter')
+parser = build_parser()
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
 parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1,
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true',
-                    help='no output of results into stdout (default: enabled)')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList,
-                    help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList,
-                    help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote=[], disablePlugins=[], purgeCaches=[])
+add_no_stdout_argument(parser)
+add_purge_cache_arguments(parser, cachesList)
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 # Main code
 
@@ -63,7 +48,7 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-orphacodes = OrphaCodes(args.orphacodesfile)
+orphacodes = OrphaCodes(args.orphacodesfile[0])
 
 cancerExistingDiagnosed = []
 cancerOnlyExistingDiagnosed = []
@@ -419,12 +404,14 @@ for df in (pd_pediatricOnlyCancerOnlyBiobanks,):
     pddfutils.tidyBiobankDf(df)
 
 if args.outputXLSX is not None:
-    log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
-    writer = pd.ExcelWriter(args.outputXLSX[0], engine='xlsxwriter')
-    pd_cancerExistingDiagnosed.to_excel(writer, sheet_name='Cancer')
-    pd_cancerOnlyExistingDiagnosed.to_excel(writer, sheet_name='Cancer-only')
-    pd_pediatricCancerExistingDiagnosed.to_excel(writer, sheet_name='Pediatric cancer')
-    pd_pediatricOnlyCancerExistingDiagnosed.to_excel(writer, sheet_name='Pediatric cancer-only')
-    pd_pediatricOnlyCancerOnlyExistingDiagnosed.to_excel(writer, sheet_name='Ped-only cancer-only')
-    pd_pediatricOnlyCancerOnlyBiobanks.to_excel(writer, sheet_name='Ped-only cancer-only BBs')
-    writer.close()
+    write_xlsx_tables(
+        args.outputXLSX[0],
+        [
+            (pd_cancerExistingDiagnosed, 'Cancer'),
+            (pd_cancerOnlyExistingDiagnosed, 'Cancer-only'),
+            (pd_pediatricCancerExistingDiagnosed, 'Pediatric cancer'),
+            (pd_pediatricOnlyCancerExistingDiagnosed, 'Pediatric cancer-only'),
+            (pd_pediatricOnlyCancerOnlyExistingDiagnosed, 'Ped-only cancer-only'),
+            (pd_pediatricOnlyCancerOnlyBiobanks, 'Ped-only cancer-only BBs'),
+        ],
+    )

@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
-import argparse
 import logging as log
 import os.path
 import pprint
@@ -9,21 +8,21 @@ import re
 
 import pandas as pd
 
+from cli_common import (
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_purge_cache_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 
 QUALITY_LABELS = {'accredited', 'eric'}
 
-cachesList = ['directory', 'emails', 'geocoding', 'URLs']
+cachesList = ['directory']
 
 pp = pprint.PrettyPrinter(indent=4)
-
-
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
 
 
 def parse_email_list(raw_value):
@@ -102,24 +101,16 @@ def get_nn_for_collection(collection_id, collection):
     return get_country_code_from_id(collection_id)
 
 
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
+parser = build_parser()
 parser.add_argument('input_xlsx', help='input XLSX (Negotiator representatives list)')
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote=[], disablePlugins=[], purgeCaches=[])
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
+add_no_stdout_argument(parser)
+add_purge_cache_arguments(parser, ['directory'])
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 if not os.path.exists(args.input_xlsx):
     raise FileNotFoundError(args.input_xlsx)

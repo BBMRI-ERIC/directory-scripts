@@ -3,13 +3,24 @@
 
 import pprint
 import re
-import argparse
 import logging as log
 import time
 from typing import List
 import os.path
 
 
+from cli_common import (
+    add_directory_auth_arguments,
+    add_directory_schema_argument,
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_plugin_disable_argument,
+    add_purge_cache_arguments,
+    add_remote_check_disable_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
 from yapsy.PluginManager import PluginManager
 from yapsy.IPlugin import IPlugin
 import inspect
@@ -26,14 +37,6 @@ disabledChecks = {
     }
 
 pp = pprint.PrettyPrinter(indent=4)
-
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
-
 
 class SafePluginManager(PluginManager):
     def isCorrectPlugin(self, candidate, category_name):
@@ -60,40 +63,30 @@ for pluginInfo in simplePluginManager.getAllPlugins():
 remoteCheckList = ['emails', 'geocoding', 'URLs']
 cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
-parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
-parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular check(s)')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='purge particular cache(s)')
+parser = build_parser()
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
+add_no_stdout_argument(parser)
+add_remote_check_disable_arguments(parser, remoteCheckList)
+add_plugin_disable_argument(parser, pluginList)
+add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1,
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
-parser.add_argument('-p', '--password', dest='password', help='Password of the account used to login to the Directory')
-parser.add_argument('-u', '--username', dest='username', help='Username of the account used to login to the Directory')
-parser.add_argument('-P', '--package', dest='package', default='ERIC', help='MOLGENIS Package that contains the data (default ERIC).')
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default='ERIC')
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 
 # Main code
 
 if args.username is not None and args.password is not None:
-    dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
 else:
-    dir = Directory(schema=args.package, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 warningContainer = WarningsContainer()
 
 orphacodes = None

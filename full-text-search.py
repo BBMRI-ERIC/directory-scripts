@@ -5,7 +5,6 @@ from typing import List
 
 import pprint
 import re
-import argparse
 import logging as log
 import time
 from typing import List
@@ -21,36 +20,28 @@ from whoosh.query import *
 from whoosh.support.charset import accent_map
 from whoosh.util import filelock
 
+from cli_common import (
+    add_logging_arguments,
+    add_purge_cache_arguments,
+    build_parser,
+    configure_logging,
+)
+
 cachesList = ['directory', 'index']
 typeList = ['COLLECTION', 'BIOBANK', 'CONTACT', 'NETWORK']
 
 pp = pprint.PrettyPrinter(indent=4)
 
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
-
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
+parser = build_parser()
+add_logging_arguments(parser)
 parser.add_argument('-i', '--print-ids-only', dest='printIdsOnly', action='store_true', help='print only matching IDs instead of search hits')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
+add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('--limit-types', dest='limitTypes', nargs='+', action='extend', choices=typeList, help='return only specific types')
 parser.add_argument('searchQuery', nargs='+', help='search query')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[], limitTypes=[])
+parser.set_defaults(purgeCaches=[], limitTypes=[])
 args = parser.parse_args()
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 
 # Main code
