@@ -14,6 +14,7 @@
   - roman
   - typing-extensions
   - openpyxl
+  - pytest (for unit tests)
 
 ## Installation
 - Verify installation:  
@@ -21,6 +22,7 @@
 python3 -m ensurepip
 ``
 - For each of the above packages `pip3  install --upgrade <package>`
+- For test dependencies only: `pip3 install -r requirements-test.txt`
 - Ensure that file `/etc/resolve.conf` exists. If it does not exist create it with the following contents:  
   ``
 nameserver 8.8.8.8
@@ -74,6 +76,39 @@ Debug mode with fresh caches:
 ``
 python3 data-check.py -d --purge-all-caches
 ``
+
+## Unit tests
+
+Run all unit tests (pytest):
+``
+pytest -q
+``
+
+Run focused tests for reusable directory helpers:
+``
+pytest -q tests/test_directory.py
+``
+
+Run live cache-mode tests against Directory (fresh fetch + cached snapshot):
+``
+pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode both
+``
+
+Run only cached-mode live tests:
+``
+pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode cached
+``
+
+Run only fresh-mode live tests:
+``
+pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode fresh
+``
+
+Optional live-test settings:
+- `--live-directory-schema <SCHEMA>` (or env `DIRECTORY_TEST_SCHEMA`) selects schema/staging area (default: `ERIC`).
+- Env `DIRECTORYUSERNAME` and `DIRECTORYPASSWORD` can be set for authenticated live runs; if unset, tests run without login.
+
+By default, live tests are skipped unless `--live-directory` is provided. They run in an isolated temporary working directory so cache purge checks do not wipe your regular local cache.
 
 ## Searching in the Directory
 

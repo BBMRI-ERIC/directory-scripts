@@ -2,6 +2,7 @@
 import logging
 import os.path
 import time
+from typing import Any, Optional
 
 import networkx as nx
 from diskcache import Cache
@@ -11,8 +12,20 @@ from molgenis_emx2_pyclient import Client
 log = logging.getLogger("BBMRI Directory")
 
 class Directory:
+    """Access, cache, and graph-model BBMRI Directory data for downstream checks."""
 
     def __init__(self, schema="ERIC", purgeCaches=None, debug=False, pp=None, username=None, password=None, token: str = None):
+        """Initialize a directory snapshot and build query/helper graphs.
+
+        Args:
+            schema: Directory schema (staging area) name.
+            purgeCaches: Cache names to purge before loading data.
+            debug: Enable additional debug output.
+            pp: Pretty-printer object used in debug mode.
+            username: Username for session authentication.
+            password: Password for session authentication.
+            token: Access token for token-based authentication.
+        """
         if purgeCaches is None:
             purgeCaches = list()
         self.__pp = pp
@@ -64,7 +77,7 @@ class Directory:
             end_time = time.perf_counter()
             if debug and self.__pp is not None:
                 for c in self.collections:
-                    pp.pprint(c)
+                    self.__pp.pprint(c)
             log.info(f'   ... retrieved {len(self.collections)} collections in ' + "%0.3f" % (end_time-start_time) + 's')
         log.info('   ... retrieving contacts')
         if 'contacts' in cache:
@@ -243,35 +256,53 @@ class Directory:
         self.__orphacodesmapper = None
 
     def setOrphaCodesMapper(self, o):
+        """Attach an OrphaCodes mapper implementation."""
         self.__orphacodesmapper = o
 
     def issetOrphaCodesMapper(self) -> bool:
-        if self.__orphacodesmapper is not None:
-            return True
-        else:
-            return False
+        """Return whether an OrphaCodes mapper is configured."""
+        return self.__orphacodesmapper is not None
 
     def getOrphaCodesMapper(self):
+        """Return the configured OrphaCodes mapper."""
         return self.__orphacodesmapper
 
     def getBiobanks(self):
+        """Return all loaded biobanks."""
         return self.biobanks
     
     def getQualBB(self):
+        """Return the biobank quality-info table."""
         return self.qualBBtable
     
     def getQualColl(self):
+        """Return the collection quality-info table."""
         return self.qualColltable
 
-    def getBiobankById(self, biobankId : str):
+    def getBiobankById(self, biobankId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
+        """Return a biobank by id.
+
+        Args:
+            biobankId: Biobank identifier.
+            raise_on_missing: Raise KeyError when not found.
+
+        Returns:
+            Matching biobank or None when not found and raise_on_missing is False.
+        """
         for b in self.biobanks:
             if b['id'] == biobankId:
                 return b
+        if raise_on_missing:
+            raise KeyError(f"Biobank {biobankId!r} not found in loaded directory snapshot.")
+        log.warning("Biobank %r not found in loaded directory snapshot.", biobankId)
+        return None
 
     def getBiobanksCount(self):
+        """Return the number of loaded biobanks."""
         return len(self.biobanks)
 
-    def getBiobankNN(self, biobankID : str):
+    def getBiobankNN(self, biobankID: str):
+        """Return country/national-node information for a biobank id."""
         # TODO: handle IARC!
         #data = nx.get_node_attributes(self.directoryGraph, 'data')
         #if self.pp is not None:
@@ -281,34 +312,66 @@ class Directory:
         return biobank['country']
 
     def getCollections(self):
+        """Return all loaded collections."""
         return self.collections
 
-    def getCollectionById(self, collectionId : str):
+    def getCollectionById(self, collectionId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
+        """Return a collection by id.
+
+        Args:
+            collectionId: Collection identifier.
+            raise_on_missing: Raise KeyError when not found.
+
+        Returns:
+            Matching collection or None when not found and raise_on_missing is False.
+        """
         for c in self.collections:
             if c['id'] == collectionId:
                 return c
+        if raise_on_missing:
+            raise KeyError(f"Collection {collectionId!r} not found in loaded directory snapshot.")
+        log.warning("Collection %r not found in loaded directory snapshot.", collectionId)
+        return None
 
     def getCollectionsCount(self):
+        """Return the number of loaded collections."""
         return len(self.collections)
 
-    def getCollectionBiobankId(self, collectionID : str):
+    def getCollectionBiobankId(self, collectionID: str):
+        """Return the parent biobank id of the given collection id."""
         collection = self.directoryGraph.nodes[collectionID]['data']
         return collection['biobank']['id']
 
-    def getCollectionContact(self, collectionID : str):
+    def getCollectionContact(self, collectionID: str):
+        """Return primary contact record for a collection id."""
         collection = self.directoryGraph.nodes[collectionID]['data']
         return self.contactHashmap[collection['contact']['id']]
 
-    def getBiobankContact(self, biobankID : str):
+    def getBiobankContact(self, biobankID: str):
+        """Return primary contact record for a biobank id."""
         biobank = self.directoryGraph.nodes[biobankID]['data']
         return self.contactHashmap[biobank['contact']['id']]
 
-    def isTopLevelCollection(self, collectionID : str):
+    def isTopLevelCollection(self, collectionID: str):
+        """Return True when collection has no parent_collection pointer."""
         collection = self.directoryGraph.nodes[collectionID]['data']
         return not 'parent_collection' in collection
 
-    def isCountableCollection(self, collectionID : str, metric : str):
-        assert metric == 'number_of_donors' or metric == 'size' 
+    def isCountableCollection(self, collectionID: str, metric: str):
+        """Return whether collection should be counted for a specific metric.
+
+        A collection is countable when it has an integer value for `metric` and
+        no ancestor collection has an integer value for the same metric.
+
+        Args:
+            collectionID: Collection identifier.
+            metric: Supported metrics are `number_of_donors` and `size`.
+
+        Raises:
+            ValueError: If metric is unsupported.
+        """
+        if metric not in {'number_of_donors', 'size'}:
+            raise ValueError(f"Unsupported metric {metric!r}; expected 'number_of_donors' or 'size'.")
         # note that this is intentionally not implemented for OoM - since OoM is a required parameter and thus any child collection would be double-counted
         collection = self.directoryGraph.nodes[collectionID]['data']
         if not (metric in collection and isinstance(collection[metric], int)):
@@ -334,42 +397,53 @@ class Directory:
                 
 
     def getCollectionNN(self, collectionID):
+        """Return country/national-node information for a collection id."""
         # TODO: handle IARC!
         return self.getBiobankNN(self.getCollectionBiobankId(collectionID))
 
     # return the whole subgraph including the biobank itself
-    def getGraphBiobankCollectionsFromBiobank(self, biobankID : str):
+    def getGraphBiobankCollectionsFromBiobank(self, biobankID: str):
+        """Return subgraph containing a biobank and all descendant collections."""
         return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, biobankID).union({biobankID}))
 
     # return the whole subgraph including some collection
-    def getGraphBiobankCollectionsFromCollection(self, collectionID : str):
+    def getGraphBiobankCollectionsFromCollection(self, collectionID: str):
+        """Return subgraph containing a collection, its ancestors, and descendants."""
         return self.directoryCollectionsDAG.subgraph(nx.algorithms.dag.ancestors(self.directoryCollectionsDAG, collectionID).union(nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)).union({collectionID}))
 
-    def getCollectionsDescendants(self, collectionID : str):
+    def getCollectionsDescendants(self, collectionID: str):
+        """Return descendant collection ids for a collection id."""
         return nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)
 
     def getContacts(self):
+        """Return all loaded contacts."""
         return self.contacts
 
-    def getContact(self, contactID : str):
+    def getContact(self, contactID: str):
+        """Return a contact by id."""
         return self.contactHashmap[contactID]
 
-    def getContactNN(self, contactID : str):
+    def getContactNN(self, contactID: str):
+        """Return country/national-node information for a contact id."""
         # TODO: handle IARC!
         #return self.contactHashmap[contactID]['country']['id'] # EMX2 change: Country only contains the ID now, so:
         return self.contactHashmap[contactID]['country']
 
 
     def getNetworks(self):
+        """Return all loaded networks."""
         return self.networks
 
     def getFacts(self):
+        """Return all loaded collection facts."""
         return self.facts
 
-    def getCollectionFacts(self, collectionID : str):
+    def getCollectionFacts(self, collectionID: str):
+        """Return facts for a specific collection id."""
         return self.collectionFactMap[collectionID]
 
-    def getNetworkNN(self, networkID : str):
+    def getNetworkNN(self, networkID: str):
+        """Return country/national-node information for a network id."""
         # TODO: review handling of IARC/EU/global collections
         network = self.networkGraph.nodes[networkID]['data']
         NN = ""
@@ -382,9 +456,11 @@ class Directory:
         return NN
 
     @staticmethod
-    def getListOfEntityAttributeIds(entity, key : str):
+    def getListOfEntityAttributeIds(entity, key: str):
+        """Return list of `id` values from an entity attribute list."""
         return [ element['id'] for element in entity[key] ] if key in entity else []
 
     @staticmethod
-    def getListOfEntityAttributes(entity, key : str):
+    def getListOfEntityAttributes(entity, key: str):
+        """Return list value of an entity attribute when present, else empty list."""
         return [ element for element in entity[key] ] if key in entity else []

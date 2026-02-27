@@ -1,0 +1,3 @@
+pytest>=8.0
+# Optional property-based testing framework for future tests:
+# hypothesis>=6.0
