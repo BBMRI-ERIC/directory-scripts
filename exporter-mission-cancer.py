@@ -21,6 +21,11 @@ from cli_common import (
 from directory import Directory
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
+from oomutils import (
+    describe_oom_estimate_policy,
+    estimate_count_from_oom,
+    get_oom_upper_bound_coefficient,
+)
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -47,6 +52,11 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+log.info(
+    "OoM estimate policy: %s (coefficient=%s)",
+    describe_oom_estimate_policy(),
+    get_oom_upper_bound_coefficient(),
+)
 
 orphacodes = OrphaCodes(args.orphacodesfile[0])
 
@@ -109,8 +119,6 @@ for collection in dir.getCollections():
     if 'network' in biobank:
         for n in biobank['network']:
             biobank_networks.append(n['id'])
-
-    OoM = int(collection['order_of_magnitude'])
 
     materials = []
     if 'materials' in collection:
@@ -279,17 +287,18 @@ for collection in dir.getCollections():
                     pediatricOnlyCancerOnlyCollectionSamplesExplicit += collection['size']
                     pediatricOnlyCancerOnlyCollectionSamplesIncOoM += collection['size']
         else:
-            cancerCollectionSamplesIncOoM += 10 ** OoM
+            estimate = estimate_count_from_oom(collection['order_of_magnitude'])
+            cancerCollectionSamplesIncOoM += estimate
             if pediatric:
-                pediatricCancerCollectionSamplesIncOoM += 10 ** OoM
+                pediatricCancerCollectionSamplesIncOoM += estimate
             if pediatricOnly:
-                pediatricOnlyCancerCollectionSamplesIncOoM += 10 ** OoM
+                pediatricOnlyCancerCollectionSamplesIncOoM += estimate
             if not non_cancer:
-                cancerOnlyCollectionSamplesIncOoM += 10 ** OoM
+                cancerOnlyCollectionSamplesIncOoM += estimate
                 if pediatric:
-                    pediatricCancerOnlyCollectionSamplesIncOoM += 10 ** OoM
+                    pediatricCancerOnlyCollectionSamplesIncOoM += estimate
                 if pediatricOnly:
-                    pediatricOnlyCancerOnlyCollectionSamplesIncOoM += 10 ** OoM
+                    pediatricOnlyCancerOnlyCollectionSamplesIncOoM += estimate
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             cancerCollectionDonorsExplicit += collection['number_of_donors']
             if pediatric:

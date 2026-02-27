@@ -21,6 +21,10 @@ from cli_common import (
 )
 from directory import Directory
 from directory_stats_utils import build_directory_stats, build_stats_summary
+from oomutils import (
+    describe_oom_estimate_policy,
+    get_oom_upper_bound_coefficient,
+)
 from xlsxutils import write_xlsx_tables
 
 
@@ -106,6 +110,11 @@ dir = Directory(**directory_kwargs)
 log.info("Total biobanks: %d", dir.getBiobanksCount())
 log.info("Total collections: %d", dir.getCollectionsCount())
 log.info("Total services: %d", len(dir.getServices()))
+log.info(
+    "OoM estimate policy: %s (coefficient=%s)",
+    describe_oom_estimate_policy(),
+    get_oom_upper_bound_coefficient(),
+)
 
 stats = build_directory_stats(
     dir,
@@ -120,6 +129,8 @@ summary["include_withdrawn_biobanks"] = int(args.include_withdrawn_biobanks)
 summary["country_filter"] = ",".join(args.countries)
 summary["staging_area_filter"] = ",".join(args.staging_areas)
 summary["collection_type_filter"] = ",".join(args.collection_types)
+summary["oom_upper_bound_coefficient"] = get_oom_upper_bound_coefficient()
+summary["oom_estimate_policy"] = describe_oom_estimate_policy()
 
 stats_df = pd.DataFrame(stats["biobank_rows"])
 summary_df = pd.DataFrame([summary])

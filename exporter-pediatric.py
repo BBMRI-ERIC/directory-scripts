@@ -20,6 +20,11 @@ from cli_common import (
 from directory import Directory
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
+from oomutils import (
+    describe_oom_estimate_policy,
+    estimate_count_from_oom,
+    get_oom_upper_bound_coefficient,
+)
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -46,6 +51,11 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+log.info(
+    "OoM estimate policy: %s (coefficient=%s)",
+    describe_oom_estimate_policy(),
+    get_oom_upper_bound_coefficient(),
+)
 
 orphacodes = OrphaCodes(args.orphacodesfile)
 
@@ -78,8 +88,6 @@ for collection in dir.getCollections():
     if 'network' in biobank:
         for n in biobank['network']:
             biobank_networks.append(n['id'])
-
-    OoM = collection['order_of_magnitude']
 
     materials = []
     if 'materials' in collection:
@@ -204,6 +212,10 @@ for collection in dir.getCollections():
         if 'size' in collection and isinstance(collection['size'], int):
             pediatricCollectionSamplesExplicit += collection['size']
             pediatricCollectionSamplesIncOoM += collection['size']
+        else:
+            pediatricCollectionSamplesIncOoM += estimate_count_from_oom(
+                collection['order_of_magnitude']
+            )
     if pediatricOnly:
         log.info(f"Pediatric-only collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
         pediatricOnlyExistingDiagnosed.append(collection)
@@ -212,6 +224,10 @@ for collection in dir.getCollections():
         if 'size' in collection and isinstance(collection['size'], int):
             pediatricOnlyCollectionSamplesExplicit += collection['size']
             pediatricOnlyCollectionSamplesIncOoM += collection['size']
+        else:
+            pediatricOnlyCollectionSamplesIncOoM += estimate_count_from_oom(
+                collection['order_of_magnitude']
+            )
     if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
         if pediatric:
             pediatricCollectionDonorsExplicit += collection['number_of_donors']

@@ -302,6 +302,28 @@ def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):
     assert include_summary["services_total"] == default_summary["services_total"] + 1
 
 
+def test_directory_stats_matches_exporter_all_when_oom_policy_changes(
+    monkeypatch,
+):
+    monkeypatch.setenv("DIRECTORY_OOM_UPPER_BOUND_COEFFICIENT", "0.3")
+
+    stats_globals, _, _ = _run_script(
+        monkeypatch,
+        "directory-stats.py",
+        ["-N"],
+    )
+    exporter_globals, _, _ = _run_script(
+        monkeypatch,
+        "exporter-all.py",
+        ["-N"],
+    )
+
+    summary = stats_globals["summary"]
+    assert summary["oom_upper_bound_coefficient"] == 0.3
+    assert summary["samples_total"] == exporter_globals["allCollectionSamplesIncOoM"]
+    assert summary["donors_total"] == exporter_globals["allCollectionDonorsIncOoM"]
+
+
 def test_directory_stats_script_applies_country_and_staging_area_filters(monkeypatch):
     globals_dict, _, _ = _run_script(
         monkeypatch,

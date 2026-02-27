@@ -20,6 +20,11 @@ from cli_common import (
 from directory import Directory
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
+from oomutils import (
+    describe_oom_estimate_policy,
+    estimate_count_from_oom,
+    get_oom_upper_bound_coefficient,
+)
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -46,6 +51,11 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+log.info(
+    "OoM estimate policy: %s (coefficient=%s)",
+    describe_oom_estimate_policy(),
+    get_oom_upper_bound_coefficient(),
+)
 
 orphacodes = OrphaCodes(args.orphacodesfile[0])
 
@@ -87,8 +97,6 @@ for collection in dir.getCollections():
     if 'network' in biobank:
         for n in biobank['network']:
             biobank_networks.append(n['id'])
-
-    OoM = int(collection['order_of_magnitude'])
 
     materials = []
     if 'materials' in collection:
@@ -190,8 +198,9 @@ for collection in dir.getCollections():
             pediatricOnlyObesitySamplesExplicit += collection['size']
             pediatricOnlyObesitySamplesIncOoM += collection['size']
         else:
-            log.info('Adding %d for OoM %d on behalf of %s'%(10**OoM, OoM, collection['id']))
-            pediatricOnlyObesitySamplesIncOoM += 10 ** OoM
+            estimate = estimate_count_from_oom(collection['order_of_magnitude'])
+            log.info('Adding %d for OoM %s on behalf of %s'%(estimate, collection['order_of_magnitude'], collection['id']))
+            pediatricOnlyObesitySamplesIncOoM += estimate
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             pediatricOnlyObesityDonorsExplicit += collection['number_of_donors']
     elif pediatric and obesity:
@@ -202,8 +211,9 @@ for collection in dir.getCollections():
             pediatricObesitySamplesExplicit += collection['size']
             pediatricObesitySamplesIncOoM += collection['size']
         else:
-            log.info('Adding %d for OoM %d on behalf of %s'%(10**OoM, OoM, collection['id']))
-            pediatricObesitySamplesIncOoM += 10 ** OoM
+            estimate = estimate_count_from_oom(collection['order_of_magnitude'])
+            log.info('Adding %d for OoM %s on behalf of %s'%(estimate, collection['order_of_magnitude'], collection['id']))
+            pediatricObesitySamplesIncOoM += estimate
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             pediatricObesityDonorsExplicit += collection['number_of_donors']
     elif obesity:
@@ -214,8 +224,9 @@ for collection in dir.getCollections():
             obesitySamplesExplicit += collection['size']
             obesitySamplesIncOoM += collection['size']
         else:
-            log.info('Adding %d for OoM %d on behalf of %s'%(10**OoM, OoM, collection['id']))
-            obesitySamplesIncOoM += 10 ** OoM
+            estimate = estimate_count_from_oom(collection['order_of_magnitude'])
+            log.info('Adding %d for OoM %s on behalf of %s'%(estimate, collection['order_of_magnitude'], collection['id']))
+            obesitySamplesIncOoM += estimate
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             obesityDonorsExplicit += collection['number_of_donors']
 

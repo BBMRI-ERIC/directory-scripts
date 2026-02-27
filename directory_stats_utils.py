@@ -7,6 +7,7 @@ from collections import Counter
 from typing import Any
 
 from fact_sheet_utils import analyze_collection_fact_sheet, has_fact_sheet
+from oomutils import estimate_count_from_oom_or_none
 
 
 def _normalize_scalar(value: Any) -> Any:
@@ -17,23 +18,6 @@ def _normalize_scalar(value: Any) -> Any:
         if "name" in value:
             return value["name"]
     return value
-
-
-def _normalize_order_of_magnitude(value: Any, collection_id: str, field_name: str):
-    """Return integer order-of-magnitude value or None when unavailable."""
-    scalar_value = _normalize_scalar(value)
-    if scalar_value in (None, ""):
-        return None
-    try:
-        return int(scalar_value)
-    except (TypeError, ValueError):
-        log.warning(
-            "Collection %s has invalid %s value %r; ignoring it for estimates.",
-            collection_id,
-            field_name,
-            value,
-        )
-        return None
 
 
 def _normalize_country(value: Any) -> str:
@@ -239,24 +223,24 @@ def build_directory_stats(
             if directory.isCountableCollection(collection_id, "size"):
                 samples_explicit += collection["size"]
             elif is_top_level:
-                size_oom = _normalize_order_of_magnitude(
+                size_estimate = estimate_count_from_oom_or_none(
                     collection.get("order_of_magnitude"),
-                    collection_id,
-                    "order_of_magnitude",
+                    collection_id=collection_id,
+                    field_name="order_of_magnitude",
                 )
-                if size_oom is not None:
-                    samples_oom += 10 ** size_oom
+                if size_estimate is not None:
+                    samples_oom += size_estimate
 
             if directory.isCountableCollection(collection_id, "number_of_donors"):
                 donors_explicit += collection["number_of_donors"]
             elif is_top_level:
-                donor_oom = _normalize_order_of_magnitude(
+                donor_estimate = estimate_count_from_oom_or_none(
                     collection.get("order_of_magnitude_donors"),
-                    collection_id,
-                    "order_of_magnitude_donors",
+                    collection_id=collection_id,
+                    field_name="order_of_magnitude_donors",
                 )
-                if donor_oom is not None:
-                    donors_oom += 10 ** donor_oom
+                if donor_estimate is not None:
+                    donors_oom += donor_estimate
 
             if has_fact_sheet(collection):
                 collections_with_facts += 1

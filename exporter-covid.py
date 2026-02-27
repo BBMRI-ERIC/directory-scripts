@@ -21,6 +21,11 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from oomutils import (
+    describe_oom_estimate_policy,
+    estimate_count_from_oom,
+    get_oom_upper_bound_coefficient,
+)
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -45,6 +50,11 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+log.info(
+    "OoM estimate policy: %s (coefficient=%s)",
+    describe_oom_estimate_policy(),
+    get_oom_upper_bound_coefficient(),
+)
 
 covidExistingDiagnosed = []
 covidExistingControls = []
@@ -84,8 +94,6 @@ for collection in dir.getCollections():
     if 'network' in collection:
         for n in collection['network']:
             collection_networks.append(n['id'])
-
-    OoM = int(collection['order_of_magnitude'])
 
     materials = []
     if 'materials' in collection:
@@ -177,9 +185,10 @@ for collection in dir.getCollections():
                 covidOnlyCollectionSamplesExplicit += collection['size']
                 covidOnlyCollectionSamplesIncOoM += collection['size']
         else:
-            covidCollectionSamplesIncOoM += 10**OoM
+            estimate = estimate_count_from_oom(collection['order_of_magnitude'])
+            covidCollectionSamplesIncOoM += estimate
             if not non_covid:
-                covidOnlyCollectionSamplesIncOoM += 10**OoM
+                covidOnlyCollectionSamplesIncOoM += estimate
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             covidCollectionDonorsExplicit += collection['number_of_donors']
             if not non_covid:

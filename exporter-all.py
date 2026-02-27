@@ -18,6 +18,11 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from oomutils import (
+    describe_oom_estimate_policy,
+    estimate_count_from_oom_or_none,
+    get_oom_upper_bound_coefficient,
+)
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -88,13 +93,6 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
         if collection_withdrawn:
             continue
 
-        OoM = int(collection['order_of_magnitude'])
-        # OoM Donors
-        try:
-            OoMDonors = int(collection['order_of_magnitude_donors'])
-        except KeyError:
-            OoMDonors = None
-
         if biobank['country'] != 'EU':
             allCountries.add(biobank['country'])
         allCollections.append(collection)
@@ -105,18 +103,29 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
             allCollectionSamplesExplicit += collection['size']
             allCollectionSamplesIncOoM += collection['size']
         else:
-            # Intentionally, the lower bound of the OoM interval is taken - the size of the collection should be in the range of 10**OoM to 10**(OoM+1) - and hence using 10**OoM is a bound nobody can question unless there is a bug in the underlying data. Historically, we used also 0.3*10**(OoM+1).
             # note that OoM is only counted for top-level collections to avoid double counting - because OoM is mandatory parameter, any child collection has a parent which has OoM filled in
             if dir.isTopLevelCollection(collection['id']):
-                allCollectionSamplesIncOoM += int(10 ** OoM)
+                estimate = estimate_count_from_oom_or_none(
+                    collection.get('order_of_magnitude'),
+                    collection_id=collection['id'],
+                    field_name='order_of_magnitude',
+                )
+                if estimate is not None:
+                    allCollectionSamplesIncOoM += estimate
         #if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int) and dir.isTopLevelCollection(collection['id']):
         if dir.isCountableCollection(collection['id'], 'number_of_donors'):
             allCollectionDonorsExplicit += collection['number_of_donors']
             # OoM Donors
             allCollectionDonorsIncOoM += collection['number_of_donors']
         else:
-            if dir.isTopLevelCollection(collection['id']) and OoMDonors:
-                allCollectionDonorsIncOoM += int(10 ** OoMDonors)
+            if dir.isTopLevelCollection(collection['id']):
+                estimate = estimate_count_from_oom_or_none(
+                    collection.get('order_of_magnitude_donors'),
+                    collection_id=collection['id'],
+                    field_name='order_of_magnitude_donors',
+                )
+                if estimate is not None:
+                    allCollectionDonorsIncOoM += estimate
 
         # Print also the Directory URL:
         if not 'directoryURL' in collection:
@@ -161,6 +170,11 @@ dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+log.info(
+    "OoM estimate policy: %s (coefficient=%s)",
+    describe_oom_estimate_policy(),
+    get_oom_upper_bound_coefficient(),
+)
 
 if filterCollType and filterMatType:
     for collection in dir.getCollections():

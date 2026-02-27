@@ -125,6 +125,8 @@ Optional live-test settings:
 
 By default, live tests are skipped unless `--live-directory` is provided. They run in an isolated temporary working directory so cache purge checks do not wipe your regular local cache.
 
+OoM-based count estimation is centralized in `oomutils.py`. By default all exporters/stats that estimate counts from `order_of_magnitude` use the lower bound of the OoM interval (`10**n`). To change the policy globally, set `DIRECTORY_OOM_UPPER_BOUND_COEFFICIENT`; for example, `0.3` applies `0.3 * 10**(n+1)` consistently everywhere that OoM-based counting is used.
+
 ## Searching in the Directory
 
 - **full-text-search.py** - full text search of the Directory using Whoosh with [Lucene search syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html).
