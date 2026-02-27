@@ -42,6 +42,181 @@ def compareAge(self, dir, factAges: set, factsAgeUnits: set, collection, warning
 			log.info(f"Incomplete age range information for {collection['id']}: " + str(e) + " missing")
 
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'FactTables:AddSizeAttributeCollection': {'entity': 'COLLECTION',
+                                           'fields': ['donors_present',
+                                                      'facts',
+                                                      'id',
+                                                      'size'],
+                                           'fix': 'Add size attribute to the '
+                                                  'collection',
+                                           'severity': 'WARNING',
+                                           'summary': 'Collection size attribute '
+                                                      '(number of samples) not '
+                                                      'provided'},
+ 'FactTables:AllOneStarAggregateAggregates3': {'entity': 'COLLECTION',
+                                               'fields': ['donors_present',
+                                                          'facts',
+                                                          'id'],
+                                               'severity': 'WARNING',
+                                               'summary': 'missing all-but-one-star '
+                                                          'aggregate: {aggregates[3]}'},
+ 'FactTables:AllOneStarAggregateFkValueV': {'entity': 'COLLECTION',
+                                            'fields': ['donors_present', 'facts', 'id'],
+                                            'severity': 'INFO',
+                                            'summary': 'missing all-but-one-star '
+                                                       'aggregate for {fk} value '
+                                                       '{value}: {aggregates[3]}'},
+ 'FactTables:AllStarAggregateAggregates4': {'entity': 'COLLECTION',
+                                            'fields': ['all_star_rows',
+                                                       'donors_present',
+                                                       'facts',
+                                                       'id'],
+                                            'severity': 'WARNING',
+                                            'summary': 'Expected exactly one all-star '
+                                                       'aggregate row, found '
+                                                       "{fact_sheet['all_star_rows']}."},
+ 'FactTables:AllStarDonorsMismatchCollectionDonors': {'entity': 'COLLECTION',
+                                                      'fields': ['code',
+                                                                 'donors_present',
+                                                                 'facts',
+                                                                 'id'],
+                                                      'fix': 'Check the all-star '
+                                                             'aggregate row and '
+                                                             'collection '
+                                                             'number_of_donors.',
+                                                      'severity': 'WARNING',
+                                                      'summary': 'Check '
+                                                                 'FactTables:AllStarDonorsMismatchCollectionDonors'},
+ 'FactTables:AllStarSamplesMismatchCollectionSize': {'entity': 'COLLECTION',
+                                                     'fields': ['code',
+                                                                'donors_present',
+                                                                'facts',
+                                                                'id'],
+                                                     'fix': 'Check the all-star '
+                                                            'aggregate row and '
+                                                            'collection size.',
+                                                     'severity': 'WARNING',
+                                                     'summary': 'Check '
+                                                                'FactTables:AllStarSamplesMismatchCollectionSize'},
+ 'FactTables:CheckAgeInformationCollection': {'entity': 'COLLECTION',
+                                              'fields': ['age_high',
+                                                         'age_low',
+                                                         'age_unit'],
+                                              'fix': 'Check age information of the '
+                                                     'collection description with age '
+                                                     'ranges from the facts table and '
+                                                     'correct as necessary',
+                                              'severity': 'WARNING',
+                                              'summary': 'Collection ages outside '
+                                                         'facts age range'},
+ 'FactTables:CheckAgeRangeCollection': {'entity': 'COLLECTION',
+                                        'fields': ['age_high', 'age_low', 'age_unit'],
+                                        'fix': 'Check age range of the collection '
+                                               'description with ages from the facts '
+                                               'table and correct as necessary',
+                                        'severity': 'WARNING',
+                                        'summary': 'Fact table age outside collection '
+                                                   'age_high age_low range'},
+ 'FactTables:CheckAgeUnitInformation': {'entity': 'COLLECTION',
+                                        'fields': ['age_unit'],
+                                        'fix': 'Check age unit information of the '
+                                               'collection description with age units '
+                                               'from the facts table and correct as '
+                                               'necessary',
+                                        'severity': 'WARNING',
+                                        'summary': 'Age unit ID of the collection is '
+                                                   "{collection['age_unit']} while the "
+                                                   'age unit in the fact table is '
+                                                   '{factsAgeUnits}'},
+ 'FactTables:CheckSizeInformationCollection': {'entity': 'COLLECTION',
+                                               'fields': ['all_star_number_of_samples',
+                                                          'donors_present',
+                                                          'facts',
+                                                          'id',
+                                                          'size'],
+                                               'fix': 'Check size information of the '
+                                                      'collection description with the '
+                                                      'all-star row from the facts '
+                                                      'table and correct as necessary',
+                                               'severity': 'WARNING',
+                                               'summary': 'Value of the collection '
+                                                          'size attribute (number of '
+                                                          'samples - '
+                                                          "{collection['size']}) is "
+                                                          'greater than the all-star '
+                                                          'aggregate number_of_samples '
+                                                          '({all_star_samples})'},
+ 'FactTables:CheckSizeInformationCollection2': {'entity': 'COLLECTION',
+                                                'fields': ['all_star_number_of_samples',
+                                                           'donors_present',
+                                                           'facts',
+                                                           'id',
+                                                           'size'],
+                                                'fix': 'Check size information of the '
+                                                       'collection description with '
+                                                       'the all-star row from the '
+                                                       'facts table and correct as '
+                                                       'necessary',
+                                                'severity': 'WARNING',
+                                                'summary': 'Value of the collection '
+                                                           'size attribute (number of '
+                                                           'samples - '
+                                                           "{collection['size']}) is "
+                                                           'smaller than the all-star '
+                                                           'aggregate '
+                                                           'number_of_samples '
+                                                           '({all_star_samples})'},
+ 'FactTables:Collection': {'entity': 'COLLECTION',
+                           'fields': ['donors_present', 'facts', 'id', 'network'],
+                           'severity': 'ERROR',
+                           'summary': 'Collection in {BBMRICohortsDNANetworkName} but '
+                                      'the fact table does not contain any of the '
+                                      'expected material types: '
+                                      "{','.join(requiredMaterialTypes)})"},
+ 'FactTables:Collection2': {'entity': 'COLLECTION',
+                            'fields': ['donors_present', 'facts', 'id', 'network'],
+                            'severity': 'ERROR',
+                            'summary': 'Collection in {BBMRICohortsDNANetworkName} but '
+                                       'the fact table does specified the NAV '
+                                       '(not-available) material type'},
+ 'FactTables:CollectionInformationSorted': {'entity': 'COLLECTION',
+                                            'fields': [],
+                                            'severity': 'WARNING',
+                                            'summary': ' - collection information: '
+                                                       '{sorted(collList)} - fact '
+                                                       'information: '
+                                                       '{sorted(factsList)}'},
+ 'FactTables:CollectionSizeAttributeNumber': {'entity': 'COLLECTION',
+                                              'fields': ['donors_present',
+                                                         'facts',
+                                                         'id',
+                                                         'size'],
+                                              'severity': 'ERROR',
+                                              'summary': 'Collection size attribute '
+                                                         '(number of samples) is not '
+                                                         'an integer'},
+ 'FactTables:FactTableInformationHas0Donors': {'entity': 'COLLECTION',
+                                               'fields': ['all_star_number_of_donors',
+                                                          'donors_present',
+                                                          'facts',
+                                                          'id'],
+                                               'severity': 'WARNING',
+                                               'summary': 'fact table information has '
+                                                          '0 donors/patients'},
+ 'FactTables:LenKanonymityviolatinglist': {'entity': 'COLLECTION',
+                                           'fields': ['all_star_number_of_donors',
+                                                      'donors_present',
+                                                      'facts',
+                                                      'id'],
+                                           'severity': 'WARNING',
+                                           'summary': 'the '
+                                                      '{len(kAnonymityViolatingList)} '
+                                                      'records of fact table violates '
+                                                      '{kAnonymityLimit}-anonymity: '
+                                                      '{kAnonymityViolatingList}'}}
+
 class FactTables(IPlugin):
 
 	def check(self, dir, args):

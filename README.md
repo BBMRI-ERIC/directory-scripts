@@ -72,6 +72,8 @@ Cache scope is now tool-specific:
 
 Legacy long option spellings remain accepted where needed, but the normalized lowercase kebab-case variants are preferred in documentation and automation.
 
+Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plugin source. Keep that metadata aligned with the emitted `DataCheckWarning(...)` calls; the local manual generator validates severity/entity/field consistency against the implementation.
+
 Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ``
 python3 data-check.py --purge-all-caches -X test_results.xlsx
@@ -205,7 +207,7 @@ python3 COVID19DataPortal_XMLFromBBMRIDirectory.py -x bbmriDirectory_Covid19Data
 ``
 python3 add_orphacodes.py -d directory.xlsx -O en_product1.xml -o directory-with-orpha.xlsx
 ``
-- **directory-stats.py** - per-biobank statistics for collections, samples, donors, services, collection types, service types, and fact-sheet consistency. Sample and donor totals combine explicit countable values with order-of-magnitude fallback estimates for top-level collections only, so subcollections do not double-count parent holdings. Fact-sheet warnings report missing/invalid all-star rows and mismatches against collection-level totals. Withdrawn biobanks are excluded by default; use `-w/--include-withdrawn-biobanks` to include them and their associated collections/services. You can filter by biobank `country` (`-c/--country`), by staging area code parsed from the biobank ID (`-A/--staging-area`, for example `EXT`), and by collection type (`-t/--collection-type`). Filter values accept comma-delimited OR semantics within each filter, while different filters are combined as AND. Biobank rows are listed in lexicographic ID order.  
+- **directory-stats.py** - per-biobank statistics for collections, samples, donors, services, collection types, service types, and fact-sheet consistency. Sample and donor totals combine explicit countable values with order-of-magnitude fallback estimates for top-level collections only, so subcollections do not double-count parent holdings. Fact-sheet warnings report missing/invalid all-star rows and mismatches against collection-level totals. Withdrawn biobanks are excluded by default; use `-w/--include-withdrawn-biobanks` to include them and their associated collections/services. You can filter by biobank `country` (`-c/--country`), by staging area code parsed from the biobank ID (`-A/--staging-area`, for example `EXT`), and by collection type (`-t/--collection-type`). Filter values accept comma-delimited OR semantics within each filter, while different filters are combined as AND. Biobank rows are listed in lexicographic ID order, except pure `EXT` views, which are sorted by country first and then by ID to make non-member output easier to scan.  
 ``
 python3 directory-stats.py -N
 ``

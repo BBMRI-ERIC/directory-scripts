@@ -9,6 +9,187 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 
 from directory import Directory
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'AccessPolicies:BiobankAvailableNeither': {'entity': 'BIOBANK',
+                                            'fields': ['collaboration_commercial',
+                                                       'collaboration_non_for_profit'],
+                                            'severity': 'ERROR',
+                                            'summary': 'Biobank is available neither '
+                                                       'for commercial nor for '
+                                                       'non-for-profit collaboration'},
+ 'AccessPolicies:CollectionContainsBiological': {'entity': 'COLLECTION',
+                                                 'fields': ['data_use', 'materials'],
+                                                 'severity': 'INFO',
+                                                 'summary': 'Collection contains '
+                                                            'biological material types '
+                                                            "'{materials}' but ethics "
+                                                            'approval needed '
+                                                            "'{DUO_term_ethics_needed}' "
+                                                            'is not specified in '
+                                                            'data_use attribute (may '
+                                                            'be false-positive). DUO '
+                                                            'documentation available '
+                                                            'at '
+                                                            '{DUOs_to_url(DUO_term_ethics_needed)}'},
+ 'AccessPolicies:CollectionDiseaseSpecificDuoTerm': {'entity': 'COLLECTION',
+                                                     'fields': ['data_use', 'type'],
+                                                     'severity': 'INFO',
+                                                     'summary': 'Collection is disease '
+                                                                'specific but '
+                                                                "'{DUO_term_disease_specific}' "
+                                                                'is not specified in '
+                                                                'data_use attribute '
+                                                                '(may be '
+                                                                'false-positive). DUO '
+                                                                'documentation '
+                                                                'available at '
+                                                                '{DUOs_to_url(DUO_term_disease_specific)}'},
+ 'AccessPolicies:DataAccessModeEnabledDataAccess': {'entity': 'COLLECTION',
+                                                    'fields': ['data_access_description',
+                                                               'data_access_fee',
+                                                               'data_access_joint_project',
+                                                               'data_access_uri'],
+                                                    'severity': 'ERROR',
+                                                    'summary': 'No data access mode '
+                                                               'enabled and no data '
+                                                               'access policy '
+                                                               '(description nor URI) '
+                                                               'provided for '
+                                                               'collection'},
+ 'AccessPolicies:DataReturnRequiredDuoTermData': {'entity': 'COLLECTION',
+                                                  'fields': ['data_use'],
+                                                  'severity': 'INFO',
+                                                  'summary': 'Data return is not '
+                                                             'required (missing '
+                                                             '{DUO_term_data_return}) '
+                                                             'in data_use attribute - '
+                                                             'it is recommended for '
+                                                             'biobanks to support it '
+                                                             'based on BBMRI-ERIC '
+                                                             'Access policy (but not '
+                                                             'required). DUO '
+                                                             'documentation available '
+                                                             'at '
+                                                             '{DUOs_to_url(DUO_term_data_return)}'},
+ 'AccessPolicies:DataUseOntologyDuoTermProvided': {'entity': 'COLLECTION',
+                                                   'fields': ['data_use'],
+                                                   'severity': 'WARNING',
+                                                   'summary': 'No Data Use Ontology '
+                                                              '(DUO) term provided in '
+                                                              'data_use attribute'},
+ 'AccessPolicies:ImagingAccessModeEnabledImaging': {'entity': 'COLLECTION',
+                                                    'fields': ['image_access_description',
+                                                               'image_access_fee',
+                                                               'image_access_uri',
+                                                               'image_joint_project'],
+                                                    'severity': 'ERROR',
+                                                    'summary': 'No imaging access mode '
+                                                               'enabled and no imaging '
+                                                               'access policy '
+                                                               '(description nor URI) '
+                                                               'provided for a '
+                                                               'collection which '
+                                                               'contains imaging data'},
+ 'AccessPolicies:JointProjectsSampleDataImage': {'entity': 'COLLECTION',
+                                                 'fields': ['data_use'],
+                                                 'severity': 'WARNING',
+                                                 'summary': 'Joint projects for '
+                                                            'sample/data/image access '
+                                                            'specified and '
+                                                            '{DUO_term_joint_project} '
+                                                            'is not specified in '
+                                                            'data_use attribute. DUO '
+                                                            'documentation available '
+                                                            'at '
+                                                            '{DUOs_to_url(DUO_term_joint_project)}'},
+ 'AccessPolicies:LeastOneAttributesSpecified': {'entity': 'COLLECTION',
+                                                'fields': ['collaboration_commercial',
+                                                           'collaboration_non_for_profit',
+                                                           'data_use'],
+                                                'severity': 'INFO',
+                                                'summary': 'At least one of '
+                                                           '{attributes} specified on '
+                                                           'collection level but '
+                                                           "'{DUO_term}' is not "
+                                                           'specified in data_use '
+                                                           'attribute (may be however '
+                                                           'intentional). DUO '
+                                                           'documentation available at '
+                                                           '{DUOs_to_url(DUO_term)}'},
+ 'AccessPolicies:LeastOneAttributesSpecified2': {'entity': 'COLLECTION',
+                                                 'fields': ['collaboration_commercial',
+                                                            'collaboration_non_for_profit',
+                                                            'data_use'],
+                                                 'severity': 'INFO',
+                                                 'summary': 'At least one of '
+                                                            '{attributes} specified on '
+                                                            'biobank level and not '
+                                                            'overridden on collection '
+                                                            "but '{DUO_term}' is not "
+                                                            'specified in data_use '
+                                                            'attribute (may be however '
+                                                            'intentional). DUO '
+                                                            'documentation available '
+                                                            'at '
+                                                            '{DUOs_to_url(DUO_term)}'},
+ 'AccessPolicies:LeastOneAttributesSpecified3': {'entity': 'COLLECTION',
+                                                 'fields': ['collaboration_commercial',
+                                                            'collaboration_non_for_profit',
+                                                            'data_use'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'At least one of '
+                                                            '{attributes} specified on '
+                                                            'collection level but '
+                                                            "conflicting '{DUO_term}' "
+                                                            'is specified in data_use '
+                                                            'attribute. DUO '
+                                                            'documentation available '
+                                                            'at '
+                                                            '{DUOs_to_url(DUO_term)}'},
+ 'AccessPolicies:LeastOneAttributesSpecified4': {'entity': 'COLLECTION',
+                                                 'fields': ['collaboration_commercial',
+                                                            'collaboration_non_for_profit',
+                                                            'data_use'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'At least one of '
+                                                            '{attributes} specified on '
+                                                            'biobank level and not '
+                                                            'overridden on collection '
+                                                            'but conflicting '
+                                                            "'{DUO_term}' is specified "
+                                                            'in data_use attribute. '
+                                                            'DUO documentation '
+                                                            'available at '
+                                                            '{DUOs_to_url(DUO_term)}'},
+ 'AccessPolicies:NoneGenericResearchUsePurposes': {'entity': 'COLLECTION',
+                                                   'fields': ['data_use'],
+                                                   'severity': 'WARNING',
+                                                   'summary': 'None of generic '
+                                                              'research use purposes '
+                                                              'provided '
+                                                              '({DUO_terms_research}) '
+                                                              'in data_use attribute - '
+                                                              'suspect situation for a '
+                                                              'biobank registered in '
+                                                              'BBMRI-ERIC Directory, '
+                                                              'which is for research '
+                                                              'purposes. DUO '
+                                                              'documentation available '
+                                                              'at '
+                                                              '{DUOs_to_url(DUO_terms_research)}'},
+ 'AccessPolicies:SampleAccessModeEnabledSample': {'entity': 'COLLECTION',
+                                                  'fields': ['sample_access_description',
+                                                             'sample_access_fee',
+                                                             'sample_access_joint_project',
+                                                             'sample_access_uri'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'No sample access mode '
+                                                             'enabled and no sample '
+                                                             'access policy '
+                                                             '(description nor URI) '
+                                                             'provided for collection'}}
+
 class AccessPolicies(IPlugin):
 	def check(self, dir, args):
 		warnings = []

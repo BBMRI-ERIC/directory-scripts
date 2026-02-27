@@ -81,6 +81,29 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 	log.info(logString)
 	return warnings
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'CheckURLs:BiobankUrl': {'entity': 'BIOBANK',
+                          'fields': ['url'],
+                          'severity': 'ERROR',
+                          'summary': 'Biobank URL'},
+ 'CheckURLs:DataAccessUrlCollection': {'entity': 'COLLECTION',
+                                       'fields': ['data_access_uri'],
+                                       'severity': 'ERROR',
+                                       'summary': 'Data access URL for collection'},
+ 'CheckURLs:ImageAccessUrlCollection': {'entity': 'COLLECTION',
+                                        'fields': ['image_access_uri'],
+                                        'severity': 'ERROR',
+                                        'summary': 'Image access URL for collection'},
+ 'CheckURLs:SampleAccessUrlCollection': {'entity': 'COLLECTION',
+                                         'fields': ['sample_access_uri'],
+                                         'severity': 'ERROR',
+                                         'summary': 'Sample access URL for collection'},
+ 'CheckURLs:Url': {'entity': 'BIOBANK',
+                   'fields': ['url'],
+                   'severity': 'WARNING',
+                   'summary': 'Missing URL'}}
+
 class CheckURLs(IPlugin):
 	def check(self, dir, args):
 		warnings = []

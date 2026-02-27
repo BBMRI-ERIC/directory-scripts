@@ -84,6 +84,15 @@ def test_qc_arguments_can_be_enabled_selectively():
     assert args.outputWEXLSX == ["warnings.xlsx"]
 
 
+def test_qc_arguments_support_short_option_for_disabling_all_remote_checks():
+    parser = build_parser()
+    add_remote_check_disable_arguments(parser, ["emails", "geocoding"])
+
+    args = parser.parse_args(["-r"])
+
+    assert args.disableChecksRemote == ["emails", "geocoding"]
+
+
 def test_configure_logging_sets_debug_level():
     parser = build_parser()
     add_logging_arguments(parser)

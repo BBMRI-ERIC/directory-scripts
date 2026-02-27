@@ -8,6 +8,26 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 from directory import Directory
 
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'SubcollectionNetworkMembership:SubcollectionPartNetworkNetwork': {'entity': 'COLLECTION',
+                                                                    'fields': ['id',
+                                                                               'network',
+                                                                               'parent_collection'],
+                                                                    'severity': 'WARNING',
+                                                                    'summary': 'Subcollection '
+                                                                               'is not '
+                                                                               'part '
+                                                                               'of '
+                                                                               'network '
+                                                                               "{network['id']}, "
+                                                                               'even '
+                                                                               'though '
+                                                                               'parent '
+                                                                               'collection '
+                                                                               '{parent_id} '
+                                                                               'is.'}}
+
 class SubcollectionNetworkMembership(IPlugin):
     """Check whether subcollections belong to the same network as their parent collections"""
 

@@ -9,6 +9,140 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 covidNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:COVID19'
 covidProspectiveCollectionIdPattern =  '.*:COVID19PROSPECTIVE$'
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'COVID:BiobankContainsCovidCollection': {'entity': 'BIOBANK',
+                                          'fields': [],
+                                          'severity': 'ERROR',
+                                          'summary': 'Biobank contains COVID '
+                                                     'collection  but not marked as '
+                                                     'part of '},
+ 'COVID:BiobankContainsCovidCollection2': {'entity': 'BIOBANK',
+                                           'fields': ['covid19'],
+                                           'severity': 'ERROR',
+                                           'summary': 'Biobank contains COVID '
+                                                      'collection  but does not have '
+                                                      '"covid19" attribute in '
+                                                      '"capabilities" section of '
+                                                      'attributes'},
+ 'COVID:BiobankHasCovid19Among': {'entity': 'BIOBANK',
+                                  'fields': ['covid19'],
+                                  'severity': 'ERROR',
+                                  'summary': 'Biobank has covid19 among covid19biobank '
+                                             'attributes but is not part of '},
+ 'COVID:BiobankHasCovid19Among2': {'entity': 'BIOBANK',
+                                   'fields': ['covid19', 'id'],
+                                   'severity': 'ERROR',
+                                   'summary': 'Biobank has covid19 among capabilities '
+                                              'but has no relevant services nor any '
+                                              'collection of COVID-19 samples nor any '
+                                              'collection of COVID-19 controls'},
+ 'COVID:BiobankHasProspectiveCovid19': {'entity': 'BIOBANK',
+                                        'fields': ['id'],
+                                        'severity': 'ERROR',
+                                        'summary': 'Biobank has prospective COVID-19 '
+                                                   'collection defined but '
+                                                   'ProspectiveCollections is not '
+                                                   'among covid19biobank attributes'},
+ 'COVID:BiobankHasProspectivecollections': {'entity': 'BIOBANK',
+                                            'fields': ['id'],
+                                            'severity': 'WARNING',
+                                            'summary': 'Biobank has '
+                                                       'ProspectiveCollections among '
+                                                       'covid19biobank attributes but '
+                                                       'has no prospective collection '
+                                                       'defined (collection ID '
+                                                       "matching '' regex pattern)"},
+ 'COVID:BiobankPartDoesHaveCovid19Among': {'entity': 'BIOBANK',
+                                           'fields': ['covid19'],
+                                           'severity': 'ERROR',
+                                           'summary': 'Biobank is part of  but does '
+                                                      'not have covid19 among '
+                                                      'covid19biobank attributes'},
+ 'COVID:CollectionHavingAbilityCollect': {'entity': 'COLLECTION',
+                                          'fields': ['id', 'name'],
+                                          'severity': 'ERROR',
+                                          'summary': 'Collection having "ability to '
+                                                     'collect" does not have '
+                                                     'COVID19PROSPECTIVE label'},
+ 'COVID:CollectionTypeProvided': {'entity': 'COLLECTION',
+                                  'fields': [],
+                                  'severity': 'ERROR',
+                                  'summary': 'Collection type not provided'},
+ 'COVID:Covid19CollectionMissesCovid19': {'entity': 'COLLECTION',
+                                          'fields': ['id'],
+                                          'severity': 'ERROR',
+                                          'summary': 'COVID19 collection misses '
+                                                     'COVID-19 diagnosis filled in'},
+ 'COVID:Covid19prospectiveCollection': {'entity': 'COLLECTION',
+                                        'fields': ['id'],
+                                        'severity': 'ERROR',
+                                        'summary': 'COVID19PROSPECTIVE collection '
+                                                   'misses COVID-19 diagnosis or '
+                                                   'COVID-19 controls filled in'},
+ 'COVID:ExistingCovid19CollectionsMust': {'entity': 'COLLECTION',
+                                          'fields': ['id'],
+                                          'severity': 'ERROR',
+                                          'summary': 'Existing COVID-19 collections '
+                                                     'must have DISEASE_SPECIFIC as '
+                                                     'one of its types'},
+ 'COVID:ProspectiveCollectionType': {'entity': 'COLLECTION',
+                                     'fields': ['id', 'order_of_magnitude'],
+                                     'severity': 'WARNING',
+                                     'summary': 'Prospective collection type '
+                                                'represents capability of setting up '
+                                                'prospective collections - hence it '
+                                                'should have zero order of magnitude'},
+ 'COVID:ProspectiveCollectionType2': {'entity': 'COLLECTION',
+                                      'fields': ['id', 'name', 'order_of_magnitude'],
+                                      'severity': 'WARNING',
+                                      'summary': 'Prospective collection type '
+                                                 'represents capability of setting up '
+                                                 'prospective collections - hence it '
+                                                 'should have zero order of magnitude'},
+ 'COVID:ProspectiveCovid19Collections': {'entity': 'COLLECTION',
+                                         'fields': ['id'],
+                                         'severity': 'ERROR',
+                                         'summary': 'Prospective COVID-19 collections '
+                                                    'must have DISEASE_SPECIFIC as one '
+                                                    'of its types'},
+ 'COVID:ProspectiveCovid19Collections2': {'entity': 'COLLECTION',
+                                          'fields': ['id'],
+                                          'severity': 'ERROR',
+                                          'summary': 'Prospective COVID-19 collections '
+                                                     'must have PROSPECTIVE_COLLECTION '
+                                                     'as one of its types'},
+ 'COVID:SeemsDiagnosesContainsRangeWill': {'entity': 'COLLECTION',
+                                           'fields': [],
+                                           'severity': 'ERROR',
+                                           'summary': 'It seems that diagnoses '
+                                                      'contains range - this will '
+                                                      'render the diagnosis search '
+                                                      'ineffective for the given '
+                                                      'collection. Violating diagnosis '
+                                                      'term(s): '},
+ 'COVID:SituationCollectionContains': {'entity': 'COLLECTION',
+                                       'fields': ['id'],
+                                       'severity': 'WARNING',
+                                       'summary': 'Suspect situation: collection '
+                                                  'contains infectious material '
+                                                  '(nasal/throat swabs, faeces) while '
+                                                  'the parent biobank does not '
+                                                  'indicate BSL2 nor BSL3 available'},
+ 'COVID:SupectMaterialTypesExistingCovid': {'entity': 'COLLECTION',
+                                            'fields': ['id'],
+                                            'severity': 'WARNING',
+                                            'summary': 'Supect material types: '
+                                                       'existing COVID-19 collection '
+                                                       'does not have any of the '
+                                                       'common material types: DNA, '
+                                                       'PATHOGEN, '
+                                                       'PERIPHERAL_BLOOD_CELLS, '
+                                                       'PLASMA, RNA, SALIVA, SERUM, '
+                                                       'WHOLE_BLOOD, FECES, '
+                                                       'BUFFY_COAT, NASAL_SWAB, '
+                                                       'THROAT_SWAB'}}
+
 class COVID(IPlugin):
 	def check(self, dir, args):
 		warnings = []

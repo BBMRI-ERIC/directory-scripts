@@ -130,11 +130,11 @@ if args.negotiator:
             elif len(correspondingNNs) == 1: 
                 NN = correspondingNNs.pop()
                 if (NN not in turnedOffNNs):
-                    if (NN in NNContacts.NNtoEmails):
-                        additionalContacts = NNContacts.NNtoEmails[NN]
+                    if NNContacts.labels_as_node_scope(NN):
+                        additionalContacts = NNContacts.get_contacts(NN)
                         NN = "BBMRI." + NN.lower()
                     else:
-                        additionalContacts = "petr.holub@bbmri-eric.eu"
+                        additionalContacts = NNContacts.get_contacts(NN)
                         NN = "BBMRI-nonmember." + NN.lower()
                     worksheet.write_string(worksheet_row, 3, NN)
                     worksheet.write_string(worksheet_row, 4, additionalContacts.replace(",",";"))

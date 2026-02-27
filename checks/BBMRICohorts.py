@@ -35,6 +35,56 @@ def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
 	warningsList.append(DataCheckWarning(make_check_id(self, "CheckBothSoRemoveNetworksBbmri"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection and biobank are not available for commercial collaboration modes: collection[commercial_use] is {formatAttribute('commercial_use', collection)}, biobank[collaboration_commercial] is {formatAttribute('collaboration_commercial', biobank)}", "Check if this is true (that both are false): if so, remove the networks BBMRI Cohorts/BBMRI Cohorts DNA , otherwise correct the value of commercial availibility", dir.getCollectionContact(collection['id'])['email']))
 
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'BBMRICohorts:CheckBothSoRemoveNetworksBbmri': {'entity': 'COLLECTION',
+                                                 'fields': [],
+                                                 'fix': 'Check if this is true (that '
+                                                        'both are false): if so, '
+                                                        'remove the networks BBMRI '
+                                                        'Cohorts/BBMRI Cohorts DNA , '
+                                                        'otherwise correct the value '
+                                                        'of commercial availibility',
+                                                 'severity': 'ERROR',
+                                                 'summary': 'Collection and biobank '
+                                                            'are not available for '
+                                                            'commercial collaboration '
+                                                            'modes: '
+                                                            'collection[commercial_use] '
+                                                            'is '
+                                                            "{formatAttribute('commercial_use', "
+                                                            'collection)}, '
+                                                            'biobank[collaboration_commercial] '
+                                                            'is '
+                                                            "{formatAttribute('collaboration_commercial', "
+                                                            'biobank)}'},
+ 'BBMRICohorts:PrepareFactsTableCollection': {'entity': 'COLLECTION',
+                                              'fields': ['facts', 'network'],
+                                              'fix': 'Prepare the facts table for the '
+                                                     'collection and upload',
+                                              'severity': 'ERROR',
+                                              'summary': 'Collection in BBMRI cohorts '
+                                                         '{BBMRICohortsList} but the '
+                                                         'fact table is missing'},
+ 'BBMRICohorts:RemoveBbmriCohortsBbmriCohorts': {'entity': 'BIOBANK',
+                                                 'fields': [],
+                                                 'fix': 'Remove BBMRI Cohorts/BBMRI '
+                                                        'Cohorts DNA network from the '
+                                                        'Biobank entry, check which '
+                                                        'collections shall be flagged '
+                                                        'with the networks BBMRI '
+                                                        'Cohorts / BBMRI Cohorts DNA '
+                                                        'and flag them',
+                                                 'severity': 'ERROR',
+                                                 'summary': 'Biobanks are not expected '
+                                                            'to be part of '
+                                                            'BBMRI-Cohorts networks, '
+                                                            'only specific collections '
+                                                            'must be included. Biobank '
+                                                            'participates in '
+                                                            'BBMRI-Cohorts network: '
+                                                            '{network}.'}}
+
 class BBMRICohorts(IPlugin):
 
 	def check(self, dir, args):

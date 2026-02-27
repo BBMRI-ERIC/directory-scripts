@@ -15,6 +15,60 @@ def descriptionTooShort(s : str) -> bool:
 	else:
 		return False
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'SemiemptyFields:DescriptionBiobankDescription': {'entity': 'BIOBANK',
+                                                   'fields': ['description'],
+                                                   'severity': 'WARNING',
+                                                   'summary': 'Missing description for '
+                                                              "biobank ('description' "
+                                                              'attribute is empty for '
+                                                              'the biobank)'},
+ 'SemiemptyFields:DescriptionCollectionDescription': {'entity': 'COLLECTION',
+                                                      'fields': ['description'],
+                                                      'severity': 'WARNING',
+                                                      'summary': 'Missing description '
+                                                                 'for collection '
+                                                                 "('description' "
+                                                                 'attribute is empty '
+                                                                 'for the collection)'},
+ 'SemiemptyFields:NameBiobankNameAttributeEmpty': {'entity': 'BIOBANK',
+                                                   'fields': ['name'],
+                                                   'severity': 'ERROR',
+                                                   'summary': 'Missing name for '
+                                                              "biobank ('name' "
+                                                              'attribute is empty for '
+                                                              'the biobank)'},
+ 'SemiemptyFields:NameCollectionNameAttributeEmpty': {'entity': 'COLLECTION',
+                                                      'fields': ['name'],
+                                                      'severity': 'ERROR',
+                                                      'summary': 'Missing name for '
+                                                                 "collection ('name' "
+                                                                 'attribute is empty '
+                                                                 'for the biobank)'},
+ 'SemiemptyFields:SuspiciouslyShortDescription': {'entity': 'BIOBANK',
+                                                  'fields': ['description'],
+                                                  'severity': 'WARNING',
+                                                  'summary': 'Suspiciously short '
+                                                             'description for biobank '
+                                                             "('description' attribute "
+                                                             "{biobank['description']} "
+                                                             'has less than '
+                                                             '{str(minDescWords)} '
+                                                             'words)'},
+ 'SemiemptyFields:SuspiciouslyShortDescription2': {'entity': 'COLLECTION',
+                                                   'fields': ['description'],
+                                                   'severity': 'WARNING',
+                                                   'summary': 'Suspiciously short '
+                                                              'description for '
+                                                              'collection '
+                                                              "('description' "
+                                                              'attribute '
+                                                              "{collection['description']} "
+                                                              'has less than '
+                                                              '{str(minDescWords)} '
+                                                              'words)'}}
+
 class SemiemptyFields(IPlugin):
 	def check(self, dir, args):
 		warnings = []

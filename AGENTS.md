@@ -26,6 +26,7 @@
 - Modularize cross-cutting concerns into focused helpers (for example `warningscontainer.py`, `customwarnings.py`, `star-model.py`, `nncontacts.py`, `orphacodes.py`).
 - Avoid duplicating API logic in scripts; import and reuse the shared modules instead.
 - Use assertive runtime validation for assumptions that depend on input/data/configuration; raise clear exceptions instead of relying on `assert` for runtime safety.
+- `nncontacts.py` is the single source of truth for BBMRI node contacts, member-node classification, staging-area parsing, and non-member/global area detection; do not re-encode that logic elsewhere.
 
 ## Modularization Guidelines
 - Keep exporters thin: CLI + orchestration only; move reusable logic into helper modules.
@@ -49,6 +50,7 @@
 - XLSX inputs are typically read with pandas; ensure `openpyxl` is installed for `read_excel` compatibility.
 - Directory API access requires network access; account for this when running in sandboxed environments.
 - When deriving NN from IDs, the common pattern is `ID:XX_...` (XX can be multi-letter like `EXT`).
+- Staging area and country are not the same concept: non-member/global areas such as `EXT` or `EU` can host entities whose `country` is a BBMRI member state.
 - `directory-tables-modifier.py` requires an explicit schema (`-s/--schema`) and treats table deletion as content deletion only (no dropping tables).
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`.
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
@@ -58,6 +60,8 @@
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.
   - `biobanks_summary` includes `total_collections` and now includes active biobanks even if they have 0 collections.
+- `directory-stats.py` sorting rule: normal output is lexicographic by biobank ID; pure `EXT` views are sorted by `country` first and then by ID.
+- QC CLI note: `data-check.py` and other QC tools using `cli_common.add_remote_check_disable_arguments(...)` expose `-r` / `--disable-checks-all-remote`.
 
 ## Testing Guidelines
 - A pytest-based unit test suite is present in `tests/` (currently focused on reusable modules such as `directory.py`).
@@ -69,12 +73,17 @@
 - When adding a check, include a `checks/<Name>.py` plugin and matching `checks/<Name>.yapsy-plugin`.
 - Use targeted runs with `--disable-plugins` and cache flags to validate new checks efficiently.
 - Cache guidance for local testing: avoid `--purge-cache directory` unless you suspect recent Directory content changes may affect results; prefer reusing the existing cache to keep comparisons stable and runs faster.
+- For `directory-stats.py` changes, keep cross-checks against other exporters where totals overlap, especially `exporter-all.py`.
+- When changing `nncontacts.py`, verify both warning routing and any staging/member-area classification tests.
+- When changing check documentation metadata or manual extraction, test both the local plugin tests and `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py`.
 
 ## Quality Gate
 - Use `skills/assertive-quality-gate/SKILL.md` as a required gate before every push.
 - Also apply the same gate when user asks to review code or test code.
 - Prioritize reusable modules (especially `directory.py`) for defensive checks, docstrings, and regression tests.
 - If `checks/` changes, verify `make_check_id(...)` identifiers are meaningful and `DataCheckWarning(...)` messages are actionable.
+- For new or changed checks, keep machine-readable `CHECK_DOCS` metadata next to the implementation when the check has non-obvious business context, and keep severity/entity/field declarations aligned with emitted `DataCheckWarning(...)` calls.
+- Member-area consistency logic is subtle: member-country institutions may appear only in non-member areas as a reviewed exception, but the same institution must not be duplicated across member and non-member/global areas; `EU` is only an exception for hosting location, not for duplicate institutions.
 
 ## Commit & Pull Request Guidelines
 - Commit messages are short, present-tense summaries (for example “Adapted exporter-quality-label.py…” or “updates”) and should include a comprehensive description of changes in the commit message body.
@@ -84,6 +93,7 @@
 ## Documentation Expectations
 - Maintain and expand documentation alongside code changes; updates are required for new checks, exporters, or API changes.
 - Keep `README.md` accurate and add per-script usage examples as interfaces evolve.
+- If a change also affects the Directory Data Manager manual tooling, update the corresponding files in `../BBMRI-ERIC-Directory-Data-Manager-Manual/` as a coordinated follow-up; that repo contains the check-documentation generator and is not updated automatically by changes here.
 
 ## Security & Configuration Tips
 - Keep credentials out of the repo; prefer CLI flags (`-u`, `-p`) or local config files not committed.

@@ -17,6 +17,18 @@ class DirectoryStatsStub:
                 "withdrawn": False,
             },
             {
+                "id": "bbmri-eric:ID:EXT_BB4",
+                "name": "Biobank 4",
+                "country": {"id": "AT"},
+                "withdrawn": False,
+            },
+            {
+                "id": "bbmri-eric:ID:EXT_BB5",
+                "name": "Biobank 5",
+                "country": {"id": "AT"},
+                "withdrawn": False,
+            },
+            {
                 "id": "bbmri-eric:ID:NL_BB3",
                 "name": "Biobank 3",
                 "country": "NL",
@@ -70,6 +82,26 @@ class DirectoryStatsStub:
                 "facts": [{"id": "f4"}],
                 "withdrawn": False,
             },
+            {
+                "id": "col5",
+                "name": "Collection 5",
+                "biobank": {"id": "bbmri-eric:ID:EXT_BB4"},
+                "country": "AT",
+                "type": ["POPULATION"],
+                "size": 11,
+                "number_of_donors": 12,
+                "withdrawn": False,
+            },
+            {
+                "id": "col6",
+                "name": "Collection 6",
+                "biobank": {"id": "bbmri-eric:ID:EXT_BB5"},
+                "country": "AT",
+                "type": ["CASE_CONTROL"],
+                "size": 13,
+                "number_of_donors": 14,
+                "withdrawn": False,
+            },
         ]
         self.services = [
             {
@@ -86,6 +118,11 @@ class DirectoryStatsStub:
                 "id": "svc3",
                 "biobank": {"id": "bbmri-eric:ID:EXT_BB2"},
                 "serviceTypes": ["BIOINFORMATICS_AND_DATA_SCIENCES"],
+            },
+            {
+                "id": "svc4",
+                "biobank": {"id": "bbmri-eric:ID:EXT_BB4"},
+                "serviceTypes": ["SEQUENCING"],
             },
         ]
         self.facts_by_collection = {
@@ -217,14 +254,14 @@ def test_build_directory_stats_emits_breakdown_and_warning_rows():
     stats = build_directory_stats(DirectoryStatsStub())
 
     assert stats["collection_type_summary_rows"] == [
-        {"collection_type": "CASE_CONTROL", "count": 2},
+        {"collection_type": "CASE_CONTROL", "count": 3},
         {"collection_type": "DISEASE_SPECIFIC", "count": 1},
-        {"collection_type": "POPULATION", "count": 2},
+        {"collection_type": "POPULATION", "count": 3},
     ]
     assert stats["top_level_collection_type_summary_rows"] == [
-        {"collection_type": "CASE_CONTROL", "count": 1},
+        {"collection_type": "CASE_CONTROL", "count": 2},
         {"collection_type": "DISEASE_SPECIFIC", "count": 1},
-        {"collection_type": "POPULATION", "count": 2},
+        {"collection_type": "POPULATION", "count": 3},
     ]
     assert stats["subcollection_type_summary_rows"] == [
         {"collection_type": "CASE_CONTROL", "count": 1},
@@ -232,7 +269,7 @@ def test_build_directory_stats_emits_breakdown_and_warning_rows():
     assert stats["service_type_summary_rows"] == [
         {"service_type": "BIOANALYTICAL_SERVICES", "count": 1},
         {"service_type": "BIOINFORMATICS_AND_DATA_SCIENCES", "count": 1},
-        {"service_type": "SEQUENCING", "count": 2},
+        {"service_type": "SEQUENCING", "count": 3},
     ]
 
     warning_codes = {
@@ -250,34 +287,39 @@ def test_build_stats_summary_aggregates_all_metrics():
     rows = build_biobank_stats(DirectoryStatsStub())
     summary = build_stats_summary(rows)
 
-    assert summary["biobanks_total"] == 2
+    assert summary["biobanks_total"] == 4
     assert summary["withdrawn_biobanks"] == 0
-    assert summary["biobanks_with_collections"] == 2
-    assert summary["biobanks_with_services"] == 2
-    assert summary["collection_records_total"] == 4
-    assert summary["top_level_collections"] == 3
+    assert summary["biobanks_with_collections"] == 4
+    assert summary["biobanks_with_services"] == 3
+    assert summary["collection_records_total"] == 6
+    assert summary["top_level_collections"] == 5
     assert summary["subcollections"] == 1
-    assert summary["samples_explicit"] == 107
+    assert summary["samples_explicit"] == 131
     assert summary["samples_oom"] == 1000
-    assert summary["samples_total"] == 1107
-    assert summary["donors_explicit"] == 10
+    assert summary["samples_total"] == 1131
+    assert summary["donors_explicit"] == 36
     assert summary["donors_oom"] == 200
-    assert summary["donors_total"] == 210
-    assert summary["services_total"] == 3
+    assert summary["donors_total"] == 236
+    assert summary["services_total"] == 4
     assert summary["collections_with_facts"] == 3
     assert summary["collections_with_all_star"] == 2
     assert summary["collections_missing_valid_all_star"] == 1
     assert summary["collections_all_star_inconsistent_samples"] == 1
     assert summary["collections_all_star_inconsistent_donors"] == 1
-    assert summary["top_level_collection_type_breakdown"] == "CASE_CONTROL=1; DISEASE_SPECIFIC=1; POPULATION=2"
+    assert summary["top_level_collection_type_breakdown"] == "CASE_CONTROL=2; DISEASE_SPECIFIC=1; POPULATION=3"
     assert summary["subcollection_type_breakdown"] == "CASE_CONTROL=1"
-    assert summary["service_type_breakdown"] == "BIOANALYTICAL_SERVICES=1; BIOINFORMATICS_AND_DATA_SCIENCES=1; SEQUENCING=2"
+    assert summary["service_type_breakdown"] == "BIOANALYTICAL_SERVICES=1; BIOINFORMATICS_AND_DATA_SCIENCES=1; SEQUENCING=3"
 
 
 def test_build_biobank_stats_excludes_withdrawn_biobanks_by_default():
     rows = build_biobank_stats(DirectoryStatsStub())
 
-    assert [row["id"] for row in rows] == ["bb1", "bbmri-eric:ID:EXT_BB2"]
+    assert [row["id"] for row in rows] == [
+        "bb1",
+        "bbmri-eric:ID:EXT_BB2",
+        "bbmri-eric:ID:EXT_BB4",
+        "bbmri-eric:ID:EXT_BB5",
+    ]
 
 
 def test_build_biobank_stats_can_include_withdrawn_biobanks():
@@ -331,3 +373,16 @@ def test_build_directory_stats_supports_comma_delimited_or_filters_and_collectio
     assert bb1["collection_type_breakdown"] == "CASE_CONTROL=1; POPULATION=1"
     assert bb2["collection_records_total"] == 1
     assert bb2["collection_type_breakdown"] == "CASE_CONTROL=1; POPULATION=1"
+
+
+def test_build_directory_stats_sorts_ext_rows_by_country_then_id():
+    stats = build_directory_stats(
+        DirectoryStatsStub(),
+        staging_area_filters=["EXT"],
+    )
+
+    assert [row["id"] for row in stats["biobank_rows"]] == [
+        "bbmri-eric:ID:EXT_BB4",
+        "bbmri-eric:ID:EXT_BB5",
+        "bbmri-eric:ID:EXT_BB2",
+    ]

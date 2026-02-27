@@ -7,6 +7,29 @@ import logging as log
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'BiobankFields:JuridicalPersonJuridicalPerson': {'entity': 'BIOBANK',
+                                                  'fields': ['juridical_person'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'Missing juridical person '
+                                                             "('juridical_person' "
+                                                             'attribute is empty)'},
+ 'BiobankFields:JuridicalPersonJuridicalPerson2': {'entity': 'BIOBANK',
+                                                   'fields': ['juridical_person'],
+                                                   'severity': 'ERROR',
+                                                   'summary': 'Invalid juridical '
+                                                              'person '
+                                                              "('juridical_person' "
+                                                              'attribute has an '
+                                                              'invalid value - '
+                                                              "offending value: '')"},
+ 'BiobankFields:ValidContactBiobank': {'entity': 'BIOBANK',
+                                       'fields': ['contact'],
+                                       'severity': 'ERROR',
+                                       'summary': 'Missing valid contact for the '
+                                                  'biobank'}}
+
 class BiobankFields(IPlugin):
 	def check(self, dir, args):
 		warnings = []

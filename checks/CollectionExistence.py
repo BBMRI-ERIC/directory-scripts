@@ -5,6 +5,14 @@ import logging as log
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'CollectionExistence:LeastOneCollectionBiobank': {'entity': 'BIOBANK',
+                                                   'fields': ['id'],
+                                                   'severity': 'ERROR',
+                                                   'summary': 'Missing at least one '
+                                                              'collection for biobank'}}
+
 class CollectionExistence(IPlugin):
 	def check(self, dir, args):
 		warnings = []

@@ -14,6 +14,100 @@ from geopy.geocoders import Nominatim
 from diskcache import Cache
 
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'BiobankGeo:BiobankLatitudeDecimalNumber': {'entity': 'BIOBANK',
+                                             'fields': ['latitude', 'longitude'],
+                                             'severity': 'ERROR',
+                                             'summary': 'Invalid biobank latitude '
+                                                        '(should be a decimal number '
+                                                        'with period without any '
+                                                        'spaces or stray characters '
+                                                        'around - the surrounding '
+                                                        'quotes are added in this '
+                                                        "report): offending value ''"},
+ 'BiobankGeo:BiobankLongitudeDecimalNumber': {'entity': 'BIOBANK',
+                                              'fields': ['latitude', 'longitude'],
+                                              'severity': 'ERROR',
+                                              'summary': 'Invalid biobank longitude '
+                                                         '(should be a decimal number '
+                                                         'with period without any '
+                                                         'spaces or stray characters '
+                                                         'around - the surrounding '
+                                                         'quotes are added in this '
+                                                         "report): offending value ''"},
+ 'BiobankGeo:CollectionLatitudeDecimalNumber': {'entity': 'COLLECTION',
+                                                'fields': ['latitude', 'longitude'],
+                                                'severity': 'ERROR',
+                                                'summary': 'Invalid collection '
+                                                           'latitude (should be a '
+                                                           'decimal number with period '
+                                                           'without any spaces or '
+                                                           'stray characters around - '
+                                                           'the surrounding quotes are '
+                                                           'added in this report): '
+                                                           "offending value ''"},
+ 'BiobankGeo:CollectionLongitudeDecimalNumber': {'entity': 'COLLECTION',
+                                                 'fields': ['latitude', 'longitude'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'Invalid collection '
+                                                            'longitude (should be a '
+                                                            'decimal number with '
+                                                            'period without any spaces '
+                                                            'or stray characters '
+                                                            'around - the surrounding '
+                                                            'quotes are added in this '
+                                                            'report): offending value '
+                                                            "''"},
+ 'BiobankGeo:GeographicalCoordinatesLatitude': {'entity': 'BIOBANK',
+                                                'fields': ['latitude', 'longitude'],
+                                                'severity': 'INFO',
+                                                'summary': 'Missing geographical '
+                                                           "coordinates ('latitude "
+                                                           "and/or 'longitude' "
+                                                           'attributes are empty)'},
+ 'BiobankGeo:GeolocationBiobankLikelyOutside': {'entity': 'BIOBANK',
+                                                'fields': ['address',
+                                                           'country',
+                                                           'country_code',
+                                                           'id',
+                                                           'latitude',
+                                                           'longitude'],
+                                                'severity': 'WARNING',
+                                                'summary': 'Geolocation of the biobank '
+                                                           'is likely outside of its '
+                                                           'country ; biobank seems to '
+                                                           'be in  based on '
+                                                           'geographical coordinates '
+                                                           "'latitude'={biobank['latitude']} "
+                                                           "'longitude'={biobank['longitude']}"},
+ 'BiobankGeo:GeolocationCollectionLikely': {'entity': 'COLLECTION',
+                                            'fields': ['address',
+                                                       'country',
+                                                       'country_code',
+                                                       'id',
+                                                       'latitude',
+                                                       'longitude'],
+                                            'severity': 'WARNING',
+                                            'summary': 'Geolocation of the collection '
+                                                       'is likely outside of its '
+                                                       'country ; collection seems to '
+                                                       'be in  based on geographical '
+                                                       'coordinates '
+                                                       "'latitude'={collection['latitude']} "
+                                                       "'longitude'={collection['longitude']}"},
+ 'BiobankGeo:ReverseGeocodingBiobankLocation': {'entity': 'BIOBANK',
+                                                'fields': ['latitude', 'longitude'],
+                                                'severity': 'WARNING',
+                                                'summary': 'Reverse geocoding of the '
+                                                           'biobank  location failed '
+                                                           '()'},
+ 'BiobankGeo:ReverseGeocodingCollection': {'entity': 'COLLECTION',
+                                           'fields': ['latitude', 'longitude'],
+                                           'severity': 'WARNING',
+                                           'summary': 'Reverse geocoding of the '
+                                                      'collection  location failed ()'}}
+
 class BiobankGeo(IPlugin):
 
 	def check(self, dir, args):

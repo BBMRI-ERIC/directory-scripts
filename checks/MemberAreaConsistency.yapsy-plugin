@@ -1,0 +1,8 @@
+[Core]
+Name = Check that member-country institutions are not duplicated into non-member areas
+Module = MemberAreaConsistency
+
+[Documentation]
+Author = Codex, Petr Holub
+Version = 1.0
+Description = Check that institutions from BBMRI member countries are kept in the correct staging area and not duplicated across member and non-member areas.

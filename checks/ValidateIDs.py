@@ -7,6 +7,179 @@ from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 from nncontacts import NNContacts
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'ValidateIDs:BiobankidCompliantSpecification': {'entity': 'BIOBANK',
+                                                 'fields': ['id'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'BiobankID is not '
+                                                            'compliant with the '
+                                                            'specification  (shall '
+                                                            'start with '
+                                                            '"bbmri-eric:ID:EXT_" '
+                                                            'prefix for external '
+                                                            'biobanks that have no '
+                                                            'national node)'},
+ 'ValidateIDs:BiobankidCompliantSpecification2': {'entity': 'BIOBANK',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'BiobankID is not '
+                                                             'compliant with the '
+                                                             'specification  (shall '
+                                                             'start with '
+                                                             '"bbmri-eric:ID:EXT_" '
+                                                             'prefix for external '
+                                                             'biobanks)'},
+ 'ValidateIDs:BiobankidCompliantSpecification3': {'entity': 'BIOBANK',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'BiobankID is not '
+                                                             'compliant with the '
+                                                             'specification  (shall '
+                                                             'start with '
+                                                             '"bbmri-eric:ID:_" '
+                                                             'prefix)'},
+ 'ValidateIDs:BiobankidContainsIllegal': {'entity': 'BIOBANK',
+                                          'fields': ['id'],
+                                          'severity': 'ERROR',
+                                          'summary': 'BiobankID contains illegal '
+                                                     'characters  (shall be '
+                                                     '"A-Za-z0-9:_-")'},
+ 'ValidateIDs:BiobankidContainsIndicatingEmpty': {'entity': 'BIOBANK',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'BiobankID contains :: '
+                                                             'indicating empty '
+                                                             'component in ID '
+                                                             'hierarchy'},
+ 'ValidateIDs:CollectionidCompliant': {'entity': 'COLLECTION',
+                                       'fields': ['id'],
+                                       'severity': 'ERROR',
+                                       'summary': 'CollectionID is not compliant with '
+                                                  'the specification  (shall start '
+                                                  'with "bbmri-eric:ID:EXT_" prefix '
+                                                  'for collections from external '
+                                                  'biobanks that have no national '
+                                                  'node)'},
+ 'ValidateIDs:CollectionidCompliant2': {'entity': 'COLLECTION',
+                                        'fields': ['id'],
+                                        'severity': 'ERROR',
+                                        'summary': 'CollectionID is not compliant with '
+                                                   'the specification  (shall start '
+                                                   'with "bbmri-eric:ID:EXT_" prefix '
+                                                   'for collections from external '
+                                                   'biobanks)'},
+ 'ValidateIDs:CollectionidCompliant3': {'entity': 'COLLECTION',
+                                        'fields': ['id'],
+                                        'severity': 'ERROR',
+                                        'summary': 'CollectionID is not compliant with '
+                                                   'the specification  (shall start '
+                                                   'with "bbmri-eric:ID:_" prefix)'},
+ 'ValidateIDs:CollectionidContainsIllegal': {'entity': 'COLLECTION',
+                                             'fields': ['id'],
+                                             'severity': 'ERROR',
+                                             'summary': 'CollectionID contains illegal '
+                                                        'characters  (shall be '
+                                                        '"A-Za-z0-9:_-")'},
+ 'ValidateIDs:CollectionidContainsIndicating': {'entity': 'COLLECTION',
+                                                'fields': ['id'],
+                                                'severity': 'ERROR',
+                                                'summary': 'CollectionID contains :: '
+                                                           'indicating empty component '
+                                                           'in ID hierarchy'},
+ 'ValidateIDs:CollectionidDoesContainExpected': {'entity': 'COLLECTION',
+                                                 'fields': ['biobank', 'id'],
+                                                 'severity': 'WARNING',
+                                                 'summary': 'CollectionID does not '
+                                                            'contain expected biobank '
+                                                            'prefix  (should start '
+                                                            'with :collection:)'},
+ 'ValidateIDs:ContactidCompliantSpecification': {'entity': 'CONTACT',
+                                                 'fields': ['id'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'ContactID is not '
+                                                            'compliant with the '
+                                                            'specification  (shall '
+                                                            'start with '
+                                                            '"bbmri-eric:ID:EXT_" '
+                                                            'prefix for contacts for '
+                                                            'external biobanks that '
+                                                            'have no national node)'},
+ 'ValidateIDs:ContactidCompliantSpecification2': {'entity': 'CONTACT',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'ContactID is not '
+                                                             'compliant with the '
+                                                             'specification  (shall '
+                                                             'start with '
+                                                             '"bbmri-eric:contactID:EXT_" '
+                                                             'prefix for contacts for '
+                                                             'external biobanks)'},
+ 'ValidateIDs:ContactidCompliantSpecification3': {'entity': 'CONTACT',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'ContactID is not '
+                                                             'compliant with the '
+                                                             'specification  (shall '
+                                                             'start with '
+                                                             '"bbmri-eric:contactID:_" '
+                                                             'prefix)'},
+ 'ValidateIDs:ContactidContainsIllegal': {'entity': 'CONTACT',
+                                          'fields': ['id'],
+                                          'severity': 'ERROR',
+                                          'summary': 'ContactID contains illegal '
+                                                     'characters  (shall be '
+                                                     '"A-Za-z0-9:_-")'},
+ 'ValidateIDs:ContactidContainsIndicatingEmpty': {'entity': 'CONTACT',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'ContactID contains :: '
+                                                             'indicating empty '
+                                                             'component in ID '
+                                                             'hierarchy'},
+ 'ValidateIDs:NetworkidCompliantSpecification': {'entity': 'NETWORK',
+                                                 'fields': ['id'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'NetworkID is not '
+                                                            'compliant with the '
+                                                            'specification  (shall '
+                                                            'start with '
+                                                            '"bbmri-eric:ID:EXT_" '
+                                                            'prefix for networks from '
+                                                            'countries that have no '
+                                                            'national node)'},
+ 'ValidateIDs:NetworkidCompliantSpecification2': {'entity': 'NETWORK',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'NetworkID is not '
+                                                             'compliant with the '
+                                                             'specification  (shall '
+                                                             'start with '
+                                                             '"bbmri-eric:networkID: '
+                                                             'prefix)'},
+ 'ValidateIDs:NetworkidContainsIllegal': {'entity': 'NETWORK',
+                                          'fields': ['id'],
+                                          'severity': 'ERROR',
+                                          'summary': 'NetworkID contains illegal '
+                                                     'characters  (shall be '
+                                                     '"A-Za-z0-9:_-")'},
+ 'ValidateIDs:NetworkidContainsIndicatingEmpty': {'entity': 'NETWORK',
+                                                  'fields': ['id'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'NetworkID contains :: '
+                                                             'indicating empty '
+                                                             'component in ID '
+                                                             'hierarchy'},
+ 'ValidateIDs:NetworkidHasSuspiciousCountry': {'entity': 'NETWORK',
+                                               'fields': ['id'],
+                                               'severity': 'WARNING',
+                                               'summary': 'NetworkID has suspicious '
+                                                          'country affiliation  '
+                                                          '(should start with '
+                                                          '"bbmri-eric:networkID:_" or '
+                                                          '"bbmri-eric:networkID:EU_" '
+                                                          'prefix)'}}
+
 class ValidateIDs(IPlugin):
 	def check(self, dir, args):
 		warnings = []
@@ -14,7 +187,7 @@ class ValidateIDs(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			NN = dir.getBiobankNN(biobank['id'])
-			if NN not in NNContacts.NNtoEmails:
+			if not NNContacts.is_member_node(NN):
 				if not re.search('^bbmri-eric:ID:EXT_', biobank['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "BiobankidCompliantSpecification"), "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "BiobankID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for external biobanks that have no national node)'))
 			if re.search('^bbmri-eric:ID:EXT', biobank['id']):
@@ -30,7 +203,7 @@ class ValidateIDs(IPlugin):
 
 		for collection in dir.getCollections():
 			NN = dir.getCollectionNN(collection['id'])
-			if NN not in NNContacts.NNtoEmails:
+			if not NNContacts.is_member_node(NN):
 				if not re.search('^bbmri-eric:ID:EXT_', collection['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "CollectionidCompliant"), "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "CollectionID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for collections from external biobanks that have no national node)'))
 			if re.search('^bbmri-eric:ID:EXT', collection['id']):
@@ -49,7 +222,7 @@ class ValidateIDs(IPlugin):
 
 		for contact in dir.getContacts(): # TODO: Add withdrawn
 			NN = dir.getContactNN(contact['id'])
-			if NN not in NNContacts.NNtoEmails:
+			if not NNContacts.is_member_node(NN):
 				if not re.search('^bbmri-eric:ID:EXT_', contact['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "ContactidCompliantSpecification"), "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "ContactID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for contacts for external biobanks that have no national node)'))
 			if re.search('^bbmri-eric:contactID:EXT', contact['id']):
@@ -65,7 +238,7 @@ class ValidateIDs(IPlugin):
 
 		for network in dir.getNetworks(): # TODO: Add withdrawn
 			NN = dir.getNetworkNN(network['id'])
-			if NN not in NNContacts.NNtoEmails:
+			if not NNContacts.is_member_node(NN):
 				if not re.search('^bbmri-eric:ID:EXT_', network['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "NetworkidCompliantSpecification"), "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, 'NA', "NetworkID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for networks from countries that have no national node)'))
 			if not re.search('^bbmri-eric:networkID:', network['id']):

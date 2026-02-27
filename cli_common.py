@@ -198,6 +198,7 @@ def add_remote_check_disable_arguments(
 ) -> None:
     """Add QC-only remote check disable arguments."""
     parser.add_argument(
+        "-r",
         "--disable-checks-all-remote",
         dest=dest,
         action="store_const",

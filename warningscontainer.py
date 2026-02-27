@@ -17,14 +17,11 @@ class WarningsContainer:
         self.disabledChecks = disabledChecks
 
     def newWarning(self, warning : DataCheckWarning):
-        warning_key = ""
         self.__warningsNNs.setdefault(warning.NN,[]).append(warning)
-        if warning.recipients != "":
-            warning_key = recipients + ", "
-        try: 
-            warning_key += NNContacts.NNtoEmails[warning.NN]
-        except KeyError:
-            warning_key += 'petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl, a.w.hodselmans@rug.nl'
+        warning_key = NNContacts.compose_recipients(
+            warning.NN,
+            warning.recipients,
+        )
         self.__warnings.setdefault(warning_key,[]).append(warning)
 
     def dumpWarnings(self):

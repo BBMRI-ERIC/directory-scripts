@@ -7,6 +7,7 @@ from collections import Counter
 from typing import Any
 
 from fact_sheet_utils import analyze_collection_fact_sheet, has_fact_sheet
+from nncontacts import NNContacts
 from oomutils import estimate_count_from_oom_or_none
 
 
@@ -28,13 +29,15 @@ def _normalize_country(value: Any) -> str:
 
 def extract_staging_area_from_id(entity_id: str) -> str:
     """Return the staging-area code encoded in a Directory entity id."""
-    if not isinstance(entity_id, str) or not entity_id:
-        return ""
-    parts = entity_id.split(":")
-    if len(parts) < 3:
-        return ""
-    prefix = parts[2]
-    return prefix.split("_", 1)[0]
+    return NNContacts.extract_staging_area(entity_id)
+
+
+def _sort_biobank_rows(rows: list[dict[str, Any]]) -> None:
+    """Sort biobank rows according to the requested staging-area semantics."""
+    if rows and all(row.get("staging_area") == "EXT" for row in rows):
+        rows.sort(key=lambda row: (str(row.get("country", "")), str(row.get("id", ""))))
+        return
+    rows.sort(key=lambda row: str(row.get("id", "")))
 
 
 def _normalize_multi_value_list(value: Any) -> list[str]:
@@ -328,7 +331,7 @@ def build_directory_stats(
             )
         )
 
-    biobank_rows.sort(key=lambda row: row["id"])
+    _sort_biobank_rows(biobank_rows)
 
     return {
         "biobank_rows": biobank_rows,

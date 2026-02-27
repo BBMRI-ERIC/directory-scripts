@@ -8,6 +8,233 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 
 from directory import Directory
 
+# Machine-readable check documentation for the manual generator and other tooling.
+# Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+CHECK_DOCS = {'CollectionContent:AgeHighBelowMinimumValueLimitDS': {'entity': 'COLLECTION',
+                                                       'fields': ['age_high'],
+                                                       'severity': 'ERROR',
+                                                       'summary': 'Age_high is below '
+                                                                  'the minimum value '
+                                                                  'limit (%d %s): '
+                                                                  'offending value %d'},
+ 'CollectionContent:AgeLowBelowMinimumValueLimitDS': {'entity': 'COLLECTION',
+                                                      'fields': ['age_low'],
+                                                      'severity': 'ERROR',
+                                                      'summary': 'Age_low is below the '
+                                                                 'minimum value limit '
+                                                                 '(%d %s): offending '
+                                                                 'value %d'},
+ 'CollectionContent:AgeLowDHigherThanAgeHighD': {'entity': 'COLLECTION',
+                                                 'fields': ['age_high', 'age_low'],
+                                                 'severity': 'ERROR',
+                                                 'summary': 'Age_low (%d) is higher '
+                                                            'than age_high (%d)'},
+ 'CollectionContent:AgeUnitProvidedAgeRange': {'entity': 'COLLECTION',
+                                               'fields': ['age_high',
+                                                          'age_low',
+                                                          'age_unit'],
+                                               'severity': 'ERROR',
+                                               'summary': 'Missing age_unit for '
+                                                          'provided age range: '
+                                                          "{collection.get('age_low')}-{collection.get('age_high')}"},
+ 'CollectionContent:AmbiguousSpeificationAgeUnitOne': {'entity': 'COLLECTION',
+                                                       'fields': ['age_unit'],
+                                                       'severity': 'ERROR',
+                                                       'summary': 'Ambiguous '
+                                                                  'speification of '
+                                                                  'age_unit - only one '
+                                                                  'value is permitted. '
+                                                                  'Provided values %s'},
+ 'CollectionContent:CollectionTypeProvided': {'entity': 'COLLECTION',
+                                              'fields': ['type'],
+                                              'severity': 'ERROR',
+                                              'summary': 'Collection type not '
+                                                         'provided'},
+ 'CollectionContent:ConsiderAddingFollowingOrphaCode': {'entity': 'COLLECTION',
+                                                        'fields': ['type'],
+                                                        'severity': 'INFO',
+                                                        'summary': 'Consider adding '
+                                                                   'following ORPHA '
+                                                                   'code(s) to the RD '
+                                                                   'collection - based '
+                                                                   'on mapping ICD-10 '
+                                                                   'code %s to ORPHA '
+                                                                   'codes: %s'},
+ 'CollectionContent:DiagnosesProvideCollection': {'entity': 'COLLECTION',
+                                                  'fields': ['data_categories'],
+                                                  'severity': 'WARNING',
+                                                  'summary': 'No diagnoses provide for '
+                                                             'a collection with '
+                                                             'MEDICAL_RECORDS among '
+                                                             'its data categories'},
+ 'CollectionContent:DiagnosesProvideHospitalDisease': {'entity': 'COLLECTION',
+                                                       'fields': ['type'],
+                                                       'severity': 'ERROR',
+                                                       'summary': 'No diagnoses '
+                                                                  'provide for '
+                                                                  'HOSPITAL or '
+                                                                  'DISEASE_SPECIFIC or '
+                                                                  'RD collection'},
+ 'CollectionContent:DiagnosesProvidedMedicalRecords': {'entity': 'COLLECTION',
+                                                       'fields': ['data_categories'],
+                                                       'severity': 'WARNING',
+                                                       'summary': 'Diagnoses provided '
+                                                                  'but no '
+                                                                  'MEDICAL_RECORDS '
+                                                                  'among its data '
+                                                                  'categories'},
+ 'CollectionContent:DiagnosesProvidedNoneHospital': {'entity': 'COLLECTION',
+                                                     'fields': ['type'],
+                                                     'severity': 'INFO',
+                                                     'summary': 'Diagnoses provided '
+                                                                'but none of HOSPITAL, '
+                                                                'DISEASE_SPECIFIC, RD '
+                                                                'is specified as '
+                                                                'collection type (this '
+                                                                'may be easily false '
+                                                                'positive check)'},
+ 'CollectionContent:ImageDatasetTypesProvidedImage': {'entity': 'COLLECTION',
+                                                      'fields': ['data_categories'],
+                                                      'severity': 'WARNING',
+                                                      'summary': 'No image dataset '
+                                                                 'types provided for '
+                                                                 'image collection'},
+ 'CollectionContent:ImageModalitiesProvidedImage': {'entity': 'COLLECTION',
+                                                    'fields': ['data_categories'],
+                                                    'severity': 'ERROR',
+                                                    'summary': 'No image modalities '
+                                                               'provided for image '
+                                                               'collection'},
+ 'CollectionContent:ImagingModalitiesImageDataSet': {'entity': 'COLLECTION',
+                                                     'fields': ['data_categories'],
+                                                     'severity': 'ERROR',
+                                                     'summary': 'Imaging modalities or '
+                                                                'image data set found, '
+                                                                'but IMAGING_DATA is '
+                                                                'not among data '
+                                                                'categories: '
+                                                                'image_modality = %s, '
+                                                                'image_dataset_type = '
+                                                                '%s'},
+ 'CollectionContent:MaterialTypesProvidedWhile': {'entity': 'COLLECTION',
+                                                  'fields': ['data_categories',
+                                                             'materials'],
+                                                  'severity': 'ERROR',
+                                                  'summary': 'No material types are '
+                                                             'provided while '
+                                                             'biological samples are '
+                                                             'collected'},
+ 'CollectionContent:OrphaCodeDiagnosesProvided': {'entity': 'COLLECTION',
+                                                  'fields': ['type'],
+                                                  'severity': 'WARNING',
+                                                  'summary': 'ORPHA code diagnoses '
+                                                             'provided, but collection '
+                                                             'not marked as rare '
+                                                             'disease (RD) collection'},
+ 'CollectionContent:OrphaCodeDiagnosesSpecifiedIcd10': {'entity': 'COLLECTION',
+                                                        'fields': [],
+                                                        'severity': 'WARNING',
+                                                        'summary': 'ORPHA code '
+                                                                   'diagnoses '
+                                                                   'specified, but no '
+                                                                   'ICD-10 equivalents '
+                                                                   'provided, thus '
+                                                                   'making collection '
+                                                                   'impossible to find '
+                                                                   'for users using '
+                                                                   'ICD-10 codes'},
+ 'CollectionContent:OrphaCodeFoundS': {'entity': 'COLLECTION',
+                                       'fields': ['diagnosis_available', 'name'],
+                                       'severity': 'ERROR',
+                                       'summary': 'Invalid ORPHA code found: %s'},
+ 'CollectionContent:OrphaCodeSProvidedTranslationIcd': {'entity': 'COLLECTION',
+                                                        'fields': ['code'],
+                                                        'severity': 'INFO',
+                                                        'summary': 'ORPHA code %s '
+                                                                   'provided, but its '
+                                                                   'translation to '
+                                                                   'ICD-10 as %s is '
+                                                                   'not provided '
+                                                                   '(mapping is of %s '
+                                                                   'type). It is '
+                                                                   'recommended to '
+                                                                   'provide this '
+                                                                   'translation '
+                                                                   'explicitly until '
+                                                                   'Directory '
+                                                                   'implements full '
+                                                                   'semantic mapping '
+                                                                   'search.'},
+ 'CollectionContent:RareDiseaseRdCollectionWithout': {'entity': 'COLLECTION',
+                                                      'fields': ['type'],
+                                                      'severity': 'WARNING',
+                                                      'summary': 'Rare disease (RD) '
+                                                                 'collection without '
+                                                                 'ORPHA code '
+                                                                 'diagnoses'},
+ 'CollectionContent:SampleTypesAdvertisedBiological': {'entity': 'COLLECTION',
+                                                       'fields': ['data_categories',
+                                                                  'materials'],
+                                                       'severity': 'ERROR',
+                                                       'summary': 'Sample types '
+                                                                  'advertised but '
+                                                                  'BIOLOGICAL_SAMPLES '
+                                                                  'missing among its '
+                                                                  'data categories'},
+ 'CollectionContent:SeemsDiagnosesContainsRangeWill': {'entity': 'COLLECTION',
+                                                       'fields': ['diagnosis_available'],
+                                                       'severity': 'ERROR',
+                                                       'summary': 'It seems that '
+                                                                  'diagnoses contains '
+                                                                  'range - this will '
+                                                                  'render the '
+                                                                  'diagnosis search '
+                                                                  'ineffective for the '
+                                                                  'given collection. '
+                                                                  'Violating diagnosis '
+                                                                  'term(s): '},
+ 'CollectionContent:SituationAgeLowAgeHighDPositive': {'entity': 'COLLECTION',
+                                                       'fields': ['age_high',
+                                                                  'age_low'],
+                                                       'severity': 'INFO',
+                                                       'summary': 'Suspect situation: '
+                                                                  'age_low == age_high '
+                                                                  '== (%d) (may be '
+                                                                  'false positive)'},
+ 'CollectionContent:SizeCollectionDoesMatchOrder': {'entity': 'COLLECTION',
+                                                    'fields': ['order_of_magnitude',
+                                                               'size'],
+                                                    'severity': 'ERROR',
+                                                    'summary': 'Size of the collection '
+                                                               'does not match its '
+                                                               'order of magnitude: '
+                                                               'size = , order of '
+                                                               'magnitude is %d (size '
+                                                               'between %d and %d)'},
+ 'CollectionContent:SuspiciousSituationLarge': {'entity': 'COLLECTION',
+                                                'fields': ['id', 'order_of_magnitude'],
+                                                'severity': 'INFO',
+                                                'summary': 'Suspicious situation: '
+                                                           'large collection (> '
+                                                           '100,000 samples or cases) '
+                                                           'without subcollections; '
+                                                           'unless it is a really '
+                                                           'homogeneous collection, it '
+                                                           'is advisable to refine '
+                                                           'such a collection into '
+                                                           'sub-collections to give '
+                                                           'users better insight into '
+                                                           'what is stored there'},
+ 'CollectionContent:SuspiciousSituationLarge2': {'entity': 'COLLECTION',
+                                                 'fields': ['order_of_magnitude',
+                                                            'size'],
+                                                 'severity': 'INFO',
+                                                 'summary': 'Suspicious situation: '
+                                                            'large collection (> '
+                                                            '1,000,000 samples or '
+                                                            'cases) without exact size '
+                                                            'specified'}}
+
 class CollectionContent(IPlugin):
 	def check(self, dir, args):
 		warnings = []
