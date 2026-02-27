@@ -1,109 +1,185 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
-import pprint
-import re
-from enum import Enum
-import sys
-import argparse
+"""Export per-biobank sample, donor, collection, service, and fact-sheet statistics."""
+
 import logging as log
-import time
-from typing import List
-import os.path
+import pprint
+from collections import Counter
 
-import molgenis
-import networkx as nx
-import xlsxwriter
+import pandas as pd
 
-from yapsy.PluginManager import PluginManager
-from diskcache import Cache
+from cli_common import (
+    add_directory_auth_arguments,
+    add_directory_schema_argument,
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_purge_cache_arguments,
+    add_xlsx_output_argument,
+    build_parser,
+    configure_logging,
+)
+from directory import Directory
+from directory_stats_utils import build_directory_stats, build_stats_summary
+from xlsxutils import write_xlsx_tables
 
-from customwarnings import DataCheckWarningLevel,DataCheckWarning
 
-disabledChecks = {
-#       "SemiemptyFields" : {"bbmri-eric:ID:NO_HUNT", "bbmri-eric:ID:NO_Janus"}
-        }
-
+CACHES_LIST = ["directory"]
 pp = pprint.PrettyPrinter(indent=4)
 
-class ExtendAction(argparse.Action):
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
+def _build_warning_frame(rows: list[dict]) -> pd.DataFrame:
+    """Return a warnings dataframe with stable columns even when empty."""
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "biobank_id",
+            "biobank_name",
+            "collection_id",
+            "collection_name",
+            "code",
+            "message",
+            "expected",
+            "actual",
+        ],
+    )
 
-simplePluginManager = PluginManager()
-simplePluginManager.setPluginPlaces(["checks"])
-simplePluginManager.collectPlugins()
 
-pluginList = []
-for pluginInfo in simplePluginManager.getAllPlugins():
-    pluginList.append(os.path.basename(pluginInfo.path))
-
-remoteCheckList = ['emails', 'geocoding', 'URLs']
-cachesList = ['directory', 'emails', 'geocoding']
-
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
-parser.add_argument('--disable-checks-all-remote', dest='disableChecksRemote', action='store_const', const=remoteCheckList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--disable-checks-remote', dest='disableChecksRemote', nargs='+', action='extend', choices=remoteCheckList, help='disable particular long remote checks')
-parser.add_argument('--disable-plugins', dest='disablePlugins', nargs='+', action='extend', choices=pluginList, help='disable particular long remote checks')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+parser = build_parser()
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
+add_no_stdout_argument(parser)
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_purge_cache_arguments(parser, CACHES_LIST)
+parser.add_argument(
+    "-w",
+    "--include-withdrawn-biobanks",
+    dest="include_withdrawn_biobanks",
+    action="store_true",
+    help="include withdrawn biobanks and their associated collections/services in the statistics",
+)
+parser.add_argument(
+    "-c",
+    "--country",
+    dest="countries",
+    nargs="+",
+    action="extend",
+    default=[],
+    help="limit statistics to one or more biobank country codes",
+)
+parser.add_argument(
+    "-A",
+    "--staging-area",
+    dest="staging_areas",
+    nargs="+",
+    action="extend",
+    default=[],
+    help="limit statistics to one or more staging-area codes parsed from biobank IDs (for example CZ, UK, EXT)",
+)
+parser.add_argument(
+    "-t",
+    "--collection-type",
+    dest="collection_types",
+    nargs="+",
+    action="extend",
+    default=[],
+    help="limit collection-based statistics to one or more collection types",
+)
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
+directory_kwargs = {
+    "schema": args.schema,
+    "purgeCaches": args.purgeCaches,
+    "debug": args.debug,
+    "pp": pp,
+}
+if args.username is not None and args.password is not None:
+    directory_kwargs["username"] = args.username
+    directory_kwargs["password"] = args.password
 
-# Definition of Directory structure
-from directory import Directory
+dir = Directory(**directory_kwargs)
 
-# Main code
+log.info("Total biobanks: %d", dir.getBiobanksCount())
+log.info("Total collections: %d", dir.getCollectionsCount())
+log.info("Total services: %d", len(dir.getServices()))
 
-dir = Directory()
+stats = build_directory_stats(
+    dir,
+    include_withdrawn_biobanks=args.include_withdrawn_biobanks,
+    country_filters=args.countries,
+    staging_area_filters=args.staging_areas,
+    collection_type_filters=args.collection_types,
+)
+summary = build_stats_summary(stats["biobank_rows"])
+summary["fact_sheet_warnings_total"] = len(stats["fact_sheet_warning_rows"])
+summary["include_withdrawn_biobanks"] = int(args.include_withdrawn_biobanks)
+summary["country_filter"] = ",".join(args.countries)
+summary["staging_area_filter"] = ",".join(args.staging_areas)
+summary["collection_type_filter"] = ",".join(args.collection_types)
 
-biobanks = {}
-for biobank in dir.getBiobanks():
-    biobankID = biobank['id']
-    collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
-    biobanks[biobankID] = {}
-    biobanks[biobankID]['topLevelCollections'] = collections.successors(biobank['id'])
-    biobanks[biobankID]['biobankOrderOfMagnitude'] = 0
-    biobanks[biobankID]['biobankSizeExact'] = 0
-    biobanks[biobankID]['biobankSizeEstimate'] = 0
-    for collectionID in biobanks[biobank['id']]['topLevelCollections']:
-        OoM = dir.directoryGraph.nodes[collectionID]['data']['order_of_magnitude']['id']
-        if 'size' in collection.keys:
-            size = collection['size']
-        else:
-            size = 0
-        if OoM > biobanks[biobank['id']]['biobankOrderOfMagnitude']:
-            biobanks[biobank['id']]['biobankOrderOfMagnitude'] = OoM
-        if size == 0:
-            biobanks[biobank['id']]['biobankSizeEstimate'] += 3 * 10^OoM
-        else:
-            biobanks[biobank['id']]['biobankSizeExact'] += size
-    biobanks[biobank['id']]['biobankSizeTotal'] = biobanks[biobank['id']]['biobankSizeExact'] + biobanks[biobank['id']]['biobankSizeEstimate'] 
+stats_df = pd.DataFrame(stats["biobank_rows"])
+summary_df = pd.DataFrame([summary])
+collection_type_df = pd.DataFrame(stats["collection_type_rows"])
+collection_type_summary_df = pd.DataFrame(stats["collection_type_summary_rows"])
+top_level_collection_type_summary_df = pd.DataFrame(
+    stats["top_level_collection_type_summary_rows"]
+)
+subcollection_type_summary_df = pd.DataFrame(
+    stats["subcollection_type_summary_rows"]
+)
+service_type_df = pd.DataFrame(stats["service_type_rows"])
+service_type_summary_df = pd.DataFrame(stats["service_type_summary_rows"])
+fact_warning_df = _build_warning_frame(stats["fact_sheet_warning_rows"])
 
-log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
-log.info('Total collections: ' + str(dir.getCollectionsCount()))
+if stats["fact_sheet_warning_rows"]:
+    if args.verbose or args.debug:
+        for warning in stats["fact_sheet_warning_rows"]:
+            log.warning(
+                "%s: %s (%s, expected=%r, actual=%r)",
+                warning["collection_id"],
+                warning["message"],
+                warning["code"],
+                warning["expected"],
+                warning["actual"],
+            )
+    else:
+        warning_code_counts = Counter(
+            warning["code"] for warning in stats["fact_sheet_warning_rows"]
+        )
+        affected_collections = len(
+            {warning["collection_id"] for warning in stats["fact_sheet_warning_rows"]}
+        )
+        log.warning(
+            "Detected %d fact-sheet warnings across %d collections: %s",
+            len(stats["fact_sheet_warning_rows"]),
+            affected_collections,
+            ", ".join(
+                f"{code}={warning_code_counts[code]}"
+                for code in sorted(warning_code_counts)
+            ),
+        )
 
 if not args.nostdout:
-    log.info("Outputting warnings on stdout")
-
-    for biobankID in sorted(biobanks.iteritems(), key=lambda kv: kv[1]['biobankSizeTotal']):
-        print(biobankID + "\t" + len(biobanks[biobankID]['topLevelCollections']) + "\t" + biobanks[biobankID]['biobankSizeTotal'])
+    print(stats_df.to_csv(sep="\t", index=False), end="")
+    print()
+    print(summary_df.to_csv(sep="\t", index=False), end="")
 
 if args.outputXLSX is not None:
-    log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
+    write_xlsx_tables(
+        args.outputXLSX[0],
+        [
+            (stats_df, "Biobank stats", False),
+            (summary_df, "Summary", False),
+            (collection_type_df, "Collection types", False),
+            (collection_type_summary_df, "Collection type totals", False),
+            (top_level_collection_type_summary_df, "Top-level type totals", False),
+            (subcollection_type_summary_df, "Subcollection type totals", False),
+            (service_type_df, "Service types", False),
+            (service_type_summary_df, "Service type totals", False),
+            (fact_warning_df, "Fact sheet warnings", False),
+        ],
+    )

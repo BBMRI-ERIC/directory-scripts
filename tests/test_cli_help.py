@@ -9,6 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CLI_SCRIPTS = [
     "data-check.py",
+    "directory-stats.py",
     "full-text-search.py",
     "get-contacts.py",
     "geocoding_2022.py",

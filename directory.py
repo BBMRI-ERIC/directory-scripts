@@ -109,6 +109,20 @@ class Directory:
             cache['facts'] = self.facts
             end_time = time.perf_counter()
             log.info(f'   ... retrieved {len(self.facts)} facts in ' + "%0.3f" % (end_time-start_time) + 's')
+        log.info('   ... retrieving services')
+        if 'services' in cache:
+            self.services = cache['services']
+            log.info(f'   ... retrieved {len(self.services)} services from cache')
+        else:
+            try:
+                start_time = time.perf_counter()
+                self.services = session.get_graphql("Services")
+                cache['services'] = self.services
+                end_time = time.perf_counter()
+                log.info(f'   ... retrieved {len(self.services)} services in ' + "%0.3f" % (end_time-start_time) + 's')
+            except Exception as exc:
+                log.warning('Unable to retrieve services: %s', exc)
+                self.services = []
         log.info('   ... all entities retrieved')
 
         self.contactHashmap = {}
@@ -169,6 +183,14 @@ class Directory:
                 self.collectionFactMap[f['collection']['id']] = [ f ]
             else:
                 self.collectionFactMap[f['collection']['id']].append(f)
+
+        self.serviceHashmap = {}
+        self.biobankServiceMap = {}
+        for service in self.services:
+            self.serviceHashmap[service['id']] = service
+            biobank = service.get('biobank')
+            if biobank and 'id' in biobank:
+                self.biobankServiceMap.setdefault(biobank['id'], []).append(service)
 
         # check forward pointers from biobanks
         for b in self.biobanks:
@@ -440,7 +462,24 @@ class Directory:
 
     def getCollectionFacts(self, collectionID: str):
         """Return facts for a specific collection id."""
-        return self.collectionFactMap[collectionID]
+        return self.collectionFactMap.get(collectionID, [])
+
+    def getServices(self):
+        """Return all loaded services."""
+        return self.services
+
+    def getServiceById(self, serviceID: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
+        """Return a service by id."""
+        if serviceID in self.serviceHashmap:
+            return self.serviceHashmap[serviceID]
+        if raise_on_missing:
+            raise KeyError(f"Service {serviceID!r} not found in loaded directory snapshot.")
+        log.warning("Service %r not found in loaded directory snapshot.", serviceID)
+        return None
+
+    def getBiobankServices(self, biobankID: str):
+        """Return services belonging to a biobank id."""
+        return self.biobankServiceMap.get(biobankID, [])
 
     def getNetworkNN(self, networkID: str):
         """Return country/national-node information for a network id."""
