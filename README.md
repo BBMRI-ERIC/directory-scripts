@@ -74,6 +74,11 @@ Legacy long option spellings remain accepted where needed, but the normalized lo
 
 Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plugin source. Keep that metadata aligned with the emitted `DataCheckWarning(...)` calls; the local manual generator validates severity/entity/field consistency against the implementation.
 
+Email validation in `ContactFields` is split into local/static checks and optional remote checks:
+- local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
+- remote checks cover MX/reachability validation and are disabled by `--disable-checks-all-remote` / `--disable-checks-remote emails`
+- disabling remote checks does not suppress the local placeholder-domain or syntax checks
+
 Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ``
 python3 data-check.py --purge-all-caches -X test_results.xlsx
