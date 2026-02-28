@@ -46,6 +46,11 @@ def test_check_docs_metadata_matches_all_plugins():
     assert documented_checks["BBF:JuridicalMissing"][
         "fields"
     ] == ["juridical_person"]
+    assert documented_checks["CTF:EmailPlaceholder"]["fields"] == ["email"]
+    assert documented_checks["CTF:EmailCountrySuffix"]["fields"] == [
+        "CONTACT.email",
+        "BIOBANK.country",
+    ]
     assert documented_checks["BCO:AccessConflict"]["fields"] == [
         "commercial_use",
         "network",

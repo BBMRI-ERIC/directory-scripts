@@ -84,6 +84,7 @@
 - If `checks/` changes, verify `make_check_id(...)` identifiers are meaningful and `DataCheckWarning(...)` messages are actionable.
 - For new or changed checks, keep machine-readable `CHECK_DOCS` metadata next to the implementation when the check has non-obvious business context, and keep severity/entity/field declarations aligned with emitted `DataCheckWarning(...)` calls.
 - `CHECK_DOCS` must be written as complete manual-facing documentation, not just as extracted-code hints: provide concrete `fields`, a clean generic `summary`, and a practical `fix` whenever the warning text is dynamic, partial, or emitted from helper logic that the AST extractor cannot follow.
+- `CHECK_DOCS.fields` may use explicit cross-entity references such as `CONTACT.email` or `BIOBANK.country` when a check depends on linked data from another entity; prefer that over pretending the dependency is local to the warning entity.
 - Do not assume that adding `CHECK_DOCS` alone is enough; after changing check documentation metadata, verify the rendered/manual-facing result through `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py` and inspect the generated `checks-doc.tex` / `CHECKS.md` output for the affected checks.
 - Member-area consistency logic is subtle: member-country institutions may appear only in non-member areas as a reviewed exception, but the same institution must not be duplicated across member and non-member/global areas; `EU` is only an exception for hosting location, not for duplicate institutions.
 
@@ -102,3 +103,4 @@
 - Keep credentials out of the repo; prefer CLI flags (`-u`, `-p`) or local config files not committed.
 - For DNS-dependent checks, ensure `/etc/resolv.conf` is available as noted in `README.md`.
 - `directory.py` debug logs may intentionally include username/password for private troubleshooting; never share or commit such logs.
+- In `checks/ContactFields.py`, static placeholder-domain checks (for example `example.org`, `test.com`, `unknown.*`) must remain active even when remote email checks are disabled; `--disable-checks-all-remote` only suppresses MX/reachability validation, not local syntax or placeholder checks.

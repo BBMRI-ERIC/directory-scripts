@@ -13,6 +13,25 @@ from validate_email import validate_email
 from diskcache import Cache
 
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
+from nncontacts import NNContacts
+
+PLACEHOLDER_EMAIL_DOMAINS = frozenset({"example.org", "test.com"})
+GENERIC_EMAIL_SUFFIXES = frozenset(
+    {
+        "com",
+        "org",
+        "net",
+        "edu",
+        "gov",
+        "mil",
+        "int",
+        "info",
+        "biz",
+        "name",
+        "pro",
+        "eu",
+    }
+)
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
@@ -34,6 +53,41 @@ CHECK_DOCS = {'CTF:EmailMissing': {'entity': 'CONTACT',
                                                 'summary': 'Email for contact seems to '
                                                            'be unreachable because of '
                                                            'missing DNS MX record'},
+ 'CTF:EmailPlaceholder': {'entity': 'CONTACT',
+                                                'fields': ['email'],
+                                                'fix': 'Replace the placeholder email '
+                                                       'address with a real working '
+                                                       'contact email address for the '
+                                                       'person or organisation.',
+                                                'severity': 'ERROR',
+                                                'summary': 'The contact email uses a '
+                                                           'placeholder domain such '
+                                                           'as example.org, test.com, or '
+                                                           'unknown.<suffix> and is '
+                                                           'not a real operational '
+                                                           'email address.'},
+ 'CTF:EmailCountrySuffix': {'entity': 'CONTACT',
+                                                  'fields': ['CONTACT.email', 'BIOBANK.country'],
+                                                  'fix': 'Verify that the email '
+                                                         'belongs to the correct '
+                                                         'institution. If the email '
+                                                         'domain uses a country-code '
+                                                         'suffix that does not match '
+                                                         'the linked biobank country, '
+                                                         'replace it with the correct '
+                                                         'institutional email or '
+                                                         'confirm that the cross-border '
+                                                         'assignment is intentional.',
+                                                  'severity': 'WARNING',
+                                                  'summary': 'The contact email uses a '
+                                                             'country-code domain '
+                                                             'suffix that does not '
+                                                             'match the linked '
+                                                             'biobank country. Generic '
+                                                             'domains and non-country '
+                                                             'staging areas such as '
+                                                             'EU and EXT are '
+                                                             'excluded.'},
  'CTF:FirstNameMissing': {'entity': 'CONTACT',
                                              'fields': ['first_name'],
                                              'severity': 'WARNING',
@@ -62,6 +116,88 @@ CHECK_DOCS = {'CTF:EmailMissing': {'entity': 'CONTACT',
                                                              'with + sign, no spaces) '
                                                              '- offending phone number '
                                                              "in 'phone' attribute: "}}
+
+
+def get_email_domain(email: str) -> str:
+    """Return normalized domain part of an email address or empty string."""
+    if not isinstance(email, str) or "@" not in email:
+        return ""
+    return email.rsplit("@", 1)[1].strip().lower()
+
+
+def is_placeholder_email_domain(domain: str) -> bool:
+    """Return whether the email domain is a known placeholder domain."""
+    if not domain:
+        return False
+    if domain in PLACEHOLDER_EMAIL_DOMAINS:
+        return True
+    return domain.startswith("unknown.")
+
+
+def get_email_country_suffix(email: str) -> str:
+    """Return normalized country-code-like email suffix or empty string."""
+    domain = get_email_domain(email)
+    if not domain or "." not in domain:
+        return ""
+    suffix = domain.rsplit(".", 1)[1].upper()
+    if suffix.lower() in GENERIC_EMAIL_SUFFIXES:
+        return ""
+    if not NNContacts.is_iso_country_code(suffix):
+        return ""
+    return suffix
+
+
+def get_contact_biobank_contexts(dir, contact: dict) -> list[tuple[str, str]]:
+    """Return linked country-based biobank contexts as (biobank_id, country)."""
+    contexts: list[tuple[str, str]] = []
+    seen_biobanks = set()
+
+    for biobank_ref in contact.get("biobanks", []):
+        biobank_id = biobank_ref.get("id")
+        if biobank_id:
+            seen_biobanks.add(biobank_id)
+
+    for collection_ref in contact.get("collections", []):
+        collection_id = collection_ref.get("id")
+        if not collection_id:
+            continue
+        try:
+            biobank_id = dir.getCollectionBiobankId(collection_id)
+        except Exception:
+            continue
+        if biobank_id:
+            seen_biobanks.add(biobank_id)
+
+    for biobank_id in sorted(seen_biobanks):
+        biobank = dir.getBiobankById(biobank_id)
+        if not biobank:
+            continue
+        country_value = biobank.get("country")
+        if isinstance(country_value, dict):
+            country_value = country_value.get("id") or country_value.get("name")
+        country = NNContacts.normalize_code(country_value)
+        staging_area = NNContacts.extract_staging_area(biobank.get("id"))
+        if not country:
+            continue
+        if NNContacts.is_non_member_staging_area(staging_area, country=country):
+            continue
+        contexts.append((biobank_id, country))
+
+    return contexts
+
+
+def build_country_suffix_warning(contact: dict, contexts: list[tuple[str, str]]) -> str:
+    """Return mismatch warning text for an email country suffix."""
+    suffix = get_email_country_suffix(contact["email"])
+    countries = sorted({country for _, country in contexts})
+    biobank_ids = sorted({biobank_id for biobank_id, _ in contexts})
+    countries_text = ", ".join(countries)
+    biobanks_text = ", ".join(biobank_ids)
+    return (
+        f"Email for contact uses country-code domain suffix '.{suffix.lower()}', "
+        f"but the linked biobank country is {countries_text} "
+        f"(linked biobank IDs: {biobanks_text})"
+    )
 
 class ContactFields(IPlugin):
 	CHECK_ID_PREFIX = "CTF"
@@ -92,8 +228,19 @@ class ContactFields(IPlugin):
 			elif(not validate_email(contact['email'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "EmailInvalid"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact is invalid - offending  'email' attribute value: " + contact['email']))
 			else:
+				email_domain = get_email_domain(contact['email'])
+				placeholder_email = is_placeholder_email_domain(email_domain)
+				if placeholder_email:
+					warnings.append(DataCheckWarning(make_check_id(self, "EmailPlaceholder"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact uses a placeholder domain and must be replaced - offending 'email' attribute value: " + contact['email']))
+
+				email_country_suffix = get_email_country_suffix(contact['email'])
+				if email_country_suffix:
+					contexts = get_contact_biobank_contexts(dir, contact)
+					if contexts and email_country_suffix not in {country for _, country in contexts}:
+						warnings.append(DataCheckWarning(make_check_id(self, "EmailCountrySuffix"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', build_country_suffix_warning(contact, contexts)))
+
 				# This is pretty dramatic test and should be used sparingly
-				if ValidateEmails:
+				if ValidateEmails and not placeholder_email:
 					contact_email = contact['email']
 					log_message = "Validating email " + contact_email
 					# XXX: does not work in most cases
