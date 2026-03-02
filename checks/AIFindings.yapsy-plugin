@@ -5,4 +5,4 @@ Module = AIFindings
 [Documentation]
 Author = Codex, Petr Holub
 Version = 1.0
-Description = Emit shareable AI-curated findings stored in ai-check-cache without requiring live model access.
+Description = Emit shareable AI-reviewed findings stored in ai-check-cache for issues that cannot be expressed robustly as deterministic checks.

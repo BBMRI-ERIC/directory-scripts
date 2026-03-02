@@ -78,16 +78,14 @@ Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plug
 
 `data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well, or `--only-withdrawn` when you want to review only withdrawn content.
 
-Some higher-level consistency findings are now stored in the shareable repository folder `ai-check-cache/` and emitted by the `AIFindings` plugin. This is intentionally separate from private runtime caches such as `data-check-cache/`: the repository cache is meant to be reviewable, commit-friendly, and reusable even by contributors who do not have access to the same AI tooling.
+Deterministic narrative-vs-structure text checks now run directly in the regular QC pipeline via `TextConsistency`; regex-like or similar heuristics no longer belong in `ai-check-cache/`. The shareable repository folder `ai-check-cache/` is reserved only for findings that genuinely require full AI-model review on live data and cannot be expressed robustly as deterministic checks. Those findings are emitted by the `AIFindings` plugin.
 
-The shareable AI cache is regenerated with `python3 run-ai-checks.py`. Each AI cache file stores checksums for every entity reviewed by that rule and for the exact source fields used by that rule. `data-check.py` reuses only AI findings whose cached checksums still match the current Directory data. When live data changes, `AIFindings` emits a script warning listing the changed entity IDs and skips the stale cached findings until `run-ai-checks.py` is rerun.
+Each AI cache file stores checksums for every reviewed entity and for the exact source fields used by that AI-reviewed finding. `data-check.py` reuses only AI findings whose cached checksums still match the current Directory data. When live data changes, `AIFindings` emits a script warning listing the changed entity IDs and skips the stale cached findings until the live AI review is refreshed.
 
-Recommended AI-check rerun workflow:
-``
-python3 run-ai-checks.py --purge-cache directory --report ai-checks-results-current.txt
-python3 data-check.py -N | rg 'AI:'
-``
-Review `ai-checks-results-current.txt` with the strongest available model before committing any `ai-check-cache/` changes. Use `-w/--include-withdrawn` or `--only-withdrawn` only when withdrawn content is intentionally in scope.
+Recommended AI-review workflow:
+- use the Codex skill `run-ai-checks` explicitly to review live data with the strongest available model and refresh `ai-check-cache/` only for genuinely AI-only findings
+- then run `python3 data-check.py -N | rg 'AI:Curated'` to confirm the emitted AI-backed warnings
+- keep withdrawn scope explicit; active-only is the default unless the review intentionally includes withdrawn content
 
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
@@ -255,13 +253,7 @@ python3 directory-stats.py -c DE,FR -A EXT -t CASE_CONTROL,POPULATION -N
 ``
 python3 directory-stats.py --only-withdrawn -N
 ``
-- **run-ai-checks.py** - regenerates the shareable `ai-check-cache/` findings from current Directory data and can also write a human-reviewable AI findings report. By default it works on active content only; use `-w/--include-withdrawn` or `--only-withdrawn` only when withdrawn content is intentionally part of the review.  
-``
-python3 run-ai-checks.py --purge-cache directory --report ai-checks-results-current.txt
-``
-``
-python3 run-ai-checks.py -w --report ai-checks-withdrawn-too.txt
-``
+- **AI review workflow** - use the Codex skill `run-ai-checks` explicitly when you need full AI-model review of live Directory data. That workflow refreshes `ai-check-cache/` only for genuinely AI-only findings; deterministic regex/heuristic text checks already run in the normal QC pipeline via `TextConsistency`. After refreshing AI-reviewed findings, run `python3 data-check.py -N | rg 'AI:Curated'` to inspect the emitted cache-backed warnings.  
 - **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
 ``
 python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson

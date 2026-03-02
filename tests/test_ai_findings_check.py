@@ -9,14 +9,8 @@ class AIFindingsDirectoryStub:
     def getSchema(self):
         return "ERIC"
 
-    def getBiobankById(self, biobank_id):
-        return {"id": biobank_id} if biobank_id == "bb1" else None
-
     def getCollectionById(self, collection_id):
         return {"id": collection_id} if collection_id == "col1" else None
-
-    def getBiobankNN(self, biobank_id):
-        return "CZ"
 
     def getCollectionNN(self, collection_id):
         return "CZ"
@@ -28,28 +22,20 @@ def test_ai_findings_plugin_emits_only_findings_for_entities_in_scope(monkeypatc
         lambda directory: AICacheLoadResult(
             findings=[
                 {
-                    "rule": "StudyText",
+                    "rule": "NarrativeReuseBarrier",
                     "entity_id": "col1",
                     "entity_type": "COLLECTION",
                     "severity": "WARNING",
-                    "message": "Study text mismatch",
-                    "action": "Review collection type",
+                    "message": "Narrative describes a missing reuse restriction.",
+                    "action": "Review the narrative.",
                 },
                 {
-                    "rule": "CovidText",
+                    "rule": "NarrativeReuseBarrier",
                     "entity_id": "missing_collection",
                     "entity_type": "COLLECTION",
                     "severity": "WARNING",
                     "message": "Should be skipped",
                     "action": "Skip",
-                },
-                {
-                    "rule": "AgeText",
-                    "entity_id": "col1",
-                    "entity_type": "COLLECTION",
-                    "severity": "WARNING",
-                    "message": "Age text mismatch",
-                    "action": "Review",
                 },
             ],
             issues=[],
@@ -59,9 +45,9 @@ def test_ai_findings_plugin_emits_only_findings_for_entities_in_scope(monkeypatc
     warnings = AIFindings().check(AIFindingsDirectoryStub(), args=None)
 
     assert [(warning.directoryEntityID, warning.dataCheckID) for warning in warnings] == [
-        ("col1", "AI:StudyText"),
-        ("col1", "AI:AgeText"),
+        ("col1", "AI:Curated"),
     ]
+    assert warnings[0].message.startswith("[NarrativeReuseBarrier] ")
 
 
 def test_ai_findings_plugin_logs_script_warning_for_stale_cache(monkeypatch, caplog):
@@ -71,8 +57,8 @@ def test_ai_findings_plugin_logs_script_warning_for_stale_cache(monkeypatch, cap
             findings=[],
             issues=[
                 AICacheIssue(
-                    path=Path("ai-check-cache/ERIC/study-text.json"),
-                    rule="StudyText",
+                    path=Path("ai-check-cache/ERIC/reuse-barriers.json"),
+                    rule="NarrativeReuseBarrier",
                     withdrawn_scope="active-only",
                     reason="changed-entities",
                     entity_ids=("col1", "col2"),
@@ -86,3 +72,4 @@ def test_ai_findings_plugin_logs_script_warning_for_stale_cache(monkeypatch, cap
 
     assert warnings == []
     assert "Changed entities: col1, col2" in caplog.text
+    assert "live AI-review workflow" in caplog.text

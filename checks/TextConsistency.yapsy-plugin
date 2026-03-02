@@ -1,0 +1,9 @@
+[Core]
+Name = Deterministic text consistency checks
+Module = TextConsistency
+
+[Documentation]
+Author = Codex
+Version = 0.1
+Website = https://directory.bbmri-eric.eu/
+Description = Deterministic regex/heuristic checks that compare collection narrative text with structured metadata.

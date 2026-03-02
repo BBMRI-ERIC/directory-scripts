@@ -1,30 +1,15 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
-"""Generate shareable AI-check cache payloads from current Directory data."""
+"""Deterministic narrative-vs-structure consistency checks for collections."""
 
 from __future__ import annotations
 
-import json
 import re
-from collections import Counter
-from datetime import date
-from pathlib import Path
-from typing import Any, Callable, Iterable, Optional
-
-from ai_cache import (
-    compute_entity_checksum,
-    compute_source_checksum,
-    get_withdrawn_scope_label,
-)
+from typing import Any, Iterable, Optional
 
 
-GENERATOR_NAME = "codex-ai-review-v2"
-ENTITY_TYPE = "COLLECTION"
-SEVERITY = "WARNING"
-
-RULES = {
-    "AgeText": {
-        "filename": "age-text.json",
+CHECKS = {
+    "TXT:AgeRange": {
         "fields": [
             "COLLECTION.name",
             "COLLECTION.description",
@@ -32,24 +17,21 @@ RULES = {
             "COLLECTION.age_high",
         ],
     },
-    "StudyText": {
-        "filename": "study-text.json",
+    "TXT:StudyType": {
         "fields": [
             "COLLECTION.name",
             "COLLECTION.description",
             "COLLECTION.type",
         ],
     },
-    "FFPEText": {
-        "filename": "ffpe-text.json",
+    "TXT:FFPEMaterial": {
         "fields": [
             "COLLECTION.name",
             "COLLECTION.description",
             "COLLECTION.materials",
         ],
     },
-    "CovidText": {
-        "filename": "covid-text.json",
+    "TXT:CovidDiag": {
         "fields": [
             "COLLECTION.name",
             "COLLECTION.description",
@@ -73,7 +55,10 @@ ADULT_PATTERNS = [
     (re.compile(r"\bgeriatric\b", re.IGNORECASE), "geriatric"),
 ]
 AGE_SUPPRESSION_PATTERNS = [
-    re.compile(r"adults? and pediatric|pediatric and adults?|adults? and children|children and adults?", re.IGNORECASE),
+    re.compile(
+        r"adults? and pediatric|pediatric and adults?|adults? and children|children and adults?",
+        re.IGNORECASE,
+    ),
     re.compile(r"parents?|pregnan|mother|father|caretaker|family", re.IGNORECASE),
     re.compile(r"young adults?|adolescen", re.IGNORECASE),
 ]
@@ -169,96 +154,22 @@ COVID_ACUTE_DIAGNOSIS = re.compile(r"\bU07(?:\.1|\.2)?\b", re.IGNORECASE)
 COVID_LONG_DIAGNOSIS = re.compile(r"\bU09(?:\.9)?\b", re.IGNORECASE)
 
 
-def generate_payloads(directory: Any) -> list[dict[str, Any]]:
-    """Generate all AI cache payloads for the current Directory scope."""
-    collections = sorted(directory.getCollections(), key=lambda item: item["id"])
-    scope = get_withdrawn_scope_label(directory)
-    payloads = []
-    for rule_name, spec in RULES.items():
-        findings = []
-        checked_entities = []
-        for collection in collections:
-            checked_entities.append(
-                {
-                    "entity_id": collection["id"],
-                    "entity_type": ENTITY_TYPE,
-                    "entity_checksum": compute_entity_checksum(collection),
-                    "source_checksum": compute_source_checksum(
-                        ENTITY_TYPE,
-                        collection,
-                        spec["fields"],
-                    ),
-                }
-            )
-            finding = _generate_finding(rule_name, collection, directory)
-            if finding is not None:
-                findings.append(finding)
-        payloads.append(
-            {
-                "schema": directory.getSchema(),
-                "rule": rule_name,
-                "generator": GENERATOR_NAME,
-                "generated_on": date.today().isoformat(),
-                "withdrawn_scope": scope,
-                "checked_fields": spec["fields"],
-                "checked_entities": checked_entities,
-                "findings": sorted(findings, key=lambda item: (item["entity_id"], item["message"])),
-                "filename": spec["filename"],
-            }
-        )
-    return payloads
+def build_text_consistency_findings(collection: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return deterministic narrative-vs-structure findings for one collection."""
+    findings = []
+    for builder in (
+        _build_age_finding,
+        _build_study_finding,
+        _build_ffpe_finding,
+        _build_covid_finding,
+    ):
+        finding = builder(collection)
+        if finding is not None:
+            findings.append(finding)
+    return findings
 
 
-def write_payloads(directory: Any, output_root: Path) -> dict[str, int]:
-    """Write all AI cache payloads to disk and return per-rule finding counts."""
-    payloads = generate_payloads(directory)
-    schema_dir = output_root / directory.getSchema()
-    schema_dir.mkdir(parents=True, exist_ok=True)
-    counts: dict[str, int] = {}
-    for payload in payloads:
-        filename = payload["filename"]
-        path = schema_dir / filename
-        serializable_payload = dict(payload)
-        serializable_payload.pop("filename", None)
-        path.write_text(
-            json.dumps(serializable_payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        counts[payload["rule"]] = len(payload["findings"])
-    return counts
-
-
-def build_report_lines(payloads: Iterable[dict[str, Any]]) -> list[str]:
-    """Return AI findings in the human-readable report format used for review."""
-    lines: list[str] = []
-    for payload in payloads:
-        for finding in payload["findings"]:
-            lines.append(
-                f"Collection {finding['entity_id']} AI:{finding['rule']}/{finding['severity']}: "
-                f"{finding['message']} {finding['action']}"
-            )
-    return sorted(lines)
-
-
-def summarize_payloads(payloads: Iterable[dict[str, Any]]) -> dict[str, int]:
-    """Return finding counts per rule."""
-    return dict(Counter(payload["rule"] for payload in payloads for _ in payload["findings"]))
-
-
-def _generate_finding(rule_name: str, collection: dict[str, Any], directory: Any) -> Optional[dict[str, Any]]:
-    """Generate one rule-specific finding for a collection, if any."""
-    if rule_name == "AgeText":
-        return _generate_age_finding(collection, directory)
-    if rule_name == "StudyText":
-        return _generate_study_finding(collection, directory)
-    if rule_name == "FFPEText":
-        return _generate_ffpe_finding(collection, directory)
-    if rule_name == "CovidText":
-        return _generate_covid_finding(collection, directory)
-    raise ValueError(f"Unsupported AI rule {rule_name!r}.")
-
-
-def _generate_age_finding(collection: dict[str, Any], directory: Any) -> Optional[dict[str, Any]]:
+def _build_age_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
     text = _collection_text(collection)
     if any(pattern.search(text) for pattern in AGE_SUPPRESSION_PATTERNS):
         return None
@@ -271,37 +182,35 @@ def _generate_age_finding(collection: dict[str, Any], directory: Any) -> Optiona
     age_low = collection.get("age_low")
     age_high = collection.get("age_high")
     if pediatric_match and (age_high is None or age_high > 18):
-        return _build_collection_finding(
-            rule_name="AgeText",
-            collection=collection,
-            directory=directory,
-            message=(
+        return {
+            "check_id": "TXT:AgeRange",
+            "fields": CHECKS["TXT:AgeRange"]["fields"],
+            "message": (
                 f"Collection text suggests a pediatric population (matched '{pediatric_match}'), "
                 f"but age_high is {age_high}."
             ),
-            action=(
+            "action": (
                 "Review the age range metadata and the collection narrative. "
                 "If the collection is pediatric, age_high should usually be <= 18."
             ),
-        )
+        }
     if adult_match and (age_low is None or age_low < 18):
-        return _build_collection_finding(
-            rule_name="AgeText",
-            collection=collection,
-            directory=directory,
-            message=(
+        return {
+            "check_id": "TXT:AgeRange",
+            "fields": CHECKS["TXT:AgeRange"]["fields"],
+            "message": (
                 f"Collection text suggests an adult/geriatric population (matched '{adult_match}'), "
                 f"but age_low is {age_low}."
             ),
-            action=(
+            "action": (
                 "Review the age range metadata and the collection narrative. "
                 "If the collection targets adults only, age_low should usually be >= 18."
             ),
-        )
+        }
     return None
 
 
-def _generate_study_finding(collection: dict[str, Any], directory: Any) -> Optional[dict[str, Any]]:
+def _build_study_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
     text = _collection_text(collection)
     current_types = set(_as_sorted_strings(collection.get("type")))
     suggestions: list[str] = []
@@ -329,22 +238,21 @@ def _generate_study_finding(collection: dict[str, Any], directory: Any) -> Optio
     if not suggestions:
         return None
 
-    return _build_collection_finding(
-        rule_name="StudyText",
-        collection=collection,
-        directory=directory,
-        message=(
+    return {
+        "check_id": "TXT:StudyType",
+        "fields": CHECKS["TXT:StudyType"]["fields"],
+        "message": (
             f"Collection text suggests structured type(s) {suggestions} based on terms {matched_terms}, "
             f"but the current type list is {_as_sorted_strings(collection.get('type'))}."
         ),
-        action=(
+        "action": (
             "Review the narrative and add the missing structured collection type(s) "
             "if the text really describes the collection design."
         ),
-    )
+    }
 
 
-def _generate_ffpe_finding(collection: dict[str, Any], directory: Any) -> Optional[dict[str, Any]]:
+def _build_ffpe_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
     materials = set(_as_sorted_strings(collection.get("materials")))
     if "TISSUE_PARAFFIN_EMBEDDED" in materials:
         return None
@@ -363,23 +271,22 @@ def _generate_ffpe_finding(collection: dict[str, Any], directory: Any) -> Option
     if derived_signal and materials and materials <= DERIVED_MATERIALS:
         return None
 
-    return _build_collection_finding(
-        rule_name="FFPEText",
-        collection=collection,
-        directory=directory,
-        message=(
+    return {
+        "check_id": "TXT:FFPEMaterial",
+        "fields": CHECKS["TXT:FFPEMaterial"]["fields"],
+        "message": (
             f"Collection text mentions '{matched_term}', but materials do not include "
             f"TISSUE_PARAFFIN_EMBEDDED (current materials: {_as_sorted_strings(collection.get('materials'))})."
         ),
-        action=(
+        "action": (
             "Review whether the collection really contains FFPE/paraffin-embedded tissue. "
             "If yes, add TISSUE_PARAFFIN_EMBEDDED to materials; otherwise clarify the narrative "
             "when the text only refers to slides, sections, images, or derived DNA/RNA."
         ),
-    )
+    }
 
 
-def _generate_covid_finding(collection: dict[str, Any], directory: Any) -> Optional[dict[str, Any]]:
+def _build_covid_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
     text = _collection_text(collection)
     general_match = _first_match(COVID_GENERAL_PATTERNS, text)
     long_match = _first_match(COVID_LONG_PATTERNS, text)
@@ -396,20 +303,19 @@ def _generate_covid_finding(collection: dict[str, Any], directory: Any) -> Optio
     if long_match:
         if has_long_covid_diagnosis:
             return None
-        return _build_collection_finding(
-            rule_name="CovidText",
-            collection=collection,
-            directory=directory,
-            message=(
+        return {
+            "check_id": "TXT:CovidDiag",
+            "fields": CHECKS["TXT:CovidDiag"]["fields"],
+            "message": (
                 f"Collection text suggests post-/long-COVID context (matched '{long_match}'), "
                 f"but diagnosis_available does not contain U09.9 or another post-COVID diagnosis "
                 f"(current diagnoses: {diagnosis_names})."
             ),
-            action=(
+            "action": (
                 "Review whether the collection really targets post-/long-COVID cases. "
                 "If yes, add U09.9 or the relevant structured post-COVID diagnosis; otherwise reword the narrative."
             ),
-        )
+        }
 
     vaccination_only = any(pattern.search(text) for pattern in COVID_VACCINATION_PATTERNS)
     context_only = any(pattern.search(text) for pattern in COVID_CONTEXT_PATTERNS)
@@ -422,55 +328,28 @@ def _generate_covid_finding(collection: dict[str, Any], directory: Any) -> Optio
     if has_acute_covid_diagnosis:
         return None
 
-    return _build_collection_finding(
-        rule_name="CovidText",
-        collection=collection,
-        directory=directory,
-        message=(
+    return {
+        "check_id": "TXT:CovidDiag",
+        "fields": CHECKS["TXT:CovidDiag"]["fields"],
+        "message": (
             f"Collection text suggests COVID-19 disease context (matched '{general_match or long_match}'), "
             f"but diagnosis_available does not contain recognized COVID-19 diagnoses such as U07.1/U07.2 "
             f"(current diagnoses: {diagnosis_names})."
         ),
-        action=(
+        "action": (
             "Review whether the collection really targets COVID-19 cases or convalescents. "
             "If yes, add the relevant structured COVID-19 diagnosis; otherwise reword the narrative to avoid misleading discovery."
         ),
-    )
-
-
-def _build_collection_finding(
-    *,
-    rule_name: str,
-    collection: dict[str, Any],
-    directory: Any,
-    message: str,
-    action: str,
-) -> dict[str, Any]:
-    """Build one shareable AI finding record for a collection."""
-    fields = RULES[rule_name]["fields"]
-    return {
-        "rule": rule_name,
-        "entity_id": collection["id"],
-        "entity_type": ENTITY_TYPE,
-        "severity": SEVERITY,
-        "fields": fields,
-        "message": message,
-        "action": action,
-        "withdrawn": str(directory.isCollectionWithdrawn(collection["id"])),
-        "entity_checksum": compute_entity_checksum(collection),
-        "source_checksum": compute_source_checksum(ENTITY_TYPE, collection, fields),
     }
 
 
 def _collection_text(collection: dict[str, Any]) -> str:
-    """Return a normalized narrative text for a collection."""
     name = collection.get("name") or ""
     description = collection.get("description") or ""
     return f"{name} {description}".replace("\n", " ")
 
 
 def _first_match(patterns: Iterable[tuple[re.Pattern[str], str]], text: str) -> Optional[str]:
-    """Return the label of the first regex that matches the text."""
     for pattern, label in patterns:
         if pattern.search(text):
             return label
@@ -478,7 +357,6 @@ def _first_match(patterns: Iterable[tuple[re.Pattern[str], str]], text: str) -> 
 
 
 def _as_sorted_strings(values: Any) -> list[str]:
-    """Return a stable sorted list of string-like values."""
     if not values:
         return []
     if isinstance(values, list):
@@ -493,7 +371,6 @@ def _as_sorted_strings(values: Any) -> list[str]:
 
 
 def _diagnosis_names(collection: dict[str, Any]) -> list[str]:
-    """Return sorted diagnosis names for a collection."""
     diagnoses = collection.get("diagnosis_available")
     if not diagnoses:
         return []

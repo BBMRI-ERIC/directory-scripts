@@ -55,9 +55,26 @@ def test_check_docs_metadata_matches_all_plugins():
         "COLLECTION.size",
         "COLLECTION.sub_collection",
     ]
-    assert documented_checks["AI:FFPEText"]["fields"] == [
+    assert documented_checks["AI:Curated"]["fields"] == []
+    assert documented_checks["TXT:AgeRange"]["fields"] == [
+        "COLLECTION.age_high",
+        "COLLECTION.age_low",
+        "COLLECTION.description",
+        "COLLECTION.name",
+    ]
+    assert documented_checks["TXT:StudyType"]["fields"] == [
+        "COLLECTION.description",
+        "COLLECTION.name",
+        "COLLECTION.type",
+    ]
+    assert documented_checks["TXT:FFPEMaterial"]["fields"] == [
         "COLLECTION.description",
         "COLLECTION.materials",
+        "COLLECTION.name",
+    ]
+    assert documented_checks["TXT:CovidDiag"]["fields"] == [
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available",
         "COLLECTION.name",
     ]
     assert documented_checks["BCO:AccessConflict"]["fields"] == [

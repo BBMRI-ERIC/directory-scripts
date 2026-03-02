@@ -1,44 +1,54 @@
 ---
 name: run-ai-checks
-description: "Use when the user asks to rerun, refresh, or validate the shareable AI checks. This skill regenerates `ai-check-cache/` from current Directory data, produces a human-reviewable AI findings report, and requires a strongest-model review of the refreshed results before committing AI-check changes."
+description: "Use when the user asks to run or refresh true AI-reviewed checks on live Directory data. This skill performs a strongest-model review on current data, keeps regex/heuristic checks out of the AI cache, updates `ai-check-cache/` only for genuinely AI-only findings, and validates the refreshed cache before commit."
 ---
 
 # Run AI Checks
 
-Use this skill when the user asks to rerun AI checks, refresh `ai-check-cache/`, validate stale AI-cache warnings, or prepare AI-check updates for review.
+Use this skill when the user asks to run full AI checks, refresh `ai-check-cache/`, validate stale AI-cache warnings, or prepare AI-cache updates for review.
 
 ## Required workflow
 
-1. Refresh the data source first:
-   - default active content: `python3 run-ai-checks.py --purge-cache directory --report ai-checks-results-current.txt`
-   - include withdrawn: add `-w/--include-withdrawn`
-   - withdrawn only: add `--only-withdrawn`
-2. Inspect the script summary counts and the generated `ai-checks-results-current.txt`.
-3. Review the refreshed result set with the strongest available model in the current session.
-4. Identify obvious false positives, false negatives, and deterministic overlaps before committing any cache changes.
-5. Re-run `python3 data-check.py -N` (or a focused equivalent) after the cache refresh if the user wants to confirm the emitted `AI:*` warnings in the normal QC pipeline.
+1. Confirm model strength first:
+   - if the current model is not the strongest available, tell the user and recommend switching before interpreting results, unless the user explicitly wants to continue
+2. Refresh or inspect current live Directory data:
+   - use `Directory(...)` directly from Codex or a small local Python helper
+   - keep withdrawn scope explicit; active-only is the default unless the user explicitly asks otherwise
+3. Review current deterministic coverage first:
+   - inspect `checks/`, especially `text_consistency.py` and the existing deterministic plugins
+   - do not put regex-like findings into `ai-check-cache/`
+4. Run the full AI review on the live data in Codex:
+   - identify only findings that cannot be expressed robustly as deterministic checks
+   - check current `ai-check-cache/` entries for overlap before adding anything new
+5. Update `ai-check-cache/` entries only for the residual AI-only findings:
+   - keep JSON stable and commit-friendly
+   - include current `entity_checksum` and `source_checksum`
+   - include enough message/action detail that non-experts can understand the issue
+6. Re-run the normal QC path after updating the cache:
+   - `python3 data-check.py -N`
+   - inspect emitted `AI:Curated` warnings and confirm they match the intended refreshed findings
 
 ## Required checks
 
-- If the current model is not the strongest available, tell the user and recommend switching before interpreting the refreshed AI findings, unless the user explicitly wants to continue.
-- If `data-check.py` or `AIFindings` reports AI-cache staleness warnings, do not trust the old cache; rerun `run-ai-checks.py` first.
-- Keep withdrawn scope explicit. The committed cache is normally generated for active content only unless the user explicitly asks otherwise.
+- Do not trust stale AI-cache findings. If `AIFindings` reports changed entity IDs, refresh the live AI review before using or editing those entries.
+- Keep the AI cache focused on genuinely AI-only findings. If a pattern is deterministic, move it into a regular plugin instead.
 - Do not commit private runtime caches or ad-hoc local outputs outside `ai-check-cache/`.
 
 ## Validation expectations
 
-After rerunning the cache, validate at least:
+After updating the AI cache, validate at least:
 
-- `python3 -m py_compile ai_cache.py ai_check_generation.py run-ai-checks.py checks/AIFindings.py <changed tests>`
-- `pytest -q tests/test_ai_check_generation.py tests/test_ai_cache.py tests/test_ai_findings_check.py`
-- the relevant broader test subset or full `pytest -q` when AI-check logic changed materially
+- `python3 -m py_compile ai_cache.py checks/AIFindings.py <changed deterministic helpers/plugins/tests>`
+- `pytest -q tests/test_ai_cache.py tests/test_ai_findings_check.py <changed deterministic test subsets>`
+- `python3 data-check.py -N`
+- `python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py` if documentation metadata changed
 
 ## Output format
 
 Report in this order:
 
-1. Refresh command used
-2. Counts per AI rule
-3. Notable false positives/false negatives found in the refreshed run
-4. Whether the cache is ready to commit
-5. Any follow-up deterministic checks or refinements that should replace AI coverage later
+1. Live-data scope reviewed
+2. AI-only findings added/updated/removed
+3. Deterministic findings that should become or remain regular plugin checks instead
+4. Validation status
+5. Whether the cache is ready to commit
