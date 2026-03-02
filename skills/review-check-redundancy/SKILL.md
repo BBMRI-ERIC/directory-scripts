@@ -5,7 +5,7 @@ description: "Use before committing or pushing changes to `checks/` or `ai-check
 
 # Review Check Redundancy
 
-Use this skill before commit/push when `checks/`, `checks/AIFindings.py`, `ai_cache.py`, or `ai-check-cache/` changed, and when the user asks to review check overlap.
+Use this skill before commit/push when `checks/`, `checks/AIFindings.py`, `ai_cache.py`, `ai_check_generation.py`, `run-ai-checks.py`, or `ai-check-cache/` changed, and when the user asks to review check overlap.
 
 ## Review goals
 
@@ -20,7 +20,7 @@ Use this skill before commit/push when `checks/`, `checks/AIFindings.py`, `ai_ca
 
 - List changed checks and nearby related checks.
 - Review matching `CHECK_DOCS`, tests, and README/manual references.
-- Inspect `ai-check-cache/` categories and finding rationales when AI checks are involved.
+- Inspect `ai-check-cache/` categories, generation heuristics, and current `run-ai-checks.py` output when AI checks are involved.
 
 ### Step 2: overlap analysis
 
@@ -58,6 +58,7 @@ Each proposal must state:
 - If deterministic and AI checks overlap, the deterministic rule is the default owner.
 - If AI coverage catches broader but noisy cases, keep it only for the residual fuzzy area and document that boundary.
 - If live data still triggers an older check, treat that as active coverage, not dead code.
+- When AI checks changed, review the refreshed `run-ai-checks.py --report ...` output before committing to make sure the overlap analysis is grounded in current real data.
 
 ## Output format
 

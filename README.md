@@ -80,6 +80,15 @@ Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plug
 
 Some higher-level consistency findings are now stored in the shareable repository folder `ai-check-cache/` and emitted by the `AIFindings` plugin. This is intentionally separate from private runtime caches such as `data-check-cache/`: the repository cache is meant to be reviewable, commit-friendly, and reusable even by contributors who do not have access to the same AI tooling.
 
+The shareable AI cache is regenerated with `python3 run-ai-checks.py`. Each AI cache file stores checksums for every entity reviewed by that rule and for the exact source fields used by that rule. `data-check.py` reuses only AI findings whose cached checksums still match the current Directory data. When live data changes, `AIFindings` emits a script warning listing the changed entity IDs and skips the stale cached findings until `run-ai-checks.py` is rerun.
+
+Recommended AI-check rerun workflow:
+``
+python3 run-ai-checks.py --purge-cache directory --report ai-checks-results-current.txt
+python3 data-check.py -N | rg 'AI:'
+``
+Review `ai-checks-results-current.txt` with the strongest available model before committing any `ai-check-cache/` changes. Use `-w/--include-withdrawn` or `--only-withdrawn` only when withdrawn content is intentionally in scope.
+
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
 - remote checks cover MX/reachability validation and are disabled by `--disable-checks-all-remote` / `--disable-checks-remote emails`
@@ -245,6 +254,13 @@ python3 directory-stats.py -c DE,FR -A EXT -t CASE_CONTROL,POPULATION -N
 ``
 ``
 python3 directory-stats.py --only-withdrawn -N
+``
+- **run-ai-checks.py** - regenerates the shareable `ai-check-cache/` findings from current Directory data and can also write a human-reviewable AI findings report. By default it works on active content only; use `-w/--include-withdrawn` or `--only-withdrawn` only when withdrawn content is intentionally part of the review.  
+``
+python3 run-ai-checks.py --purge-cache directory --report ai-checks-results-current.txt
+``
+``
+python3 run-ai-checks.py -w --report ai-checks-withdrawn-too.txt
 ``
 - **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
 ``

@@ -69,6 +69,9 @@
 - Withdrawal for checks is logically inherited for collections: a collection counts as withdrawn if it is withdrawn itself, if its biobank is withdrawn, or if an ancestor collection is withdrawn.
 - AI-assisted findings that should be shareable belong in `ai-check-cache/`, not in private runtime caches such as `data-check-cache/`.
 - `ai-check-cache/` stores reviewable JSON findings committed to Git; regular `data-check.py` runs only read those findings and must not require live model access.
+- Regenerate the shareable AI cache with `python3 run-ai-checks.py --purge-cache directory --report ai-checks-results-current.txt`; review the refreshed report with the strongest available model before committing `ai-check-cache/` changes.
+- AI cache reuse is checksum-based: findings remain reusable only while the live entity checksum and source-field checksum still match; `AIFindings` logs script warnings listing changed entity IDs and skips stale findings until the cache is rerun.
+- AI cache checksums must exclude pure runtime metadata such as timestamps and `mg_*` fields so metadata-only churn does not force pointless reruns.
 - `exporter-bbmri-cohorts.py` uses `-W/--warnings`; keep `-w` reserved for withdrawn-scope selection.
 
 ## Testing Guidelines
@@ -89,7 +92,8 @@
 - Use `skills/assertive-quality-gate/SKILL.md` as a required gate before every push.
 - Also apply the same gate when user asks to review code or test code.
 - Use `skills/propose-ai-checks/SKILL.md` only when the user explicitly asks to review current data and propose new AI checks.
-- Use `skills/review-check-redundancy/SKILL.md` before committing or pushing changes to `checks/`, `checks/AIFindings.py`, `ai_cache.py`, or `ai-check-cache/`.
+- Use `skills/run-ai-checks/SKILL.md` when rerunning or refreshing the shareable AI checks, or when validating stale AI-cache warnings.
+- Use `skills/review-check-redundancy/SKILL.md` before committing or pushing changes to `checks/`, `checks/AIFindings.py`, `ai_cache.py`, `ai_check_generation.py`, `run-ai-checks.py`, or `ai-check-cache/`.
 - Prioritize reusable modules (especially `directory.py`) for defensive checks, docstrings, and regression tests.
 - If `checks/` changes, verify `make_check_id(...)` identifiers are meaningful and `DataCheckWarning(...)` messages are actionable.
 - For new or changed checks, keep machine-readable `CHECK_DOCS` metadata next to the implementation when the check has non-obvious business context, and keep severity/entity/field declarations aligned with emitted `DataCheckWarning(...)` calls.
@@ -98,6 +102,8 @@
 - If a check is backed by `ai-check-cache/`, keep the plugin implementation and the JSON findings aligned: the plugin defines stable warning IDs and manual docs, while the JSON files carry concrete entity-level findings and evidence.
 - New AI-check proposals must review existing deterministic checks and existing `ai-check-cache/` findings first; prefer deterministic checks when the rule can be stated clearly and tested robustly.
 - AI-check work is always two-step: first proposal with real-data counts and overlap analysis, then implementation only after explicit user approval.
+- Proposal/review of AI checks must use the strongest available model in the current session; if that is not the strongest model available, tell the user before relying on the review.
+- After changing AI heuristics or AI cache content, rerun `run-ai-checks.py`, inspect the refreshed `ai-checks-results-current.txt`, and then rerun the relevant tests plus the normal QC path before committing.
 - Do not assume that adding `CHECK_DOCS` alone is enough; after changing check documentation metadata, verify the rendered/manual-facing result through `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py` and inspect the generated `checks-doc.tex` / `CHECKS.md` output for the affected checks.
 - Member-area consistency logic is subtle: member-country institutions may appear only in non-member areas as a reviewed exception, but the same institution must not be duplicated across member and non-member/global areas; `EU` is only an exception for hosting location, not for duplicate institutions.
 
