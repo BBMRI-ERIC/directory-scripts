@@ -74,18 +74,9 @@ Cache scope is now tool-specific:
 
 Legacy long option spellings remain accepted where needed, but the normalized lowercase kebab-case variants are preferred in documentation and automation.
 
-Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plugin source. Keep that metadata aligned with the emitted `DataCheckWarning(...)` calls; the local manual generator validates severity/entity/field consistency against the implementation.
-
 `data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well, or `--only-withdrawn` when you want to review only withdrawn content.
 
-Deterministic narrative-vs-structure text checks now run directly in the regular QC pipeline via `TextConsistency`; regex-like or similar heuristics no longer belong in `ai-check-cache/`. The shareable repository folder `ai-check-cache/` is reserved only for findings that genuinely require full AI-model review on live data and cannot be expressed robustly as deterministic checks. Those findings are emitted by the `AIFindings` plugin.
-
-Each AI cache file stores checksums for every reviewed entity and for the exact source fields used by that AI-reviewed finding. `data-check.py` reuses only AI findings whose cached checksums still match the current Directory data. When live data changes, `AIFindings` emits a script warning listing the changed entity IDs and skips the stale cached findings until the live AI review is refreshed.
-
-Recommended AI-review workflow:
-- use the Codex skill `run-ai-checks` explicitly to review live data with the strongest available model and refresh `ai-check-cache/` only for genuinely AI-only findings
-- then run `python3 data-check.py -N | rg 'AI:Curated'` to confirm the emitted AI-backed warnings
-- keep withdrawn scope explicit; active-only is the default unless the review intentionally includes withdrawn content
+For developer-facing architecture, coding-style, AI-check, and testing notes, see `DEVELOPMENT.md`.
 
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
@@ -122,38 +113,9 @@ Run checks only on withdrawn content:
 python3 data-check.py --only-withdrawn -X withdrawn-only-review.xlsx
 ``
 
-## Unit tests
+## Developer notes
 
-Run all unit tests (pytest):
-``
-pytest -q
-``
-
-Run focused tests for reusable directory helpers:
-``
-pytest -q tests/test_directory.py
-``
-
-Run live cache-mode tests against Directory (fresh fetch + cached snapshot):
-``
-pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode both
-``
-
-Run only cached-mode live tests:
-``
-pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode cached
-``
-
-Run only fresh-mode live tests:
-``
-pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode fresh
-``
-
-Optional live-test settings:
-- `--live-directory-schema <SCHEMA>` (or env `DIRECTORY_TEST_SCHEMA`) selects schema/staging area (default: `ERIC`).
-- Env `DIRECTORYUSERNAME` and `DIRECTORYPASSWORD` can be set for authenticated live runs; if unset, tests run without login.
-
-By default, live tests are skipped unless `--live-directory` is provided. They run in an isolated temporary working directory so cache purge checks do not wipe your regular local cache.
+Developer-facing architecture, coding-style, testing, and AI-check workflow notes are documented in `DEVELOPMENT.md`.
 
 OoM-based count estimation is centralized in `oomutils.py`. By default all exporters/stats that estimate counts from `order_of_magnitude` use the lower bound of the OoM interval (`10**n`). To change the policy globally, set `DIRECTORY_OOM_UPPER_BOUND_COEFFICIENT`; for example, `0.3` applies `0.3 * 10**(n+1)` consistently everywhere that OoM-based counting is used.
 
