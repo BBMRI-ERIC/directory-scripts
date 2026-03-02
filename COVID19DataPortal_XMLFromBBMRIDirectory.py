@@ -17,6 +17,8 @@ from cli_common import (
     add_directory_schema_argument,
     add_logging_arguments,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -34,7 +36,8 @@ parser.add_argument('-o', '--out-name', '--outName', dest='outNameExcludedBioban
 parser.add_argument('-x', '--out-xml', '--outNameXML', dest='outXML', default='bbmriDirectory_Covid19DataPortal.xml', help='Output XML name')
 add_logging_arguments(parser)
 add_directory_auth_arguments(parser)
-add_directory_schema_argument(parser, default='eu_bbmri_eric')
+add_directory_schema_argument(parser, default='ERIC')
+add_withdrawn_scope_arguments(parser)
 
 parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
@@ -47,10 +50,7 @@ outFile = open(args.outNameExcludedBiobanks, 'w')
 
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
-if args.username is not None and args.password is not None:
-    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
-else:
-    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 
 ### Functions

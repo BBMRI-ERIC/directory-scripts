@@ -120,7 +120,6 @@ def _build_breakdown_summary_rows(
 def build_directory_stats(
     directory,
     *,
-    include_withdrawn_biobanks: bool = False,
     country_filters: list[str] | None = None,
     staging_area_filters: list[str] | None = None,
     collection_type_filters: list[str] | None = None,
@@ -134,8 +133,6 @@ def build_directory_stats(
 
     selected_biobanks: dict[str, dict[str, Any]] = {}
     for biobank in directory.getBiobanks():
-        if _is_withdrawn(biobank) and not include_withdrawn_biobanks:
-            continue
         country = _normalize_country(biobank.get("country")).upper()
         staging_area = extract_staging_area_from_id(biobank.get("id", "")).upper()
         if normalized_country_filters and country not in normalized_country_filters:
@@ -152,8 +149,6 @@ def build_directory_stats(
         biobank_id = directory.getCollectionBiobankId(collection["id"])
         biobank = selected_biobanks.get(biobank_id)
         if biobank is None:
-            continue
-        if _is_withdrawn(collection):
             continue
         collection_types = {
             collection_type.upper()
@@ -360,7 +355,6 @@ def build_directory_stats(
 def build_biobank_stats(
     directory,
     *,
-    include_withdrawn_biobanks: bool = False,
     country_filters: list[str] | None = None,
     staging_area_filters: list[str] | None = None,
     collection_type_filters: list[str] | None = None,
@@ -368,7 +362,6 @@ def build_biobank_stats(
     """Build the main per-biobank statistics rows."""
     return build_directory_stats(
         directory,
-        include_withdrawn_biobanks=include_withdrawn_biobanks,
         country_filters=country_filters,
         staging_area_filters=staging_area_filters,
         collection_type_filters=collection_type_filters,

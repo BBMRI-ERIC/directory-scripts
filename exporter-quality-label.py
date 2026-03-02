@@ -8,11 +8,14 @@ from builtins import str, set
 import pandas as pd
 
 from cli_common import (
+    add_directory_schema_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_optional_xlsx_output_argument,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -36,9 +39,18 @@ add_optional_xlsx_output_argument(
     help_text='write withdrawn biobanks and collections to the provided XLSX file',
 )
 add_no_stdout_argument(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.set_defaults(purgeCaches=[], filterCollType=[], filterMatType=[])
 args = parser.parse_args()
+
+if args.outputXLSXwithdrawn is not None and not (
+    args.include_withdrawn or args.only_withdrawn
+):
+    parser.error(
+        "--output-xlsx-withdrawn requires --include-withdrawn or --only-withdrawn."
+    )
 
 configure_logging(args)
 
@@ -105,6 +117,19 @@ def replacebyQMvalues(df, include_headers=False):
 
     return df
 
+
+def _normalize_quality_value(value):
+    if isinstance(value, dict):
+        return value.get("id", "")
+    return value if value is not None else ""
+
+
+def _filter_quality_table(df, column_name, allowed_ids):
+    if df.empty or column_name not in df.columns:
+        return df.copy()
+    mask = df[column_name].apply(_normalize_quality_value).isin(allowed_ids)
+    return df.loc[mask].copy()
+
 #### Main
 
 # Get ontology info from Directory
@@ -115,10 +140,21 @@ session = Client(directoryURL, schema='DirectoryOntologies')
 qualityStandardsOntology = session.get(table = 'QualityStandards', as_df= True)
 
 # Get data
-dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
+
+selected_biobank_ids = {biobank["id"] for biobank in dir.getBiobanks()}
+selected_collection_ids = {collection["id"] for collection in dir.getCollections()}
+withdrawn_biobank_ids = {
+    biobank_id for biobank_id in selected_biobank_ids if dir.isBiobankWithdrawn(biobank_id)
+}
+withdrawn_collection_ids = {
+    collection_id
+    for collection_id in selected_collection_ids
+    if dir.isCollectionWithdrawn(collection_id)
+}
 
 ### Get combined quality info
 
@@ -129,17 +165,6 @@ for collection in dir.getCollections():
     
     if 'contact' in collection:
         collection['contact'] = dir.getContact(collection['contact']['id'])
-
-    collection_withdrawn = False
-    if 'withdrawn' in collection and collection['withdrawn']:
-        log.debug("Detected a withdrawn collection: " + collection['id'])
-        collection_withdrawn = True
-    if 'withdrawn' in biobank and biobank['withdrawn']:
-        if not collection_withdrawn:
-            log.debug("Detected a withdrawn collection " + collection['id'] + " because a withdrawn biobank: " + biobankId)
-            collection_withdrawn = True
-    if collection_withdrawn:
-        continue
 
     if 'combined_quality' in collection:
         qual_label[collection['id']] = collection['combined_quality']
@@ -164,6 +189,9 @@ combinedQualitydf = pd.DataFrame(rows, columns=columns)
 qualBBdf = dir.getQualBB()
 qualColldf = dir.getQualColl()
 
+qualBBdf = _filter_quality_table(qualBBdf, 'biobank', selected_biobank_ids)
+qualColldf = _filter_quality_table(qualColldf, 'collection', selected_collection_ids)
+
 qualBBfinaldf = reshape_quality_table(qualBBdf, 'biobank', 'assess_level_bio', qualityStandardsOntology)
 qualCollfinaldf = reshape_quality_table(qualColldf, 'collection', 'assess_level_col', qualityStandardsOntology)
 
@@ -173,3 +201,32 @@ qualCollfinaldf = replacebyQMvalues(qualCollfinaldf)
 combinedQualitydf = replacebyQMvalues(combinedQualitydf, include_headers=True)
 
 outputExcelBiobanksCollections(args.outputXLSX[0], qualBBfinaldf, "Biobanks", qualCollfinaldf, "Collections", combinedQualitydf, "CombinedQuality")
+
+if args.outputXLSXwithdrawn is not None:
+    qualBBwithdrawndf = _filter_quality_table(
+        dir.getQualBB(), 'biobank', withdrawn_biobank_ids
+    )
+    qualCollwithdrawndf = _filter_quality_table(
+        dir.getQualColl(), 'collection', withdrawn_collection_ids
+    )
+    qualBBwithdrawnfinaldf = reshape_quality_table(
+        qualBBwithdrawndf, 'biobank', 'assess_level_bio', qualityStandardsOntology
+    )
+    qualCollwithdrawnfinaldf = reshape_quality_table(
+        qualCollwithdrawndf, 'collection', 'assess_level_col', qualityStandardsOntology
+    )
+    qualBBwithdrawnfinaldf = replacebyQMvalues(qualBBwithdrawnfinaldf)
+    qualCollwithdrawnfinaldf = replacebyQMvalues(qualCollwithdrawnfinaldf)
+    combinedQualityWithdrawndf = replacebyQMvalues(
+        combinedQualitydf[combinedQualitydf["Key"].isin(withdrawn_collection_ids)].copy(),
+        include_headers=False,
+    )
+    outputExcelBiobanksCollections(
+        args.outputXLSXwithdrawn[0],
+        qualBBwithdrawnfinaldf,
+        "Withdrawn biobanks",
+        qualCollwithdrawnfinaldf,
+        "Withdrawn collections",
+        combinedQualityWithdrawndf,
+        "Withdrawn combined quality",
+    )

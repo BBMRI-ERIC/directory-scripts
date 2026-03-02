@@ -23,7 +23,8 @@ class Directory:
         username=None,
         password=None,
         token: str = None,
-        include_withdrawn_entities: bool = True,
+        include_withdrawn_entities: bool = False,
+        only_withdrawn_entities: bool = False,
     ):
         """Initialize a directory snapshot and build query/helper graphs.
 
@@ -38,12 +39,16 @@ class Directory:
             include_withdrawn_entities: When False, public biobank/collection
                 accessors exclude entities that are withdrawn explicitly or
                 inherit withdrawal from a parent biobank/collection.
+            only_withdrawn_entities: When True, public biobank/collection
+                accessors return only withdrawn entities. Implies
+                include_withdrawn_entities.
         """
         if purgeCaches is None:
             purgeCaches = list()
         self.__pp = pp
         self.__package = schema
-        self.include_withdrawn_entities = include_withdrawn_entities
+        self.only_withdrawn_entities = only_withdrawn_entities
+        self.include_withdrawn_entities = include_withdrawn_entities or only_withdrawn_entities
         log.debug('Checking data in schema: ' + schema)
 
         cache_dir = 'data-check-cache/directory'
@@ -335,13 +340,19 @@ class Directory:
         self._collection_withdrawn_cache[collectionID] = withdrawn
         return withdrawn
 
+    def _matches_withdrawn_scope(self, is_withdrawn: bool) -> bool:
+        """Return whether an entity matches the configured withdrawn scope."""
+        if self.only_withdrawn_entities:
+            return is_withdrawn
+        if self.include_withdrawn_entities:
+            return True
+        return not is_withdrawn
+
     def getBiobanks(self):
         """Return all loaded biobanks."""
-        if self.include_withdrawn_entities:
-            return self.biobanks
         return [
             biobank for biobank in self.biobanks
-            if not self.isBiobankWithdrawn(biobank['id'])
+            if self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobank['id']))
         ]
     
     def getQualBB(self):
@@ -364,7 +375,7 @@ class Directory:
         """
         for b in self.biobanks:
             if b['id'] == biobankId:
-                if not self.include_withdrawn_entities and self.isBiobankWithdrawn(biobankId):
+                if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobankId)):
                     break
                 return b
         if raise_on_missing:
@@ -388,11 +399,9 @@ class Directory:
 
     def getCollections(self):
         """Return all loaded collections."""
-        if self.include_withdrawn_entities:
-            return self.collections
         return [
             collection for collection in self.collections
-            if not self.isCollectionWithdrawn(collection['id'])
+            if self._matches_withdrawn_scope(self.isCollectionWithdrawn(collection['id']))
         ]
 
     def getCollectionById(self, collectionId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
@@ -407,7 +416,7 @@ class Directory:
         """
         for c in self.collections:
             if c['id'] == collectionId:
-                if not self.include_withdrawn_entities and self.isCollectionWithdrawn(collectionId):
+                if not self._matches_withdrawn_scope(self.isCollectionWithdrawn(collectionId)):
                     break
                 return c
         if raise_on_missing:
@@ -506,7 +515,7 @@ class Directory:
             child = self.directoryGraph.nodes[childID]['data']
             if 'biobank' not in child:
                 continue
-            if not self.include_withdrawn_entities and self.isCollectionWithdrawn(childID):
+            if not self._matches_withdrawn_scope(self.isCollectionWithdrawn(childID)):
                 continue
             children.append(child)
         return children
@@ -540,7 +549,12 @@ class Directory:
 
     def getServices(self):
         """Return all loaded services."""
-        return self.services
+        return [
+            service for service in self.services
+            if self._matches_withdrawn_scope(
+                self.isBiobankWithdrawn(service['biobank']['id'])
+            )
+        ]
 
     def getServiceById(self, serviceID: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
         """Return a service by id."""
@@ -553,6 +567,8 @@ class Directory:
 
     def getBiobankServices(self, biobankID: str):
         """Return services belonging to a biobank id."""
+        if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobankID)):
+            return []
         return self.biobankServiceMap.get(biobankID, [])
 
     def getNetworkNN(self, networkID: str):

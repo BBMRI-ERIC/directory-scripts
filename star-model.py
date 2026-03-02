@@ -5,15 +5,19 @@ from typing import List
 
 import pprint
 import re
-import argparse
 import logging as log
-import time
-from typing import List
-import os.path
 
-import xlsxwriter
-import pandas as pd
-
+from cli_common import (
+    add_directory_schema_argument,
+    add_logging_arguments,
+    add_no_stdout_argument,
+    add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
+    add_xlsx_output_argument,
+    build_directory_kwargs,
+    build_parser,
+    configure_logging,
+)
 from directory import Directory
 
 
@@ -21,35 +25,21 @@ cachesList = ['directory']
 
 pp = pprint.PrettyPrinter(indent=4)
 
-class ExtendAction(argparse.Action):
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        items = getattr(namespace, self.dest) or []
-        items.extend(values)
-        setattr(namespace, self.dest, items)
-
-parser = argparse.ArgumentParser()
-parser.register('action', 'extend', ExtendAction)
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose information on progress of the data checks')
-parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='debug information on progress of the data checks')
-parser.add_argument('-X', '--output-XLSX', dest='outputXLSX', nargs=1, help='output of results into XLSX with filename provided as parameter')
-parser.add_argument('-N', '--output-no-stdout', dest='nostdout', action='store_true', help='no output of results into stdout (default: enabled)')
-parser.add_argument('--purge-all-caches', dest='purgeCaches', action='store_const', const=cachesList, help='disable all long remote checks (email address testing, geocoding, URLs')
-parser.add_argument('--purge-cache', dest='purgeCaches', nargs='+', action='extend', choices=cachesList, help='disable particular long remote checks')
-parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
+parser = build_parser()
+add_logging_arguments(parser)
+add_xlsx_output_argument(parser)
+add_no_stdout_argument(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_withdrawn_scope_arguments(parser)
+add_purge_cache_arguments(parser, cachesList)
+parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
-
-if args.debug:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-elif args.verbose:
-    log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
-else:
-    log.basicConfig(format="%(levelname)s: %(message)s")
+configure_logging(args)
 
 
 # Main code
 
-dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))

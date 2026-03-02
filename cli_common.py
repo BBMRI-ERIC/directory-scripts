@@ -125,19 +125,43 @@ def add_no_stdout_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_withdrawn_scope_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    include_dest: str = "include_withdrawn",
+    only_dest: str = "only_withdrawn",
+    include_help_text: str = "include withdrawn entities in the check/export run",
+    only_help_text: str = "run only on withdrawn entities",
+) -> None:
+    """Add shared flags for withdrawn-scope selection."""
+    parser.add_argument(
+        "-w",
+        "--include-withdrawn",
+        dest=include_dest,
+        action="store_true",
+        help=include_help_text,
+    )
+    parser.add_argument(
+        "--only-withdrawn",
+        dest=only_dest,
+        action="store_true",
+        help=only_help_text,
+    )
+
+
 def add_include_withdrawn_argument(
     parser: argparse.ArgumentParser,
     *,
     dest: str = "include_withdrawn",
     help_text: str = "include withdrawn entities in the check/export run",
 ) -> None:
-    """Add a shared flag for including withdrawn records."""
-    parser.add_argument(
-        "-w",
-        "--include-withdrawn",
-        dest=dest,
-        action="store_true",
-        help=help_text,
+    """Backward-compatible wrapper for include-withdrawn-only use."""
+    add_withdrawn_scope_arguments(
+        parser,
+        include_dest=dest,
+        only_dest="__unused_only_withdrawn",
+        include_help_text=help_text,
+        only_help_text=argparse.SUPPRESS,
     )
 
 
@@ -204,6 +228,31 @@ def add_directory_schema_argument(
         ["--package"],
         dest=dest,
     )
+
+
+def build_directory_kwargs(args, *, pp=None) -> dict:
+    """Build normalized keyword arguments for Directory(...)."""
+    include_withdrawn = bool(
+        getattr(args, "include_withdrawn", False)
+        or getattr(args, "only_withdrawn", False)
+    )
+    kwargs = {
+        "schema": getattr(args, "schema", "ERIC"),
+        "purgeCaches": getattr(args, "purgeCaches", []),
+        "debug": getattr(args, "debug", False),
+        "pp": pp,
+        "include_withdrawn_entities": include_withdrawn,
+        "only_withdrawn_entities": bool(getattr(args, "only_withdrawn", False)),
+    }
+    username = getattr(args, "username", None)
+    password = getattr(args, "password", None)
+    if username is not None and password is not None:
+        kwargs["username"] = username
+        kwargs["password"] = password
+    token = getattr(args, "token", None)
+    if token is not None:
+        kwargs["token"] = token
+    return kwargs
 
 
 def add_remote_check_disable_arguments(

@@ -9,11 +9,14 @@ from typing import List
 import pandas as pd
 
 from cli_common import (
+    add_directory_schema_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_optional_xlsx_output_argument,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -42,6 +45,8 @@ add_optional_xlsx_output_argument(
     help_text='write withdrawn biobanks and collections to the provided XLSX file',
 )
 add_no_stdout_argument(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('-FCT', '--filter-collection-type', '--filter-coll-type', dest='filterCollType', nargs='+', action='extend',
                     help='filter by the collection types in the data model, each of them between quotes ("") and separated by a space. E.g.: -FCT "CASE_CONTROL" "LONGITUDINAL" "DISEASE_SPECIFIC"') # TODO: Till now it uses the terms from the data model, different from the ones displayed in Directory
@@ -53,6 +58,13 @@ parser.set_defaults(purgeCaches=[], filterCollType=[], filterMatType=[])
 args = parser.parse_args()
 filterCollType = args.filterCollType
 filterMatType = args.filterMatType
+
+if args.outputXLSXwithdrawn is not None and not (
+    args.include_withdrawn or args.only_withdrawn
+):
+    parser.error(
+        "--output-xlsx-withdrawn requires --include-withdrawn or --only-withdrawn."
+    )
 
 configure_logging(args)
 
@@ -80,17 +92,14 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
         if 'contact' in collection:
             collection['contact'] = dir.getContact(collection['contact']['id'])
 
-        collection_withdrawn = False
-        if 'withdrawn' in collection and collection['withdrawn']:
-            withdrawnCollections.append(collection)
-            log.debug("Detected a withdrawn collection: " + collection['id'])
-            collection_withdrawn = True
-        if 'withdrawn' in biobank and biobank['withdrawn']:
-            withdrawnBiobanks.add(biobankId)
-            if not collection_withdrawn:
-                log.debug("Detected a withdrawn collection " + collection['id'] + " because a withdrawn biobank: " + biobankId)
-                collection_withdrawn = True
+        collection_withdrawn = dir.isCollectionWithdrawn(collection['id'])
+        biobank_withdrawn = dir.isBiobankWithdrawn(biobankId)
         if collection_withdrawn:
+            withdrawnCollections.append(collection)
+            log.debug("Detected a withdrawn collection: %s", collection['id'])
+        if biobank_withdrawn:
+            withdrawnBiobanks.add(biobankId)
+        if collection_withdrawn and not (args.include_withdrawn or args.only_withdrawn):
             continue
 
         if biobank['country'] != 'EU':
@@ -139,13 +148,13 @@ def analyseBBs():
         if 'contact' in biobank:
             biobank['contact'] = dir.getContact(biobank['contact']['id'])
         log.debug("Analyzing biobank " + biobankId)
-        if not biobankId in allBiobanks and not biobankId in withdrawnBiobanks:
-            log.info("   Biobank without any collection identified: " + biobankId)
-            if 'withdrawn' in biobank and biobank['withdrawn']:
-                withdrawnBiobanks.add(biobankId)
-                log.debug("Detected a withdrawn biobank without any collection " + biobankId)
-            else:
-                allBiobanks.add(biobankId)
+        if biobankId in allBiobanks:
+            continue
+        log.info("   Biobank without any collection identified: " + biobankId)
+        if dir.isBiobankWithdrawn(biobankId):
+            withdrawnBiobanks.add(biobankId)
+            log.debug("Detected a withdrawn biobank without any collection %s", biobankId)
+        allBiobanks.add(biobankId)
     return allBiobanks
 
 def printCollectionStdout(collectionList: List):
@@ -166,7 +175,7 @@ def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, bi
 
 ### Main
 
-dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
@@ -208,9 +217,9 @@ pd_withdrawnBiobanks = pd.DataFrame([dir.getBiobankById(biobankId) for biobankId
 if not args.nostdout:
     printCollectionStdout(allCollections)
     print("Totals:")
-    print("- total of biobanks: %d" % (len(allBiobanks)))
-    print("- total of withdrawn biobanks: %d" % (len(withdrawnBiobanks)))
-    print("- total of collections with existing samples: %d" % (len(allCollections)))
+    print("- total of biobanks in selected scope: %d" % (len(allBiobanks)))
+    print("- total of withdrawn biobanks in selected scope: %d" % (len(withdrawnBiobanks)))
+    print("- total of collections with existing samples in selected scope: %d" % (len(allCollections)))
     print("- total of countries: %d" % ( len(allCountries)))
     print("Estimated totals:")
     print("- total of samples/donors advertised explicitly in all-relevant collections: %d / %d" % (
@@ -219,9 +228,11 @@ if not args.nostdout:
         allCollectionSamplesIncOoM, allCollectionDonorsIncOoM))
 
 for df in (pd_allCollections, pd_withdrawnCollections):
-    pddfutils.tidyCollectionDf(df)
+    if not df.empty:
+        pddfutils.tidyCollectionDf(df)
 for df in (pd_allBiobanks, pd_withdrawnBiobanks):
-    pddfutils.tidyBiobankDf(df)
+    if not df.empty:
+        pddfutils.tidyBiobankDf(df)
 
 if args.outputXLSX is not None:
     outputExcelBiobanksCollections(args.outputXLSX[0], pd_allBiobanks, "Biobanks", pd_allCollections, "Collections")

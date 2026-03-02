@@ -10,7 +10,9 @@ from cli_common import (
     add_plugin_disable_argument,
     add_purge_cache_arguments,
     add_remote_check_disable_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -101,6 +103,35 @@ def test_include_withdrawn_argument_supports_short_and_long_forms():
     assert parser.parse_args([]).include_withdrawn is False
     assert parser.parse_args(["-w"]).include_withdrawn is True
     assert parser.parse_args(["--include-withdrawn"]).include_withdrawn is True
+
+
+def test_withdrawn_scope_arguments_support_include_and_only():
+    parser = build_parser()
+    add_withdrawn_scope_arguments(parser)
+
+    args = parser.parse_args(["--only-withdrawn"])
+
+    assert args.include_withdrawn is False
+    assert args.only_withdrawn is True
+
+
+def test_build_directory_kwargs_uses_schema_and_withdrawn_scope():
+    parser = build_parser()
+    add_logging_arguments(parser)
+    add_directory_schema_argument(parser, default="ERIC")
+    add_withdrawn_scope_arguments(parser)
+    add_purge_cache_arguments(parser, ["directory"])
+
+    args = parser.parse_args(
+        ["--schema", "BBMRI-EU", "--only-withdrawn", "--purge-cache", "directory"]
+    )
+
+    kwargs = build_directory_kwargs(args)
+
+    assert kwargs["schema"] == "BBMRI-EU"
+    assert kwargs["purgeCaches"] == ["directory"]
+    assert kwargs["include_withdrawn_entities"] is True
+    assert kwargs["only_withdrawn_entities"] is True
 
 
 def test_configure_logging_sets_debug_level():

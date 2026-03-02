@@ -10,14 +10,15 @@ import os.path
 
 
 from cli_common import (
+    build_directory_kwargs,
     add_directory_auth_arguments,
     add_directory_schema_argument,
-    add_include_withdrawn_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_plugin_disable_argument,
     add_purge_cache_arguments,
     add_remote_check_disable_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
     build_parser,
     configure_logging,
@@ -68,10 +69,10 @@ parser = build_parser()
 add_logging_arguments(parser)
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
-add_include_withdrawn_argument(
+add_withdrawn_scope_arguments(
     parser,
-    dest="include_withdrawn",
-    help_text="include explicitly and logically withdrawn biobanks/collections in checks",
+    include_help_text="include explicitly and logically withdrawn biobanks/collections in checks",
+    only_help_text="run checks only on explicitly or logically withdrawn biobanks/collections",
 )
 add_remote_check_disable_arguments(parser, remoteCheckList)
 add_plugin_disable_argument(parser, pluginList)
@@ -89,24 +90,7 @@ configure_logging(args)
 
 # Main code
 
-if args.username is not None and args.password is not None:
-    dir = Directory(
-        schema=args.schema,
-        purgeCaches=args.purgeCaches,
-        debug=args.debug,
-        pp=pp,
-        username=args.username,
-        password=args.password,
-        include_withdrawn_entities=args.include_withdrawn,
-    )
-else:
-    dir = Directory(
-        schema=args.schema,
-        purgeCaches=args.purgeCaches,
-        debug=args.debug,
-        pp=pp,
-        include_withdrawn_entities=args.include_withdrawn,
-    )
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 warningContainer = WarningsContainer()
 
 orphacodes = None

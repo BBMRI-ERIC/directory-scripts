@@ -9,10 +9,13 @@ import re
 import pandas as pd
 
 from cli_common import (
+    add_directory_schema_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -106,6 +109,8 @@ parser.add_argument('input_xlsx', help='input XLSX (Negotiator representatives l
 add_logging_arguments(parser)
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, ['directory'])
 parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
@@ -115,7 +120,7 @@ configure_logging(args)
 if not os.path.exists(args.input_xlsx):
     raise FileNotFoundError(args.input_xlsx)
 
-dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
@@ -187,7 +192,7 @@ for collection in dir.getCollections():
     collection_map_all[collection_id] = collection
     biobank_id = collection['biobank']['id']
     biobank_to_collections_all.setdefault(biobank_id, []).append(collection_id)
-    if collection.get('withdrawn'):
+    if dir.isCollectionWithdrawn(collection_id):
         biobank_to_collections_withdrawn.setdefault(biobank_id, []).append(collection_id)
         continue
     collection_map_active[collection_id] = collection
@@ -204,7 +209,11 @@ for collection_id in collection_map_active:
 
 for collection_id in rows_by_collection:
     if collection_id not in collection_map_active:
-        log.warning("Input collection %s not found in Directory or withdrawn", collection_id)
+        log.warning(
+            "Input collection %s not found in the selected Directory scope. "
+            "Use --include-withdrawn or --only-withdrawn to include withdrawn collections.",
+            collection_id,
+        )
 
 biobank_uniform_reps = {}
 for biobank_id, collection_ids in biobank_to_collections.items():
@@ -230,7 +239,7 @@ for collection_id, collection in collection_map_active.items():
             parent = collection_map_all.get(parent_id)
             if parent is None:
                 continue
-            if parent.get('withdrawn'):
+            if dir.isCollectionWithdrawn(parent_id):
                 continue
             parent_rep_set = reps_by_collection.get(parent_id, set())
             if parent_rep_set:
@@ -291,11 +300,11 @@ for collection_id, row in rows_by_collection.items():
         result['parent_collection'] = collection['parent_collection']['id']
     nn_code = get_nn_for_collection(collection_id, collection)
     if collection:
-        if collection.get('withdrawn'):
+        if dir.isCollectionWithdrawn(collection_id):
             log.warning("Withdrawn collection %s present in output input set", collection_id)
         biobank_id = collection['biobank']['id']
         biobank = biobank_map_all.get(biobank_id)
-        if biobank and biobank.get('withdrawn'):
+        if biobank and dir.isBiobankWithdrawn(biobank_id):
             log.warning("Collection %s belongs to withdrawn biobank %s and is present in output input set", collection_id, biobank_id)
         country_code = dir.getCollectionNN(collection_id)
     else:
@@ -372,7 +381,7 @@ for collection_id in output_collection_ids:
     if collection:
         output_biobank_ids.add(collection['biobank']['id'])
 for biobank_id, biobank in biobank_map_all.items():
-    if biobank.get('withdrawn'):
+    if dir.isBiobankWithdrawn(biobank_id):
         continue
     if biobank_id not in output_biobank_ids:
         total_collections = len(biobank_to_collections_all.get(biobank_id, []))
@@ -404,7 +413,7 @@ if args.outputXLSX:
     # Include biobanks without any collections: biobank_to_collections is derived from iterating
     # active (non-withdrawn) collections, which misses biobanks that have no collections at all.
     for biobank_id, biobank_stub in biobank_map_all.items():
-        if biobank_stub.get('withdrawn'):
+        if dir.isBiobankWithdrawn(biobank_id):
             continue
         collection_ids = biobank_to_collections.get(biobank_id, [])
         biobank = dir.getBiobankById(biobank_id)

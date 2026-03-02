@@ -15,7 +15,9 @@ from cli_common import (
     add_logging_arguments,
     add_no_stdout_argument,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -55,14 +57,12 @@ add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default="ERIC")
-add_purge_cache_arguments(parser, CACHES_LIST)
-parser.add_argument(
-    "-w",
-    "--include-withdrawn-biobanks",
-    dest="include_withdrawn_biobanks",
-    action="store_true",
-    help="include withdrawn biobanks and their associated collections/services in the statistics",
+add_withdrawn_scope_arguments(
+    parser,
+    include_help_text="include explicitly and logically withdrawn biobanks/collections in the statistics",
+    only_help_text="build statistics only for explicitly or logically withdrawn biobanks/collections",
 )
+add_purge_cache_arguments(parser, CACHES_LIST)
 parser.add_argument(
     "-c",
     "--country",
@@ -95,17 +95,7 @@ args = parser.parse_args()
 
 configure_logging(args)
 
-directory_kwargs = {
-    "schema": args.schema,
-    "purgeCaches": args.purgeCaches,
-    "debug": args.debug,
-    "pp": pp,
-}
-if args.username is not None and args.password is not None:
-    directory_kwargs["username"] = args.username
-    directory_kwargs["password"] = args.password
-
-dir = Directory(**directory_kwargs)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 log.info("Total biobanks: %d", dir.getBiobanksCount())
 log.info("Total collections: %d", dir.getCollectionsCount())
@@ -118,14 +108,14 @@ log.info(
 
 stats = build_directory_stats(
     dir,
-    include_withdrawn_biobanks=args.include_withdrawn_biobanks,
     country_filters=args.countries,
     staging_area_filters=args.staging_areas,
     collection_type_filters=args.collection_types,
 )
 summary = build_stats_summary(stats["biobank_rows"])
 summary["fact_sheet_warnings_total"] = len(stats["fact_sheet_warning_rows"])
-summary["include_withdrawn_biobanks"] = int(args.include_withdrawn_biobanks)
+summary["include_withdrawn"] = int(args.include_withdrawn)
+summary["only_withdrawn"] = int(args.only_withdrawn)
 summary["country_filter"] = ",".join(args.countries)
 summary["staging_area_filter"] = ",".join(args.staging_areas)
 summary["collection_type_filter"] = ",".join(args.collection_types)

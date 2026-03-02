@@ -7,6 +7,7 @@ from directory import Directory
 def _make_directory_stub():
     directory = Directory.__new__(Directory)
     directory.include_withdrawn_entities = True
+    directory.only_withdrawn_entities = False
     directory._collection_withdrawn_cache = {}
     directory._Directory__package = "ERIC"
 
@@ -157,6 +158,7 @@ def test_get_biobank_services_returns_services_for_biobank():
 def test_directory_filters_withdrawn_entities_when_requested():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
+    directory.only_withdrawn_entities = False
 
     assert [biobank["id"] for biobank in directory.getBiobanks()] == ["bb1"]
     assert [collection["id"] for collection in directory.getCollections()] == ["col1", "col2"]
@@ -176,6 +178,17 @@ def test_is_collection_withdrawn_inherits_from_parent_biobank_and_collection():
 def test_get_direct_subcollections_respects_withdrawn_filter():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
+    directory.only_withdrawn_entities = False
 
     assert [collection["id"] for collection in directory.getDirectSubcollections("col1")] == ["col2"]
     assert directory.getDirectSubcollections("col3") == []
+
+
+def test_directory_can_return_only_withdrawn_entities():
+    directory = _make_directory_stub()
+    directory.include_withdrawn_entities = True
+    directory.only_withdrawn_entities = True
+
+    assert [biobank["id"] for biobank in directory.getBiobanks()] == ["bb2"]
+    assert [collection["id"] for collection in directory.getCollections()] == ["col3", "col4"]
+    assert [service["id"] for service in directory.getServices()] == []

@@ -24,7 +24,9 @@ from cli_common import (
     add_plugin_disable_argument,
     add_purge_cache_arguments,
     add_remote_check_disable_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -131,10 +133,11 @@ add_optional_xlsx_output_argument(
     help_text='write warnings and errors to the provided XLSX file',
 )
 add_no_stdout_argument(parser)
-parser.add_argument('-w', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
+parser.add_argument('-W', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
 add_logging_arguments(parser)
 add_directory_auth_arguments(parser)
-add_directory_schema_argument(parser, default='eu_bbmri_eric')
+add_directory_schema_argument(parser, default='ERIC')
+add_withdrawn_scope_arguments(parser)
 parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 add_remote_check_disable_arguments(parser, remoteCheckList)
 add_plugin_disable_argument(parser, pluginList)
@@ -149,10 +152,7 @@ configure_logging(args)
 
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
-if args.username is not None and args.password is not None:
-    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
-else:
-    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 
 '''

@@ -21,8 +21,11 @@ from whoosh.support.charset import accent_map
 from whoosh.util import filelock
 
 from cli_common import (
+    add_directory_schema_argument,
     add_logging_arguments,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -34,6 +37,12 @@ pp = pprint.PrettyPrinter(indent=4)
 
 parser = build_parser()
 add_logging_arguments(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_withdrawn_scope_arguments(
+    parser,
+    include_help_text="include withdrawn biobanks and collections in the index and search results",
+    only_help_text="index and search only withdrawn biobanks and collections",
+)
 parser.add_argument('-i', '--print-ids-only', dest='printIdsOnly', action='store_true', help='print only matching IDs instead of search hits')
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('--limit-types', dest='limitTypes', nargs='+', action='extend', choices=typeList, help='return only specific types')
@@ -47,7 +56,15 @@ configure_logging(args)
 # Main code
 
 
-indexdir = "indexdir"
+def _withdrawn_scope_label(args):
+    if args.only_withdrawn:
+        return "withdrawn-only"
+    if args.include_withdrawn:
+        return "with-withdrawn"
+    return "active-only"
+
+
+indexdir = os.path.join("indexdir", args.schema, _withdrawn_scope_label(args))
 
 def _patch_whoosh_lockf():
     try:
@@ -95,7 +112,7 @@ if 'directory' in args.purgeCaches and 'index' not in args.purgeCaches:
         args.purgeCaches.append('index')
 if 'index' in args.purgeCaches or not os.path.exists(indexdir):
     _patch_whoosh_lockf()
-    dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+    dir = Directory(**build_directory_kwargs(args, pp=pp))
 
     log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
     log.info('Total collections: ' + str(dir.getCollectionsCount()))

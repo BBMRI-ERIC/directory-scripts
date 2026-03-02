@@ -176,6 +176,8 @@ class SharedDirectoryStub:
     ]
 
     def __init__(self, *args, **kwargs):
+        self.include_withdrawn_entities = kwargs.get("include_withdrawn_entities", False) or kwargs.get("only_withdrawn_entities", False)
+        self.only_withdrawn_entities = kwargs.get("only_withdrawn_entities", False)
         self.biobanks = copy.deepcopy(self.BASE_BIOBANKS)
         self.collections = copy.deepcopy(self.BASE_COLLECTIONS)
         self.contacts = copy.deepcopy(self.BASE_CONTACTS)
@@ -183,25 +185,61 @@ class SharedDirectoryStub:
         self.collectionFactMap = copy.deepcopy(self.BASE_FACTS)
         self.contactHashmap = {contact["id"]: contact for contact in self.contacts}
 
+    def _matches_withdrawn_scope(self, is_withdrawn):
+        if self.only_withdrawn_entities:
+            return is_withdrawn
+        if self.include_withdrawn_entities:
+            return True
+        return not is_withdrawn
+
+    def isBiobankWithdrawn(self, biobank_id):
+        biobank = next(
+            biobank for biobank in self.biobanks if biobank["id"] == biobank_id
+        )
+        return bool(biobank.get("withdrawn"))
+
+    def isCollectionWithdrawn(self, collection_id):
+        collection = next(
+            collection for collection in self.collections if collection["id"] == collection_id
+        )
+        if bool(collection.get("withdrawn")):
+            return True
+        if self.isBiobankWithdrawn(collection["biobank"]["id"]):
+            return True
+        parent = collection.get("parent_collection")
+        if parent is not None:
+            return self.isCollectionWithdrawn(parent["id"])
+        return False
+
     def getBiobanks(self):
-        return self.biobanks
+        return [
+            biobank
+            for biobank in self.biobanks
+            if self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobank["id"]))
+        ]
 
     def getBiobanksCount(self):
-        return len(self.biobanks)
+        return len(self.getBiobanks())
 
     def getBiobankById(self, biobank_id, raise_on_missing=False):
         for biobank in self.biobanks:
             if biobank["id"] == biobank_id:
+                if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobank_id)):
+                    break
                 return biobank
         if raise_on_missing:
             raise KeyError(biobank_id)
         return None
 
     def getCollections(self):
-        return self.collections
+        return [
+            collection
+            for collection in self.collections
+            if self._matches_withdrawn_scope(self.isCollectionWithdrawn(collection["id"]))
+        ]
 
     def getCollectionsCount(self):
-        return len(self.collections)
+        return len(self.getCollections())
 
     def getCollectionBiobankId(self, collection_id):
         return self.getCollectionById(collection_id)["biobank"]["id"]
@@ -209,6 +247,10 @@ class SharedDirectoryStub:
     def getCollectionById(self, collection_id, raise_on_missing=False):
         for collection in self.collections:
             if collection["id"] == collection_id:
+                if not self._matches_withdrawn_scope(
+                    self.isCollectionWithdrawn(collection_id)
+                ):
+                    break
                 return collection
         if raise_on_missing:
             raise KeyError(collection_id)
@@ -221,7 +263,13 @@ class SharedDirectoryStub:
         return self.contactHashmap[contact_id]
 
     def getServices(self):
-        return self.services
+        return [
+            service
+            for service in self.services
+            if self._matches_withdrawn_scope(
+                self.isBiobankWithdrawn(service["biobank"]["id"])
+            )
+        ]
 
     def isTopLevelCollection(self, collection_id):
         return "parent_collection" not in self.getCollectionById(collection_id)
@@ -296,10 +344,24 @@ def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):
     assert include_summary["biobanks_total"] == 3
     assert default_summary["withdrawn_biobanks"] == 0
     assert include_summary["withdrawn_biobanks"] == 1
-    assert include_summary["collection_records_total"] == default_summary["collection_records_total"] + 1
+    assert include_summary["collection_records_total"] == default_summary["collection_records_total"] + 2
     assert include_summary["samples_explicit"] == default_summary["samples_explicit"] + 12
     assert include_summary["donors_explicit"] == default_summary["donors_explicit"] + 8
     assert include_summary["services_total"] == default_summary["services_total"] + 1
+
+
+def test_directory_stats_can_select_only_withdrawn_biobanks(monkeypatch):
+    only_globals, _, _ = _run_script(
+        monkeypatch,
+        "directory-stats.py",
+        ["-N", "--only-withdrawn"],
+    )
+
+    only_summary = only_globals["summary"]
+
+    assert only_summary["biobanks_total"] == 1
+    assert only_summary["withdrawn_biobanks"] == 1
+    assert only_summary["collection_records_total"] == 1
 
 
 def test_directory_stats_matches_exporter_all_when_oom_policy_changes(

@@ -13,10 +13,13 @@ import os.path
 import pandas as pd
 
 from cli_common import (
+    add_directory_schema_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
     add_xlsx_output_argument,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -30,6 +33,8 @@ parser = build_parser()
 add_logging_arguments(parser)
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
+add_directory_schema_argument(parser, default="ERIC")
+add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
@@ -39,7 +44,7 @@ configure_logging(args)
 
 # Main code
 
-dir = Directory(purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))

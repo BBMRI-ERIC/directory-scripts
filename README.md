@@ -62,8 +62,9 @@ Common CLI conventions across validation/export tools:
 - `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
 - `-N` / `--no-stdout` to suppress normal stdout output
 - `-w` / `--include-withdrawn` when a tool supports opt-in processing of withdrawn entities
+- `--only-withdrawn` when a tool supports withdrawn-only processing
 - `--purge-cache ...` and `--purge-all-caches` for cache purging
-- `-P` / `--schema` for Directory-backed tools that need an explicit schema/staging area
+- `-P` / `--schema` for Directory-backed tools; normal read/export/check tools default to `ERIC`, while `directory-tables-modifier.py` always requires an explicit staging area
 
 Cache scope is now tool-specific:
 - exporters that only read the Directory expose only the `directory` cache
@@ -75,7 +76,7 @@ Legacy long option spellings remain accepted where needed, but the normalized lo
 
 Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plugin source. Keep that metadata aligned with the emitted `DataCheckWarning(...)` calls; the local manual generator validates severity/entity/field consistency against the implementation.
 
-`data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well.
+`data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well, or `--only-withdrawn` when you want to review only withdrawn content.
 
 Some higher-level consistency findings are now stored in the shareable repository folder `ai-check-cache/` and emitted by the `AIFindings` plugin. This is intentionally separate from private runtime caches such as `data-check-cache/`: the repository cache is meant to be reviewable, commit-friendly, and reusable even by contributors who do not have access to the same AI tooling.
 
@@ -107,6 +108,11 @@ python3 data-check.py -d --purge-all-caches
 Include withdrawn entities explicitly:  
 ``
 python3 data-check.py -w -X withdrawn-review.xlsx
+``
+
+Run checks only on withdrawn content:  
+``
+python3 data-check.py --only-withdrawn -X withdrawn-only-review.xlsx
 ``
 
 ## Unit tests
@@ -147,15 +153,17 @@ OoM-based count estimation is centralized in `oomutils.py`. By default all expor
 ## Searching in the Directory
 
 - **full-text-search.py** - full text search of the Directory using Whoosh with [Lucene search syntax](https://lucene.apache.org/core/2_9_4/queryparsersyntax.html).
+  - indexes are separated by schema and withdrawn scope (`active-only`, `with-withdrawn`, `withdrawn-only`)
   - `./full-text-search.py 'bbmri-eric:ID:UK_GBR-1-101'`
   - `./full-text-search.py '"Cell therapy"~3'` (note shell escaping of quotes)
   - `./full-text-search.py '*420*'`
   - `./full-text-search.py --purge-cache directory --purge-cache index -v 'DE_*'`
+  - `./full-text-search.py --only-withdrawn 'withdrawn biobank'`
   - `./full-text-search.py 'myID' | perl -ne "while(<>) {if(m/^.*?'id':\\s+'(.+?)'.*$/) {print \\$1 . \"\\n\";}}"`
 
 ## Exporters
 
-- **exporter-all.py** - exports all biobanks/collections with aggregate counts and optional filters; can output withdrawn entities.  
+- **exporter-all.py** - exports biobanks/collections with aggregate counts and optional filters. By default it works on active content only. Use `-w/--include-withdrawn` to include withdrawn content in the main output, `--only-withdrawn` to run only on withdrawn content, and `--output-xlsx-withdrawn` to write the withdrawn subset separately (requires `-w` or `--only-withdrawn`).  
 ``
 python3 exporter-all.py -X all.xlsx
 ``
@@ -222,7 +230,7 @@ python3 COVID19DataPortal_XMLFromBBMRIDirectory.py -x bbmriDirectory_Covid19Data
 ``
 python3 add_orphacodes.py -d directory.xlsx -O en_product1.xml -o directory-with-orpha.xlsx
 ``
-- **directory-stats.py** - per-biobank statistics for collections, samples, donors, services, collection types, service types, and fact-sheet consistency. Sample and donor totals combine explicit countable values with order-of-magnitude fallback estimates for top-level collections only, so subcollections do not double-count parent holdings. Fact-sheet warnings report missing/invalid all-star rows and mismatches against collection-level totals. Withdrawn biobanks are excluded by default; use `-w/--include-withdrawn-biobanks` to include them and their associated collections/services. You can filter by biobank `country` (`-c/--country`), by staging area code parsed from the biobank ID (`-A/--staging-area`, for example `EXT`), and by collection type (`-t/--collection-type`). Filter values accept comma-delimited OR semantics within each filter, while different filters are combined as AND. Biobank rows are listed in lexicographic ID order, except pure `EXT` views, which are sorted by country first and then by ID to make non-member output easier to scan.  
+- **directory-stats.py** - per-biobank statistics for collections, samples, donors, services, collection types, service types, and fact-sheet consistency. Sample and donor totals combine explicit countable values with order-of-magnitude fallback estimates for top-level collections only, so subcollections do not double-count parent holdings. Fact-sheet warnings report missing/invalid all-star rows and mismatches against collection-level totals. Withdrawn biobanks and collections are excluded by default; use `-w/--include-withdrawn` to include them, or `--only-withdrawn` to report only withdrawn content. You can filter by biobank `country` (`-c/--country`), by staging area code parsed from the biobank ID (`-A/--staging-area`, for example `EXT`), and by collection type (`-t/--collection-type`). Filter values accept comma-delimited OR semantics within each filter, while different filters are combined as AND. Biobank rows are listed in lexicographic ID order, except pure `EXT` views, which are sorted by country first and then by ID to make non-member output easier to scan.  
 ``
 python3 directory-stats.py -N
 ``
@@ -234,6 +242,9 @@ python3 directory-stats.py -c DE -A EXT -N
 ``
 ``
 python3 directory-stats.py -c DE,FR -A EXT -t CASE_CONTROL,POPULATION -N
+``
+``
+python3 directory-stats.py --only-withdrawn -N
 ``
 - **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
 ``
@@ -251,6 +262,8 @@ python3 install_certifi.py
 Key safety points:
 - Requires `.env` with `DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD` (or pass CLI overrides).
 - Schema is required (`-s/--schema`) and corresponds to the staging area name shown in the Molgenis Navigator (for example `BBMRI-EU`).
+- Use a node staging area for normal edits. `ERIC` is the aggregated public schema and should normally not be edited with this tool.
+- If you explicitly request `-s ERIC`, the script requires an extra interactive approval unless `-f/--force` is used.
 - Table name is required for import, delete, and export (`-T/--table`).
 - Actions are mutually exclusive: import (`-i`), delete (`-x`), export (`-e`).
 - Deletions always require interactive confirmation unless `-f/--force` is used.
@@ -270,16 +283,16 @@ Federated login note:
 
 Examples:
 ``
-python3 directory-tables-modifier.py -s ERIC -T Biobanks -i Biobanks.csv
+python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.csv
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -T Collections -i Collections.data -F csv -n -v
+python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.data -F csv -n -v
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -T Biobanks -i Biobanks.tsv -N BBMRI-EU
+python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.tsv -N BBMRI-EU
 ``
 ``
-python3 directory-tables-modifier.py -s ERIC -T Collections -i Collections.tsv -R '^COLL_' -C BB_001
+python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.tsv -R '^COLL_' -C BB_001
 ``
 
 ### Delete records (table contents only)

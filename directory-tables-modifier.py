@@ -22,7 +22,7 @@ username = os.getenv("DIRECTORYUSERNAME")
 password = os.getenv("DIRECTORYPASSWORD")
 
 # Get args from stdin
-parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in BBMRI Directory staging area. Make sure you have an .env file in this folder, containing: DIRECTORYTARGET, DIRECTORYUSERNAME, DIRECTORYPASSWORD.")
+parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in a BBMRI Directory staging area. Use node staging areas for normal edits; ERIC is the aggregated public schema and requires explicit confirmation. Make sure you have an .env file in this folder, containing: DIRECTORYTARGET, DIRECTORYUSERNAME, DIRECTORYPASSWORD.")
 
 # Keep these immediately after -h in help output
 parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output. Includes detailed records to be added/deleted.")
@@ -31,7 +31,7 @@ parser.add_argument("-n", "--dry-run", action="store_true", help="Show planned c
 parser.add_argument("-f", "--force", action="store_true", help="Skip interactive approval for deletions.")
 parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-error output on STDOUT.")
 
-parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU).")
+parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU). Use node staging areas for edits; ERIC requires explicit confirmation and should normally not be modified with this tool.")
 
 parser.add_argument("--directory-target", dest="directory_target", type=str, help="Directory base URL (overrides DIRECTORYTARGET env var).", default=None)
 parser.add_argument("--directory-username", dest="directory_username", type=str, help="Directory username (overrides DIRECTORYUSERNAME env var).", default=None)

@@ -22,6 +22,8 @@ from cli_common import (
     add_directory_schema_argument,
     add_logging_arguments,
     add_purge_cache_arguments,
+    add_withdrawn_scope_arguments,
+    build_directory_kwargs,
     build_parser,
     configure_logging,
 )
@@ -39,6 +41,7 @@ parser.add_argument('-o', '--out-name', '--outName', dest='outName', default='bb
 add_logging_arguments(parser)
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default='ERIC')
+add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 
@@ -156,10 +159,7 @@ def sendEmail(sender, receivers, message):
 
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
-if args.username is not None and args.password is not None:
-	dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
-else:
-	dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 # Initialize main dictionary
 features = {}
@@ -237,7 +237,7 @@ if args.printDf:
 # Iterate dataframe rows
 for index, biobank in filtered_df.iterrows():
 
-    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip and biobank['id'] not in biobanksIDSkip and biobank['withdrawn'] == False:
+    if biobank['name'] not in biobanksNameSkip and biobank['id'].split(':')[2].split('_')[0] not in biobanksCountrySkip and biobank['id'] not in biobanksIDSkip:
         biobankDict = {}
         # Biobank properties:
         biobankPropertiesDict = {}

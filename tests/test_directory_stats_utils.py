@@ -7,7 +7,14 @@ from directory_stats_utils import (
 
 
 class DirectoryStatsStub:
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        include_withdrawn_entities=False,
+        only_withdrawn_entities=False,
+    ):
+        self.include_withdrawn_entities = include_withdrawn_entities or only_withdrawn_entities
+        self.only_withdrawn_entities = only_withdrawn_entities
         self.biobanks = [
             {"id": "bb1", "name": "Biobank 1", "country": "CZ", "withdrawn": False},
             {
@@ -161,8 +168,38 @@ class DirectoryStatsStub:
             ],
         }
 
+    def _matches_withdrawn_scope(self, is_withdrawn):
+        if self.only_withdrawn_entities:
+            return is_withdrawn
+        if self.include_withdrawn_entities:
+            return True
+        return not is_withdrawn
+
+    def isBiobankWithdrawn(self, biobank_id):
+        biobank = next(
+            biobank for biobank in self.biobanks if biobank["id"] == biobank_id
+        )
+        return bool(biobank.get("withdrawn"))
+
+    def isCollectionWithdrawn(self, collection_id):
+        collection = next(
+            collection for collection in self.collections if collection["id"] == collection_id
+        )
+        if bool(collection.get("withdrawn")):
+            return True
+        if self.isBiobankWithdrawn(collection["biobank"]["id"]):
+            return True
+        parent = collection.get("parent_collection")
+        if parent is not None:
+            return self.isCollectionWithdrawn(parent["id"])
+        return False
+
     def getBiobanks(self):
-        return self.biobanks
+        return [
+            biobank
+            for biobank in self.biobanks
+            if self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobank["id"]))
+        ]
 
     def getBiobankById(self, biobank_id, raise_on_missing=False):
         for biobank in self.biobanks:
@@ -173,10 +210,18 @@ class DirectoryStatsStub:
         return None
 
     def getCollections(self):
-        return self.collections
+        return [
+            collection
+            for collection in self.collections
+            if self._matches_withdrawn_scope(self.isCollectionWithdrawn(collection["id"]))
+        ]
 
     def getServices(self):
-        return self.services
+        return [
+            service
+            for service in self.services
+            if self._matches_withdrawn_scope(self.isBiobankWithdrawn(service["biobank"]["id"]))
+        ]
 
     def getCollectionBiobankId(self, collection_id):
         return next(
@@ -323,13 +368,16 @@ def test_build_biobank_stats_excludes_withdrawn_biobanks_by_default():
 
 
 def test_build_biobank_stats_can_include_withdrawn_biobanks():
-    rows = build_biobank_stats(
-        DirectoryStatsStub(),
-        include_withdrawn_biobanks=True,
-    )
+    rows = build_biobank_stats(DirectoryStatsStub(include_withdrawn_entities=True))
 
     bb3 = next(row for row in rows if row["id"] == "bbmri-eric:ID:NL_BB3")
     assert bb3["withdrawn"] is True
+
+
+def test_build_biobank_stats_can_select_only_withdrawn_biobanks():
+    rows = build_biobank_stats(DirectoryStatsStub(only_withdrawn_entities=True))
+
+    assert [row["id"] for row in rows] == ["bbmri-eric:ID:NL_BB3"]
 
 
 def test_extract_staging_area_from_id_supports_directory_ids():
