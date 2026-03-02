@@ -1,0 +1,8 @@
+[Core]
+Name = Emit shareable AI-curated findings from ai-check-cache
+Module = AIFindings
+
+[Documentation]
+Author = Codex, Petr Holub
+Version = 1.0
+Description = Emit shareable AI-curated findings stored in ai-check-cache without requiring live model access.

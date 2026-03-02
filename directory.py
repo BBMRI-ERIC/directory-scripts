@@ -14,7 +14,17 @@ log = logging.getLogger("BBMRI Directory")
 class Directory:
     """Access, cache, and graph-model BBMRI Directory data for downstream checks."""
 
-    def __init__(self, schema="ERIC", purgeCaches=None, debug=False, pp=None, username=None, password=None, token: str = None):
+    def __init__(
+        self,
+        schema="ERIC",
+        purgeCaches=None,
+        debug=False,
+        pp=None,
+        username=None,
+        password=None,
+        token: str = None,
+        include_withdrawn_entities: bool = True,
+    ):
         """Initialize a directory snapshot and build query/helper graphs.
 
         Args:
@@ -25,11 +35,15 @@ class Directory:
             username: Username for session authentication.
             password: Password for session authentication.
             token: Access token for token-based authentication.
+            include_withdrawn_entities: When False, public biobank/collection
+                accessors exclude entities that are withdrawn explicitly or
+                inherit withdrawal from a parent biobank/collection.
         """
         if purgeCaches is None:
             purgeCaches = list()
         self.__pp = pp
         self.__package = schema
+        self.include_withdrawn_entities = include_withdrawn_entities
         log.debug('Checking data in schema: ' + schema)
 
         cache_dir = 'data-check-cache/directory'
@@ -276,6 +290,7 @@ class Directory:
 
         log.info('Directory structure initialized')
         self.__orphacodesmapper = None
+        self._collection_withdrawn_cache = {}
 
     def setOrphaCodesMapper(self, o):
         """Attach an OrphaCodes mapper implementation."""
@@ -289,9 +304,45 @@ class Directory:
         """Return the configured OrphaCodes mapper."""
         return self.__orphacodesmapper
 
+    def getSchema(self) -> str:
+        """Return the configured Directory schema/staging-area name."""
+        return self.__package
+
+    @staticmethod
+    def _is_explicitly_withdrawn(entity: Optional[dict[str, Any]]) -> bool:
+        """Return whether an entity is explicitly marked as withdrawn."""
+        if not entity:
+            return False
+        return bool(entity.get("withdrawn"))
+
+    def isBiobankWithdrawn(self, biobankID: str) -> bool:
+        """Return whether a biobank is explicitly marked as withdrawn."""
+        biobank = self.directoryGraph.nodes[biobankID]['data']
+        return self._is_explicitly_withdrawn(biobank)
+
+    def isCollectionWithdrawn(self, collectionID: str) -> bool:
+        """Return whether a collection is withdrawn, including inherited state."""
+        if collectionID in self._collection_withdrawn_cache:
+            return self._collection_withdrawn_cache[collectionID]
+
+        collection = self.directoryGraph.nodes[collectionID]['data']
+        withdrawn = self._is_explicitly_withdrawn(collection)
+        if not withdrawn:
+            withdrawn = self.isBiobankWithdrawn(collection['biobank']['id'])
+        if not withdrawn and 'parent_collection' in collection:
+            withdrawn = self.isCollectionWithdrawn(collection['parent_collection']['id'])
+
+        self._collection_withdrawn_cache[collectionID] = withdrawn
+        return withdrawn
+
     def getBiobanks(self):
         """Return all loaded biobanks."""
-        return self.biobanks
+        if self.include_withdrawn_entities:
+            return self.biobanks
+        return [
+            biobank for biobank in self.biobanks
+            if not self.isBiobankWithdrawn(biobank['id'])
+        ]
     
     def getQualBB(self):
         """Return the biobank quality-info table."""
@@ -313,6 +364,8 @@ class Directory:
         """
         for b in self.biobanks:
             if b['id'] == biobankId:
+                if not self.include_withdrawn_entities and self.isBiobankWithdrawn(biobankId):
+                    break
                 return b
         if raise_on_missing:
             raise KeyError(f"Biobank {biobankId!r} not found in loaded directory snapshot.")
@@ -321,7 +374,7 @@ class Directory:
 
     def getBiobanksCount(self):
         """Return the number of loaded biobanks."""
-        return len(self.biobanks)
+        return len(self.getBiobanks())
 
     def getBiobankNN(self, biobankID: str):
         """Return country/national-node information for a biobank id."""
@@ -335,7 +388,12 @@ class Directory:
 
     def getCollections(self):
         """Return all loaded collections."""
-        return self.collections
+        if self.include_withdrawn_entities:
+            return self.collections
+        return [
+            collection for collection in self.collections
+            if not self.isCollectionWithdrawn(collection['id'])
+        ]
 
     def getCollectionById(self, collectionId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
         """Return a collection by id.
@@ -349,6 +407,8 @@ class Directory:
         """
         for c in self.collections:
             if c['id'] == collectionId:
+                if not self.include_withdrawn_entities and self.isCollectionWithdrawn(collectionId):
+                    break
                 return c
         if raise_on_missing:
             raise KeyError(f"Collection {collectionId!r} not found in loaded directory snapshot.")
@@ -357,7 +417,7 @@ class Directory:
 
     def getCollectionsCount(self):
         """Return the number of loaded collections."""
-        return len(self.collections)
+        return len(self.getCollections())
 
     def getCollectionBiobankId(self, collectionID: str):
         """Return the parent biobank id of the given collection id."""
@@ -436,6 +496,20 @@ class Directory:
     def getCollectionsDescendants(self, collectionID: str):
         """Return descendant collection ids for a collection id."""
         return nx.algorithms.dag.descendants(self.directoryCollectionsDAG, collectionID)
+
+    def getDirectSubcollections(self, collectionID: str):
+        """Return direct child collections of a collection id."""
+        children = []
+        for childID in self.directoryCollectionsDAG.successors(collectionID):
+            if childID not in self.directoryGraph.nodes:
+                continue
+            child = self.directoryGraph.nodes[childID]['data']
+            if 'biobank' not in child:
+                continue
+            if not self.include_withdrawn_entities and self.isCollectionWithdrawn(childID):
+                continue
+            children.append(child)
+        return children
 
     def getContacts(self):
         """Return all loaded contacts."""

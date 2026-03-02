@@ -62,6 +62,10 @@
   - `biobanks_summary` includes `total_collections` and now includes active biobanks even if they have 0 collections.
 - `directory-stats.py` sorting rule: normal output is lexicographic by biobank ID; pure `EXT` views are sorted by `country` first and then by ID.
 - QC CLI note: `data-check.py` and other QC tools using `cli_common.add_remote_check_disable_arguments(...)` expose `-r` / `--disable-checks-all-remote`.
+- QC CLI note: `data-check.py` excludes withdrawn biobanks/collections by default; `-w` / `--include-withdrawn` is required to check explicitly or logically withdrawn content.
+- Withdrawal for checks is logically inherited for collections: a collection counts as withdrawn if it is withdrawn itself, if its biobank is withdrawn, or if an ancestor collection is withdrawn.
+- AI-assisted findings that should be shareable belong in `ai-check-cache/`, not in private runtime caches such as `data-check-cache/`.
+- `ai-check-cache/` stores reviewable JSON findings committed to Git; regular `data-check.py` runs only read those findings and must not require live model access.
 
 ## Testing Guidelines
 - A pytest-based unit test suite is present in `tests/` (currently focused on reusable modules such as `directory.py`).
@@ -85,6 +89,7 @@
 - For new or changed checks, keep machine-readable `CHECK_DOCS` metadata next to the implementation when the check has non-obvious business context, and keep severity/entity/field declarations aligned with emitted `DataCheckWarning(...)` calls.
 - `CHECK_DOCS` must be written as complete manual-facing documentation, not just as extracted-code hints: provide concrete `fields`, a clean generic `summary`, and a practical `fix` whenever the warning text is dynamic, partial, or emitted from helper logic that the AST extractor cannot follow.
 - `CHECK_DOCS.fields` may use explicit cross-entity references such as `CONTACT.email` or `BIOBANK.country` when a check depends on linked data from another entity; prefer that over pretending the dependency is local to the warning entity.
+- If a check is backed by `ai-check-cache/`, keep the plugin implementation and the JSON findings aligned: the plugin defines stable warning IDs and manual docs, while the JSON files carry concrete entity-level findings and evidence.
 - Do not assume that adding `CHECK_DOCS` alone is enough; after changing check documentation metadata, verify the rendered/manual-facing result through `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py` and inspect the generated `checks-doc.tex` / `CHECKS.md` output for the affected checks.
 - Member-area consistency logic is subtle: member-country institutions may appear only in non-member areas as a reviewed exception, but the same institution must not be duplicated across member and non-member/global areas; `EU` is only an exception for hosting location, not for duplicate institutions.
 

@@ -125,6 +125,22 @@ def add_no_stdout_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_include_withdrawn_argument(
+    parser: argparse.ArgumentParser,
+    *,
+    dest: str = "include_withdrawn",
+    help_text: str = "include withdrawn entities in the check/export run",
+) -> None:
+    """Add a shared flag for including withdrawn records."""
+    parser.add_argument(
+        "-w",
+        "--include-withdrawn",
+        dest=dest,
+        action="store_true",
+        help=help_text,
+    )
+
+
 def add_purge_cache_arguments(
     parser: argparse.ArgumentParser,
     cache_choices,

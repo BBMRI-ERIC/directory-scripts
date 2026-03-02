@@ -1,0 +1,8 @@
+[Core]
+Name = Check that direct subcollections do not exceed parent totals
+Module = CollectionPartitioning
+
+[Documentation]
+Author = Codex, Petr Holub
+Version = 1.0
+Description = Check that direct subcollections never exceed their parent collection in exact counts or all-star fact-sheet totals.

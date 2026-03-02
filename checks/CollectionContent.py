@@ -116,6 +116,14 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                                 'image_modality = %s, '
                                                                 'image_dataset_type = '
                                                                 '%s'},
+ 'CC:ImageTypeMissing': {'entity': 'COLLECTION',
+                                                      'fields': ['type'],
+                                                      'severity': 'ERROR',
+                                                      'summary': 'Imaging modalities or '
+                                                                 'image data set found, '
+                                                                 'but collection type '
+                                                                 'does not include '
+                                                                 'IMAGE.'},
  'CC:MaterialsMissing': {'entity': 'COLLECTION',
                                                   'fields': ['data_categories',
                                                              'materials'],
@@ -361,6 +369,8 @@ class CollectionContent(IPlugin):
 
 			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGING_DATA' not in data_categories:
 				warnings.append(DataCheckWarning(make_check_id(self, "ImageCatMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but IMAGING_DATA is not among data categories: image_modality = %s, image_dataset_type = %s"%(modalities,image_dataset_types)))
+			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGE' not in types:
+				warnings.append(DataCheckWarning(make_check_id(self, "ImageTypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but collection type does not include IMAGE"))
 
 			age_unit = None
 			if 'age_unit' in collection:

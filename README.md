@@ -61,6 +61,7 @@ Common CLI conventions across validation/export tools:
 - `-v` / `--verbose` for progress logging, `-d` / `--debug` for debug logging
 - `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
 - `-N` / `--no-stdout` to suppress normal stdout output
+- `-w` / `--include-withdrawn` when a tool supports opt-in processing of withdrawn entities
 - `--purge-cache ...` and `--purge-all-caches` for cache purging
 - `-P` / `--schema` for Directory-backed tools that need an explicit schema/staging area
 
@@ -73,6 +74,10 @@ Cache scope is now tool-specific:
 Legacy long option spellings remain accepted where needed, but the normalized lowercase kebab-case variants are preferred in documentation and automation.
 
 Checks can now carry machine-readable `CHECK_DOCS` metadata directly in the plugin source. Keep that metadata aligned with the emitted `DataCheckWarning(...)` calls; the local manual generator validates severity/entity/field consistency against the implementation.
+
+`data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well.
+
+Some higher-level consistency findings are now stored in the shareable repository folder `ai-check-cache/` and emitted by the `AIFindings` plugin. This is intentionally separate from private runtime caches such as `data-check-cache/`: the repository cache is meant to be reviewable, commit-friendly, and reusable even by contributors who do not have access to the same AI tooling.
 
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
@@ -97,6 +102,11 @@ python3 data-check.py -O en_product1.xml
 Debug mode with fresh caches:  
 ``
 python3 data-check.py -d --purge-all-caches
+``
+
+Include withdrawn entities explicitly:  
+``
+python3 data-check.py -w -X withdrawn-review.xlsx
 ``
 
 ## Unit tests

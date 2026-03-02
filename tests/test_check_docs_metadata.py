@@ -51,6 +51,15 @@ def test_check_docs_metadata_matches_all_plugins():
         "CONTACT.email",
         "BIOBANK.country",
     ]
+    assert documented_checks["CP:SizeOver"]["fields"] == [
+        "COLLECTION.size",
+        "COLLECTION.sub_collection",
+    ]
+    assert documented_checks["AI:FFPEText"]["fields"] == [
+        "COLLECTION.description",
+        "COLLECTION.materials",
+        "COLLECTION.name",
+    ]
     assert documented_checks["BCO:AccessConflict"]["fields"] == [
         "commercial_use",
         "network",
@@ -61,6 +70,9 @@ def test_check_docs_metadata_matches_all_plugins():
     assert documented_checks["C19:DiagRange"]["fields"] == ["diagnosis_available"]
     assert documented_checks["CC:OrphaNeedsIcd"]["fields"] == [
         "diagnosis_available"
+    ]
+    assert documented_checks["CC:ImageTypeMissing"]["fields"] == [
+        "type",
     ]
     assert documented_checks["FT:CollFactsMismatch"]["fields"] == [
         "diagnosis_available",

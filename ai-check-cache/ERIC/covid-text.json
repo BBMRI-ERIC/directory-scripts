@@ -1,0 +1,995 @@
+{
+  "findings": [
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUG:collection:COVAC-DMStudy:diabetesmellitustype1diabetesmellitustype2COVID-19COVID-19vaccine",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:E10 urn:miriam:icd:E10-E14 urn:miriam:icd:E11 urn:miriam:icd:IV).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUG:collection:COVID-19RecoveredPatients",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUG:collection:HBOPost-Covid:ongoingCovid-19longCovid-19hyperbaricoxygen",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post-Covid'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUG:collection:TheCoVVacBoostStudy-COVID-19boostervaccination",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUG:collection:TheCoVVacStudy:COVID-19vaccinationimmunocompromisedhealthyt-cellagingt-cellimmunityhumoralandcellularimmuneresponse",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:C00-C97 urn:miriam:icd:C81-C96 urn:miriam:icd:C90 urn:miriam:icd:C91 urn:miriam:icd:C91.1 urn:miriam:icd:C92 urn:miriam:icd:D37-D48 urn:miriam:icd:D38 urn:miriam:icd:D46 urn:miriam:icd:II urn:miriam:icd:M00-M25 urn:miriam:icd:M05 urn:miriam:icd:M05-M14 urn:miriam:icd:M30-M36 urn:miriam:icd:M34 urn:miriam:icd:XIII).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9641-Covid-19convalescent",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Covid-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9641-Covid-19convalescent:Covid-19convalescent-Serum",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Covid-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9702-Post-COVIDOutpatientCare",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post-COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9702-Post-COVIDOutpatientCare:Post-COVIDOutpatientCare-EDTAPlasma",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post-COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9702-Post-COVIDOutpatientCare:Post-COVIDOutpatientCare-RNA",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post-COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9702-Post-COVIDOutpatientCare:Post-COVIDOutpatientCare-Serum",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post-COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9702-Post-COVIDOutpatientCare:Post-COVIDOutpatientCare-ccfDNA",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post-COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:9810-Long-COVIDregistry",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Long COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:BE_CMGO1:collection:COVID19",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:CH_FondazioneEpatocentroTicino:collection:Covid-19TicinoBiobank",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Covid-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:U04.9).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve:collection:CH_ICOVAX",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:CY_cybiobank:collection:COVID19_cohort",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:PROSECO_P1",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Coronavirus'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:I10 urn:miriam:icd:J44 urn:miriam:icd:J45).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:PROSECO_P2",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Coronavirus'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:I10 urn:miriam:icd:J44 urn:miriam:icd:J45).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:PROSECO_P3",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Coronavirus'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:I10 urn:miriam:icd:J44 urn:miriam:icd:J45).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:DE_Helmholtz-MuenchenBiobank:collection:DE_KORA",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'covid19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:Z00-Z13).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_BV:collection:COVID19negative",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:Z03.8).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_BV:collection:COVID19vaccine",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_IACS:collection:SC_20-02_1",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_IACS:collection:SC_20-02_2",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_IBSP-CV:collection:cp",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_IBSP-CV:collection:cv",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'VACCINATED'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_IBSP-CV:collection:lc",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'LONG COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_INCLIVA:collection:COVID-19-Vaccinated",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:ES_INCLIVA:collection:Post-COVID-19",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Post COVID'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:FI_001:collection:Auria_Covid",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Covid-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:HU_USZ:collection:COVID",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1382965524316631:collection:02160057253f4fb59198bba6fd14d75d",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: ORPHA:598363).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1384262955037988:collection:1444717601686865",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1384262955037988:collection:1591018459831921",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1384262955037988:collection:159117670833922",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1384423915353703:collection:1612440735633383",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:A41 urn:miriam:icd:B97 urn:miriam:icd:I26 urn:miriam:icd:J21).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1385652938842205:collection:1588752239251781",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1463060660514422:collection:c33ebd46225749d",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1590354344812714:collection:1590354354818634",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1590672328377759:collection:7a937a25e2214e279484b77ed926bca8",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Covid19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_1605519998080235:collection:6b6a977b0b9d4f7",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:U11.9).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:IT_25cf7c508c14492:collection:201096ed2fe44581ad571edb574106ec",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:LT_VULSK:collection:COVID-19_control",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:2001",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Covid-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_5517",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_6535",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_7253",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_7704",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_8898",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2024_0003",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2024_0006",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2024_0049",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2024_0070",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_CB_IMPORT_2021_05",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_CB_IMPORT_2021_22",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'CoViD-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:LONG",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXSW447PSACQK2MBZ5YAAM:collection:NKIBAAA171D",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXSW447PSACQK2MBZ5YAAM:collection:NKIBAAA178C",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB18-010",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:D84.9).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB20-006",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB20-012",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB21-001",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB21-009",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB21-011",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Vaccination'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: urn:miriam:icd:D69.4).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:HRI-COV87",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB20-0046",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Coronavirus'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB21-0005",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB21-0013",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB21-0038",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_CBB:collection:HRI-COV0116",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_NA:collection:HRI_COV66",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_NA:collection:HRI_COV73",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'Coronavirus'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_NA:collection:HRI_COV88",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:181",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'COVID-19'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review whether the collection really targets COVID-19, post-COVID, or vaccination cohorts. If yes, add the relevant structured diagnoses; otherwise reword the narrative.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:HRI-COV0118",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.diagnosis_available"
+      ],
+      "message": "Collection text suggests COVID-19 or related context (matched 'SARS-CoV-2'), but diagnosis_available does not contain recognized COVID/post-COVID diagnosis terms (current diagnoses: []).",
+      "rule": "CovidText",
+      "severity": "WARNING"
+    }
+  ],
+  "generated_on": "2026-03-01",
+  "generator": "codex-heuristic-v1",
+  "schema": "ERIC"
+}

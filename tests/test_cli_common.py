@@ -3,6 +3,7 @@ import logging
 from cli_common import (
     add_directory_auth_arguments,
     add_directory_schema_argument,
+    add_include_withdrawn_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_optional_xlsx_output_argument,
@@ -91,6 +92,15 @@ def test_qc_arguments_support_short_option_for_disabling_all_remote_checks():
     args = parser.parse_args(["-r"])
 
     assert args.disableChecksRemote == ["emails", "geocoding"]
+
+
+def test_include_withdrawn_argument_supports_short_and_long_forms():
+    parser = build_parser()
+    add_include_withdrawn_argument(parser)
+
+    assert parser.parse_args([]).include_withdrawn is False
+    assert parser.parse_args(["-w"]).include_withdrawn is True
+    assert parser.parse_args(["--include-withdrawn"]).include_withdrawn is True
 
 
 def test_configure_logging_sets_debug_level():

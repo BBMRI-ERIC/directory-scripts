@@ -12,6 +12,7 @@ import os.path
 from cli_common import (
     add_directory_auth_arguments,
     add_directory_schema_argument,
+    add_include_withdrawn_argument,
     add_logging_arguments,
     add_no_stdout_argument,
     add_plugin_disable_argument,
@@ -67,6 +68,11 @@ parser = build_parser()
 add_logging_arguments(parser)
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
+add_include_withdrawn_argument(
+    parser,
+    dest="include_withdrawn",
+    help_text="include explicitly and logically withdrawn biobanks/collections in checks",
+)
 add_remote_check_disable_arguments(parser, remoteCheckList)
 add_plugin_disable_argument(parser, pluginList)
 add_purge_cache_arguments(parser, cachesList)
@@ -84,9 +90,23 @@ configure_logging(args)
 # Main code
 
 if args.username is not None and args.password is not None:
-    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp, username=args.username, password=args.password)
+    dir = Directory(
+        schema=args.schema,
+        purgeCaches=args.purgeCaches,
+        debug=args.debug,
+        pp=pp,
+        username=args.username,
+        password=args.password,
+        include_withdrawn_entities=args.include_withdrawn,
+    )
 else:
-    dir = Directory(schema=args.schema, purgeCaches=args.purgeCaches, debug=args.debug, pp=pp)
+    dir = Directory(
+        schema=args.schema,
+        purgeCaches=args.purgeCaches,
+        debug=args.debug,
+        pp=pp,
+        include_withdrawn_entities=args.include_withdrawn,
+    )
 warningContainer = WarningsContainer()
 
 orphacodes = None
@@ -130,7 +150,7 @@ if args.outputXLSX is not None:
     allBiobanks = {}
     allCollections = {}
     for biobank in dir.getBiobanks():
-        allBiobanks[biobank['id']] = str(biobank['withdrawn'])
+        allBiobanks[biobank['id']] = str(dir.isBiobankWithdrawn(biobank['id']))
     for collection in dir.getCollections():
-        allCollections[collection['id']] = str(collection['withdrawn'])
+        allCollections[collection['id']] = str(dir.isCollectionWithdrawn(collection['id']))
     warningContainer.dumpWarningsXLSX(args.outputXLSX, allBiobanks, allCollections, True)

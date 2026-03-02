@@ -1,0 +1,1981 @@
+{
+  "findings": [
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 20.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328396",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328397",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328398",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328399",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328400",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328401",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328402",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:AT_MUW:collection:BB9347-9348:328403",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:BE_BBRU1:collection:all_samples",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 99.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:CH_CHUV:collection:CH_BB-URAN",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:CH_CHUV:collection:CH_CURMLSuddencardiacdeath",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_ETH:collection:CH_Microbiome_IEM",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_ETH:collection:CH_Microbiome_NEC",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve:collection:CH_CEVD",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve:collection:CH_GenevaBrainTumor",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_KinderspitalZurich:collection:CH_PINIT",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_KinderspitalZurich:collection:CH_SwissPediatricHaematologyOncologyBiobankNetwork",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_UNIBE:collection:CH_BEready",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CH_USZ:collection:CH_NGN_LEARN",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:CELSPAC_TNG",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:CELSPAC_TNG:Bucal_swab_child",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:CELSPAC_TNG:Dry_blood_spot",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:CZ_CELSPAC:collection:CELSPAC_YA",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 32.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:DE_BIPS:collection:IDEFICS_IFamily",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 75.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:DE_BIPS:collection:IFamily",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 75.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:DE_FREEZE-Biobank:collection:FREEZE-Hilda",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Adolescent'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:DE_HUB:collection:CF_Register",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:DE_LMB:collection:LIFE_CHILD_BM",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'CHILD'), but age_high is 60.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:DE_UMGB:collection:PRECOVERY",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:DE_UMGB:collection:Pharma_Krankheitsmodelle",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:DE_UTZBD:collection:GGN",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:DE_ZeBanC:collection:Sarkom",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:ES_HGUVBB:collection:Lung-BB",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:ES_IACS:collection:SC_13-12",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 59.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:ES_IDIVAL:collection:BV0010000000",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 79.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:ES_IGTP-HUGTP:collection:CLCN",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 75.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:FI_002:collection:FinHIT",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 66.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:FI_006:collection:BorealisMaternityClinic",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'newborn'), but age_high is 48.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:FI_012:collection:NFBC1966",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 46.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:GR_HBOOCA:collection:oo1",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:HU_UOP_SZKK:collection:PEDBANK",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:HU_UPB:collection:PEDBANK_ASTRAGEN",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_135477591365434:collection:153b2d41f2cf4b759ba0a142ac4a42da",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1382539370263740:collection:144471729877953",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1382783556249610:collection:1444717329716938",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Paediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1382965524316631:collection:02160057253f4fb59198bba6fd14d75d",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Paediatric'), but age_high is 47.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1383758011993577:collection:a858e9d4ba3d4ea",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 104.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1548666951181832",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1561564763441725",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 60.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1608066723004545",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 85.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1608233763906945",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 30.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:160823437944161",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 90.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1608234899060930",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 30.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1608236018076265",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1608236428811701",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 90.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:160823702509334",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 100.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1547222650173780:collection:1608237353260953",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 30.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:IT_1590747237803484:collection:159074723808849",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_89cf68fdf2a4497:collection:3d229895dd9d42b",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 50.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:IT_89cf68fdf2a4497:collection:f759e5f5dd75444",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 88.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACVKPKFJ4CZSUAVNCZ2AAAE:collection:38",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACVKPKFJ4CZSUAVNCZ2AAAE:collection:39",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACVOEPHI3IZSUAVNCZ2AAAE:collection:DC17-002",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_6276",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_6834",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2023_7859",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2024_0030",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:EMC_2024_0057",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'AdolesceNT'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:imaging_prosper",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW5FCXM3MZSUAVNCZ2AAAE:collection:imaging_prosper_brain",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACW7MF7WRMACQK2MD37AAAE:collection:123",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:ACHD",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:AGORA",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:BIA",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:CURIUM",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:ENTU",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:HDFN",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Newborn'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:MISK",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXJQEK6I4ACQK2ME25QAAE:collection:NDZ",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Geriatric'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXPKEZGNYACQK2ME25QAAE:collection:23",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 80.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXPRBD7XQACQK2ME25QAAE:collection:79",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXPRDRIO6ACQK2ME25QAAE:collection:16",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXSW447PSACQK2MBZ5YAAM:collection:NKIBAAA1A07",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AAAACXSW447PSACQK2MBZ5YAAM:collection:NKIBAAA1C0C",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB14-001",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB14-003",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB14-006",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB17-020",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Paediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB21-006",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:AB21-009",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB20-0026",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB21-0009",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'elderly'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_AMCBB:collection:VB23-0037",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adult'), but age_low is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_CBB:collection:HRI-COV0116",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_NA:collection:HRI_COV66",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:138",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 100.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:143",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 69.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:149",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'Adult'), but age_low is 0.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:151",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is 0.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection targets adults only, age_low should usually be >= 18.",
+      "entity_id": "bbmri-eric:ID:NL_RB:collection:184",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests an adult/geriatric population (matched 'adults'), but age_low is 1.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:GECKO",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 23.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M1",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M10",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M11",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M12",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M2",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M3",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M4",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M5",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M6",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:LIFELINES_NEXT_M9",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M1",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M10",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M11",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M12",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M2",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M3",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M4",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M5",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M6",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:LIFELINES_NEXT:collection:M9",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'infant'), but age_high is 64.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_baseline",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_1",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_2",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_3",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_4",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_5",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_6",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_7",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_8",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:REPSULT:collection:REPSULT_year_9",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is 24.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:TRAILS",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:NL_UMCG:collection:VBB",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'child'), but age_high is 44.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:PL_BIOBANK_RCNT:collection:PL_X5MKE_E0IX7",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:PL_JD16N:collection:PL_JD16N_R07AR",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 63.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:SE_1741:collection:MOS",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'Children'), but age_high is 75.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:SE_1750:collection:all_samples",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'pediatric'), but age_high is None.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    },
+    {
+      "action": "Review the age range metadata and the collection narrative. If the collection is pediatric, age_high should usually be <= 18.",
+      "entity_id": "bbmri-eric:ID:SE_KI_Biobank:collection:Lifegene",
+      "entity_type": "COLLECTION",
+      "fields": [
+        "COLLECTION.name",
+        "COLLECTION.description",
+        "COLLECTION.age_low",
+        "COLLECTION.age_high"
+      ],
+      "message": "Collection text suggests a pediatric population (matched 'children'), but age_high is 94.",
+      "rule": "AgeText",
+      "severity": "WARNING"
+    }
+  ],
+  "generated_on": "2026-03-01",
+  "generator": "codex-heuristic-v1",
+  "schema": "ERIC"
+}
