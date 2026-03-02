@@ -58,41 +58,41 @@ for collection in dir.getCollections():
     log.debug("Analyzing collection " + collectionId)
     biobankId = dir.getCollectionBiobankId(collectionId)
     biobank = dir.getBiobankById(biobankId)
-    NN = dir.getBiobankNN(biobankId)
-    if not NN in countryBiobanks:
-        countryBiobanks[NN] = set()
-    if not NN in countryBiobanksWithCollections:
-        countryBiobanksWithCollections[NN] = set()
-    if not NN in countryCollections:
-        countryCollections[NN] = set()
-    countryBiobanks[NN].add(biobankId)
-    countryBiobanksWithCollections[NN].add(biobankId)
-    countryCollections[NN].add(collectionId)
+    country_code = dir.getBiobankCountry(biobankId)
+    if country_code not in countryBiobanks:
+        countryBiobanks[country_code] = set()
+    if country_code not in countryBiobanksWithCollections:
+        countryBiobanksWithCollections[country_code] = set()
+    if country_code not in countryCollections:
+        countryCollections[country_code] = set()
+    countryBiobanks[country_code].add(biobankId)
+    countryBiobanksWithCollections[country_code].add(biobankId)
+    countryCollections[country_code].add(collectionId)
     
 for biobank in dir.getBiobanks():
     biobankId = biobank['id']
-    NN = dir.getBiobankNN(biobankId)
-    if not NN in countryBiobanks:
-        countryBiobanks[NN] = set()
-    if not biobankId in countryBiobanks[NN]:
+    country_code = dir.getBiobankCountry(biobankId)
+    if country_code not in countryBiobanks:
+        countryBiobanks[country_code] = set()
+    if biobankId not in countryBiobanks[country_code]:
         log.info(f"Biobank {biobankId} without having collections")
-        countryBiobanks[NN].add(biobankId)
+        countryBiobanks[country_code].add(biobankId)
 
 output_rows = []
-for NN in sorted(countryBiobanks):
+for country_code in sorted(countryBiobanks):
     output_rows.append(
         {
-            'Country': NN,
-            'Biobanks total': len(countryBiobanks[NN]),
-            'Biobanks with collections': len(countryBiobanksWithCollections[NN]),
-            'Collections': len(countryCollections[NN]),
+            'Country': country_code,
+            'Biobanks total': len(countryBiobanks[country_code]),
+            'Biobanks with collections': len(countryBiobanksWithCollections.get(country_code, set())),
+            'Collections': len(countryCollections.get(country_code, set())),
         }
     )
     if not args.nostdout:
         print(
-            f"{NN}: biobanks total = {len(countryBiobanks[NN])}, "
-            f"biobanks with collections = {len(countryBiobanksWithCollections[NN])}, "
-            f"collections = {len(countryCollections[NN])}"
+            f"{country_code}: biobanks total = {len(countryBiobanks[country_code])}, "
+            f"biobanks with collections = {len(countryBiobanksWithCollections.get(country_code, set()))}, "
+            f"collections = {len(countryCollections.get(country_code, set()))}"
         )
 
 if args.outputXLSX is not None:

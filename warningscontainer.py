@@ -8,6 +8,25 @@ import xlsxwriter
 from customwarnings import DataCheckWarning
 from nncontacts import NNContacts
 
+
+QC_SHEET_HEADERS = (
+    ("Entity ID", 50),
+    ("Entity type", 12),
+    ("Entity withdrawn", 8),
+    ("Check", 24),
+    ("Severity", 10),
+    ("Message", 120),
+    ("Action", 60),
+    ("Email", 50),
+)
+
+ENTITY_LIST_HEADERS = (
+    ("Entity ID", 50),
+    ("Entity type", 12),
+    ("Entity withdrawn", 8),
+)
+
+
 class WarningsContainer:
 
     def __init__(self, disabledChecks = {}):
@@ -32,6 +51,12 @@ class WarningsContainer:
                     w.dump()
             print("")
 
+    @staticmethod
+    def _write_headers(worksheet, headers, bold):
+        for col_idx, (header, width) in enumerate(headers):
+            worksheet.write_string(0, col_idx, header, bold)
+            worksheet.set_column(col_idx, col_idx, width)
+
     def dumpWarningsXLSX(self, filename : List[str], allBiobanks: dict, allCollections: dict, allNNs_sheet: bool = False):
         workbook = xlsxwriter.Workbook(filename[0])
         bold = workbook.add_format({'bold': True})
@@ -40,67 +65,24 @@ class WarningsContainer:
             # Create a sheet containing content for all NNs together
             allNNs_worksheet = workbook.add_worksheet("ALL")
             allNNs_row = 0
-
-            allNNs_worksheet.write_string(allNNs_row, 0, "Entity ID", bold)
-            allNNs_worksheet.set_column(0,0, 50)
-            allNNs_worksheet.write_string(allNNs_row, 1, "Entity type", bold)
-            allNNs_worksheet.set_column(1,1, 10)
-            allNNs_worksheet.write_string(allNNs_row, 2, "Entity withdrawn", bold)
-            allNNs_worksheet.set_column(2,2, 20)
-            allNNs_worksheet.write_string(allNNs_row, 3, "Check", bold)
-            allNNs_worksheet.set_column(3,3, 10)
-            allNNs_worksheet.write_string(allNNs_row, 4, "Severity", bold)
-            allNNs_worksheet.set_column(4,4, 120)
-            allNNs_worksheet.write_string(allNNs_row, 5, "Message", bold)
-            allNNs_worksheet.set_column(5,5, 120)
-            allNNs_worksheet.write_string(allNNs_row, 6, "Action", bold)
-            allNNs_worksheet.set_column(6,6, 50)
-            allNNs_worksheet.write_string(allNNs_row, 7, "Email", bold)
-            allNNs_worksheet.set_column(7,7, 50)
+            self._write_headers(allNNs_worksheet, QC_SHEET_HEADERS, bold)
 
         if allBiobanks:
             # Print all biobanks present in Directory or in the given list, no matter if they have warnings or not
             allBBs_worksheet = workbook.add_worksheet("AllBiobanks")
             allBBs_row = 0
-
-            allBBs_worksheet.write_string(allBBs_row, 0, "Entity ID", bold)
-            allBBs_worksheet.set_column(0,0, 50)
-            allBBs_worksheet.write_string(allBBs_row, 1, "Entity type", bold)
-            allBBs_worksheet.set_column(1,1, 10)
-            allBBs_worksheet.write_string(allBBs_row, 2, "Entity withdrawn", bold)
-            allBBs_worksheet.set_column(2,2, 10)
+            self._write_headers(allBBs_worksheet, ENTITY_LIST_HEADERS, bold)
 
         if allCollections:
             # Print all collections present in Directory or in the given list, no matter if they have warnings or not
             allColls_worksheet = workbook.add_worksheet("AllCollections")
             allColls_row = 0
-
-            allColls_worksheet.write_string(allColls_row, 0, "Entity ID", bold)
-            allColls_worksheet.set_column(0,0, 50)
-            allColls_worksheet.write_string(allColls_row, 1, "Entity type", bold)
-            allColls_worksheet.set_column(1,1, 10)
-            allColls_worksheet.write_string(allColls_row, 2, "Entity withdrawn", bold)
-            allColls_worksheet.set_column(2,2, 10)
+            self._write_headers(allColls_worksheet, ENTITY_LIST_HEADERS, bold)
 
         for nn in sorted(self.__warningsNNs):
             worksheet = workbook.add_worksheet(nn)
             worksheet_row = 0
-            worksheet.write_string(worksheet_row, 0, "Entity ID", bold)
-            worksheet.set_column(0,0, 50)
-            worksheet.write_string(worksheet_row, 1, "Entity type", bold)
-            worksheet.set_column(1,1, 10)
-            worksheet.write_string(worksheet_row, 2, "Entity withdrawn", bold)
-            worksheet.set_column(2,2, 20)
-            worksheet.write_string(worksheet_row, 3, "Check", bold)
-            worksheet.set_column(3,3, 10)
-            worksheet.write_string(worksheet_row, 4, "Severity", bold)
-            worksheet.set_column(4,4, 120)
-            worksheet.write_string(worksheet_row, 5, "Message", bold)
-            worksheet.set_column(5,5, 120)
-            worksheet.write_string(worksheet_row, 6, "Action", bold)
-            worksheet.set_column(6,6, 50)
-            worksheet.write_string(worksheet_row, 7, "Email", bold)
-            worksheet.set_column(7,7, 50)
+            self._write_headers(worksheet, QC_SHEET_HEADERS, bold)
             for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
                 if not (w.dataCheckID in self.disabledChecks and w.directoryEntityID in self.disabledChecks[w.dataCheckID]):
                     worksheet_row += 1

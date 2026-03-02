@@ -7,6 +7,7 @@ from typing import Any, Optional
 import networkx as nx
 from diskcache import Cache
 from molgenis_emx2_pyclient import Client
+from nncontacts import NNContacts
 
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
@@ -387,15 +388,31 @@ class Directory:
         """Return the number of loaded biobanks."""
         return len(self.getBiobanks())
 
+    @staticmethod
+    def _extract_country_code(value) -> str:
+        """Return a country/staging code from a scalar or EMX-style wrapper."""
+        if isinstance(value, dict):
+            value = value.get("id", "")
+        return str(value).strip().upper() if value is not None else ""
+
     def getBiobankNN(self, biobankID: str):
-        """Return country/national-node information for a biobank id."""
-        # TODO: handle IARC!
-        #data = nx.get_node_attributes(self.directoryGraph, 'data')
-        #if self.pp is not None:
-            #pp.pprint(data)
-        #biobank = data[biobankID]
+        """Return the node/staging-area code for a biobank id.
+
+        The routing/grouping node is derived from the entity id prefix, not from
+        the biobank country. This keeps non-member/global areas such as EXT/EU
+        grouped under their staging area even when the hosted biobank country is
+        a member-state code such as US/VN/DE.
+        """
         biobank = self.directoryGraph.nodes[biobankID]['data']
-        return biobank['country']
+        staging_area = NNContacts.extract_staging_area(biobankID)
+        if staging_area:
+            return staging_area
+        return self._extract_country_code(biobank.get('country'))
+
+    def getBiobankCountry(self, biobankID: str):
+        """Return the reported country code for a biobank id."""
+        biobank = self.directoryGraph.nodes[biobankID]['data']
+        return self._extract_country_code(biobank.get('country'))
 
     def getCollections(self):
         """Return all loaded collections."""
@@ -488,9 +505,19 @@ class Directory:
                 
 
     def getCollectionNN(self, collectionID):
-        """Return country/national-node information for a collection id."""
-        # TODO: handle IARC!
+        """Return the node/staging-area code for a collection id."""
+        staging_area = NNContacts.extract_staging_area(collectionID)
+        if staging_area:
+            return staging_area
         return self.getBiobankNN(self.getCollectionBiobankId(collectionID))
+
+    def getCollectionCountry(self, collectionID: str):
+        """Return the reported country code for a collection id."""
+        collection = self.directoryGraph.nodes[collectionID]['data']
+        country = self._extract_country_code(collection.get('country'))
+        if country:
+            return country
+        return self.getBiobankCountry(self.getCollectionBiobankId(collectionID))
 
     # return the whole subgraph including the biobank itself
     def getGraphBiobankCollectionsFromBiobank(self, biobankID: str):
@@ -529,10 +556,15 @@ class Directory:
         return self.contactHashmap[contactID]
 
     def getContactNN(self, contactID: str):
-        """Return country/national-node information for a contact id."""
-        # TODO: handle IARC!
-        #return self.contactHashmap[contactID]['country']['id'] # EMX2 change: Country only contains the ID now, so:
-        return self.contactHashmap[contactID]['country']
+        """Return the node/staging-area code for a contact id."""
+        staging_area = NNContacts.extract_staging_area(contactID)
+        if staging_area:
+            return staging_area
+        return self.getContactCountry(contactID)
+
+    def getContactCountry(self, contactID: str):
+        """Return the reported country code for a contact id."""
+        return self._extract_country_code(self.contactHashmap[contactID].get('country'))
 
 
     def getNetworks(self):
@@ -572,17 +604,25 @@ class Directory:
         return self.biobankServiceMap.get(biobankID, [])
 
     def getNetworkNN(self, networkID: str):
-        """Return country/national-node information for a network id."""
-        # TODO: review handling of IARC/EU/global collections
+        """Return the node/staging-area code for a network id."""
+        staging_area = NNContacts.extract_staging_area(networkID)
+        if staging_area:
+            return staging_area
         network = self.networkGraph.nodes[networkID]['data']
-        NN = ""
         if 'country' in network:
-            NN = network['country']['id']
+            return self._extract_country_code(network['country'])
         elif 'contact' in network:
-            NN = self.getContactNN(network['contact']['id'])
-        else:
-            NN = "EU"
-        return NN
+            return self.getContactNN(network['contact']['id'])
+        return "EU"
+
+    def getNetworkCountry(self, networkID: str):
+        """Return the reported country code for a network id when present."""
+        network = self.networkGraph.nodes[networkID]['data']
+        if 'country' in network:
+            return self._extract_country_code(network['country'])
+        if 'contact' in network:
+            return self.getContactCountry(network['contact']['id'])
+        return ""
 
     @staticmethod
     def getListOfEntityAttributeIds(entity, key: str):

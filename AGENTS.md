@@ -51,6 +51,7 @@
 - Directory API access requires network access; account for this when running in sandboxed environments.
 - When deriving NN from IDs, the common pattern is `ID:XX_...` (XX can be multi-letter like `EXT`).
 - Staging area and country are not the same concept: non-member/global areas such as `EXT` or `EU` can host entities whose `country` is a BBMRI member state.
+- `Directory.get*NN(...)` is for node/staging-area routing and grouping and must follow entity IDs via `nncontacts.py`; `Directory.get*Country(...)` is for reported country values. For example, `US`/`VN` biobanks in `EXT` belong under the `EXT` node tab, not country-specific tabs.
 - `directory-tables-modifier.py` requires an explicit schema (`-s/--schema`) and treats table deletion as content deletion only (no dropping tables).
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`.

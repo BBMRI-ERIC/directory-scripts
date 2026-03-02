@@ -23,7 +23,13 @@ def _make_directory_stub():
             "country": "DE",
             "contact": {"id": "ct1"},
             "withdrawn": True,
-        }
+        },
+        {
+            "id": "bbmri-eric:ID:EXT_demo",
+            "country": "US",
+            "contact": {"id": "bbmri-eric:contactID:EXT_demo:main"},
+            "withdrawn": False,
+        },
     ]
     directory.collections = [
         {
@@ -56,12 +62,32 @@ def _make_directory_stub():
             "parent_collection": {"id": "col3"},
             "withdrawn": False,
         },
+        {
+            "id": "bbmri-eric:ID:EXT_demo:collection:col5",
+            "biobank": {"id": "bbmri-eric:ID:EXT_demo"},
+            "contact": {"id": "bbmri-eric:contactID:EXT_demo:main"},
+            "country": "US",
+            "size": 3,
+            "withdrawn": False,
+        },
     ]
-    directory.contacts = [{"id": "ct1", "country": "CZ"}]
-    directory.networks = [{"id": "net1", "country": {"id": "CZ"}}]
+    directory.contacts = [
+        {"id": "ct1", "country": "CZ"},
+        {"id": "bbmri-eric:contactID:EXT_demo:main", "country": "US"},
+    ]
+    directory.networks = [
+        {"id": "net1", "country": {"id": "CZ"}},
+        {"id": "bbmri-eric:networkID:EXT_demo:net1", "country": {"id": "US"}},
+    ]
     directory.facts = [{"id": "fact1", "collection": {"id": "col1"}}]
     directory.services = [{"id": "svc1", "biobank": {"id": "bb1"}}]
-    directory.contactHashmap = {"ct1": {"id": "ct1", "country": "CZ"}}
+    directory.contactHashmap = {
+        "ct1": {"id": "ct1", "country": "CZ"},
+        "bbmri-eric:contactID:EXT_demo:main": {
+            "id": "bbmri-eric:contactID:EXT_demo:main",
+            "country": "US",
+        },
+    }
     directory.collectionFactMap = {"col1": [{"id": "fact1"}]}
     directory.serviceHashmap = {"svc1": {"id": "svc1", "biobank": {"id": "bb1"}}}
     directory.biobankServiceMap = {"bb1": [{"id": "svc1", "biobank": {"id": "bb1"}}]}
@@ -69,6 +95,7 @@ def _make_directory_stub():
     directory.directoryGraph = nx.DiGraph()
     directory.directoryGraph.add_node("bb1", data=directory.biobanks[0])
     directory.directoryGraph.add_node("bb2", data=directory.biobanks[1])
+    directory.directoryGraph.add_node("bbmri-eric:ID:EXT_demo", data=directory.biobanks[2])
     for collection in directory.collections:
         directory.directoryGraph.add_node(collection["id"], data=collection)
 
@@ -77,10 +104,18 @@ def _make_directory_stub():
     directory.directoryCollectionsDAG.add_edge("col1", "col2")
     directory.directoryCollectionsDAG.add_edge("bb2", "col3")
     directory.directoryCollectionsDAG.add_edge("col3", "col4")
+    directory.directoryCollectionsDAG.add_edge(
+        "bbmri-eric:ID:EXT_demo",
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+    )
 
     directory.contactGraph = nx.DiGraph()
     directory.networkGraph = nx.DiGraph()
     directory.networkGraph.add_node("net1", data=directory.networks[0])
+    directory.networkGraph.add_node(
+        "bbmri-eric:networkID:EXT_demo:net1",
+        data=directory.networks[1],
+    )
 
     return directory
 
@@ -160,8 +195,15 @@ def test_directory_filters_withdrawn_entities_when_requested():
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
 
-    assert [biobank["id"] for biobank in directory.getBiobanks()] == ["bb1"]
-    assert [collection["id"] for collection in directory.getCollections()] == ["col1", "col2"]
+    assert [biobank["id"] for biobank in directory.getBiobanks()] == [
+        "bb1",
+        "bbmri-eric:ID:EXT_demo",
+    ]
+    assert [collection["id"] for collection in directory.getCollections()] == [
+        "col1",
+        "col2",
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+    ]
     assert directory.getBiobankById("bb2") is None
     assert directory.getCollectionById("col3") is None
     assert directory.getCollectionById("col4") is None
@@ -192,3 +234,16 @@ def test_directory_can_return_only_withdrawn_entities():
     assert [biobank["id"] for biobank in directory.getBiobanks()] == ["bb2"]
     assert [collection["id"] for collection in directory.getCollections()] == ["col3", "col4"]
     assert [service["id"] for service in directory.getServices()] == []
+
+
+def test_directory_nn_methods_prefer_staging_area_over_country():
+    directory = _make_directory_stub()
+
+    assert directory.getBiobankNN("bbmri-eric:ID:EXT_demo") == "EXT"
+    assert directory.getBiobankCountry("bbmri-eric:ID:EXT_demo") == "US"
+    assert directory.getCollectionNN("bbmri-eric:ID:EXT_demo:collection:col5") == "EXT"
+    assert directory.getCollectionCountry("bbmri-eric:ID:EXT_demo:collection:col5") == "US"
+    assert directory.getContactNN("bbmri-eric:contactID:EXT_demo:main") == "EXT"
+    assert directory.getContactCountry("bbmri-eric:contactID:EXT_demo:main") == "US"
+    assert directory.getNetworkNN("bbmri-eric:networkID:EXT_demo:net1") == "EXT"
+    assert directory.getNetworkCountry("bbmri-eric:networkID:EXT_demo:net1") == "US"

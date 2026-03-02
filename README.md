@@ -76,6 +76,8 @@ Legacy long option spellings remain accepted where needed, but the normalized lo
 
 `data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well, or `--only-withdrawn` when you want to review only withdrawn content.
 
+The XLSX warning workbook is split into tabs by BBMRI node / staging area derived from entity IDs (`AT`, `SK`, `EXT`, `EU`, ...), not by reported country. This keeps non-member biobanks hosted in countries such as `US` or `VN` grouped under the `EXT` tab. Reported country values remain available separately where scripts explicitly report country-level statistics.
+
 For developer-facing architecture, coding-style, AI-check, and testing notes, see `DEVELOPMENT.md`.
 
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:

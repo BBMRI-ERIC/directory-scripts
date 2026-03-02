@@ -20,6 +20,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from nncontacts import NNContacts
 
 QUALITY_LABELS = {'accredited', 'eric'}
 
@@ -56,17 +57,10 @@ def _extract_quality_values(value):
     return values
 
 
-def get_country_code_from_id(collection_id):
+def get_staging_area_from_id(collection_id):
     if not collection_id:
         return ""
-    value = str(collection_id)
-    if value.startswith("ID:"):
-        value = value[3:]
-    if ":" in value:
-        value = value.split(":", 1)[0]
-    if "_" in value:
-        value = value.split("_", 1)[0]
-    return value
+    return NNContacts.extract_staging_area(str(collection_id))
 
 
 def get_parent_chain_ids(collection, collection_map):
@@ -89,19 +83,14 @@ def get_parent_chain_ids(collection, collection_map):
 
 
 def get_nn_from_biobank_id(biobank_id):
-    if not biobank_id:
-        return ""
-    match = re.search(r'ID:([^_]+)_', str(biobank_id))
-    if match:
-        return match.group(1)
-    return ""
+    return NNContacts.extract_staging_area(biobank_id)
 
 
 def get_nn_for_collection(collection_id, collection):
     if collection:
         biobank_id = collection['biobank']['id']
         return get_nn_from_biobank_id(biobank_id)
-    return get_country_code_from_id(collection_id)
+    return get_staging_area_from_id(collection_id)
 
 
 parser = build_parser()
@@ -306,9 +295,9 @@ for collection_id, row in rows_by_collection.items():
         biobank = biobank_map_all.get(biobank_id)
         if biobank and dir.isBiobankWithdrawn(biobank_id):
             log.warning("Collection %s belongs to withdrawn biobank %s and is present in output input set", collection_id, biobank_id)
-        country_code = dir.getCollectionNN(collection_id)
+        country_code = dir.getCollectionCountry(collection_id)
     else:
-        country_code = get_country_code_from_id(collection_id)
+        country_code = ""
 
     output_rows.append({
         'nn': nn_code,
@@ -346,7 +335,7 @@ for collection_id, collection in collection_map_active.items():
     if collection_id not in rows_by_collection:
         output_rows.append({
             'nn': get_nn_from_biobank_id(collection['biobank']['id']),
-            'country_code': dir.getCollectionNN(collection_id),
+            'country_code': dir.getCollectionCountry(collection_id),
             'network_name': row.get('network_name', ''),
             'biobank_name': row.get('biobank_name', ''),
             'resource_name': row.get('resource_name', ''),
@@ -441,7 +430,7 @@ if args.outputXLSX:
                 missing_reps_with_biobank_quality += 1
         biobank_rows.append({
             'nn': get_nn_from_biobank_id(biobank_id),
-            'country_code': dir.getBiobankNN(biobank_id),
+            'country_code': dir.getBiobankCountry(biobank_id),
             'biobank_name': biobank.get('name', '') if biobank else '',
             'biobank_id': biobank_id,
             'total_collections': len(biobank_to_collections_all.get(biobank_id, [])),

@@ -29,7 +29,8 @@ class NNContacts:
         "DE": "michael.hummel@charite.de, caecilia.engels@charite.de, cornelia.specht@charite.de",
         "EE": "andres.metspalu@ut.ee, kristjan.metsalu@ut.ee",
         "ES": "eortega@cnio.es",
-        "EU": "petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl",
+        "EU": "kurt.majcen@bbmri-eric.eu, petr.holub@bbmri-eric.eu",
+        "EXT": "SBenvenuti@Telethon.it, kurt.majcen@bbmri-eric.eu, petr.holub@bbmri-eric.eu",
         "FI": "marco.hautalahti@finbb.fi, pauli.wihuri@finbb.fi",
         "GR": "s.kolyva@pasteur.gr, thanos@bioacademy.gr, koumakis@ics.forth.gr",
         "HU": "molnarmj@gmail.com",
@@ -41,6 +42,7 @@ class NNContacts:
         "NO": "vegard.marschhauser@ntnu.no, kristian.hveem@ntnu.no",
         "PL": "dominik.strapagiel@biol.uni.lodz.pl, blazej.marciniak@biol.uni.lodz.pl, andrzej.strug@gumed.edu.pl, aklis@bee2code.com",
         "SE": "anna.beskow@uppsalabiobank.uu.se, nils.hailer@uu.se",
+        "SK": "marian.mizik@uniba.sk",
         "TR": "nese.atabey@ibg.edu.tr",
         "IARC": "kozlakidisz@iarc.fr",
     }

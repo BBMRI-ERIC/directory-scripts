@@ -179,3 +179,8 @@ Collection withdrawal is logically inherited:
 Use:
 - `-w` / `--include-withdrawn` to include withdrawn content
 - `--only-withdrawn` to restrict the run to withdrawn content
+
+Node/staging-area scope and reported country must stay distinct:
+- `Directory.get*NN(...)` is for BBMRI node / staging-area routing and workbook grouping, derived from entity IDs via `nncontacts.py`
+- `Directory.get*Country(...)` is for actual reported country values
+- non-member biobanks hosted in countries such as `US` or `VN` must still route/group under `EXT`, not under country-specific tabs
