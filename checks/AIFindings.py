@@ -6,6 +6,7 @@ from yapsy.IPlugin import IPlugin
 
 from ai_cache import load_ai_findings_for_directory
 from customwarnings import DataCheckEntityType, DataCheckWarning, DataCheckWarningLevel, make_check_id
+from validation_helpers import build_validation_warning_handler
 
 CHECK_ID_PREFIX = 'AI'
 
@@ -31,7 +32,16 @@ class AIFindings(IPlugin):
 
 	def check(self, dir, args):
 		log.info('Running shareable AI-curated checks (AIFindings)')
-		load_result = load_ai_findings_for_directory(dir)
+		warn = build_validation_warning_handler(
+			enabled=not bool(getattr(args, "suppress_validation_warnings", False)),
+			logger=log.getLogger("validation"),
+		)
+		try:
+			load_result = load_ai_findings_for_directory(dir, warn=warn)
+		except TypeError as exc:
+			if "unexpected keyword argument 'warn'" not in str(exc):
+				raise
+			load_result = load_ai_findings_for_directory(dir)
 		for issue in load_result.issues:
 			self._log_cache_issue(issue)
 		warnings = []

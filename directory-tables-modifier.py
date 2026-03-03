@@ -13,6 +13,10 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 from molgenis_emx2.directory_client.directory_client import DirectorySession
+from pydantic import ValidationError
+
+from validation_helpers import format_validation_error
+from validation_models import TableModifierSettingsModel
 
 # Get credentials from .env
 load_dotenv()
@@ -30,6 +34,7 @@ parser.add_argument("-d", "--debug", action="store_true", help="Debug output. Im
 parser.add_argument("-n", "--dry-run", action="store_true", help="Show planned changes without modifying data.")
 parser.add_argument("-f", "--force", action="store_true", help="Skip interactive approval for deletions.")
 parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-error output on STDOUT.")
+parser.add_argument("--suppress-validation-warnings", action="store_true", help="reserved for suppressing non-fatal local validation warnings")
 
 parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU). Use node staging areas for edits; ERIC requires explicit confirmation and should normally not be modified with this tool.")
 
@@ -661,10 +666,26 @@ def setup_logging():
 
 
 def validate_inputs():
-    if not target:
-        raise InputError("DIRECTORYTARGET is not set. Define it in the .env file or pass --directory-target.")
-    if not username or not password:
-        raise InputError("DIRECTORYUSERNAME or DIRECTORYPASSWORD is not set. Define them in the .env file or pass --directory-username/--directory-password.")
+    try:
+        TableModifierSettingsModel.parse_obj(
+            {
+                "schema": schema,
+                "table": table_name,
+                "directory_target": target,
+                "directory_username": username,
+                "directory_password": password,
+                "file_format": file_format,
+                "tsv_quote_char": tsvQuoteChar,
+                "tsv_escape_char": tsvEscapeChar,
+            }
+        )
+    except ValidationError as exc:
+        raise InputError(
+            format_validation_error(
+                "Invalid directory-tables-modifier settings",
+                exc,
+            )
+        ) from exc
     if schema.strip().upper() == "ERIC":
         logging.warning(
             "Schema ERIC should not be edited with this script; it is auto-populated nightly from per-node staging areas."

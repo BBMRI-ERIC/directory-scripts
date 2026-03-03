@@ -10,6 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from pydantic import ValidationError
+
+from validation_helpers import warn_from_validation_error
+from validation_models import AICachePayloadModel
+
 
 AI_CACHE_ROOT = Path(__file__).resolve().parent / "ai-check-cache"
 TIMESTAMP_KEYS = {"timestamp", "mg_insertedOn", "mg_updatedOn"}
@@ -60,21 +65,21 @@ def get_withdrawn_scope_label(directory: Any) -> str:
     return "active-only"
 
 
-def load_ai_findings(schema: str) -> list[dict[str, Any]]:
+def load_ai_findings(schema: str, *, warn=None) -> list[dict[str, Any]]:
     """Load and validate AI-curated findings for one schema."""
     findings: list[dict[str, Any]] = []
-    for payload in load_ai_payloads(schema):
+    for payload in load_ai_payloads(schema, warn=warn):
         findings.extend(payload.findings)
     return findings
 
 
-def load_ai_findings_for_directory(directory: Any) -> AICacheLoadResult:
+def load_ai_findings_for_directory(directory: Any, *, warn=None) -> AICacheLoadResult:
     """Load AI findings and keep only records whose cached source data still matches."""
     if hasattr(directory, "prepare_ai_cache_checksum_state"):
         directory.prepare_ai_cache_checksum_state()
     findings: list[dict[str, Any]] = []
     issues: list[AICacheIssue] = []
-    for payload in load_ai_payloads(directory.getSchema()):
+    for payload in load_ai_payloads(directory.getSchema(), warn=warn):
         reusable_records, payload_issues = _validate_payload_against_directory(
             payload, directory
         )
@@ -83,12 +88,20 @@ def load_ai_findings_for_directory(directory: Any) -> AICacheLoadResult:
     return AICacheLoadResult(findings=findings, issues=issues)
 
 
-def load_ai_payloads(schema: str) -> list[AICachePayload]:
+def load_ai_payloads(schema: str, *, warn=None) -> list[AICachePayload]:
     """Load validated AI cache payloads for one schema."""
     payloads: list[AICachePayload] = []
     for path in get_ai_cache_paths(schema):
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        payloads.append(_validate_payload(path, payload))
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            if warn is not None:
+                warn(f"{path}: invalid JSON: {exc}")
+            continue
+        try:
+            payloads.append(_validate_payload(path, payload))
+        except ValidationError as exc:
+            warn_from_validation_error(str(path), exc, warn)
     return payloads
 
 
@@ -127,96 +140,10 @@ def compute_checksum(value: Any) -> str:
 
 def _validate_payload(path: Path, payload: Any) -> AICachePayload:
     """Validate one cache payload and return its normalized representation."""
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: cache payload must be a JSON object.")
-
-    records = payload.get("findings")
-    if not isinstance(records, list):
-        raise ValueError(f"{path}: expected 'findings' to be a list.")
-
-    checked_entities = payload.get("checked_entities", [])
-    if checked_entities is None:
-        checked_entities = []
-    if not isinstance(checked_entities, list):
-        raise ValueError(f"{path}: expected 'checked_entities' to be a list when present.")
-
-    normalized_payload = dict(payload)
-    normalized_payload.setdefault("checked_fields", [])
-    normalized_payload.setdefault("withdrawn_scope", "active-only")
-    normalized_payload.setdefault("generator", "legacy")
-    normalized_payload["checked_entities"] = [
-        _validate_checked_entity(path, index, record)
-        for index, record in enumerate(checked_entities)
-    ]
-
-    findings = [
-        _validate_record(path, index, record)
-        for index, record in enumerate(records)
-    ]
-    normalized_payload["findings"] = findings
+    model = AICachePayloadModel.parse_obj(payload)
+    normalized_payload = model.dict()
+    findings = normalized_payload["findings"]
     return AICachePayload(path=path, data=normalized_payload, findings=findings)
-
-
-def _validate_checked_entity(path: Path, index: int, record: Any) -> dict[str, Any]:
-    """Validate one checked-entity metadata record."""
-    if not isinstance(record, dict):
-        raise ValueError(f"{path}: checked_entities #{index} must be a JSON object.")
-
-    required_fields = {"entity_id", "entity_type", "entity_checksum", "source_checksum"}
-    missing = sorted(required_fields - set(record))
-    if missing:
-        raise ValueError(
-            f"{path}: checked_entities #{index} is missing required fields: {missing}."
-        )
-
-    normalized = dict(record)
-    if normalized["entity_type"] not in {"BIOBANK", "COLLECTION"}:
-        raise ValueError(
-            f"{path}: checked_entities #{index} has unsupported entity_type "
-            f"{normalized['entity_type']!r}."
-        )
-    return normalized
-
-
-def _validate_record(path: Path, index: int, record: Any) -> dict[str, Any]:
-    """Validate one AI finding record and return the normalized mapping."""
-    if not isinstance(record, dict):
-        raise ValueError(f"{path}: finding #{index} must be a JSON object.")
-
-    required_fields = {
-        "rule",
-        "entity_id",
-        "entity_type",
-        "severity",
-        "message",
-        "action",
-    }
-    missing = sorted(required_fields - set(record))
-    if missing:
-        raise ValueError(
-            f"{path}: finding #{index} is missing required fields: {missing}."
-        )
-
-    normalized = dict(record)
-    normalized.setdefault("fields", [])
-    normalized.setdefault("email", "")
-    normalized.setdefault("nn", "")
-    normalized.setdefault("withdrawn", "")
-
-    if normalized["entity_type"] not in {"BIOBANK", "COLLECTION"}:
-        raise ValueError(
-            f"{path}: finding #{index} has unsupported entity_type "
-            f"{normalized['entity_type']!r}."
-        )
-    if normalized["severity"] not in {"ERROR", "WARNING", "INFO"}:
-        raise ValueError(
-            f"{path}: finding #{index} has unsupported severity "
-            f"{normalized['severity']!r}."
-        )
-    if not isinstance(normalized["fields"], list):
-        raise ValueError(f"{path}: finding #{index} field 'fields' must be a list.")
-
-    return normalized
 
 
 def _validate_payload_against_directory(

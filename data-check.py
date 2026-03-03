@@ -10,6 +10,7 @@ import os.path
 
 
 from cli_common import (
+    add_validation_warning_argument,
     build_directory_kwargs,
     add_directory_auth_arguments,
     add_directory_schema_argument,
@@ -23,6 +24,7 @@ from cli_common import (
     build_parser,
     configure_logging,
 )
+from validation_helpers import build_validation_warning_handler
 from yapsy.PluginManager import PluginManager
 from yapsy.IPlugin import IPlugin
 import inspect
@@ -73,6 +75,7 @@ parser = build_parser()
 add_logging_arguments(parser)
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
+add_validation_warning_argument(parser)
 add_withdrawn_scope_arguments(
     parser,
     include_help_text="include explicitly and logically withdrawn biobanks/collections in checks",
@@ -102,7 +105,13 @@ configure_logging(args)
 
 dir = Directory(**build_directory_kwargs(args, pp=pp))
 dir.prepare_ai_cache_checksum_state()
-warningContainer = WarningsContainer(load_warning_suppressions(args.warning_suppressions))
+validation_warn = build_validation_warning_handler(
+    enabled=not getattr(args, "suppress_validation_warnings", False),
+    logger=log.getLogger("validation"),
+)
+warningContainer = WarningsContainer(
+    load_warning_suppressions(args.warning_suppressions, warn=validation_warn)
+)
 
 orphacodes = None
 if args.orphacodesfile is not None:

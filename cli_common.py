@@ -125,6 +125,16 @@ def add_no_stdout_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_validation_warning_argument(parser: argparse.ArgumentParser) -> None:
+    """Add shared suppression for non-fatal local validation warnings."""
+    parser.add_argument(
+        "--suppress-validation-warnings",
+        dest="suppress_validation_warnings",
+        action="store_true",
+        help="suppress non-fatal local validation warnings (config/cache/input normalization)",
+    )
+
+
 def add_withdrawn_scope_arguments(
     parser: argparse.ArgumentParser,
     *,

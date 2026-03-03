@@ -20,6 +20,28 @@ This document collects developer-facing architecture, code-organization, style, 
 - helper modules such as `nncontacts.py`, `warningscontainer.py`, `warning_suppressions.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`, `fact_descriptor_sync.py`
   - own reusable logic that can be consumed by multiple scripts or plugins
 
+### Directory cache scope
+
+- The shared `data-check-cache/directory` cache is keyed by entity class/table, not by target URL.
+- This is acceptable for the current operating model, but it means alternate Directory targets share the same cache namespace.
+- When switching a tool to a non-default Directory instance, purge the `directory` cache before switching back or comparing runs across targets.
+
+### Scoped Pydantic validation
+
+Pydantic is used narrowly in this repository.
+
+- Use it for local inputs and repository-owned artifacts:
+  - tool/runtime settings
+  - shareable AI-cache payloads
+  - warning-suppression JSON
+- Do not use it as a full wrapper around live Molgenis Directory entities.
+  - Molgenis already enforces much of the structural validity for stored data.
+  - wrapping the whole live payload graph would add brittleness and duplicate validation noise.
+- Non-fatal validation problems must not crash the tool:
+  - QC path: log script-level validation warnings and continue
+  - maintenance CLIs: raise user-facing input errors only when the tool cannot proceed safely
+- Validation warnings should be suppressible via `--suppress-validation-warnings` where supported.
+
 ### Deterministic text checks vs AI-reviewed findings
 
 Narrative-vs-structure checks are split into two categories:
@@ -56,8 +78,13 @@ Rule of thumb:
   - used by both `checks/FactTables.py` and `collection-factsheet-descriptor-updater.py`
   - owns special handling such as:
     - ignoring `*` fact-sheet aggregate values for descriptor comparison
-    - treating `NAV` material as non-authoritative when other materials exist
+    - treating `NAV` material as ambiguous/non-authoritative when richer materials may be hidden by k-anonymity suppression
     - preserving broader ICD-10 metadata codes when they already cover more specific fact-sheet diagnoses
+
+- Design note for material updates:
+  - NAV-only fact output is not definitive evidence that collection-level materials are wrong.
+  - Fact rows can be suppressed by k-anonymity, so richer metadata may still be valid.
+  - Treat such cases as review-required and document the ambiguity clearly in user-facing tooling/docs.
 
 - `checks/FactTables.py`
   - runtime QC warning producer

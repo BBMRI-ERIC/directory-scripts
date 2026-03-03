@@ -292,3 +292,45 @@ def test_load_ai_findings_for_directory_aggregates_multiple_payload_files(monkey
 
     assert [finding["entity_id"] for finding in result.findings] == ["colA", "colB"]
     assert result.issues == []
+
+
+def test_load_ai_payloads_skips_invalid_payload_with_warning(monkeypatch, tmp_path):
+    write_named_payload(
+        tmp_path,
+        "broken.json",
+        {
+            "schema": "ERIC",
+            "rule": "BrokenRule",
+            "findings": [{"entity_id": "col1"}],
+        },
+    )
+    monkeypatch.setattr(ai_cache, "AI_CACHE_ROOT", tmp_path)
+
+    warnings = []
+    payloads = ai_cache.load_ai_payloads("ERIC", warn=warnings.append)
+
+    assert payloads == []
+    assert warnings
+    assert "findings.0.rule" in warnings[0] or "findings.0.entity_type" in warnings[0]
+
+
+def test_load_ai_payloads_rejects_payload_missing_findings(monkeypatch, tmp_path):
+    write_named_payload(
+        tmp_path,
+        "missing-findings.json",
+        {
+            "schema": "ERIC",
+            "rule": "BrokenRule",
+            "generator": "test",
+            "checked_fields": [],
+            "checked_entities": [],
+        },
+    )
+    monkeypatch.setattr(ai_cache, "AI_CACHE_ROOT", tmp_path)
+
+    warnings = []
+    payloads = ai_cache.load_ai_payloads("ERIC", warn=warnings.append)
+
+    assert payloads == []
+    assert warnings
+    assert "findings" in warnings[0]

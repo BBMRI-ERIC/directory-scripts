@@ -25,6 +25,7 @@ class Directory:
         username=None,
         password=None,
         token: str = None,
+        directory_url: Optional[str] = None,
         include_withdrawn_entities: bool = False,
         only_withdrawn_entities: bool = False,
     ):
@@ -38,6 +39,7 @@ class Directory:
             username: Username for session authentication.
             password: Password for session authentication.
             token: Access token for token-based authentication.
+            directory_url: Base URL of the Directory instance to query.
             include_withdrawn_entities: When False, public biobank/collection
                 accessors exclude entities that are withdrawn explicitly or
                 inherit withdrawal from a parent biobank/collection.
@@ -62,7 +64,7 @@ class Directory:
             cache.clear()
 
         #self.__directoryURL = "https://directory-acc.molgenis.net/"
-        self.__directoryURL = "https://directory.bbmri-eric.eu"
+        self.__directoryURL = directory_url or "https://directory.bbmri-eric.eu"
         log.info('Retrieving directory content from ' + self.__directoryURL)
         session = Client(self.__directoryURL, schema=schema)
         if username is not None and password is not None:

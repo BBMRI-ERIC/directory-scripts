@@ -55,6 +55,7 @@
 - `Directory.get*NN(...)` is for node/staging-area routing and grouping and must follow entity IDs via `nncontacts.py`; `Directory.get*Country(...)` is for reported country values. For example, `US`/`VN` biobanks in `EXT` belong under the `EXT` node tab, not country-specific tabs.
 - `directory-tables-modifier.py` requires an explicit schema (`-s/--schema`) and treats table deletion as content deletion only (no dropping tables).
 - `collection-factsheet-descriptor-updater.py` analyzes facts from `ERIC` but writes only to the explicitly requested staging-area schema; it must confirm schema/prefix mismatches interactively unless `-f/--force` is used.
+- `collection-factsheet-descriptor-updater.py` intentionally reads the public `ERIC` schema without authentication and uses credentials only for the staging-area write session; do not treat missing ERIC read credentials as a bug in reviews unless the operating model changes.
 - `collection-factsheet-descriptor-updater.py` should only append missing multi-value descriptors by default; only `--replace-existing` may remove/replace existing diagnosis/material/sex values, while all-star sample/donor totals may still replace numeric totals without that option.
 - `collection-factsheet-descriptor-updater.py` must treat fact-sheet `*` rows as aggregates only and must not propagate `NAV` sample type to collection metadata when other fact/metadata material types exist.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
@@ -80,6 +81,10 @@
 - AI cache reuse is checksum-based: findings remain reusable only while the live entity checksum and source-field checksum still match; `AIFindings` logs script warnings listing changed entity IDs and skips stale findings until the live AI-review workflow refreshes the cache.
 - AI cache checksums must exclude pure runtime metadata such as timestamps and `mg_*` fields so metadata-only churn does not force pointless reruns.
 - `exporter-bbmri-cohorts.py` uses `-W/--warnings`; keep `-w` reserved for withdrawn-scope selection.
+- Pydantic validation is intentionally scoped to local tool settings and repository-owned JSON/cache artifacts; do not wrap full live Molgenis payloads with strict models.
+- Non-fatal validation issues from local config/cache parsing should become suppressible script warnings (`--suppress-validation-warnings`), not hard crashes; use hard input errors only when a tool cannot proceed safely.
+- The shared Directory cache is not partitioned by target URL; if a task intentionally switches to a non-default Directory instance, document the cache-sharing risk and purge `directory` cache when switching targets.
+- For fact-sheet material alignment, NAV-only fact output is ambiguous because k-anonymity suppression can hide richer material-specific rows; document that ambiguity instead of treating NAV-only facts as definitive evidence that richer collection metadata is wrong.
 
 ## Testing Guidelines
 - A pytest-based unit test suite is present in `tests/` (currently focused on reusable modules such as `directory.py`).

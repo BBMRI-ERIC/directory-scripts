@@ -61,6 +61,7 @@ Common CLI conventions across validation/export tools:
 - `-v` / `--verbose` for progress logging, `-d` / `--debug` for debug logging
 - `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
 - `-N` / `--no-stdout` to suppress normal stdout output
+- `--suppress-validation-warnings` to suppress non-fatal local validation warnings where a tool supports Pydantic-backed config/cache/input validation
 - `-w` / `--include-withdrawn` when a tool supports opt-in processing of withdrawn entities
 - `--only-withdrawn` when a tool supports withdrawn-only processing
 - `--purge-cache ...` and `--purge-all-caches` for cache purging
@@ -72,6 +73,8 @@ Cache scope is now tool-specific:
 - `geocoding_2022.py` exposes `directory` and `geocoding`
 - `data-check.py` keeps the full QC cache and check/plugin control surface
 
+Directory cache entries are not partitioned by target URL. If you intentionally point a tool at a different Directory instance than the default public target, purge the `directory` cache before switching back or between targets; otherwise later runs can temporarily reuse cached entities from the wrong instance.
+
 Legacy long option spellings remain accepted where needed, but the normalized lowercase kebab-case variants are preferred in documentation and automation.
 
 `data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well, or `--only-withdrawn` when you want to review only withdrawn content.
@@ -79,6 +82,14 @@ Legacy long option spellings remain accepted where needed, but the normalized lo
 The XLSX warning workbook is split into tabs by BBMRI node / staging area derived from entity IDs (`AT`, `SK`, `EXT`, `EU`, ...), not by reported country. This keeps non-member biobanks hosted in countries such as `US` or `VN` grouped under the `EXT` tab. Reported country values remain available separately where scripts explicitly report country-level statistics.
 
 For developer-facing architecture, coding-style, AI-check, and testing notes, see `DEVELOPMENT.md`.
+
+Pydantic-backed validation is intentionally limited to local inputs and repository-owned artifacts:
+- tool/runtime settings for `directory-tables-modifier.py` and `collection-factsheet-descriptor-updater.py`
+- shareable/local JSON artifacts such as `ai-check-cache/` payloads and `warning-suppressions.json`
+- malformed local artifacts are treated as non-fatal validation warnings and can be hidden with `--suppress-validation-warnings`
+- live Directory entities from Molgenis are still handled primarily through explicit runtime checks and the existing QC framework
+
+For fact-sheet-driven descriptor updates, `NAV` sample-type rows are ambiguous: they can mean “not available”, but they can also appear because material-specific rows are suppressed by k-anonymity. Treat NAV-only fact output as requiring human review rather than as definitive proof that richer collection-level material metadata is wrong.
 
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
@@ -356,10 +367,10 @@ deletes only matching rows from the file and collection filter; confirmation is 
 
 ## Collection descriptor updater
 
-`collection-factsheet-descriptor-updater.py` analyzes one collection in the public `ERIC` schema, derives collection-level descriptors from the fact sheet, and can update the `Collections` table in the explicit target staging area.
+`collection-factsheet-descriptor-updater.py` analyzes one collection in the `ERIC` schema of the configured Directory target, derives collection-level descriptors from the fact sheet, and can update the `Collections` table in the explicit target staging area.
 
 Key behavior:
-- analysis always reads facts from `ERIC`
+- analysis always reads facts from `ERIC` in the configured Directory target
 - updates are written only to the explicitly provided `-s/--schema`
 - the tool checks whether the collection ID staging prefix matches the requested schema (for example `EU` -> `BBMRI-EU`) and asks for confirmation on mismatch unless `-f/--force` is used
 - the target collection must exist in the requested schema or the tool fails with an error
