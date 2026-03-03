@@ -19,6 +19,7 @@ CHECK_DOCS = {
 		'entity': 'COLLECTION',
 		'fields': [],
 		'severity': 'WARNING',
+		'dynamic_metadata': ['severity', 'entity'],
 		'summary': 'AI-reviewed finding stored in the shareable ai-check-cache repository.',
 		'fix': 'Review the cached finding details and evidence, then update the structured metadata or narrative accordingly. If the finding can be expressed deterministically, replace it with a regular plugin check instead of keeping it in the AI cache.',
 	},

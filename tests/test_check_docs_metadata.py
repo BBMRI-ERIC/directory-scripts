@@ -28,8 +28,11 @@ def test_check_docs_metadata_matches_all_plugins():
         for check in plugin["checks"]:
             doc = check.get("doc", {})
             assert doc, check["check_id"]
-            assert doc["severity"] == check["level"]
-            assert doc["entity"] == check["entity"]
+            dynamic_metadata = set(doc.get("dynamic_metadata", []))
+            if "severity" not in dynamic_metadata:
+                assert doc["severity"] == check["level"]
+            if "entity" not in dynamic_metadata:
+                assert doc["entity"] == check["entity"]
             assert isinstance(doc["fields"], list)
 
     documented_checks = {
