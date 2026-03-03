@@ -39,6 +39,11 @@ Narrative-vs-structure checks are split into two categories:
   - stored in `ai-check-cache/`
   - reserved only for findings that genuinely need full AI-model review on live data and cannot be expressed robustly as deterministic logic
   - emitted at runtime by `checks/AIFindings.py` as `AI:Curated`
+  - current rule families cover:
+    - access-governance metadata gaps
+    - participant phenotypic/clinical-profile gaps
+    - data-category gaps
+    - material-metadata gaps
 
 Rule of thumb:
 - if a rule can be implemented with regexes, heuristics, or ordinary Python logic, it should be a deterministic plugin
@@ -81,6 +86,7 @@ These two files serve different layers:
   - consumes `ai_cache.py`
   - turns cache records into runtime `DataCheckWarning(...)`
   - logs script warnings when cache entries are stale
+  - supports both `COLLECTION` and `BIOBANK` AI-reviewed findings
   - owns the manual-facing `CHECK_DOCS` for the cache-backed check
 
 So:

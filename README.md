@@ -222,7 +222,7 @@ python3 directory-stats.py -c DE,FR -A EXT -t CASE_CONTROL,POPULATION -N
 ``
 python3 directory-stats.py --only-withdrawn -N
 ``
-- **AI review workflow** - use the Codex skill `run-ai-checks` explicitly when you need full AI-model review of live Directory data. That workflow refreshes `ai-check-cache/` only for genuinely AI-only findings; deterministic regex/heuristic text checks already run in the normal QC pipeline via `TextConsistency`. After refreshing AI-reviewed findings, run `python3 data-check.py -N | rg 'AI:Curated'` to inspect the emitted cache-backed warnings.  
+- **AI review workflow** - use the Codex skill `run-ai-checks` explicitly when you need full AI-model review of live Directory data. That workflow refreshes `ai-check-cache/` only for genuinely AI-only findings; deterministic regex/heuristic text checks already run in the normal QC pipeline via `TextConsistency`. Current AI-reviewed domains include access-governance metadata gaps, participant clinical-profile gaps, data-category gaps, and material-metadata gaps. After refreshing AI-reviewed findings, use `python3 data-check.py -N -r` to validate that the full QC path stays free of stale-cache warnings, and use `python3 data-check.py -r | rg 'AI:Curated'` to inspect the emitted cache-backed warnings themselves.  
 - **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
 ``
 python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson

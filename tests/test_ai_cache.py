@@ -60,6 +60,12 @@ def write_payload(root, payload):
     (schema_dir / "study-text.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
+def write_named_payload(root, filename, payload):
+    schema_dir = root / "ERIC"
+    schema_dir.mkdir(parents=True, exist_ok=True)
+    (schema_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_load_ai_findings_for_directory_filters_stale_entities(monkeypatch, tmp_path):
     original = build_collection("col1", description="Baseline follow-up visit", type=["SAMPLE"])
     changed = build_collection("col2", description="Original description", type=["SAMPLE"])
@@ -204,4 +210,85 @@ def test_load_ai_findings_for_directory_uses_pristine_checksum_snapshot(monkeypa
     result = load_ai_findings_for_directory(directory)
 
     assert [finding["entity_id"] for finding in result.findings] == ["col1"]
+    assert result.issues == []
+
+
+def test_load_ai_findings_for_directory_aggregates_multiple_payload_files(monkeypatch, tmp_path):
+    collection_a = build_collection("colA", description="Access narrative")
+    collection_b = build_collection("colB", description="Material narrative")
+    fields = ["COLLECTION.name", "COLLECTION.description"]
+    payload_access = {
+        "schema": "ERIC",
+        "rule": "NarrativeAccessMetadataGap",
+        "generator": "test",
+        "generated_on": "2026-03-03",
+        "withdrawn_scope": "active-only",
+        "checked_fields": fields,
+        "checked_entities": [
+            {
+                "entity_id": "colA",
+                "entity_type": "COLLECTION",
+                "entity_checksum": ai_cache.compute_entity_checksum(collection_a),
+                "source_checksum": ai_cache.compute_source_checksum("COLLECTION", collection_a, fields),
+            },
+            {
+                "entity_id": "colB",
+                "entity_type": "COLLECTION",
+                "entity_checksum": ai_cache.compute_entity_checksum(collection_b),
+                "source_checksum": ai_cache.compute_source_checksum("COLLECTION", collection_b, fields),
+            },
+        ],
+        "findings": [
+            {
+                "rule": "NarrativeAccessMetadataGap",
+                "entity_id": "colA",
+                "entity_type": "COLLECTION",
+                "severity": "WARNING",
+                "message": "Access metadata gap.",
+                "action": "Review access metadata.",
+                "fields": fields,
+            }
+        ],
+    }
+    payload_material = {
+        "schema": "ERIC",
+        "rule": "NarrativeMaterialMetadataGap",
+        "generator": "test",
+        "generated_on": "2026-03-03",
+        "withdrawn_scope": "active-only",
+        "checked_fields": fields,
+        "checked_entities": [
+            {
+                "entity_id": "colA",
+                "entity_type": "COLLECTION",
+                "entity_checksum": ai_cache.compute_entity_checksum(collection_a),
+                "source_checksum": ai_cache.compute_source_checksum("COLLECTION", collection_a, fields),
+            },
+            {
+                "entity_id": "colB",
+                "entity_type": "COLLECTION",
+                "entity_checksum": ai_cache.compute_entity_checksum(collection_b),
+                "source_checksum": ai_cache.compute_source_checksum("COLLECTION", collection_b, fields),
+            },
+        ],
+        "findings": [
+            {
+                "rule": "NarrativeMaterialMetadataGap",
+                "entity_id": "colB",
+                "entity_type": "COLLECTION",
+                "severity": "WARNING",
+                "message": "Material metadata gap.",
+                "action": "Review material metadata.",
+                "fields": fields,
+            }
+        ],
+    }
+    write_named_payload(tmp_path, "access.json", payload_access)
+    write_named_payload(tmp_path, "materials.json", payload_material)
+    monkeypatch.setattr(ai_cache, "AI_CACHE_ROOT", tmp_path)
+
+    directory = DirectoryStub([collection_a, collection_b])
+    result = load_ai_findings_for_directory(directory)
+
+    assert [finding["entity_id"] for finding in result.findings] == ["colA", "colB"]
     assert result.issues == []

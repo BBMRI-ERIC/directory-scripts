@@ -12,8 +12,14 @@ class AIFindingsDirectoryStub:
     def getCollectionById(self, collection_id):
         return {"id": collection_id} if collection_id == "col1" else None
 
+    def getBiobankById(self, biobank_id):
+        return {"id": biobank_id} if biobank_id == "bb1" else None
+
     def getCollectionNN(self, collection_id):
         return "CZ"
+
+    def getBiobankNN(self, biobank_id):
+        return "NL"
 
 
 def test_ai_findings_plugin_emits_only_findings_for_entities_in_scope(monkeypatch):
@@ -48,6 +54,32 @@ def test_ai_findings_plugin_emits_only_findings_for_entities_in_scope(monkeypatc
         ("col1", "AI:Curated"),
     ]
     assert warnings[0].message.startswith("[NarrativeReuseBarrier] ")
+
+
+def test_ai_findings_plugin_supports_biobank_findings(monkeypatch):
+    monkeypatch.setattr(
+        "checks.AIFindings.load_ai_findings_for_directory",
+        lambda directory: AICacheLoadResult(
+            findings=[
+                {
+                    "rule": "NarrativeBiobankProfileGap",
+                    "entity_id": "bb1",
+                    "entity_type": "BIOBANK",
+                    "severity": "INFO",
+                    "message": "Biobank narrative and structured profile diverge.",
+                    "action": "Review the biobank metadata.",
+                }
+            ],
+            issues=[],
+        ),
+    )
+
+    warnings = AIFindings().check(AIFindingsDirectoryStub(), args=None)
+
+    assert len(warnings) == 1
+    assert warnings[0].directoryEntityID == "bb1"
+    assert warnings[0].dataCheckID == "AI:Curated"
+    assert warnings[0].NN == "NL"
 
 
 def test_ai_findings_plugin_logs_script_warning_for_stale_cache(monkeypatch, caplog):

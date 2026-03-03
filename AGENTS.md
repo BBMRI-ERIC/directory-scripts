@@ -76,6 +76,7 @@
 - AI-assisted findings that should be shareable belong in `ai-check-cache/`, not in private runtime caches such as `data-check-cache/`.
 - `ai-check-cache/` stores reviewable JSON findings committed to Git; regular `data-check.py` runs only read those findings and must not require live model access.
 - Regex-like or heuristic text checks belong in deterministic plugins such as `TextConsistency`, not in `ai-check-cache/`.
+- Current AI-reviewed domains include access-governance metadata gaps, participant phenotypic/clinical-profile gaps, data-category gaps, and material-metadata gaps.
 - AI cache reuse is checksum-based: findings remain reusable only while the live entity checksum and source-field checksum still match; `AIFindings` logs script warnings listing changed entity IDs and skips stale findings until the live AI-review workflow refreshes the cache.
 - AI cache checksums must exclude pure runtime metadata such as timestamps and `mg_*` fields so metadata-only churn does not force pointless reruns.
 - `exporter-bbmri-cohorts.py` uses `-W/--warnings`; keep `-w` reserved for withdrawn-scope selection.
@@ -107,6 +108,7 @@
 - `CHECK_DOCS` must be written as complete manual-facing documentation, not just as extracted-code hints: provide concrete `fields`, a clean generic `summary`, and a practical `fix` whenever the warning text is dynamic, partial, or emitted from helper logic that the AST extractor cannot follow.
 - `CHECK_DOCS.fields` may use explicit cross-entity references such as `CONTACT.email` or `BIOBANK.country` when a check depends on linked data from another entity; prefer that over pretending the dependency is local to the warning entity.
 - If a check is backed by `ai-check-cache/`, keep the plugin implementation and the JSON findings aligned: the plugin defines the stable runtime warning ID (`AI:Curated`), while the JSON files carry the concrete entity-level findings and evidence.
+- `AIFindings` supports both collection-level and biobank-level AI-reviewed findings; keep the cached `entity_type` aligned with the real target entity.
 - New AI-check proposals must review existing deterministic checks and existing `ai-check-cache/` findings first; prefer deterministic checks when the rule can be stated clearly and tested robustly.
 - AI-check work is always two-step: first proposal with real-data counts and overlap analysis, then implementation only after explicit user approval.
 - Proposal/review of AI checks must use the strongest available model in the current session; if that is not the strongest model available, tell the user before relying on the review.

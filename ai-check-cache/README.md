@@ -7,6 +7,12 @@ Purpose:
 - avoid coupling AI-assisted checks to private runtime caches such as `data-check-cache/`
 - let teams without direct access to the same models still run the resulting cache-backed warnings
 
+Current rule families:
+- `NarrativeAccessMetadataGap`
+- `NarrativeParticipantClinicalProfileGap`
+- `NarrativeDataCategoryGap`
+- `NarrativeMaterialMetadataGap`
+
 Important boundary:
 - deterministic regex/heuristic checks do **not** belong here
 - those checks must be implemented directly as regular plugins (for example `TextConsistency`)
@@ -63,6 +69,7 @@ JSON format:
 
 Rules:
 - entries must describe concrete entity-level findings, not vague prompts
+- files may cover `COLLECTION` or `BIOBANK` entities; the runtime plugin supports both
 - keep findings conservative enough that they can be reviewed and committed
 - when a finding is superseded or disproved, update or delete the JSON record and keep the checksum metadata current
 - if a finding can be expressed robustly as deterministic logic, move it into a regular plugin instead of keeping it here

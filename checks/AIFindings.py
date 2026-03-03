@@ -41,18 +41,15 @@ class AIFindings(IPlugin):
 		return warnings
 
 	def _build_warning(self, dir, finding):
-		self._validate_rule_metadata(
-			finding,
-			expected_entity='COLLECTION',
-			expected_severity='WARNING',
-		)
+		entity_type = self._resolve_entity_type(finding)
+		severity = self._resolve_severity(finding)
 		return DataCheckWarning(
 			make_check_id(CHECK_ID_PREFIX, 'Curated'),
 			'',
 			self._resolve_nn(dir, finding),
-			DataCheckWarningLevel.WARNING,
+			severity,
 			finding['entity_id'],
-			DataCheckEntityType.COLLECTION,
+			entity_type,
 			str(finding.get('withdrawn', '')),
 			self._format_message(finding),
 			finding['action'],
@@ -88,24 +85,43 @@ class AIFindings(IPlugin):
 			', '.join(issue.entity_ids),
 		)
 
-	def _validate_rule_metadata(self, finding, expected_entity, expected_severity):
-		if finding['entity_type'] != expected_entity:
+	def _resolve_entity_type(self, finding):
+		entity_type = finding['entity_type']
+		mapping = {
+			'BIOBANK': DataCheckEntityType.BIOBANK,
+			'COLLECTION': DataCheckEntityType.COLLECTION,
+		}
+		if entity_type not in mapping:
 			raise ValueError(
 				f"AI finding {finding.get('rule')!r} for {finding['entity_id']!r} "
-				f"must use entity_type={expected_entity!r}."
+				f"uses unsupported entity_type={entity_type!r}."
 			)
-		if finding['severity'] != expected_severity:
+		return mapping[entity_type]
+
+	def _resolve_severity(self, finding):
+		severity = finding['severity']
+		mapping = {
+			'ERROR': DataCheckWarningLevel.ERROR,
+			'WARNING': DataCheckWarningLevel.WARNING,
+			'INFO': DataCheckWarningLevel.INFO,
+		}
+		if severity not in mapping:
 			raise ValueError(
 				f"AI finding {finding.get('rule')!r} for {finding['entity_id']!r} "
-				f"must use severity={expected_severity!r}."
+				f"uses unsupported severity={severity!r}."
 			)
+		return mapping[severity]
 
 	def _entity_exists_in_scope(self, dir, finding):
 		if finding['entity_type'] == 'COLLECTION':
 			return dir.getCollectionById(finding['entity_id']) is not None
+		if finding['entity_type'] == 'BIOBANK':
+			return dir.getBiobankById(finding['entity_id']) is not None
 		return False
 
 	def _resolve_nn(self, dir, finding):
 		if finding.get('nn'):
 			return finding['nn']
+		if finding['entity_type'] == 'BIOBANK':
+			return dir.getBiobankNN(finding['entity_id'])
 		return dir.getCollectionNN(finding['entity_id'])
