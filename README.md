@@ -85,6 +85,11 @@ Email validation in `ContactFields` is split into local/static checks and option
 - remote checks cover MX/reachability validation and are disabled by `--disable-checks-all-remote` / `--disable-checks-remote emails`
 - disabling remote checks does not suppress the local placeholder-domain or syntax checks
 
+Known false positives can be suppressed in `warning-suppressions.json`:
+- mapping is `check ID -> entity ID`
+- suppressed warnings are omitted from stdout and XLSX output
+- use this only for reviewed false positives; fix the check logic whenever the pattern can be expressed deterministically
+
 Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ``
 python3 data-check.py --purge-all-caches -X test_results.xlsx
@@ -347,4 +352,29 @@ Delete using a file plus a collection filter:
 deletes only matching rows from the file and collection filter; confirmation is required.\
 ``
 ./directory-tables-modifier.py -s BBMRI-EU -v -T CollectionFacts -N BBMRI-EU -x facts-cmp.tsv -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE
+``
+
+## Collection descriptor updater
+
+`collection-factsheet-descriptor-updater.py` analyzes one collection in the public `ERIC` schema, derives collection-level descriptors from the fact sheet, and can update the `Collections` table in the explicit target staging area.
+
+Key behavior:
+- analysis always reads facts from `ERIC`
+- updates are written only to the explicitly provided `-s/--schema`
+- the tool checks whether the collection ID staging prefix matches the requested schema (for example `EU` -> `BBMRI-EU`) and asks for confirmation on mismatch unless `-f/--force` is used
+- the target collection must exist in the requested schema or the tool fails with an error
+- by default the tool only appends missing descriptor values; use `--replace-existing` to allow removing/replacing existing multi-value descriptors
+- numbers of samples and donors are updated from the all-star fact row when that row is present, even without `--replace-existing`
+- `NAV` fact-sheet material does not propagate to collection metadata when other material types are present; `*` fact-sheet aggregates are ignored for descriptor derivation
+- ICD-10 hierarchy is respected when appending diagnoses: broader existing codes such as `urn:miriam:icd:C18` are retained and cover specific fact-sheet codes such as `urn:miriam:icd:C18.0`
+
+Examples:
+``
+python3 collection-factsheet-descriptor-updater.py -c bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort -s BBMRI-EU -n -v
+``
+``
+python3 collection-factsheet-descriptor-updater.py -c bbmri-eric:ID:CZ_FOO:collection:BAR -s BBMRI-CZ
+``
+``
+python3 collection-factsheet-descriptor-updater.py -c bbmri-eric:ID:CZ_FOO:collection:BAR -s BBMRI-CZ --replace-existing -f
 ``

@@ -53,6 +53,12 @@ class NNContacts:
     MEMBER_NODE_CODES = frozenset(code for code in NODE_TO_EMAILS if code not in {"EU", "IARC"})
     GLOBAL_STAGING_AREA_CODES = frozenset({"EU", "IARC"})
     NON_MEMBER_STAGING_AREA_CODES = frozenset({"EXT"}) | GLOBAL_STAGING_AREA_CODES
+    PERMITTED_NON_COUNTRY_PREFIX_CODES = NON_MEMBER_STAGING_AREA_CODES
+    STAGING_AREA_TO_SCHEMA = {
+        "EU": "BBMRI-EU",
+        "EXT": "EXT",
+        "IARC": "IARC",
+    }
     ISO_3166_ALPHA2_CODES = frozenset(
         {
             "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT",
@@ -155,6 +161,30 @@ class NNContacts:
             normalized_staging != normalized_country
             and not cls.is_iso_country_code(normalized_staging)
         )
+
+    @classmethod
+    def is_permitted_non_country_prefix(cls, code: str | None) -> bool:
+        """Return whether a non-country staging-area prefix is explicitly allowed."""
+        return cls.normalize_code(code) in cls.PERMITTED_NON_COUNTRY_PREFIX_CODES
+
+    @classmethod
+    def expected_schema_name(cls, staging_area: str | None) -> str:
+        """Return the expected schema name for a staging-area prefix."""
+        normalized = cls.normalize_code(staging_area)
+        if not normalized:
+            return ""
+        if normalized in cls.STAGING_AREA_TO_SCHEMA:
+            return cls.STAGING_AREA_TO_SCHEMA[normalized]
+        if cls.is_member_node(normalized):
+            return f"BBMRI-{normalized}"
+        return normalized
+
+    @classmethod
+    def schema_matches_staging_area(cls, schema: str | None, staging_area: str | None) -> bool:
+        """Return whether a schema name matches the expected staging-area schema."""
+        normalized_schema = cls.normalize_code(schema)
+        expected_schema = cls.normalize_code(cls.expected_schema_name(staging_area))
+        return bool(normalized_schema and expected_schema and normalized_schema == expected_schema)
 
     @classmethod
     def labels_as_node_scope(cls, code: str | None) -> bool:

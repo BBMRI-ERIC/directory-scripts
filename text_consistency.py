@@ -91,6 +91,21 @@ FFPE_STORAGE_PATTERNS = [
     re.compile(r"\bparaffin[- ]embedded\b", re.IGNORECASE),
     re.compile(r"\bparaffin(?:ové)? blo", re.IGNORECASE),
 ]
+FFPE_NEGATIVE_PATTERNS = [
+    re.compile(r"\bnot available\b", re.IGNORECASE),
+    re.compile(r"\bno ffpe\b", re.IGNORECASE),
+    re.compile(r"\bwithout ffpe\b", re.IGNORECASE),
+    re.compile(r"\bwithout paraffin\b", re.IGNORECASE),
+]
+FFPE_INDIRECT_PATTERNS = [
+    re.compile(r"available via access procedure", re.IGNORECASE),
+    re.compile(r"available through access procedure", re.IGNORECASE),
+    re.compile(r"contributing biobanks?", re.IGNORECASE),
+    re.compile(r"participating biobanks?", re.IGNORECASE),
+    re.compile(r"available via .*biobanks?", re.IGNORECASE),
+    re.compile(r"available from .*biobanks?", re.IGNORECASE),
+    re.compile(r"proxy for finding .*biobanks?", re.IGNORECASE),
+]
 FFPE_SLIDE_PATTERNS = [
     re.compile(r"whole slide", re.IGNORECASE),
     re.compile(r"\bwsi\b", re.IGNORECASE),
@@ -258,17 +273,15 @@ def _build_ffpe_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
         return None
 
     text = _collection_text(collection)
-    matched_term = _first_match(FFPE_PATTERNS, text)
+    matched_term = None
+    for sentence in _split_sentences(text):
+        sentence_match = _first_match(FFPE_PATTERNS, sentence)
+        if not sentence_match:
+            continue
+        if _ffpe_sentence_requires_material(sentence, materials):
+            matched_term = sentence_match
+            break
     if not matched_term:
-        return None
-
-    storage_signal = any(pattern.search(text) for pattern in FFPE_STORAGE_PATTERNS)
-    slide_signal = any(pattern.search(text) for pattern in FFPE_SLIDE_PATTERNS)
-    derived_signal = any(pattern.search(text) for pattern in FFPE_DERIVED_PATTERNS)
-
-    if slide_signal and "TISSUE_STAINED" in materials and not storage_signal:
-        return None
-    if derived_signal and materials and materials <= DERIVED_MATERIALS:
         return None
 
     return {
@@ -284,6 +297,23 @@ def _build_ffpe_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
             "when the text only refers to slides, sections, images, or derived DNA/RNA."
         ),
     }
+
+
+def _ffpe_sentence_requires_material(sentence: str, materials: set[str]) -> bool:
+    if any(pattern.search(sentence) for pattern in FFPE_NEGATIVE_PATTERNS):
+        return False
+
+    storage_signal = any(pattern.search(sentence) for pattern in FFPE_STORAGE_PATTERNS)
+    slide_signal = any(pattern.search(sentence) for pattern in FFPE_SLIDE_PATTERNS)
+    derived_signal = any(pattern.search(sentence) for pattern in FFPE_DERIVED_PATTERNS)
+
+    if any(pattern.search(sentence) for pattern in FFPE_INDIRECT_PATTERNS) and not storage_signal:
+        return False
+    if slide_signal and "TISSUE_STAINED" in materials and not storage_signal:
+        return False
+    if derived_signal and materials and materials <= DERIVED_MATERIALS:
+        return False
+    return True
 
 
 def _build_covid_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -354,6 +384,10 @@ def _first_match(patterns: Iterable[tuple[re.Pattern[str], str]], text: str) -> 
         if pattern.search(text):
             return label
     return None
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", text) if sentence.strip()]
 
 
 def _as_sorted_strings(values: Any) -> list[str]:

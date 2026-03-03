@@ -17,7 +17,7 @@ This document collects developer-facing architecture, code-organization, style, 
   - owns shared data retrieval, schema handling, withdrawal scoping, and graph helpers
 - `checks/`
   - owns actual QC logic that emits `DataCheckWarning(...)`
-- helper modules such as `nncontacts.py`, `warningscontainer.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`
+- helper modules such as `nncontacts.py`, `warningscontainer.py`, `warning_suppressions.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`, `fact_descriptor_sync.py`
   - own reusable logic that can be consumed by multiple scripts or plugins
 
 ### Deterministic text checks vs AI-reviewed findings
@@ -43,6 +43,26 @@ Narrative-vs-structure checks are split into two categories:
 Rule of thumb:
 - if a rule can be implemented with regexes, heuristics, or ordinary Python logic, it should be a deterministic plugin
 - `ai-check-cache/` is only for the residual fuzzy cases
+
+### Fact-sheet alignment helpers vs runtime checks/tools
+
+- `fact_descriptor_sync.py`
+  - shared derivation/comparison logic for collection descriptors vs fact sheets
+  - used by both `checks/FactTables.py` and `collection-factsheet-descriptor-updater.py`
+  - owns special handling such as:
+    - ignoring `*` fact-sheet aggregate values for descriptor comparison
+    - treating `NAV` material as non-authoritative when other materials exist
+    - preserving broader ICD-10 metadata codes when they already cover more specific fact-sheet diagnoses
+
+- `checks/FactTables.py`
+  - runtime QC warning producer
+  - uses the shared helper logic to avoid reporting known deterministic false positives
+
+- `collection-factsheet-descriptor-updater.py`
+  - explicit maintenance CLI
+  - uses the same shared helper logic to propose and optionally apply descriptor updates to staging-area `Collections`
+
+If descriptor-alignment logic changes, keep both the check and the updater behavior consistent.
 
 ### `ai_cache.py` vs `checks/AIFindings.py`
 
@@ -79,6 +99,19 @@ Use `CHECK_DOCS` for:
 - business-context explanations that cannot be reconstructed reliably from AST parsing alone
 
 Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
+
+### Warning suppressions
+
+- `warning-suppressions.json`
+  - reviewed false-positive suppressions
+  - maps `check ID -> entity ID`
+  - used only to hide known residual false positives from QC output
+- `warning_suppressions.py`
+  - loader/normalizer for the suppression JSON
+- `warningscontainer.py`
+  - applies suppressions before warnings are written to stdout/XLSX
+
+Suppressions are not a substitute for fixing deterministic logic. Prefer code fixes first; keep suppressions for reviewed residual cases.
 
 After changing check docs metadata, validate with:
 

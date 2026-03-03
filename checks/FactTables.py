@@ -3,14 +3,17 @@
 import re
 import logging as log
 import collections as py_collections
-
-from directory import Directory
 from fact_sheet_utils import (
 	FACT_DIMENSION_KEYS,
 	analyze_collection_fact_sheet,
 	count_star_dimensions,
 	get_dimension_values,
 	get_matching_one_star_rows,
+)
+from fact_descriptor_sync import (
+	collect_fact_descriptor_values,
+	fact_descriptor_values_for_comparison,
+	parse_collection_multi_value_field,
 )
 
 from yapsy.IPlugin import IPlugin
@@ -22,7 +25,7 @@ CHECK_ID_PREFIX = "FT"
 
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, actionDescription, warningsList): # TO improve
-	if factsList != [] and py_collections.Counter(factsList) != py_collections.Counter(collList):
+	if factsList and py_collections.Counter(factsList) != py_collections.Counter(collList):
 		warningsList.append(DataCheckWarning(make_check_id(self, "CollFactsMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email']))
 
 
@@ -170,14 +173,14 @@ CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
                                                            'number_of_samples '
                                                            '({all_star_samples})'},
  'FT:DnaMaterials': {'entity': 'COLLECTION',
-                           'fields': ['donors_present', 'facts', 'id', 'network'],
+                           'fields': ['donors_present', 'facts', 'id', 'materials', 'network'],
                            'severity': 'ERROR',
                            'summary': 'Collection in {BBMRICohortsDNANetworkName} but '
                                       'the fact table does not contain any of the '
                                       'expected material types: '
                                       "{','.join(requiredMaterialTypes)})"},
  'FT:DnaNavPresent': {'entity': 'COLLECTION',
-                            'fields': ['donors_present', 'facts', 'id', 'network'],
+                            'fields': ['donors_present', 'facts', 'id', 'materials', 'network'],
                             'severity': 'ERROR',
                             'summary': 'Collection in {BBMRICohortsDNANetworkName} but '
                                        'the fact table does specified the NAV '
@@ -240,9 +243,6 @@ class FactTables(IPlugin):
 
 		for collection in dir.getCollections():
 			collectionFacts = []
-			collFactsDiseases = set()
-			collFactsSexGroups = set()
-			collFactsMaterialTypes = set()
 			collsFactsSamples = 0
 			collsFactsDonors = 0
 
@@ -260,40 +260,30 @@ class FactTables(IPlugin):
 				for n in collection['network']:
 					collection_networks.append(n['id'])
 
-			materials = []
-			if 'materials' in collection:
-				for m in collection['materials']:
-					materials.append(m)
-
-			diags = []
-			if 'diagnosis_available' in collection.keys():
-				for d in collection['diagnosis_available']:
-					if not re.search('-', d['name']):
-						diags.append(d['name'])
-
-			collSex = set(Directory.getListOfEntityAttributes(collection, 'sex'))
+			materials = parse_collection_multi_value_field(collection.get('materials'))
+			diags = [
+				value for value in parse_collection_multi_value_field(collection.get('diagnosis_available'))
+				if not re.search('-', value)
+			]
+			collSex = parse_collection_multi_value_field(collection.get('sex'))
 
 			if 'facts' in collection.keys() and collection['facts'] != []:
 				collectionFacts = dir.getCollectionFacts(collection['id'])
 				for fact in collectionFacts:
-					if 'disease' in fact and isinstance(fact['disease'], dict):
-						collFactsDiseases.add(fact['disease']['name'])
 					if 'age_range' in fact:
 						ages.update(re.findall(r'\d+', fact['age_range']))
 						ageUnits.update(re.findall(r'\((?:\d+-\d+\s)?(.*?)\)', fact['age_range']))
 						if '>80 years' in ageUnits:
 							ageUnits.remove('>80 years')
 							ageUnits.add('years')
-					if 'sex' in fact:
-						collFactsSexGroups.add(fact['sex'])
-					if 'sample_type' in fact:
-						collFactsMaterialTypes.add(fact['sample_type'])
 					if 'number_of_samples' in fact:
 						collsFactsSamples += fact['number_of_samples']
 					if 'number_of_donors' in fact:
 						collsFactsDonors += fact['number_of_donors']
 
 				fact_sheet = analyze_collection_fact_sheet(collection, collectionFacts)
+				raw_fact_descriptor_values = collect_fact_descriptor_values(collectionFacts)
+				fact_descriptor_values = fact_descriptor_values_for_comparison(collectionFacts, collection)
 				all_star_samples = fact_sheet['all_star_number_of_samples']
 				all_star_donors = fact_sheet['all_star_number_of_donors']
 
@@ -311,13 +301,13 @@ class FactTables(IPlugin):
 						if kAnonymityViolatingList:
 							warnings.append(DataCheckWarning(make_check_id(self, "KAnonViolation"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}"))
 
-					compareFactsColl(self, dir, collFactsDiseases, diags, collection, "Diagnoses of collection and facts table do not match", "Check diagnosis entries of the collection description with diagnoses from the facts table and correct as necessary", warnings)
+					compareFactsColl(self, dir, fact_descriptor_values['diagnosis_available'], diags, collection, "Diagnoses of collection and facts table do not match", "Check diagnosis entries of the collection description with diagnoses from the facts table and correct as necessary", warnings)
 
 					if 'age_unit' in collection.keys() and ageUnits:
 						compareAge(self, dir, ages, ageUnits, collection, warnings)
 
-					compareFactsColl(self, dir, collFactsSexGroups, collSex, collection, "Sex of collection and facts table do not match", "Check sex information of the collection description with sex information from the facts table and correct as necessary", warnings)
-					compareFactsColl(self, dir, collFactsMaterialTypes, materials, collection, "Material types of collection and facts table do not match", "Check material types of the collection description with material types from the facts table and correct as necessary", warnings)
+					compareFactsColl(self, dir, fact_descriptor_values['sex'], collSex, collection, "Sex of collection and facts table do not match", "Check sex information of the collection description with sex information from the facts table and correct as necessary", warnings)
+					compareFactsColl(self, dir, fact_descriptor_values['materials'], materials, collection, "Material types of collection and facts table do not match", "Check material types of the collection description with material types from the facts table and correct as necessary", warnings)
 
 					fact_values = get_dimension_values(collectionFacts)
 					aggregates = dict(py_collections.Counter(
@@ -355,9 +345,9 @@ class FactTables(IPlugin):
 
 					if 'network' in collection and BBMRICohortsDNANetworkName in collection_networks:
 						requiredMaterialTypes = ['DNA', 'WHOLE_BLOOD', 'PERIPHERAL_BLOOD_CELLS', 'BUFFY_COAT', 'CDNA', 'PLASMA', 'SERUM']
-						if not any(mat in collFactsMaterialTypes for mat in requiredMaterialTypes):
+						if not any(mat in fact_descriptor_values['materials'] for mat in requiredMaterialTypes):
 							warnings.append(DataCheckWarning(make_check_id(self, "DnaMaterials"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection in {BBMRICohortsDNANetworkName} but the fact table does not contain any of the expected material types: {','.join(requiredMaterialTypes)})", dir.getCollectionContact(collection['id'])['email']))
 
-						if 'NAV' in collFactsMaterialTypes:
+						if 'NAV' in raw_fact_descriptor_values['materials']:
 							warnings.append(DataCheckWarning(make_check_id(self, "DnaNavPresent"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection in {BBMRICohortsDNANetworkName} but the fact table does specified the NAV (not-available) material type", dir.getCollectionContact(collection['id'])['email']))
 		return warnings

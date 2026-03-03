@@ -1,4 +1,5 @@
 import json
+import copy
 from pathlib import Path
 
 import ai_cache
@@ -10,6 +11,7 @@ class DirectoryStub:
         self._collections = list(collections)
         self.include_withdrawn_entities = include_withdrawn or only_withdrawn
         self.only_withdrawn_entities = only_withdrawn
+        self._ai_checksum_snapshot = {}
 
     def getSchema(self):
         return "ERIC"
@@ -19,6 +21,21 @@ class DirectoryStub:
 
     def getBiobanks(self):
         return []
+
+    def prepare_ai_cache_checksum_state(self):
+        if self._ai_checksum_snapshot:
+            return
+        self._ai_checksum_snapshot = {
+            "COLLECTION": {
+                collection["id"]: copy.deepcopy(collection)
+                for collection in self._collections
+            }
+        }
+
+    def get_ai_checksum_entity(self, entity_type, entity_id):
+        if not self._ai_checksum_snapshot:
+            self.prepare_ai_cache_checksum_state()
+        return self._ai_checksum_snapshot.get(entity_type, {}).get(entity_id)
 
 
 def build_collection(collection_id, **overrides):
@@ -140,3 +157,51 @@ def test_load_ai_findings_for_directory_reports_scope_mismatch(monkeypatch, tmp_
     result = load_ai_findings_for_directory(directory)
 
     assert [issue.reason for issue in result.issues] == ["scope-mismatch"]
+
+
+def test_load_ai_findings_for_directory_uses_pristine_checksum_snapshot(monkeypatch, tmp_path):
+    collection = build_collection(
+        "col1",
+        description="Narrative access conditions",
+        access_description="Structured access description",
+    )
+    fields = ["COLLECTION.name", "COLLECTION.description", "COLLECTION.access_description"]
+    payload = {
+        "schema": "ERIC",
+        "rule": "NarrativeAccessMetadataGap",
+        "generator": "test",
+        "generated_on": "2026-03-03",
+        "withdrawn_scope": "active-only",
+        "checked_fields": fields,
+        "checked_entities": [
+            {
+                "entity_id": "col1",
+                "entity_type": "COLLECTION",
+                "entity_checksum": ai_cache.compute_entity_checksum(collection),
+                "source_checksum": ai_cache.compute_source_checksum("COLLECTION", collection, fields),
+            }
+        ],
+        "findings": [
+            {
+                "rule": "NarrativeAccessMetadataGap",
+                "entity_id": "col1",
+                "entity_type": "COLLECTION",
+                "severity": "WARNING",
+                "message": "Narrative access conditions are only in free text.",
+                "action": "Review access metadata.",
+                "fields": fields,
+            }
+        ],
+    }
+    write_payload(tmp_path, payload)
+    monkeypatch.setattr(ai_cache, "AI_CACHE_ROOT", tmp_path)
+
+    directory = DirectoryStub([collection])
+    directory.prepare_ai_cache_checksum_state()
+    directory.getCollections()[0]["derived_runtime_flag"] = True
+    directory.getCollections()[0]["access_description"] = "Mutated by earlier plugin"
+
+    result = load_ai_findings_for_directory(directory)
+
+    assert [finding["entity_id"] for finding in result.findings] == ["col1"]
+    assert result.issues == []

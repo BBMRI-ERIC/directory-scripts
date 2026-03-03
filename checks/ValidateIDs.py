@@ -9,17 +9,23 @@ from nncontacts import NNContacts
 
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
+PERMITTED_NON_COUNTRY_PREFIXES = ",".join(sorted(NNContacts.PERMITTED_NON_COUNTRY_PREFIX_CODES))
+PERMITTED_NON_COUNTRY_PREFIXES_REGEX = "|".join(
+    sorted(NNContacts.PERMITTED_NON_COUNTRY_PREFIX_CODES)
+)
+
+
 CHECK_DOCS = {'VID:BBExtPrefix': {'entity': 'BIOBANK',
                                                  'fields': ['id'],
                                                  'severity': 'ERROR',
                                                  'summary': 'BiobankID is not '
                                                             'compliant with the '
                                                             'specification  (shall '
-                                                            'start with '
-                                                            '"bbmri-eric:ID:EXT_" '
-                                                            'prefix for external '
-                                                            'biobanks that have no '
-                                                            'national node)'},
+                                                            'use a permitted '
+                                                            'non-country staging '
+                                                            'prefix such as '
+                                                            '"EXT", "EU", or '
+                                                            '"IARC")'},
  'VID:BBExtFormat': {'entity': 'BIOBANK',
                                                   'fields': ['id'],
                                                   'severity': 'ERROR',
@@ -56,11 +62,10 @@ CHECK_DOCS = {'VID:BBExtPrefix': {'entity': 'BIOBANK',
                                        'fields': ['id'],
                                        'severity': 'ERROR',
                                        'summary': 'CollectionID is not compliant with '
-                                                  'the specification  (shall start '
-                                                  'with "bbmri-eric:ID:EXT_" prefix '
-                                                  'for collections from external '
-                                                  'biobanks that have no national '
-                                                  'node)'},
+                                                  'the specification  (shall use a '
+                                                  'permitted non-country staging '
+                                                  'prefix such as "EXT", "EU", or '
+                                                  '"IARC")'},
  'VID:CollExtFormat': {'entity': 'COLLECTION',
                                         'fields': ['id'],
                                         'severity': 'ERROR',
@@ -100,11 +105,11 @@ CHECK_DOCS = {'VID:BBExtPrefix': {'entity': 'BIOBANK',
                                                  'summary': 'ContactID is not '
                                                             'compliant with the '
                                                             'specification  (shall '
-                                                            'start with '
-                                                            '"bbmri-eric:ID:EXT_" '
-                                                            'prefix for contacts for '
-                                                            'external biobanks that '
-                                                            'have no national node)'},
+                                                            'use a permitted '
+                                                            'non-country staging '
+                                                            'prefix such as '
+                                                            '"EXT", "EU", or '
+                                                            '"IARC")'},
  'VID:CtExtFormat': {'entity': 'CONTACT',
                                                   'fields': ['id'],
                                                   'severity': 'ERROR',
@@ -143,11 +148,11 @@ CHECK_DOCS = {'VID:BBExtPrefix': {'entity': 'BIOBANK',
                                                  'summary': 'NetworkID is not '
                                                             'compliant with the '
                                                             'specification  (shall '
-                                                            'start with '
-                                                            '"bbmri-eric:ID:EXT_" '
-                                                            'prefix for networks from '
-                                                            'countries that have no '
-                                                            'national node)'},
+                                                            'use a permitted '
+                                                            'non-country staging '
+                                                            'prefix such as '
+                                                            '"EXT", "EU", or '
+                                                            '"IARC")'},
  'VID:NetPrefix': {'entity': 'NETWORK',
                                                   'fields': ['id'],
                                                   'severity': 'ERROR',
@@ -188,9 +193,9 @@ class ValidateIDs(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			NN = dir.getBiobankNN(biobank['id'])
-			if not NNContacts.is_member_node(NN):
-				if not re.search('^bbmri-eric:ID:EXT_', biobank['id']):
-					warnings.append(DataCheckWarning(make_check_id(self, "BBExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "BiobankID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for external biobanks that have no national node)'))
+			if not NNContacts.is_member_node(NN) and not NNContacts.is_permitted_non_country_prefix(NN):
+				if not re.search(r'^bbmri-eric:ID:(?:' + PERMITTED_NON_COUNTRY_PREFIXES_REGEX + r')_', biobank['id']):
+					warnings.append(DataCheckWarning(make_check_id(self, "BBExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "BiobankID is not compliant with the specification " + f' (shall use a permitted non-country staging prefix such as {PERMITTED_NON_COUNTRY_PREFIXES})'))
 			if re.search('^bbmri-eric:ID:EXT', biobank['id']):
 				if not re.search('^bbmri-eric:ID:EXT_', biobank['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "BBExtFormat"), "", NN, DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "BiobankID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for external biobanks)'))
@@ -204,9 +209,9 @@ class ValidateIDs(IPlugin):
 
 		for collection in dir.getCollections():
 			NN = dir.getCollectionNN(collection['id'])
-			if not NNContacts.is_member_node(NN):
-				if not re.search('^bbmri-eric:ID:EXT_', collection['id']):
-					warnings.append(DataCheckWarning(make_check_id(self, "CollExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "CollectionID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for collections from external biobanks that have no national node)'))
+			if not NNContacts.is_member_node(NN) and not NNContacts.is_permitted_non_country_prefix(NN):
+				if not re.search(r'^bbmri-eric:ID:(?:' + PERMITTED_NON_COUNTRY_PREFIXES_REGEX + r')_', collection['id']):
+					warnings.append(DataCheckWarning(make_check_id(self, "CollExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "CollectionID is not compliant with the specification " + f' (shall use a permitted non-country staging prefix such as {PERMITTED_NON_COUNTRY_PREFIXES})'))
 			if re.search('^bbmri-eric:ID:EXT', collection['id']):
 				if not re.search('^bbmri-eric:ID:EXT_', collection['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "CollExtFormat"), "", NN, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "CollectionID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for collections from external biobanks)'))
@@ -223,9 +228,9 @@ class ValidateIDs(IPlugin):
 
 		for contact in dir.getContacts(): # TODO: Add withdrawn
 			NN = dir.getContactNN(contact['id'])
-			if not NNContacts.is_member_node(NN):
-				if not re.search('^bbmri-eric:ID:EXT_', contact['id']):
-					warnings.append(DataCheckWarning(make_check_id(self, "CtExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "ContactID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for contacts for external biobanks that have no national node)'))
+			if not NNContacts.is_member_node(NN) and not NNContacts.is_permitted_non_country_prefix(NN):
+				if not re.search(r'^bbmri-eric:contactID:(?:' + PERMITTED_NON_COUNTRY_PREFIXES_REGEX + r')_', contact['id']):
+					warnings.append(DataCheckWarning(make_check_id(self, "CtExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "ContactID is not compliant with the specification " + f' (shall use a permitted non-country staging prefix such as {PERMITTED_NON_COUNTRY_PREFIXES})'))
 			if re.search('^bbmri-eric:contactID:EXT', contact['id']):
 				if not re.search('^bbmri-eric:contactID:EXT_', contact['id']):
 					warnings.append(DataCheckWarning(make_check_id(self, "CtExtFormat"), "", NN, DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "ContactID is not compliant with the specification " + ' (shall start with "bbmri-eric:contactID:EXT_" prefix for contacts for external biobanks)'))
@@ -239,9 +244,9 @@ class ValidateIDs(IPlugin):
 
 		for network in dir.getNetworks(): # TODO: Add withdrawn
 			NN = dir.getNetworkNN(network['id'])
-			if not NNContacts.is_member_node(NN):
-				if not re.search('^bbmri-eric:ID:EXT_', network['id']):
-					warnings.append(DataCheckWarning(make_check_id(self, "NetExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, 'NA', "NetworkID is not compliant with the specification " + ' (shall start with "bbmri-eric:ID:EXT_" prefix for networks from countries that have no national node)'))
+			if not NNContacts.is_member_node(NN) and not NNContacts.is_permitted_non_country_prefix(NN):
+				if not re.search(r'^bbmri-eric:networkID:(?:' + PERMITTED_NON_COUNTRY_PREFIXES_REGEX + r')_', network['id']):
+					warnings.append(DataCheckWarning(make_check_id(self, "NetExtPrefix"), "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, 'NA', "NetworkID is not compliant with the specification " + f' (shall use a permitted non-country staging prefix such as {PERMITTED_NON_COUNTRY_PREFIXES})'))
 			if not re.search('^bbmri-eric:networkID:', network['id']):
 				warnings.append(DataCheckWarning(make_check_id(self, "NetPrefix"), "", NN, DataCheckWarningLevel.ERROR, network['id'], DataCheckEntityType.NETWORK, 'NA', "NetworkID is not compliant with the specification " + ' (shall start with "bbmri-eric:networkID: prefix)'))
 			else:

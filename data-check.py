@@ -31,6 +31,10 @@ from customwarnings import DataCheckWarning
 from warningscontainer import WarningsContainer
 from nncontacts import NNContacts
 from directory import Directory
+from warning_suppressions import (
+    DEFAULT_WARNING_SUPPRESSIONS_PATH,
+    load_warning_suppressions,
+)
 
 from orphacodes import OrphaCodes
 
@@ -79,6 +83,12 @@ add_plugin_disable_argument(parser, pluginList)
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1,
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
+parser.add_argument(
+    '--warning-suppressions',
+    dest='warning_suppressions',
+    default=str(DEFAULT_WARNING_SUPPRESSIONS_PATH),
+    help='JSON file mapping check IDs to entity IDs whose warnings should be suppressed as known false positives',
+)
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default='ERIC')
 
@@ -91,7 +101,8 @@ configure_logging(args)
 # Main code
 
 dir = Directory(**build_directory_kwargs(args, pp=pp))
-warningContainer = WarningsContainer()
+dir.prepare_ai_cache_checksum_state()
+warningContainer = WarningsContainer(load_warning_suppressions(args.warning_suppressions))
 
 orphacodes = None
 if args.orphacodesfile is not None:

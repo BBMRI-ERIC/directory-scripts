@@ -27,6 +27,7 @@
 - Avoid duplicating API logic in scripts; import and reuse the shared modules instead.
 - Use assertive runtime validation for assumptions that depend on input/data/configuration; raise clear exceptions instead of relying on `assert` for runtime safety.
 - `nncontacts.py` is the single source of truth for BBMRI node contacts, member-node classification, staging-area parsing, and non-member/global area detection; do not re-encode that logic elsewhere.
+- Keep permitted non-country staging prefixes (currently `EXT`, `EU`, `IARC`) and staging-prefix-to-schema expectations in `nncontacts.py`; checks and tools such as `ValidateIDs` and `collection-factsheet-descriptor-updater.py` must use that shared configuration rather than hardcoding `EXT` rules locally.
 
 ## Modularization Guidelines
 - Keep exporters thin: CLI + orchestration only; move reusable logic into helper modules.
@@ -53,6 +54,9 @@
 - Staging area and country are not the same concept: non-member/global areas such as `EXT` or `EU` can host entities whose `country` is a BBMRI member state.
 - `Directory.get*NN(...)` is for node/staging-area routing and grouping and must follow entity IDs via `nncontacts.py`; `Directory.get*Country(...)` is for reported country values. For example, `US`/`VN` biobanks in `EXT` belong under the `EXT` node tab, not country-specific tabs.
 - `directory-tables-modifier.py` requires an explicit schema (`-s/--schema`) and treats table deletion as content deletion only (no dropping tables).
+- `collection-factsheet-descriptor-updater.py` analyzes facts from `ERIC` but writes only to the explicitly requested staging-area schema; it must confirm schema/prefix mismatches interactively unless `-f/--force` is used.
+- `collection-factsheet-descriptor-updater.py` should only append missing multi-value descriptors by default; only `--replace-existing` may remove/replace existing diagnosis/material/sex values, while all-star sample/donor totals may still replace numeric totals without that option.
+- `collection-factsheet-descriptor-updater.py` must treat fact-sheet `*` rows as aggregates only and must not propagate `NAV` sample type to collection metadata when other fact/metadata material types exist.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`.
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
@@ -67,6 +71,7 @@
 - QC CLI note: `data-check.py` and other QC tools using `cli_common.add_remote_check_disable_arguments(...)` expose `-r` / `--disable-checks-all-remote`.
 - Directory-backed tools and exporters exclude withdrawn biobanks/collections by default; `-w` / `--include-withdrawn` includes them and `--only-withdrawn` restricts the run to them.
 - `full-text-search.py` keeps separate index directories per schema and withdrawn scope; do not mix those caches manually.
+- Reviewed false positives belong in `warning-suppressions.json` as `check ID -> entity ID` suppressions. Prefer fixing deterministic logic first; use suppressions only for known residual false positives.
 - Withdrawal for checks is logically inherited for collections: a collection counts as withdrawn if it is withdrawn itself, if its biobank is withdrawn, or if an ancestor collection is withdrawn.
 - AI-assisted findings that should be shareable belong in `ai-check-cache/`, not in private runtime caches such as `data-check-cache/`.
 - `ai-check-cache/` stores reviewable JSON findings committed to Git; regular `data-check.py` runs only read those findings and must not require live model access.
@@ -87,6 +92,7 @@
 - Cache guidance for local testing: avoid `--purge-cache directory` unless you suspect recent Directory content changes may affect results; prefer reusing the existing cache to keep comparisons stable and runs faster.
 - For `directory-stats.py` changes, keep cross-checks against other exporters where totals overlap, especially `exporter-all.py`.
 - When changing `nncontacts.py`, verify both warning routing and any staging/member-area classification tests.
+- When changing fact-sheet descriptor alignment logic, validate both `checks/FactTables.py` and `collection-factsheet-descriptor-updater.py` because they intentionally share comparison/derivation rules.
 - When changing check documentation metadata or manual extraction, test both the local plugin tests and `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py`.
 
 ## Quality Gate

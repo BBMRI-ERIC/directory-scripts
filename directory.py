@@ -1,4 +1,5 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
+import copy
 import logging
 import os.path
 import time
@@ -50,6 +51,7 @@ class Directory:
         self.__package = schema
         self.only_withdrawn_entities = only_withdrawn_entities
         self.include_withdrawn_entities = include_withdrawn_entities or only_withdrawn_entities
+        self._ai_checksum_snapshot = {}
         log.debug('Checking data in schema: ' + schema)
 
         cache_dir = 'data-check-cache/directory'
@@ -297,6 +299,31 @@ class Directory:
         log.info('Directory structure initialized')
         self.__orphacodesmapper = None
         self._collection_withdrawn_cache = {}
+
+    def prepare_ai_cache_checksum_state(self):
+        """Capture pristine entities for AI-cache checksum validation.
+
+        QC plugins may mutate in-memory Directory entities during a run. AI
+        cache validation must therefore compare cached checksums against the
+        original Directory snapshot, not the post-plugin mutated state.
+        """
+        if self._ai_checksum_snapshot:
+            return
+        self._ai_checksum_snapshot = {
+            "BIOBANK": {
+                biobank["id"]: copy.deepcopy(biobank) for biobank in self.biobanks
+            },
+            "COLLECTION": {
+                collection["id"]: copy.deepcopy(collection)
+                for collection in self.collections
+            },
+        }
+
+    def get_ai_checksum_entity(self, entity_type: str, entity_id: str) -> Optional[dict[str, Any]]:
+        """Return the pristine snapshot entity used for AI-cache checksums."""
+        if not self._ai_checksum_snapshot:
+            self.prepare_ai_cache_checksum_state()
+        return self._ai_checksum_snapshot.get(entity_type, {}).get(entity_id)
 
     def setOrphaCodesMapper(self, o):
         """Attach an OrphaCodes mapper implementation."""

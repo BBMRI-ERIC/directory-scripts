@@ -87,6 +87,25 @@ def test_ffpe_material_skips_slide_and_derived_mentions_but_keeps_blocks():
     assert "TISSUE_PARAFFIN_EMBEDDED" in findings["TXT:FFPEMaterial"]["message"]
 
 
+def test_ffpe_material_skips_negative_and_indirect_mentions():
+    indirect = build_collection(
+        "indirect",
+        description=(
+            "Complete data sets as well as biological samples (at least FFPE samples) are "
+            "available via access procedure, involving the contributing biobanks."
+        ),
+        materials=[],
+    )
+    negative = build_collection(
+        "negative",
+        description="FFPE material is not available in this collection.",
+        materials=[],
+    )
+
+    assert build_text_consistency_findings(indirect) == []
+    assert build_text_consistency_findings(negative) == []
+
+
 def test_covid_diag_supports_long_covid_and_skips_context_only_cases():
     long_covid = build_collection(
         "long-covid",

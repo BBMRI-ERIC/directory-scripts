@@ -70,6 +70,8 @@ def load_ai_findings(schema: str) -> list[dict[str, Any]]:
 
 def load_ai_findings_for_directory(directory: Any) -> AICacheLoadResult:
     """Load AI findings and keep only records whose cached source data still matches."""
+    if hasattr(directory, "prepare_ai_cache_checksum_state"):
+        directory.prepare_ai_cache_checksum_state()
     findings: list[dict[str, Any]] = []
     issues: list[AICacheIssue] = []
     for payload in load_ai_payloads(directory.getSchema()):
@@ -286,7 +288,7 @@ def _validate_payload_against_directory(
 
     changed_ids: list[str] = []
     for entity_id in sorted(set(current_by_id) & set(checked_by_id)):
-        entity = current_by_id[entity_id]
+        entity = _get_checksum_entity(directory, entity_type, entity_id, current_by_id[entity_id])
         expected = checked_by_id[entity_id]
         current_entity_checksum = compute_entity_checksum(entity)
         current_source_checksum = compute_source_checksum(entity_type, entity, checked_fields)
@@ -323,6 +325,22 @@ def _get_entities_in_scope(directory: Any, entity_type: str) -> list[dict[str, A
     if entity_type == "COLLECTION":
         return list(directory.getCollections())
     raise ValueError(f"Unsupported AI cache entity_type {entity_type!r}.")
+
+
+def _get_checksum_entity(
+    directory: Any,
+    entity_type: str,
+    entity_id: str,
+    fallback_entity: dict[str, Any],
+) -> dict[str, Any]:
+    """Return the immutable checksum basis for one entity when available."""
+    getter = getattr(directory, "get_ai_checksum_entity", None)
+    if getter is None:
+        return fallback_entity
+    checksum_entity = getter(entity_type, entity_id)
+    if checksum_entity is None:
+        return fallback_entity
+    return checksum_entity
 
 
 def _infer_rule_from_payload(findings: list[dict[str, Any]]) -> str:

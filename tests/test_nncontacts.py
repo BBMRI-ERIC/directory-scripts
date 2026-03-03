@@ -19,3 +19,8 @@ def test_nncontacts_classifies_staging_areas_consistently():
     assert NNContacts.is_non_member_staging_area("AT", country="DE") is False
     assert NNContacts.is_iso_country_code("AT") is True
     assert NNContacts.is_iso_country_code("EU") is False
+    assert NNContacts.is_permitted_non_country_prefix("EU") is True
+    assert NNContacts.is_permitted_non_country_prefix("IARC") is True
+    assert NNContacts.expected_schema_name("CZ") == "BBMRI-CZ"
+    assert NNContacts.expected_schema_name("EU") == "BBMRI-EU"
+    assert NNContacts.schema_matches_staging_area("BBMRI-EU", "EU") is True
