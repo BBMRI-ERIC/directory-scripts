@@ -44,7 +44,7 @@
 - For each exporter, document the exact command line used in production (including flags, package, and cache settings) and where outputs are published or uploaded.
 - If deployed on a schedule, record the trigger (cron/job name), environment (host/container), and any required secrets or config files.
 - When outputs are consumed downstream, document the consumer, schema version, and any stability guarantees.
-- Document each exporter in `README.md` with purpose, required inputs, and example usage/output.
+- Document each exporter in [`README.md`](README.md) with purpose, required inputs, and example usage/output.
 - Prefer small, composable helpers over copy-pasted query logic; factor common code into modules.
 
 ## Operational Notes
@@ -128,7 +128,7 @@
 
 ## Documentation Expectations
 - Maintain and expand documentation alongside code changes; updates are required for new checks, exporters, or API changes.
-- Keep `README.md` accurate and add per-script usage examples as interfaces evolve.
+- Keep [`README.md`](README.md) accurate and add per-script usage examples as interfaces evolve.
 - If a change also affects the Directory Data Manager manual tooling, update the corresponding files in `../BBMRI-ERIC-Directory-Data-Manager-Manual/` as a coordinated follow-up; that repo contains the check-documentation generator and is not updated automatically by changes here.
 - When `CHECK_DOCS.fields` differ from AST-extracted fields by design, document the real intended fields explicitly and validate that the manual generator uses the documented fields rather than falling back to `None explicitly detected`.
 

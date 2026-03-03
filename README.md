@@ -1,27 +1,18 @@
 # BBMRI-ERIC Directory Validation Scripts
+
+For developer-facing architecture, coding-style, validation, and testing notes, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
 ## Requirements
-- Python >= 3.6
-- The following python packages:
-  - networkx
-  - geopy
-  - validate_email
-  - xlsxwriter
-  - py3dns (on Windows this silently conflicts if dnspython is already installed)
-  - requests
-  - diskcache
-  - yapsy (see below if you run Python 3.12 or higher)
-  - whoosh
-  - roman
-  - typing-extensions
-  - openpyxl
-  - pytest (for unit tests)
+- Python 3
+- Runtime dependencies are listed in [`requirements.txt`](requirements.txt)
+- Test-only dependencies are listed in [`requirements-test.txt`](requirements-test.txt)
 
 ## Installation
 - Verify installation:  
   ``
 python3 -m ensurepip
 ``
-- For each of the above packages `pip3  install --upgrade <package>`
+- Install runtime dependencies: `pip3 install -r requirements.txt`
 - For test dependencies only: `pip3 install -r requirements-test.txt`
 - Ensure that file `/etc/resolve.conf` exists. If it does not exist create it with the following contents:  
   ``
@@ -81,7 +72,7 @@ Legacy long option spellings remain accepted where needed, but the normalized lo
 
 The XLSX warning workbook is split into tabs by BBMRI node / staging area derived from entity IDs (`AT`, `SK`, `EXT`, `EU`, ...), not by reported country. This keeps non-member biobanks hosted in countries such as `US` or `VN` grouped under the `EXT` tab. Reported country values remain available separately where scripts explicitly report country-level statistics.
 
-For developer-facing architecture, coding-style, AI-check, and testing notes, see `DEVELOPMENT.md`.
+For developer-facing architecture, coding-style, AI-check, and testing notes, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 Pydantic-backed validation is intentionally limited to local inputs and repository-owned artifacts:
 - tool/runtime settings for `directory-tables-modifier.py` and `collection-factsheet-descriptor-updater.py`
@@ -90,6 +81,7 @@ Pydantic-backed validation is intentionally limited to local inputs and reposito
 - live Directory entities from Molgenis are still handled primarily through explicit runtime checks and the existing QC framework
 
 For fact-sheet-driven descriptor updates, `NAV` sample-type rows are ambiguous: they can mean “not available”, but they can also appear because material-specific rows are suppressed by k-anonymity. Treat NAV-only fact output as requiring human review rather than as definitive proof that richer collection-level material metadata is wrong.
+Age-range updates from fact sheets are also conservative: month/day/week units are preserved when they can be inferred consistently, and mixed-unit fact ranges are not auto-applied.
 
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
@@ -133,7 +125,7 @@ python3 data-check.py --only-withdrawn -X withdrawn-only-review.xlsx
 
 ## Developer notes
 
-Developer-facing architecture, coding-style, testing, and AI-check workflow notes are documented in `DEVELOPMENT.md`.
+Developer-facing architecture, coding-style, testing, and AI-check workflow notes are documented in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 OoM-based count estimation is centralized in `oomutils.py`. By default all exporters/stats that estimate counts from `order_of_magnitude` use the lower bound of the OoM interval (`10**n`). To change the policy globally, set `DIRECTORY_OOM_UPPER_BOUND_COEFFICIENT`; for example, `0.3` applies `0.3 * 10**(n+1)` consistently everywhere that OoM-based counting is used.
 

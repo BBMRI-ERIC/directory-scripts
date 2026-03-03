@@ -2,6 +2,8 @@
 
 This document collects developer-facing architecture, code-organization, style, and testing guidance that does not belong in the user-focused `README.md`.
 
+For user-facing usage, installation, and tool examples, see [README.md](README.md).
+
 ## Architecture
 
 ### Repository structure
@@ -85,6 +87,9 @@ Rule of thumb:
   - NAV-only fact output is not definitive evidence that collection-level materials are wrong.
   - Fact rows can be suppressed by k-anonymity, so richer metadata may still be valid.
   - Treat such cases as review-required and document the ambiguity clearly in user-facing tooling/docs.
+- Design note for age updates:
+  - preserve fact-sheet month/day/week/year units when they can be inferred consistently
+  - do not auto-update age metadata when fact rows mix incompatible units
 
 - `checks/FactTables.py`
   - runtime QC warning producer

@@ -4,6 +4,9 @@ This changelog is organized by date, newest first. Because the repository does n
 
 ## 2026-03-03
 - Hardened AI cache validation against in-memory mutation and improved fact-sheet synchronization behavior.
+- Expanded `AI:Curated` cache coverage across access, participant clinical-profile, data-category, and material-metadata gaps, and refreshed the AI-check workflow/docs.
+- Added this dated changelog and improved handling of dynamic AI check metadata in generated documentation.
+- Added scoped Pydantic validation for local tool settings and repository-owned JSON/cache artifacts, with suppressible validation warnings.
 
 ## 2026-03-02
 - Added collection partitioning checks and introduced shareable AI-reviewed findings with a rerun workflow.
