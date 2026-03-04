@@ -53,3 +53,5 @@ def test_text_consistency_plugin_emits_expected_warning_ids():
         ("col1", "TXT:FFPEMaterial"),
         ("col1", "TXT:CovidDiag"),
     ]
+    assert any(warning.dataCheckID == "TXT:StudyType" and warning.fix_proposals for warning in warnings)
+    assert any(warning.dataCheckID == "TXT:CovidDiag" and warning.fix_proposals for warning in warnings)

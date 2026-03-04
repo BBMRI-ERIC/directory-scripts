@@ -4,6 +4,7 @@ import re
 import logging as log
 
 from yapsy.IPlugin import IPlugin
+from check_fix_helpers import make_collection_multi_value_fix
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 
 covidNetworkName = 'bbmri-eric:networkID:EU_BBMRI-ERIC:networks:COVID19'
@@ -271,9 +272,31 @@ class COVID(IPlugin):
 			if re.search(covidProspectiveCollectionIdPattern, collection['id']):
 				biobankHasCovidProspectiveCollection[biobank['id']] = True
 				if not 'DISEASE_SPECIFIC' in types:
-					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
+					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types", fix_proposals=[
+						make_collection_multi_value_fix(
+							update_id='collection_type.add.disease_specific',
+							module='collection_types',
+							collection=collection,
+							field='type',
+							proposed_values=['DISEASE_SPECIFIC'],
+							confidence='certain',
+							human_explanation='Add collection type DISEASE_SPECIFIC because the collection is explicitly a prospective COVID-19 collection.',
+							rationale='The COVID-specific deterministic rule requires DISEASE_SPECIFIC for COVID19PROSPECTIVE collections.',
+						)
+					]))
 				if not 'PROSPECTIVE_COLLECTION' in types:
-					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types"))
+					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types", fix_proposals=[
+						make_collection_multi_value_fix(
+							update_id='collection_type.add.prospective_collection',
+							module='collection_types',
+							collection=collection,
+							field='type',
+							proposed_values=['PROSPECTIVE_COLLECTION'],
+							confidence='certain',
+							human_explanation='Add collection type PROSPECTIVE_COLLECTION because the collection is explicitly a prospective COVID-19 collection.',
+							rationale='The COVID-specific deterministic rule requires PROSPECTIVE_COLLECTION for COVID19PROSPECTIVE collections.',
+						)
+					]))
 				if OoM and OoM > 0:
 					warnings.append(DataCheckWarning(make_check_id(self, "ProsOoMNonZero"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective collection type represents capability of setting up prospective collections - hence it should have zero order of magnitude"))
 				if not covid_diag and not covid_control:
@@ -294,13 +317,49 @@ class COVID(IPlugin):
 
 			if re.search('.*:COVID19$', collection['id']):
 				if not 'DISEASE_SPECIFIC' in types:
-					warnings.append(DataCheckWarning(make_check_id(self, "NeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types"))
+					warnings.append(DataCheckWarning(make_check_id(self, "NeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types", fix_proposals=[
+						make_collection_multi_value_fix(
+							update_id='collection_type.add.disease_specific',
+							module='collection_types',
+							collection=collection,
+							field='type',
+							proposed_values=['DISEASE_SPECIFIC'],
+							confidence='certain',
+							human_explanation='Add collection type DISEASE_SPECIFIC because the collection identifier marks it as a COVID-19 collection.',
+							rationale='The COVID-specific deterministic rule requires DISEASE_SPECIFIC for collections with a COVID19 identifier.',
+						)
+					]))
 				if not 'DNA' in materials and not 'PATHOGEN' in materials and not 'PERIPHERAL_BLOOD_CELLS' in materials and not 'PLASMA' in materials and not 'RNA' in materials and not 'SALIVA' in materials and not 'SERUM' in materials and not 'WHOLE_BLOOD' in materials and not 'FECES' in materials and not 'BUFFY_COAT' in materials and not 'NASAL_SWAB' in materials and not 'THROAT_SWAB' in materials:
 					warnings.append(DataCheckWarning(make_check_id(self, "MaterialsSuspect"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Supect material types: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB"))
 				if 'NASAL_SWAB' in materials or 'THROAT_SWAB' in materials or 'FECES' in materials and not ('BSL2' in biobank_covid or 'BSL3' in biobank_covid):
 					warnings.append(DataCheckWarning(make_check_id(self, "BslFlagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Suspect situation: collection contains infectious material (nasal/throat swabs, faeces) while the parent biobank does not indicate BSL2 nor BSL3 available"))
 				if not covid_diag:
-					warnings.append(DataCheckWarning(make_check_id(self, "CovidDiagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19 collection misses COVID-19 diagnosis filled in"))
+					warnings.append(DataCheckWarning(make_check_id(self, "CovidDiagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19 collection misses COVID-19 diagnosis filled in", fix_proposals=[
+						make_collection_multi_value_fix(
+							update_id='diagnoses.add.covid_acute_u07_1',
+							module='diagnoses',
+							collection=collection,
+							field='diagnosis_available',
+							proposed_values=['urn:miriam:icd:U07.1'],
+							confidence='uncertain',
+							human_explanation='Add ICD-10 U07.1 if the collection really contains confirmed COVID-19 cases.',
+							rationale='The collection identifier indicates COVID-19, but the exact acute COVID-19 diagnosis code still needs curator choice.',
+							blocking_reason='Several plausible acute COVID-19 diagnosis codes may apply; choose the correct one explicitly.',
+							exclusive_group='covid_acute_diagnosis',
+						),
+						make_collection_multi_value_fix(
+							update_id='diagnoses.add.covid_acute_u07_2',
+							module='diagnoses',
+							collection=collection,
+							field='diagnosis_available',
+							proposed_values=['urn:miriam:icd:U07.2'],
+							confidence='uncertain',
+							human_explanation='Add ICD-10 U07.2 if the collection really contains clinically or epidemiologically diagnosed COVID-19 cases.',
+							rationale='The collection identifier indicates COVID-19, but the exact acute COVID-19 diagnosis code still needs curator choice.',
+							blocking_reason='Several plausible acute COVID-19 diagnosis codes may apply; choose the correct one explicitly.',
+							exclusive_group='covid_acute_diagnosis',
+						),
+					]))
 
 
 		for biobank in dir.getBiobanks():

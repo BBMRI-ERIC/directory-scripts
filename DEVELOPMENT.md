@@ -99,6 +99,11 @@ Rule of thumb:
   - explicit maintenance CLI
   - uses the same shared helper logic to propose and optionally apply descriptor updates to staging-area `Collections`
 
+- `collection-qcheck-updater.py`
+  - explicit maintenance CLI for QC-derived fix plans
+  - consumes structured `fix_proposals` exported from `data-check.py`
+  - supports human-readable listing, dry-run, interactive apply, and forced batch apply
+
 If descriptor-alignment logic changes, keep both the check and the updater behavior consistent.
 
 ### `ai_cache.py` vs `checks/AIFindings.py`
@@ -144,6 +149,10 @@ Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
   - reviewed false-positive suppressions
   - maps `check ID -> entity ID`
   - used only to hide known residual false positives from QC output
+- exported QC update-plan JSON
+  - checksum-signed fix-plan artifact produced by `data-check.py --export-update-plan ...`
+  - consumed by `collection-qcheck-updater.py`
+  - carries both per-update integrity checksums and expected current field values
 - `warning_suppressions.py`
   - loader/normalizer for the suppression JSON
 - `warningscontainer.py`
@@ -237,6 +246,17 @@ Typical follow-up validation:
 ```bash
 python3 data-check.py -N | rg 'AI:Curated'
 ```
+
+## QC-derived update workflow
+
+- `DataCheckWarning` may carry structured `fix_proposals` alongside the human warning text.
+- `data-check.py --export-update-plan ...` serializes those proposals into a JSON fix plan.
+- `collection-qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
+- Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
+- Every update also carries `expected_current_value`; apply logic must compare it with the live staging-area value and warn before writing when the values diverge.
+- `uncertain` proposals are still exported because they can represent genuine alternative curator choices; do not auto-merge or auto-apply them blindly.
+- Ontology-backed fixes such as DUO terms must carry explanations validated against the official ontology source during development; do not improvise ontology descriptions at runtime.
+- This workflow only makes sense when the staging area is the authoritative editable source. If a node imports/synchronizes data from another primary system, fix that primary source instead.
 
 ## Withdrawal scope
 

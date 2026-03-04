@@ -381,3 +381,28 @@ python3 collection-factsheet-descriptor-updater.py -c bbmri-eric:ID:CZ_FOO:colle
 ``
 python3 collection-factsheet-descriptor-updater.py -c bbmri-eric:ID:CZ_FOO:collection:BAR -s BBMRI-CZ --replace-existing -f
 ``
+
+## QC update workflow
+
+`data-check.py` can export a structured update plan from warnings that carry machine-readable fixes, and `collection-qcheck-updater.py` can list, dry-run, review, and apply those fixes to a staging-area schema.
+
+Examples:
+``
+python3 data-check.py --export-update-plan qc-updates.json -r -N
+``
+``
+python3 collection-qcheck-updater.py -i qc-updates.json -s BBMRI-CZ --list
+``
+``
+python3 collection-qcheck-updater.py -i qc-updates.json -s BBMRI-CZ -n --module access
+``
+``
+python3 collection-qcheck-updater.py -i qc-updates.json -s BBMRI-CZ --module access --force
+``
+
+Key behavior:
+- the exported JSON plan contains per-update and whole-file checksums; the updater warns when the file or individual updates were edited after export, but the user can still proceed deliberately
+- each update carries the expected current field value seen at export time; if the live staging-area value changed before apply, the updater warns and requires explicit confirmation unless `-f/--force` is used
+- filtering is supported by exact entity ID, hierarchy root ID (biobank or collection), staging area, originating check ID, update ID, module, and confidence
+- `uncertain` updates stay in the plan so the user can review alternative resolutions, but they should only be applied deliberately after narrowing the selection
+- this workflow is only appropriate when the BBMRI Node maintains metadata directly in the Directory staging area; if the staging area is synchronized or imported from another authoritative source, fix the primary source instead of applying updates here

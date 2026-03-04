@@ -15,6 +15,7 @@ from fact_descriptor_sync import (
 	fact_descriptor_values_for_comparison,
 	parse_collection_multi_value_field,
 )
+from check_fix_helpers import build_fact_alignment_fix_proposals
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
@@ -26,22 +27,22 @@ CHECK_ID_PREFIX = "FT"
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, actionDescription, warningsList): # TO improve
 	if factsList and py_collections.Counter(factsList) != py_collections.Counter(collList):
-		warningsList.append(DataCheckWarning(make_check_id(self, "CollFactsMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email']))
+		warningsList.append(DataCheckWarning(make_check_id(self, "CollFactsMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email'], fix_proposals=build_fact_alignment_fix_proposals(collection, dir.getCollectionFacts(collection['id']))))
 
 
 def compareAge(self, dir, factAges: set, factsAgeUnits: set, collection, warningsList):
 	# NOTE assuming that collection age units uppercase and singular match with facts age units lowercase and plural (at least with years, YEAR, months, MONTH works)
 	collUnitsAdapt = collection['age_unit'].lower() + 's'
 	if collUnitsAdapt != str((',').join(sorted(factsAgeUnits))):
-		warningsList.append(DataCheckWarning(make_check_id(self, "AgeUnitMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+		warningsList.append(DataCheckWarning(make_check_id(self, "AgeUnitMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Age unit ID of the collection is {collection['age_unit']} while the age unit in the fact table is {factsAgeUnits}", "Check age unit information of the collection description with age units from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email'], fix_proposals=build_fact_alignment_fix_proposals(collection, dir.getCollectionFacts(collection['id']))))
 	else:
 		minFactAge = int(min(sorted(factAges)))
 		maxFactAge = int(max(sorted(factAges)))
 		try:
 			if (minFactAge < collection['age_low']) or (maxFactAge > collection['age_high']):
-				warningsList.append(DataCheckWarning(make_check_id(self, "AgeRangeMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+				warningsList.append(DataCheckWarning(make_check_id(self, "AgeRangeMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Fact table age outside collection age_high age_low range", "Check age range of the collection description with ages from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email'], fix_proposals=build_fact_alignment_fix_proposals(collection, dir.getCollectionFacts(collection['id']))))
 			if (collection['age_low'] < minFactAge) or (collection['age_high'] > maxFactAge):
-				warningsList.append(DataCheckWarning(make_check_id(self, "AgeRangeBroad"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email']))
+				warningsList.append(DataCheckWarning(make_check_id(self, "AgeRangeBroad"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection ages outside facts age range", "Check age information of the collection description with age ranges from the facts table and correct as necessary", dir.getCollectionContact(collection['id'])['email'], fix_proposals=build_fact_alignment_fix_proposals(collection, dir.getCollectionFacts(collection['id']))))
 		except KeyError as e:
 			log.info(f"Incomplete age range information for {collection['id']}: " + str(e) + " missing")
 

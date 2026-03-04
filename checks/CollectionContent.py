@@ -4,6 +4,7 @@ import re
 import logging as log
 
 from yapsy.IPlugin import IPlugin
+from check_fix_helpers import make_collection_multi_value_fix
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 
 from directory import Directory
@@ -336,7 +337,18 @@ class CollectionContent(IPlugin):
 
 
 			if len(diags_orpha) > 0 and 'RD' not in types:
-				warnings.append(DataCheckWarning(make_check_id(self, "OrphaNeedsRDType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "ORPHA code diagnoses provided, but collection not marked as rare disease (RD) collection"))
+				warnings.append(DataCheckWarning(make_check_id(self, "OrphaNeedsRDType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "ORPHA code diagnoses provided, but collection not marked as rare disease (RD) collection", fix_proposals=[
+					make_collection_multi_value_fix(
+						update_id='collection_type.add.rd',
+						module='collection_types',
+						collection=collection,
+						field='type',
+						proposed_values=['RD'],
+						confidence='almost_certain',
+						human_explanation='Add collection type RD because the collection already advertises ORPHA diagnoses.',
+						rationale='Structured ORPHA diagnoses strongly suggest a rare-disease collection type.',
+					)
+				]))
 
 			if len(diags_orpha) > 0 and len(diags_icd10) == 0:
 				warnings.append(DataCheckWarning(make_check_id(self, "OrphaNeedsIcd"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "ORPHA code diagnoses specified, but no ICD-10 equivalents provided, thus making collection impossible to find for users using ICD-10 codes"))
@@ -370,7 +382,18 @@ class CollectionContent(IPlugin):
 			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGING_DATA' not in data_categories:
 				warnings.append(DataCheckWarning(make_check_id(self, "ImageCatMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but IMAGING_DATA is not among data categories: image_modality = %s, image_dataset_type = %s"%(modalities,image_dataset_types)))
 			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGE' not in types:
-				warnings.append(DataCheckWarning(make_check_id(self, "ImageTypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but collection type does not include IMAGE"))
+				warnings.append(DataCheckWarning(make_check_id(self, "ImageTypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but collection type does not include IMAGE", fix_proposals=[
+					make_collection_multi_value_fix(
+						update_id='collection_type.add.image',
+						module='collection_types',
+						collection=collection,
+						field='type',
+						proposed_values=['IMAGE'],
+						confidence='certain',
+						human_explanation='Add collection type IMAGE because imaging modalities or image dataset types are already present.',
+						rationale='Structured imaging metadata deterministically implies IMAGE collection type.',
+					)
+				]))
 
 			age_unit = None
 			if 'age_unit' in collection:

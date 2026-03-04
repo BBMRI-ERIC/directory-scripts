@@ -30,6 +30,7 @@ from yapsy.IPlugin import IPlugin
 import inspect
 
 from customwarnings import DataCheckWarning
+from fix_proposals import write_fix_plan
 from warningscontainer import WarningsContainer
 from nncontacts import NNContacts
 from directory import Directory
@@ -91,6 +92,12 @@ parser.add_argument(
     dest='warning_suppressions',
     default=str(DEFAULT_WARNING_SUPPRESSIONS_PATH),
     help='JSON file mapping check IDs to entity IDs whose warnings should be suppressed as known false positives',
+)
+parser.add_argument(
+    '--export-update-plan',
+    dest='update_plan',
+    default=None,
+    help='write structured fix proposals attached to warnings into the provided JSON update-plan file',
 )
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default='ERIC')
@@ -158,3 +165,13 @@ if args.outputXLSX is not None:
     for collection in dir.getCollections():
         allCollections[collection['id']] = str(dir.isCollectionWithdrawn(collection['id']))
     warningContainer.dumpWarningsXLSX(args.outputXLSX, allBiobanks, allCollections, True)
+if args.update_plan:
+    log.info("Outputting structured fix proposals in JSON update plan %s", args.update_plan)
+    payload = write_fix_plan(
+        args.update_plan,
+        warningContainer.getWarnings(),
+        schema=dir.getSchema(),
+        include_withdrawn=bool(getattr(args, "include_withdrawn", False)),
+        only_withdrawn=bool(getattr(args, "only_withdrawn", False)),
+    )
+    log.info("   ... exported %d fix proposals", len(payload.get("updates", [])))

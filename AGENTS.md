@@ -58,6 +58,12 @@
 - `collection-factsheet-descriptor-updater.py` intentionally reads the public `ERIC` schema without authentication and uses credentials only for the staging-area write session; do not treat missing ERIC read credentials as a bug in reviews unless the operating model changes.
 - `collection-factsheet-descriptor-updater.py` should only append missing multi-value descriptors by default; only `--replace-existing` may remove/replace existing diagnosis/material/sex values, while all-star sample/donor totals may still replace numeric totals without that option.
 - `collection-factsheet-descriptor-updater.py` must treat fact-sheet `*` rows as aggregates only and must not propagate `NAV` sample type to collection metadata when other fact/metadata material types exist.
+- `data-check.py --export-update-plan ...` exports structured fix proposals attached to warnings; `collection-qcheck-updater.py` consumes that plan instead of recomputing QC logic independently.
+- Structured QC fix proposals must carry human-readable explanations, expected current values, confidence (`certain`, `almost_certain`, `uncertain`), and any validated ontology-term explanations needed for user review.
+- `collection-qcheck-updater.py` must reuse `.env` (`DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD`) consistently with the other write-capable tools.
+- `collection-qcheck-updater.py` must support exact-entity, hierarchy-root, staging-area, check-id, update-id, module, and confidence filtering; the hierarchy can be biobank->collections or collection->subcollections, but not contact-sharing relationships.
+- Checksums on exported QC update plans are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits of the JSON plan remain possible.
+- QC-derived updates are only appropriate when the node edits the Directory staging area directly. If the staging area is synchronized/imported from another authoritative system, fixes must be made in that primary source instead.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`.
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
@@ -99,6 +105,7 @@
 - For `directory-stats.py` changes, keep cross-checks against other exporters where totals overlap, especially `exporter-all.py`.
 - When changing `nncontacts.py`, verify both warning routing and any staging/member-area classification tests.
 - When changing fact-sheet descriptor alignment logic, validate both `checks/FactTables.py` and `collection-factsheet-descriptor-updater.py` because they intentionally share comparison/derivation rules.
+- When changing structured QC fix proposals, validate both `data-check.py --export-update-plan ...` and `collection-qcheck-updater.py`, because the warning emission and updater apply path must stay aligned.
 - When changing check documentation metadata or manual extraction, test both the local plugin tests and `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py`.
 
 ## Quality Gate

@@ -80,6 +80,13 @@ class WarningsContainer:
                 w.dump()
             print("")
 
+    def getWarnings(self):
+        """Return all non-suppressed warnings as a flat list."""
+        warnings = []
+        for warning_list in self.__warnings.values():
+            warnings.extend(warning_list)
+        return warnings
+
     @staticmethod
     def _write_headers(worksheet, headers, bold):
         for col_idx, (header, width) in enumerate(headers):

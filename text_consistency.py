@@ -200,6 +200,7 @@ def _build_age_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
         return {
             "check_id": "TXT:AgeRange",
             "fields": CHECKS["TXT:AgeRange"]["fields"],
+            "suggested_age": {"age_low": 0, "age_high": 18, "age_unit": "YEAR"},
             "message": (
                 f"Collection text suggests a pediatric population (matched '{pediatric_match}'), "
                 f"but age_high is {age_high}."
@@ -213,6 +214,7 @@ def _build_age_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
         return {
             "check_id": "TXT:AgeRange",
             "fields": CHECKS["TXT:AgeRange"]["fields"],
+            "suggested_age": {"age_low": 18, "age_high": age_high, "age_unit": "YEAR"},
             "message": (
                 f"Collection text suggests an adult/geriatric population (matched '{adult_match}'), "
                 f"but age_low is {age_low}."
@@ -256,6 +258,7 @@ def _build_study_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]
     return {
         "check_id": "TXT:StudyType",
         "fields": CHECKS["TXT:StudyType"]["fields"],
+        "suggested_types": suggestions,
         "message": (
             f"Collection text suggests structured type(s) {suggestions} based on terms {matched_terms}, "
             f"but the current type list is {_as_sorted_strings(collection.get('type'))}."
@@ -287,6 +290,7 @@ def _build_ffpe_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
     return {
         "check_id": "TXT:FFPEMaterial",
         "fields": CHECKS["TXT:FFPEMaterial"]["fields"],
+        "suggested_materials": ["TISSUE_PARAFFIN_EMBEDDED"],
         "message": (
             f"Collection text mentions '{matched_term}', but materials do not include "
             f"TISSUE_PARAFFIN_EMBEDDED (current materials: {_as_sorted_strings(collection.get('materials'))})."
@@ -336,6 +340,7 @@ def _build_covid_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]
         return {
             "check_id": "TXT:CovidDiag",
             "fields": CHECKS["TXT:CovidDiag"]["fields"],
+            "suggested_diagnoses": ["urn:miriam:icd:U09.9"],
             "message": (
                 f"Collection text suggests post-/long-COVID context (matched '{long_match}'), "
                 f"but diagnosis_available does not contain U09.9 or another post-COVID diagnosis "
@@ -361,6 +366,7 @@ def _build_covid_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]
     return {
         "check_id": "TXT:CovidDiag",
         "fields": CHECKS["TXT:CovidDiag"]["fields"],
+        "suggested_diagnosis_alternatives": [["urn:miriam:icd:U07.1"], ["urn:miriam:icd:U07.2"]],
         "message": (
             f"Collection text suggests COVID-19 disease context (matched '{general_match or long_match}'), "
             f"but diagnosis_available does not contain recognized COVID-19 diagnoses such as U07.1/U07.2 "

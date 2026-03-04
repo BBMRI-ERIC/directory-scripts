@@ -131,3 +131,17 @@ def test_facttables_check_ignores_star_rows_and_non_authoritative_nav_material()
         entity_id == "col3" and "facts table do not match" in message
         for entity_id, message in warning_keys
     )
+
+
+def test_facttables_check_attaches_fact_alignment_fix_proposals():
+    plugin = FactTables()
+    warnings = plugin.check(FactTablesDirectoryStub(), args=None)
+
+    proposals = [
+        proposal
+        for warning in warnings
+        for proposal in warning.fix_proposals
+    ]
+
+    assert proposals
+    assert any(proposal.module in {"age", "diagnoses", "materials", "clinical_profile", "counts"} for proposal in proposals)

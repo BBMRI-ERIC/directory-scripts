@@ -17,7 +17,7 @@ class DataCheckEntityType(Enum):
 
 class DataCheckWarning:
 
-    def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, directoryEntityType : DataCheckEntityType, directoryEntityWithdrawn : str, message : str, action : str = '', emailTo : str = ''):
+    def __init__(self, dataCheckID : str, recipients : str, NN : str, level : DataCheckWarningLevel, directoryEntityID : str, directoryEntityType : DataCheckEntityType, directoryEntityWithdrawn : str, message : str, action : str = '', emailTo : str = '', fix_proposals = None):
         self.dataCheckID = dataCheckID
         self.recipients = recipients
         self.NN = NN
@@ -28,6 +28,7 @@ class DataCheckWarning:
         self.message = message
         self.action = action
         self.emailTo = emailTo
+        self.fix_proposals = list(fix_proposals or [])
     
     def dump(self):
         print(self.directoryEntityType.value + " " + self.directoryEntityID + " " + self.dataCheckID + "/" + self.level.name + ": " + self.message + " " + self.action + " " + self.emailTo)
@@ -45,4 +46,3 @@ def make_check_id(plugin, suffix: str) -> str:
     if not suffix:
         return plugin_name
     return f"{plugin_name}:{suffix}"
-
