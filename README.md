@@ -384,11 +384,11 @@ python3 collection-factsheet-descriptor-updater.py -c bbmri-eric:ID:CZ_FOO:colle
 
 ## QC update workflow
 
-`data-check.py` can export a structured update plan from warnings that carry machine-readable fixes, and `collection-qcheck-updater.py` can list, dry-run, review, and apply those fixes to a staging-area schema.
+`data-check.py` can export a structured update plan from warnings that carry machine-readable fixes via `-U/--export-update-plan`, and `collection-qcheck-updater.py` can list, dry-run, review, and apply those fixes to a staging-area schema.
 
 Examples:
 ``
-python3 data-check.py --export-update-plan qc-updates.json -r -N
+python3 data-check.py -U qc-updates.json -r -N
 ``
 ``
 python3 collection-qcheck-updater.py -i qc-updates.json -s BBMRI-CZ --list
@@ -401,8 +401,26 @@ python3 collection-qcheck-updater.py -i qc-updates.json -s BBMRI-CZ --module acc
 ``
 
 Key behavior:
+- workflow:
+  - run `data-check.py -U ...` on `ERIC`
+  - inspect the generated plan with `collection-qcheck-updater.py --list`
+  - dry-run the selected subset with `-n/--dry-run`
+  - apply the reviewed subset interactively or with `-f/--force`
 - the exported JSON plan contains per-update and whole-file checksums; the updater warns when the file or individual updates were edited after export, but the user can still proceed deliberately
 - each update carries the expected current field value seen at export time; if the live staging-area value changed before apply, the updater warns and requires explicit confirmation unless `-f/--force` is used
 - filtering is supported by exact entity ID, hierarchy root ID (biobank or collection), staging area, originating check ID, update ID, module, and confidence
+- hierarchy selection:
+  - `--entity-id` selects one exact target entity
+  - `--root-id` expands over a biobank -> collection/subcollection hierarchy or a collection -> subcollection hierarchy
+  - contacts are intentionally not treated as hierarchy roots because they are shared across unrelated entities
 - `uncertain` updates stay in the plan so the user can review alternative resolutions, but they should only be applied deliberately after narrowing the selection
+- current fix modules emitted by checks include:
+  - `access` for DUO/access-policy fixes
+  - `collection_types`
+  - `age`
+  - `materials`
+  - `diagnoses`
+  - `clinical_profile` / `counts` where the deterministic evidence is already present
+- current implementation of `collection-qcheck-updater.py` applies collection-level updates only
+- ontology-backed fixes carry human-readable explanations in the update plan so the reviewer can see what a term such as `DUO:...` means before approving the change
 - this workflow is only appropriate when the BBMRI Node maintains metadata directly in the Directory staging area; if the staging area is synchronized or imported from another authoritative source, fix the primary source instead of applying updates here

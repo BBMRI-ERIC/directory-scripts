@@ -94,6 +94,7 @@ parser.add_argument(
     help='JSON file mapping check IDs to entity IDs whose warnings should be suppressed as known false positives',
 )
 parser.add_argument(
+    '-U',
     '--export-update-plan',
     dest='update_plan',
     default=None,
