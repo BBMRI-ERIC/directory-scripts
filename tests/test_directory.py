@@ -269,6 +269,45 @@ def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_
     assert calls.index(("signin", "user", "secret")) < calls.index(("set_schema", "BBMRI-EU"))
 
 
+def test_directory_uses_schema_specific_cache_and_skips_missing_quality_tables(monkeypatch, tmp_path):
+    calls = []
+
+    class ClientStub:
+        def __init__(self, url, **kwargs):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def set_schema(self, schema):
+            calls.append(("set_schema", schema))
+            return schema
+
+        def get(self, table=None, as_df=False):
+            calls.append(("get", table, as_df))
+            if table in {"QualityInfoBiobanks", "QualityInfoCollections"}:
+                raise directory_module.NoSuchTableException(f"{table} missing")
+            return pd.DataFrame()
+
+        def get_graphql(self, table=None):
+            calls.append(("get_graphql", table))
+            return []
+
+    monkeypatch.setattr(directory_module, "Client", ClientStub)
+    monkeypatch.chdir(tmp_path)
+
+    directory = Directory(schema="BBMRI-EU")
+
+    assert (tmp_path / "data-check-cache" / "directory-BBMRI-EU").exists()
+    assert directory.getQualBB().empty
+    assert directory.getQualColl().empty
+    assert ("get", "QualityInfoBiobanks", True) in calls
+    assert ("get", "QualityInfoCollections", True) in calls
+
+
 def test_directory_can_return_only_withdrawn_entities():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = True
