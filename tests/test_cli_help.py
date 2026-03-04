@@ -43,3 +43,19 @@ def test_cli_help_runs(script_name):
     )
     assert result.returncode == 0, result.stderr
     assert "usage:" in result.stdout.lower()
+
+
+def test_data_check_non_eric_schema_requires_auth():
+    env = dict(**__import__("os").environ)
+    env["DIRECTORYUSERNAME"] = ""
+    env["DIRECTORYPASSWORD"] = ""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "data-check.py"), "--schema", "BBMRI-EU", "-N", "-r"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode != 0
+    assert "requires -u/--username and -p/--password" in result.stderr

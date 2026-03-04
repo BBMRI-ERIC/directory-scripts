@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review and Commit"
+  short_description: "Run pre-commit review, tests, docs, and commit"
+  default_prompt: "Use $review-and-commit to review the current changes, validate tests/docs/manual updates, and commit safely."
