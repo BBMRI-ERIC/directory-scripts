@@ -103,9 +103,10 @@
 - AI cache reuse is checksum-based: findings remain reusable only while the live entity checksum and source-field checksum still match; `AIFindings` logs script warnings listing changed entity IDs and skips stale findings until the live AI-review workflow refreshes the cache.
 - AI cache checksums must exclude pure runtime metadata such as timestamps and `mg_*` fields so metadata-only churn does not force pointless reruns.
 - `exporter-bbmri-cohorts.py` uses `-W/--warnings`; keep `-w` reserved for withdrawn-scope selection.
-- Pydantic validation is intentionally scoped to local tool settings and repository-owned JSON/cache artifacts; do not wrap full live Molgenis payloads with strict models.
+- Scoped local validation is intentionally limited to local tool settings and repository-owned JSON/cache artifacts; do not wrap full live Molgenis payloads with strict models.
 - Non-fatal validation issues from local config/cache parsing should become suppressible script warnings (`--suppress-validation-warnings`), not hard crashes; use hard input errors only when a tool cannot proceed safely.
-- The shared Directory cache is not partitioned by target URL; if a task intentionally switches to a non-default Directory instance, document the cache-sharing risk and purge `directory` cache when switching targets.
+- Directory caches are partitioned by schema (`directory-ERIC`, `directory-BBMRI-EU`, ...) but not by target URL; if a task intentionally switches to a non-default Directory instance, document the remaining cache-sharing risk and purge the schema-specific `directory` cache when switching targets.
+- Quality-info tables are optional outside `ERIC`; shared tooling should skip them gracefully on schemas that do not expose `QualityInfoBiobanks` or `QualityInfoCollections`.
 - For fact-sheet material alignment, NAV-only fact output is ambiguous because k-anonymity suppression can hide richer material-specific rows; document that ambiguity instead of treating NAV-only facts as definitive evidence that richer collection metadata is wrong.
 
 ## Testing Guidelines

@@ -21,7 +21,7 @@ CHECK_DOCS = {'AP:BBAvailNone': {'entity': 'BIOBANK',
                                                        'for commercial nor for '
                                                        'non-for-profit collaboration'},
  'AP:BioDuoMissing': {'entity': 'COLLECTION',
-                                                 'fields': ['data_use', 'materials'],
+                                                 'fields': ['data_use'],
                                                  'severity': 'INFO',
                                                  'summary': 'Collection contains '
                                                             'biological material types '
@@ -205,7 +205,13 @@ class AccessPolicies(IPlugin):
 		for collection in dir.getCollections():
 
 			#materials = Directory.getListOfEntityAttributeIds(collection, 'materials') EMX2 materials do not have id, then:
-			materials = [ material for material in collection['materials'] ] if 'materials' in collection else []
+			raw_materials = Directory.getListOfEntityAttributes(collection, 'materials')
+			materials = []
+			for material in raw_materials:
+				material_value = str(material).strip() if material is not None else ""
+				if not material_value or material_value.upper() == "NAV":
+					continue
+				materials.append(material_value)
 			#collection_types = Directory.getListOfEntityAttributeIds(collection, 'type') # EMX2 types does not have ID, then:
 			collection_types = Directory.getListOfEntityAttributes(collection, 'type')
 			#DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use') # EMX2 types does not have ID, then:
@@ -376,7 +382,7 @@ class AccessPolicies(IPlugin):
 			# DUO term DUO:0000021 (ethics approval needed) is usually needed for reuse of human biological material
 			DUO_term_ethics_needed = 'DUO:0000021'
 			if materials and DUO_term_ethics_needed not in DUOs:
-				warnings.append(DataCheckWarning(make_check_id(self, "BioDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection contains biological material types '{materials}' but ethics approval needed '{DUO_term_ethics_needed}' is not specified in data_use attribute (may be false-positive). DUO documentation available at {DUOs_to_url(DUO_term_ethics_needed)}", fix_proposals=[
+				warnings.append(DataCheckWarning(make_check_id(self, "BioDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection contains biological material types from materials attribute '{collection.get('materials', [])}' but ethics approval needed '{DUO_term_ethics_needed}' is not specified in data_use attribute (may be false-positive). DUO documentation available at {DUOs_to_url(DUO_term_ethics_needed)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.ethics_approval_required",
 						module="AP",

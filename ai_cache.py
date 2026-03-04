@@ -10,10 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from pydantic import ValidationError
-
 from validation_helpers import warn_from_validation_error
-from validation_models import AICachePayloadModel
+from validation_models import AICachePayloadModel, ValidationError
 
 
 AI_CACHE_ROOT = Path(__file__).resolve().parent / "ai-check-cache"

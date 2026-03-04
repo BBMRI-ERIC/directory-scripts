@@ -1,11 +1,11 @@
-"""Helpers for non-fatal validation warnings and Pydantic error formatting."""
+"""Helpers for non-fatal validation warnings and validation error formatting."""
 
 from __future__ import annotations
 
 import logging
 from typing import Callable
 
-from pydantic import ValidationError
+from validation_models import ValidationError
 
 
 ValidationWarnFn = Callable[[str], None]
@@ -31,7 +31,7 @@ def warn_from_validation_error(
     exc: ValidationError,
     warn: ValidationWarnFn | None,
 ) -> None:
-    """Emit one warning line per Pydantic validation error."""
+    """Emit one warning line per structured validation error."""
     if warn is None:
         return
     for error in exc.errors():
