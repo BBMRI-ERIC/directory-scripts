@@ -132,7 +132,7 @@ class CheckURLs(IPlugin):
 				warnings += URLwarnings
 
 		log.info("Testing collection URLs")
-		for collection in dir.getBiobanks():
+		for collection in dir.getCollections():
 			# non-existence of access URIs is tested in the access policy checks - here we only check validity of the URL if it exists
 			if 'data_access_uri' in collection and not re.search('^\s*$', collection['data_access_uri']):
 				URLwarnings = testURL(collection['data_access_uri'],
