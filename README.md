@@ -305,17 +305,19 @@ python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.csv -R 
 
 ### Sync table contents
 - Sync mode (`-y/--sync-data`) makes table contents match exactly the input file by:
-  1) truncating current table contents, then
-  2) importing file contents.
-- This operation is **non-atomic** (not a single server transaction). If import fails after truncate, the table can remain partially or fully empty.
+  1) for full-table sync (no `-R/-C`): truncating current table contents, then importing file contents;
+  2) for filtered sync (`-R` and/or `-C`): deleting only matching server rows, then importing only matching file rows.
+- This operation is **non-atomic** (not a single server transaction). If import fails after truncate/delete, the table (or filtered scope) can remain partially or fully unsynced.
 - Use `-n/--dry-run` first and strongly consider `--export-on-delete` as a backup.
-- Sync mode does not accept `-R/-C` filters; provide the full desired table content in the sync file.
+- In filtered sync mode, any file rows that do **not** match `-R/-C` are ignored and reported as warnings.
 
 Examples:
 ```bash
 python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -y facts-sync.tsv -n -v
 
 python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -y facts-sync.tsv --export-on-delete facts-pre-sync-backup.tsv
+
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -y facts-sync.tsv -R '^fact:' -C bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE
 ```
 
 ### TSV parsing overrides
