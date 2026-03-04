@@ -264,7 +264,7 @@ class AccessPolicies(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "GenericDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"None of generic research use purposes provided ({DUO_terms_research}) in data_use attribute - suspect situation for a biobank registered in BBMRI-ERIC Directory, which is for research purposes. DUO documentation available at {DUOs_to_url(DUO_terms_research)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.general_research_use",
-						module="access",
+						module="AP",
 						collection=collection,
 						field="data_use",
 						term_id="DUO:0000042",
@@ -276,7 +276,7 @@ class AccessPolicies(IPlugin):
 					),
 					make_collection_term_append_fix(
 						update_id="access.duo.health_medical_biomedical",
-						module="access",
+						module="AP",
 						collection=collection,
 						field="data_use",
 						term_id="DUO:0000006",
@@ -294,7 +294,7 @@ class AccessPolicies(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "DataRetDuo"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Data return is not required (missing {DUO_term_data_return}) in data_use attribute - it is recommended for biobanks to support it based on BBMRI-ERIC Access policy (but not required). DUO documentation available at {DUOs_to_url(DUO_term_data_return)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.return_to_resource",
-						module="access",
+						module="AP",
 						collection=collection,
 						field="data_use",
 						term_id=DUO_term_data_return,
@@ -311,7 +311,7 @@ class AccessPolicies(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "JointDuo"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Joint projects for sample/data/image access specified and {DUO_term_joint_project} is not specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term_joint_project)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.collaboration_required",
-						module="access",
+						module="AP",
 						collection=collection,
 						field="data_use",
 						term_id=DUO_term_joint_project,
@@ -327,7 +327,7 @@ class AccessPolicies(IPlugin):
 					warnings.append(DataCheckWarning(make_check_id(self, "CollDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"At least one of {attributes} specified on collection level but '{DUO_term}' is not specified in data_use attribute (may be however intentional). DUO documentation available at {DUOs_to_url(DUO_term)}", fix_proposals=[
 						make_collection_term_append_fix(
 							update_id="access.duo.non_profit_non_commercial",
-							module="access",
+							module="AP",
 							collection=collection,
 							field="data_use",
 							term_id=DUO_term,
@@ -340,7 +340,7 @@ class AccessPolicies(IPlugin):
 					warnings.append(DataCheckWarning(make_check_id(self, "BBDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"At least one of {attributes} specified on biobank level and not overridden on collection but '{DUO_term}' is not specified in data_use attribute (may be however intentional). DUO documentation available at {DUOs_to_url(DUO_term)}", fix_proposals=[
 						make_collection_term_append_fix(
 							update_id="access.duo.non_profit_non_commercial",
-							module="access",
+							module="AP",
 							collection=collection,
 							field="data_use",
 							term_id=DUO_term,
@@ -362,7 +362,7 @@ class AccessPolicies(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "DiseaseDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection is disease specific but '{DUO_term_disease_specific}' is not specified in data_use attribute (may be false-positive). DUO documentation available at {DUOs_to_url(DUO_term_disease_specific)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.disease_specific_research",
-						module="access",
+						module="AP",
 						collection=collection,
 						field="data_use",
 						term_id=DUO_term_disease_specific,
@@ -378,7 +378,7 @@ class AccessPolicies(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "BioDuoMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Collection contains biological material types '{materials}' but ethics approval needed '{DUO_term_ethics_needed}' is not specified in data_use attribute (may be false-positive). DUO documentation available at {DUOs_to_url(DUO_term_ethics_needed)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.ethics_approval_required",
-						module="access",
+						module="AP",
 						collection=collection,
 						field="data_use",
 						term_id=DUO_term_ethics_needed,

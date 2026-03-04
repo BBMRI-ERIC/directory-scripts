@@ -3,10 +3,11 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 import pandas as pd
+import logging
 
 from fix_proposals import compute_checksum
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "collection-qcheck-updater.py"
+MODULE_PATH = Path(__file__).resolve().parents[1] / "qcheck-updater.py"
 
 
 def load_module():
@@ -20,7 +21,7 @@ def load_module():
 def build_plan(tmp_path: Path) -> Path:
     update = {
         "update_id": "access.duo.collaboration_required",
-        "module": "access",
+        "module": "AP",
         "entity_type": "COLLECTION",
         "entity_id": "bbmri-eric:ID:CZ_demo:collection:col1",
         "field": "data_use",
@@ -158,3 +159,105 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
 
     assert result == module.EXIT_OK
     assert saved == []
+
+
+def test_collection_qcheck_updater_module_filter_accepts_check_prefix(tmp_path):
+    module = load_module()
+    path = build_plan(tmp_path)
+    payload = module.load_fix_plan(path).payload
+
+    updates = module._filter_updates(
+        Namespace(
+            entity_id=None,
+            root_id=None,
+            staging_area=None,
+            check_id=[],
+            update_id=[],
+            module=["AP"],
+            confidence=None,
+            list=True,
+        ),
+        payload,
+        directory=None,
+    )
+
+    assert len(updates) == 1
+
+
+def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp_path, monkeypatch, caplog):
+    module = load_module()
+    path = build_plan(tmp_path)
+    saved = []
+
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["updates"][0]["field"] = "sex"
+    payload["updates"][0]["current_value_at_export"] = ["MALE", "FEMALE"]
+    payload["updates"][0]["expected_current_value"] = ["MALE", "FEMALE"]
+    payload["updates"][0]["proposed_value"] = ["MALE", "FEMALE"]
+    payload["updates"][0]["update_checksum"] = compute_checksum(
+        {key: value for key, value in payload["updates"][0].items() if key != "update_checksum"}
+    )
+    payload["file_checksum"] = compute_checksum({key: value for key, value in payload.items() if key != "file_checksum"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            assert table == "Collections"
+            assert schema == "BBMRI-CZ"
+            assert as_df is True
+            return pd.DataFrame([
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "sex": "FEMALE,MALE",
+                }
+            ])
+
+        def save_table(self, **kwargs):
+            saved.append(kwargs)
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+
+    args = Namespace(
+        input=str(path),
+        schema="BBMRI-CZ",
+        entity_id=None,
+        root_id=None,
+        staging_area=None,
+        check_id=[],
+        update_id=[],
+        module=[],
+        confidence=None,
+        list=False,
+        dry_run=True,
+        force=False,
+        replace_existing=False,
+        verbose=False,
+        debug=False,
+        quiet=False,
+        directory_target="https://directory.example.org",
+        directory_username="user",
+        directory_password="secret",
+    )
+
+    with caplog.at_level(logging.WARNING):
+        result = module.run_updater(args)
+
+    assert result == module.EXIT_OK
+    assert saved == []
+    assert "Live value mismatch" not in caplog.text

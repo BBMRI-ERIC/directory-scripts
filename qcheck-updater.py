@@ -55,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Read a QC update-plan JSON file exported by data-check.py, filter the selected "
-            "collection updates, list them in a human-readable form, or apply them to a staging schema."
+            "entity updates, list them in a human-readable form, or apply them to a staging schema."
         )
     )
     parser.add_argument("-i", "--input", required=True, help="Path to the JSON update-plan exported by data-check.py.")
@@ -70,7 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--staging-area", help="Comma-delimited staging-area filter (OR within the option).")
     parser.add_argument("--check-id", action="append", default=[], help="Restrict to one or more originating check IDs (repeat or comma-separate).")
     parser.add_argument("--update-id", action="append", default=[], help="Restrict to one or more update IDs (repeat or comma-separate).")
-    parser.add_argument("--module", action="append", default=[], help="Restrict to one or more fix modules (repeat or comma-separate).")
+    parser.add_argument(
+        "--module",
+        action="append",
+        default=[],
+        help="Restrict to one or more fix modules/check-prefix families such as AP, CC, C19, FT, or TXT (repeat or comma-separate).",
+    )
     parser.add_argument(
         "--confidence",
         default=None,
@@ -155,6 +160,17 @@ def _split_csv_values(raw_values: list[str] | str | None) -> set[str]:
     return values
 
 
+def _module_filter_matches(update: EntityFixProposal, requested_modules: set[str]) -> bool:
+    """Return True when requested module names match update modules or check prefixes."""
+    if not requested_modules:
+        return True
+    candidates = {update.module}
+    for check_id in update.source_check_ids:
+        if ":" in check_id:
+            candidates.add(check_id.split(":", 1)[0])
+    return any(module in candidates for module in requested_modules)
+
+
 def _confidence_filter(args: argparse.Namespace) -> set[str]:
     if args.confidence:
         requested = {value.strip() for value in args.confidence.split(",") if value.strip()}
@@ -212,7 +228,7 @@ def _filter_updates(args: argparse.Namespace, payload: dict, directory: Director
             continue
         if update_filter and update.update_id not in update_filter:
             continue
-        if module_filter and update.module not in module_filter:
+        if not _module_filter_matches(update, module_filter):
             continue
         if update.confidence not in confidence_filter:
             continue
@@ -230,6 +246,19 @@ def _normalize_live_row_value(row: dict, field: str):
     value = row.get(field)
     if field in MULTI_VALUE_FIELDS:
         return parse_collection_multi_value_field(value)
+    if field in INTEGER_FIELDS:
+        if value in (None, ""):
+            return None
+        return int(value)
+    return _normalize_scalar(value)
+
+
+def _canonical_field_value(field: str, value):
+    """Return a comparison-stable value for one field."""
+    if field in MULTI_VALUE_FIELDS:
+        if value in (None, ""):
+            return []
+        return sorted(str(item) for item in parse_collection_multi_value_field(value))
     if field in INTEGER_FIELDS:
         if value in (None, ""):
             return None
@@ -286,7 +315,7 @@ def _merge_updates(selected_updates: list[EntityFixProposal]) -> tuple[list[Enti
             confidences = []
             blocking_reasons = []
             for update in updates:
-                if update.current_value_at_export != base.current_value_at_export:
+                if _canonical_field_value(field, update.current_value_at_export) != _canonical_field_value(field, base.current_value_at_export):
                     conflicts.append(f"{entity_id} field {field} has inconsistent expected current values across append updates.")
                     break
                 for value in update.proposed_value:
@@ -325,7 +354,10 @@ def _merge_updates(selected_updates: list[EntityFixProposal]) -> tuple[list[Enti
                 merged_updates.append(base)
             continue
 
-        unique_payloads = {(_render_value(update.proposed_value), update.confidence) for update in updates}
+        unique_payloads = {
+            (_canonical_field_value(field, update.proposed_value), update.confidence)
+            for update in updates
+        }
         if len(unique_payloads) > 1:
             conflicts.append(
                 f"{entity_id} field {field} has conflicting target values: "
@@ -459,7 +491,7 @@ def run_updater(args: argparse.Namespace) -> int:
         skipped_replace_required = []
         for update in merged_updates:
             live_value = _normalize_live_row_value(live_rows[update.entity_id], update.field)
-            if live_value != update.expected_current_value:
+            if _canonical_field_value(update.field, live_value) != _canonical_field_value(update.field, update.expected_current_value):
                 mismatch_updates.append(update)
             if update.replace_required and not args.replace_existing:
                 skipped_replace_required.append(update)

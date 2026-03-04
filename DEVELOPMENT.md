@@ -99,7 +99,7 @@ Rule of thumb:
   - explicit maintenance CLI
   - uses the same shared helper logic to propose and optionally apply descriptor updates to staging-area `Collections`
 
-- `collection-qcheck-updater.py`
+- `qcheck-updater.py`
   - explicit maintenance CLI for QC-derived fix plans
   - consumes structured `fix_proposals` exported from `data-check.py`
   - supports human-readable listing, dry-run, interactive apply, and forced batch apply
@@ -151,7 +151,7 @@ Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
   - used only to hide known residual false positives from QC output
 - exported QC update-plan JSON
   - checksum-signed fix-plan artifact produced by `data-check.py -U/--export-update-plan ...`
-  - consumed by `collection-qcheck-updater.py`
+  - consumed by `qcheck-updater.py`
   - carries both per-update integrity checksums and expected current field values
 - `warning_suppressions.py`
   - loader/normalizer for the suppression JSON
@@ -251,7 +251,7 @@ python3 data-check.py -N | rg 'AI:Curated'
 
 - `DataCheckWarning` may carry structured `fix_proposals` alongside the human warning text.
 - `data-check.py -U/--export-update-plan ...` serializes those proposals into a JSON fix plan.
-- `collection-qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
+- `qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
 - The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
 - The current updater apply path supports collection-level fixes only. Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
@@ -260,22 +260,21 @@ python3 data-check.py -N | rg 'AI:Curated'
 - Ontology-backed fixes such as DUO terms must carry explanations validated against the official ontology source during development; do not improvise ontology descriptions at runtime.
 - This workflow only makes sense when the staging area is the authoritative editable source. If a node imports/synchronizes data from another primary system, fix that primary source instead.
 
-### Current fix-producing modules
+### Current fix-producing module labels
 
-- `access`
-  - DUO/access-policy proposals from `checks/AccessPolicies.py`
-- `collection_types`
-  - structured type fixes from `checks/CollectionContent.py`, `checks/COVID.py`, and cautious narrative suggestions from `checks/TextConsistency.py`
-- `age`
-  - fact-sheet-derived age fixes from `checks/FactTables.py` and cautious narrative suggestions from `checks/TextConsistency.py`
-- `materials`
-  - fact-sheet-derived material fixes from `checks/FactTables.py` and deterministic FFPE text suggestions from `checks/TextConsistency.py`
-- `diagnoses`
-  - fact-sheet-derived diagnosis fixes from `checks/FactTables.py` and deterministic COVID text suggestions from `checks/TextConsistency.py`
-- `clinical_profile`
-  - currently used for deterministic sex/profile alignment from fact sheets
-- `counts`
-  - sample/donor total alignment from fact-sheet all-star rows
+- exported `module` values intentionally match the visible QC check-prefix family that users see in warning IDs
+- current labels:
+  - `AP`
+    - DUO/access-policy proposals from `checks/AccessPolicies.py`
+  - `CC`
+    - collection-content/type fixes from `checks/CollectionContent.py`
+  - `C19`
+    - COVID-specific fixes from `checks/COVID.py`
+  - `FT`
+    - fact-sheet-derived diagnosis/material/sex/age/count fixes from `checks/FactTables.py`
+  - `TXT`
+    - deterministic narrative-to-structure fixes from `checks/TextConsistency.py`
+- keep the semantic category in `update_id`; do not overload `module` with a second naming scheme
 
 ### Confidence handling
 

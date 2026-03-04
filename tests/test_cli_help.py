@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CLI_SCRIPTS = [
     "data-check.py",
-    "collection-qcheck-updater.py",
+    "qcheck-updater.py",
     "collection-factsheet-descriptor-updater.py",
     "directory-stats.py",
     "full-text-search.py",

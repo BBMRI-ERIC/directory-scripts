@@ -144,4 +144,4 @@ def test_facttables_check_attaches_fact_alignment_fix_proposals():
     ]
 
     assert proposals
-    assert any(proposal.module in {"age", "diagnoses", "materials", "clinical_profile", "counts"} for proposal in proposals)
+    assert any(proposal.module == "FT" for proposal in proposals)

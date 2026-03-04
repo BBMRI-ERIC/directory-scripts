@@ -340,7 +340,7 @@ class CollectionContent(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "OrphaNeedsRDType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "ORPHA code diagnoses provided, but collection not marked as rare disease (RD) collection", fix_proposals=[
 					make_collection_multi_value_fix(
 						update_id='collection_type.add.rd',
-						module='collection_types',
+						module='CC',
 						collection=collection,
 						field='type',
 						proposed_values=['RD'],
@@ -385,7 +385,7 @@ class CollectionContent(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "ImageTypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but collection type does not include IMAGE", fix_proposals=[
 					make_collection_multi_value_fix(
 						update_id='collection_type.add.image',
-						module='collection_types',
+						module='CC',
 						collection=collection,
 						field='type',
 						proposed_values=['IMAGE'],
