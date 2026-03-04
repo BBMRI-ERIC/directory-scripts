@@ -157,6 +157,14 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
         confidence = "certain" if update_family in {"diagnoses", "materials", "counts"} else "almost_certain"
         if update_family == "age" and note_text:
             confidence = "uncertain"
+        if update_family == "age":
+            base_rationale = (
+                "Age proposal uses conservative normalization: Directory age labels/ranges are mapped to numeric bounds, aggregate/unknown rows ('*', Unknown, Undefined) are ignored, and automatic updates only widen coverage unless explicit replace mode is used."
+            )
+        else:
+            base_rationale = (
+                "Fact-sheet proposal uses conservative normalization: aggregate rows ('*') are ignored, Unknown/Undefined age labels are ignored, and NAV material is treated as non-specific unless it is the only material signal."
+            )
         fix_proposals.append(
             make_fix_proposal(
                 update_id=f"{update_family}.{field}.from_facts",
@@ -172,7 +180,7 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
                     f"Update collection field {field} from fact-sheet derived values."
                 ),
                 rationale=(
-                    "The fact-sheet-derived proposal reuses the same conservative normalization as the fact-sheet descriptor updater."
+                    base_rationale
                     + (f" {note_text}" if note_text else "")
                 ),
                 blocking_reason=(

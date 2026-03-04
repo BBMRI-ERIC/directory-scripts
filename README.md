@@ -52,7 +52,7 @@ Common CLI conventions across validation/export tools:
 - `-v` / `--verbose` for progress logging, `-d` / `--debug` for debug logging
 - `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
 - `-N` / `--no-stdout` to suppress normal stdout output
-- `--suppress-validation-warnings` to suppress non-fatal local validation warnings where a tool supports Pydantic-backed config/cache/input validation
+- `--suppress-validation-warnings` to suppress non-fatal local validation warnings where a tool supports scoped local config/cache/input validation
 - `-w` / `--include-withdrawn` when a tool supports opt-in processing of withdrawn entities
 - `--only-withdrawn` when a tool supports withdrawn-only processing
 - `--purge-cache ...` and `--purge-all-caches` for cache purging
@@ -77,7 +77,7 @@ The XLSX warning workbook is split into tabs by BBMRI node / staging area derive
 
 For developer-facing architecture, coding-style, AI-check, and testing notes, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-Pydantic-backed validation is intentionally limited to local inputs and repository-owned artifacts:
+Built-in scoped validation is intentionally limited to local inputs and repository-owned artifacts:
 - tool/runtime settings for `directory-tables-modifier.py` and `collection-factsheet-descriptor-updater.py`
 - shareable/local JSON artifacts such as `ai-check-cache/` payloads and `warning-suppressions.json`
 - malformed local artifacts are treated as non-fatal validation warnings and can be hidden with `--suppress-validation-warnings`

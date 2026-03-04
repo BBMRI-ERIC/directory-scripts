@@ -28,9 +28,9 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - This is acceptable for the current operating model, but it means alternate Directory targets share the same cache namespace.
 - When switching a tool to a non-default Directory instance, purge the `directory` cache before switching back or comparing runs across targets.
 
-### Scoped Pydantic validation
+### Scoped local validation
 
-Pydantic is used narrowly in this repository.
+A lightweight in-repo validation layer is used narrowly in this repository.
 
 - Use it for local inputs and repository-owned artifacts:
   - tool/runtime settings

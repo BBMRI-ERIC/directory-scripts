@@ -1,8 +1,7 @@
-from pydantic import ValidationError
-
 from validation_models import (
     FactsheetUpdaterSettingsModel,
     TableModifierSettingsModel,
+    ValidationError,
 )
 
 

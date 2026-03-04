@@ -1,35 +1,132 @@
-"""Scoped Pydantic models for local tool/config/cache validation."""
+"""Scoped validation helpers for local tool/config/cache payloads.
+
+This module intentionally avoids optional third-party validation runtimes so
+that command-line tools keep working in constrained environments (for example
+Cygwin). The API keeps compatibility with existing callers:
+`Model.parse_obj(...)`, `model.dict()`, and `ValidationError.errors()`.
+"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from pydantic import BaseModel, validator
+
+class ValidationError(ValueError):
+    """Structured validation error with machine-readable ``errors()`` output."""
+
+    def __init__(self, errors: list[dict[str, Any]]):
+        self._errors = errors
+        message = "; ".join(
+            f"{'.'.join(str(part) for part in error.get('loc', ()))}: {error.get('msg', 'invalid value')}"
+            if error.get("loc")
+            else str(error.get("msg", "invalid value"))
+            for error in errors
+        )
+        super().__init__(message)
+
+    def errors(self) -> list[dict[str, Any]]:
+        return list(self._errors)
 
 
-def _non_empty_string(value: Any) -> str:
+def _make_error(loc: tuple[str | int, ...], msg: str) -> dict[str, Any]:
+    return {"loc": loc, "msg": msg}
+
+
+def _raise_if_errors(errors: list[dict[str, Any]]) -> None:
+    if errors:
+        raise ValidationError(errors)
+
+
+def _non_empty_string(value: Any, *, field_name: str) -> str:
     if value is None:
-        raise ValueError("field is required")
+        raise ValidationError([_make_error((field_name,), "field is required")])
     text = str(value).strip()
     if not text:
-        raise ValueError("field must not be empty")
+        raise ValidationError([_make_error((field_name,), "field must not be empty")])
     return text
 
 
-class ToolConnectionSettingsModel(BaseModel):
+def _get_string(
+    payload: dict[str, Any],
+    *,
+    field_name: str,
+    aliases: tuple[str, ...] = (),
+    required: bool = True,
+    default: Optional[str] = None,
+) -> Optional[str]:
+    for key in (field_name, *aliases):
+        if key in payload:
+            value = payload[key]
+            if required:
+                return _non_empty_string(value, field_name=field_name)
+            if value is None:
+                return default
+            return str(value)
+    if required:
+        raise ValidationError([_make_error((field_name,), "field is required")])
+    return default
+
+
+def _get_list(
+    payload: dict[str, Any],
+    *,
+    field_name: str,
+    default: Optional[list[Any]] = None,
+) -> list[Any]:
+    if field_name not in payload:
+        return [] if default is None else list(default)
+    value = payload[field_name]
+    if value is None or value == "":
+        return [] if default is None else list(default)
+    if not isinstance(value, list):
+        raise ValidationError([_make_error((field_name,), "must be a list")])
+    return value
+
+
+@dataclass
+class _BaseModel:
+    """Small base class exposing ``dict()`` for compatibility."""
+
+    def dict(self) -> dict[str, Any]:
+        return dict(self.__dict__)
+
+
+@dataclass
+class ToolConnectionSettingsModel(_BaseModel):
     """Validate common Directory connection settings for local CLIs."""
 
     directory_target: str
     directory_username: str
     directory_password: str
 
-    _validate_directory_target = validator("directory_target", allow_reuse=True)(_non_empty_string)
-    _validate_directory_username = validator("directory_username", allow_reuse=True)(_non_empty_string)
-    _validate_directory_password = validator("directory_password", allow_reuse=True)(_non_empty_string)
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "ToolConnectionSettingsModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        errors: list[dict[str, Any]] = []
+
+        def parse_required(name: str) -> str:
+            try:
+                return _non_empty_string(payload.get(name), field_name=name)
+            except ValidationError as exc:
+                errors.extend(exc.errors())
+                return ""
+
+        target = parse_required("directory_target")
+        username = parse_required("directory_username")
+        password = parse_required("directory_password")
+        _raise_if_errors(errors)
+        return cls(
+            directory_target=target,
+            directory_username=username,
+            directory_password=password,
+        )
 
 
+@dataclass
 class TableModifierSettingsModel(ToolConnectionSettingsModel):
-    """Validate resolved `directory-tables-modifier.py` runtime settings."""
+    """Validate resolved ``directory-tables-modifier.py`` runtime settings."""
 
     schema_name: str
     table: str
@@ -37,91 +134,192 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
     tsv_quote_char: str = '"'
     tsv_escape_char: Optional[str] = None
 
-    _validate_schema = validator("schema_name", allow_reuse=True)(_non_empty_string)
-    _validate_table = validator("table", allow_reuse=True)(_non_empty_string)
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "TableModifierSettingsModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        base = ToolConnectionSettingsModel.parse_obj(payload)
+        errors: list[dict[str, Any]] = []
 
-    @validator("file_format", allow_reuse=True)
-    def validate_file_format(cls, value: str) -> str:
-        if value not in {"auto", "csv", "tsv"}:
-            raise ValueError("must be one of: auto, csv, tsv")
-        return value
+        def parse_non_empty(field_name: str, aliases: tuple[str, ...] = ()) -> str:
+            value = payload.get(field_name)
+            if value is None:
+                for alias in aliases:
+                    if alias in payload:
+                        value = payload[alias]
+                        break
+            try:
+                return _non_empty_string(value, field_name=field_name)
+            except ValidationError as exc:
+                errors.extend(exc.errors())
+                return ""
 
-    @validator("tsv_quote_char", allow_reuse=True)
-    def validate_tsv_quote_char(cls, value: str) -> str:
-        value = _non_empty_string(value)
-        if len(value) != 1:
-            raise ValueError("must be a single character")
-        return value
+        schema_name = parse_non_empty("schema_name", aliases=("schema",))
+        table = parse_non_empty("table")
 
-    @validator("tsv_escape_char", allow_reuse=True)
-    def validate_tsv_escape_char(cls, value: Optional[str]) -> Optional[str]:
-        if value is None or value == "":
-            return None
-        value = str(value)
-        if len(value) != 1:
-            raise ValueError("must be a single character")
-        return value
+        file_format = str(payload.get("file_format", "auto"))
+        if file_format not in {"auto", "csv", "tsv"}:
+            errors.append(_make_error(("file_format",), "must be one of: auto, csv, tsv"))
 
-    class Config:
-        allow_population_by_field_name = True
-        fields = {"schema_name": "schema"}
+        quote_raw = payload.get("tsv_quote_char", '"')
+        try:
+            quote_char = _non_empty_string(quote_raw, field_name="tsv_quote_char")
+            if len(quote_char) != 1:
+                errors.append(_make_error(("tsv_quote_char",), "must be a single character"))
+        except ValidationError as exc:
+            errors.extend(exc.errors())
+            quote_char = '"'
+
+        escape_raw = payload.get("tsv_escape_char")
+        if escape_raw in (None, ""):
+            escape_char = None
+        else:
+            escape_char = str(escape_raw)
+            if len(escape_char) != 1:
+                errors.append(_make_error(("tsv_escape_char",), "must be a single character"))
+
+        _raise_if_errors(errors)
+        return cls(
+            directory_target=base.directory_target,
+            directory_username=base.directory_username,
+            directory_password=base.directory_password,
+            schema_name=schema_name,
+            table=table,
+            file_format=file_format,
+            tsv_quote_char=quote_char,
+            tsv_escape_char=escape_char,
+        )
 
 
+@dataclass
 class FactsheetUpdaterSettingsModel(ToolConnectionSettingsModel):
-    """Validate resolved `collection-factsheet-descriptor-updater.py` settings."""
+    """Validate resolved ``collection-factsheet-descriptor-updater.py`` settings."""
 
     schema_name: str
     collection_id: str
 
-    _validate_schema = validator("schema_name", allow_reuse=True)(_non_empty_string)
-    _validate_collection_id = validator("collection_id", allow_reuse=True)(_non_empty_string)
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "FactsheetUpdaterSettingsModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        base = ToolConnectionSettingsModel.parse_obj(payload)
+        errors: list[dict[str, Any]] = []
 
-    class Config:
-        allow_population_by_field_name = True
-        fields = {"schema_name": "schema"}
+        def parse_non_empty(field_name: str, aliases: tuple[str, ...] = ()) -> str:
+            value = payload.get(field_name)
+            if value is None:
+                for alias in aliases:
+                    if alias in payload:
+                        value = payload[alias]
+                        break
+            try:
+                return _non_empty_string(value, field_name=field_name)
+            except ValidationError as exc:
+                errors.extend(exc.errors())
+                return ""
+
+        schema_name = parse_non_empty("schema_name", aliases=("schema",))
+        collection_id = parse_non_empty("collection_id")
+        _raise_if_errors(errors)
+        return cls(
+            directory_target=base.directory_target,
+            directory_username=base.directory_username,
+            directory_password=base.directory_password,
+            schema_name=schema_name,
+            collection_id=collection_id,
+        )
 
 
-class WarningSuppressionEntryModel(BaseModel):
+@dataclass
+class WarningSuppressionEntryModel(_BaseModel):
     """Normalized warning-suppression record."""
 
     check_id: str
     entity_id: str
     reason: str = ""
 
-    _validate_check_id = validator("check_id", allow_reuse=True)(_non_empty_string)
-    _validate_entity_id = validator("entity_id", allow_reuse=True)(_non_empty_string)
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "WarningSuppressionEntryModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        errors: list[dict[str, Any]] = []
 
-    @validator("reason", pre=True, always=True, allow_reuse=True)
-    def normalize_reason(cls, value: Any) -> str:
-        if value is None:
-            return ""
-        return str(value)
+        try:
+            check_id = _non_empty_string(payload.get("check_id"), field_name="check_id")
+        except ValidationError as exc:
+            errors.extend(exc.errors())
+            check_id = ""
+        try:
+            entity_id = _non_empty_string(payload.get("entity_id"), field_name="entity_id")
+        except ValidationError as exc:
+            errors.extend(exc.errors())
+            entity_id = ""
+
+        reason = payload.get("reason")
+        normalized_reason = "" if reason is None else str(reason)
+
+        _raise_if_errors(errors)
+        return cls(check_id=check_id, entity_id=entity_id, reason=normalized_reason)
 
 
-class AICheckedEntityModel(BaseModel):
+@dataclass
+class AICheckedEntityModel(_BaseModel):
     """Validated checked-entity checksum record."""
 
     entity_id: str
     entity_type: str
     entity_checksum: str
     source_checksum: str
+    extras: dict[str, Any] = field(default_factory=dict)
 
-    class Config:
-        extra = "allow"
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "AICheckedEntityModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        errors: list[dict[str, Any]] = []
 
-    _validate_entity_id = validator("entity_id", allow_reuse=True)(_non_empty_string)
-    _validate_entity_checksum = validator("entity_checksum", allow_reuse=True)(_non_empty_string)
-    _validate_source_checksum = validator("source_checksum", allow_reuse=True)(_non_empty_string)
+        def req(name: str) -> str:
+            try:
+                return _non_empty_string(payload.get(name), field_name=name)
+            except ValidationError as exc:
+                errors.extend(exc.errors())
+                return ""
 
-    @validator("entity_type", allow_reuse=True)
-    def validate_entity_type(cls, value: str) -> str:
-        value = _non_empty_string(value)
-        if value not in {"BIOBANK", "COLLECTION"}:
-            raise ValueError("must be one of: BIOBANK, COLLECTION")
-        return value
+        entity_id = req("entity_id")
+        entity_type = req("entity_type")
+        if entity_type and entity_type not in {"BIOBANK", "COLLECTION"}:
+            errors.append(_make_error(("entity_type",), "must be one of: BIOBANK, COLLECTION"))
+        entity_checksum = req("entity_checksum")
+        source_checksum = req("source_checksum")
+
+        _raise_if_errors(errors)
+        extras = {
+            key: value
+            for key, value in payload.items()
+            if key
+            not in {"entity_id", "entity_type", "entity_checksum", "source_checksum"}
+        }
+        return cls(
+            entity_id=entity_id,
+            entity_type=entity_type,
+            entity_checksum=entity_checksum,
+            source_checksum=source_checksum,
+            extras=extras,
+        )
+
+    def dict(self) -> dict[str, Any]:
+        out = {
+            "entity_id": self.entity_id,
+            "entity_type": self.entity_type,
+            "entity_checksum": self.entity_checksum,
+            "source_checksum": self.source_checksum,
+        }
+        out.update(self.extras)
+        return out
 
 
-class AIFindingModel(BaseModel):
+@dataclass
+class AIFindingModel(_BaseModel):
     """Validated AI-curated finding record."""
 
     rule: str
@@ -130,75 +328,213 @@ class AIFindingModel(BaseModel):
     severity: str
     message: str
     action: str
-    fields: list[str] = []
+    fields: list[str] = field(default_factory=list)
     email: str = ""
     nn: str = ""
     withdrawn: str = ""
+    extras: dict[str, Any] = field(default_factory=dict)
 
-    class Config:
-        extra = "allow"
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "AIFindingModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        errors: list[dict[str, Any]] = []
 
-    _validate_rule = validator("rule", allow_reuse=True)(_non_empty_string)
-    _validate_entity_id = validator("entity_id", allow_reuse=True)(_non_empty_string)
-    _validate_message = validator("message", allow_reuse=True)(_non_empty_string)
-    _validate_action = validator("action", allow_reuse=True)(_non_empty_string)
+        def req(name: str) -> str:
+            try:
+                return _non_empty_string(payload.get(name), field_name=name)
+            except ValidationError as exc:
+                errors.extend(exc.errors())
+                return ""
 
-    @validator("entity_type", allow_reuse=True)
-    def validate_entity_type(cls, value: str) -> str:
-        value = _non_empty_string(value)
-        if value not in {"BIOBANK", "COLLECTION"}:
-            raise ValueError("must be one of: BIOBANK, COLLECTION")
-        return value
+        rule = req("rule")
+        entity_id = req("entity_id")
+        entity_type = req("entity_type")
+        if entity_type and entity_type not in {"BIOBANK", "COLLECTION"}:
+            errors.append(_make_error(("entity_type",), "must be one of: BIOBANK, COLLECTION"))
+        severity = req("severity")
+        if severity and severity not in {"ERROR", "WARNING", "INFO"}:
+            errors.append(_make_error(("severity",), "must be one of: ERROR, WARNING, INFO"))
+        message = req("message")
+        action = req("action")
 
-    @validator("severity", allow_reuse=True)
-    def validate_severity(cls, value: str) -> str:
-        value = _non_empty_string(value)
-        if value not in {"ERROR", "WARNING", "INFO"}:
-            raise ValueError("must be one of: ERROR, WARNING, INFO")
-        return value
+        raw_fields = payload.get("fields", [])
+        if raw_fields in (None, ""):
+            fields = []
+        elif isinstance(raw_fields, list):
+            fields = [str(item) for item in raw_fields]
+        else:
+            fields = []
+            errors.append(_make_error(("fields",), "must be a list"))
 
-    @validator("fields", pre=True, always=True, allow_reuse=True)
-    def validate_fields(cls, value: Any) -> list[str]:
-        if value is None or value == "":
-            return []
-        if not isinstance(value, list):
-            raise ValueError("must be a list")
-        return [str(item) for item in value]
+        _raise_if_errors(errors)
+        extras = {
+            key: value
+            for key, value in payload.items()
+            if key
+            not in {
+                "rule",
+                "entity_id",
+                "entity_type",
+                "severity",
+                "message",
+                "action",
+                "fields",
+                "email",
+                "nn",
+                "withdrawn",
+            }
+        }
+        return cls(
+            rule=rule,
+            entity_id=entity_id,
+            entity_type=entity_type,
+            severity=severity,
+            message=message,
+            action=action,
+            fields=fields,
+            email="" if payload.get("email") is None else str(payload.get("email")),
+            nn="" if payload.get("nn") is None else str(payload.get("nn")),
+            withdrawn="" if payload.get("withdrawn") is None else str(payload.get("withdrawn")),
+            extras=extras,
+        )
+
+    def dict(self) -> dict[str, Any]:
+        out = {
+            "rule": self.rule,
+            "entity_id": self.entity_id,
+            "entity_type": self.entity_type,
+            "severity": self.severity,
+            "message": self.message,
+            "action": self.action,
+            "fields": list(self.fields),
+            "email": self.email,
+            "nn": self.nn,
+            "withdrawn": self.withdrawn,
+        }
+        out.update(self.extras)
+        return out
 
 
-class AICachePayloadModel(BaseModel):
+@dataclass
+class AICachePayloadModel(_BaseModel):
     """Validated shareable AI cache file payload."""
 
-    schema_name: Optional[str] = None
-    rule: Optional[str] = None
-    generator: str = "legacy"
-    withdrawn_scope: str = "active-only"
-    checked_fields: list[str] = []
-    checked_entities: list[AICheckedEntityModel] = []
+    schema_name: Optional[str]
+    rule: Optional[str]
+    generator: str
+    withdrawn_scope: str
+    checked_fields: list[str]
+    checked_entities: list[AICheckedEntityModel]
     findings: list[AIFindingModel]
+    extras: dict[str, Any] = field(default_factory=dict)
 
-    class Config:
-        extra = "allow"
-        allow_population_by_field_name = True
-        fields = {"schema_name": "schema"}
+    @classmethod
+    def parse_obj(cls, payload: Any) -> "AICachePayloadModel":
+        if not isinstance(payload, dict):
+            raise ValidationError([_make_error((), "input must be a JSON object")])
+        errors: list[dict[str, Any]] = []
 
-    @validator("generator", pre=True, always=True, allow_reuse=True)
-    def normalize_generator(cls, value: Any) -> str:
-        if value is None or value == "":
-            return "legacy"
-        return str(value)
+        schema_name = payload.get("schema_name", payload.get("schema"))
+        if schema_name is not None:
+            schema_name = str(schema_name)
+        rule = payload.get("rule")
+        if rule is not None and rule != "":
+            rule = str(rule)
+        elif rule == "":
+            rule = None
 
-    @validator("withdrawn_scope", allow_reuse=True)
-    def validate_withdrawn_scope(cls, value: str) -> str:
-        value = _non_empty_string(value)
-        if value not in {"active-only", "include-withdrawn", "only-withdrawn"}:
-            raise ValueError("must be one of: active-only, include-withdrawn, only-withdrawn")
-        return value
+        generator = payload.get("generator", "legacy")
+        if generator in (None, ""):
+            generator = "legacy"
+        generator = str(generator)
 
-    @validator("checked_fields", pre=True, always=True, allow_reuse=True)
-    def validate_checked_fields(cls, value: Any) -> list[str]:
-        if value is None or value == "":
-            return []
-        if not isinstance(value, list):
-            raise ValueError("must be a list")
-        return [str(item) for item in value]
+        withdrawn_scope = str(payload.get("withdrawn_scope", "active-only"))
+        if withdrawn_scope not in {"active-only", "include-withdrawn", "only-withdrawn"}:
+            errors.append(
+                _make_error(
+                    ("withdrawn_scope",),
+                    "must be one of: active-only, include-withdrawn, only-withdrawn",
+                )
+            )
+
+        try:
+            checked_fields_raw = _get_list(payload, field_name="checked_fields", default=[])
+            checked_fields = [str(item) for item in checked_fields_raw]
+        except ValidationError as exc:
+            errors.extend(exc.errors())
+            checked_fields = []
+
+        checked_entities_raw = payload.get("checked_entities", [])
+        if checked_entities_raw in (None, ""):
+            checked_entities_raw = []
+        if not isinstance(checked_entities_raw, list):
+            errors.append(_make_error(("checked_entities",), "must be a list"))
+            checked_entities_raw = []
+
+        checked_entities: list[AICheckedEntityModel] = []
+        for index, record in enumerate(checked_entities_raw):
+            try:
+                checked_entities.append(AICheckedEntityModel.parse_obj(record))
+            except ValidationError as exc:
+                for error in exc.errors():
+                    loc = ("checked_entities", index, *tuple(error.get("loc", ())))
+                    errors.append(_make_error(loc, error.get("msg", "invalid value")))
+
+        if "findings" not in payload:
+            errors.append(_make_error(("findings",), "field is required"))
+            findings_raw = []
+        else:
+            findings_raw = payload.get("findings")
+        if not isinstance(findings_raw, list):
+            errors.append(_make_error(("findings",), "must be a list"))
+            findings_raw = []
+
+        findings: list[AIFindingModel] = []
+        for index, record in enumerate(findings_raw):
+            try:
+                findings.append(AIFindingModel.parse_obj(record))
+            except ValidationError as exc:
+                for error in exc.errors():
+                    loc = ("findings", index, *tuple(error.get("loc", ())))
+                    errors.append(_make_error(loc, error.get("msg", "invalid value")))
+
+        _raise_if_errors(errors)
+        extras = {
+            key: value
+            for key, value in payload.items()
+            if key
+            not in {
+                "schema_name",
+                "schema",
+                "rule",
+                "generator",
+                "withdrawn_scope",
+                "checked_fields",
+                "checked_entities",
+                "findings",
+            }
+        }
+        return cls(
+            schema_name=schema_name,
+            rule=rule,
+            generator=generator,
+            withdrawn_scope=withdrawn_scope,
+            checked_fields=checked_fields,
+            checked_entities=checked_entities,
+            findings=findings,
+            extras=extras,
+        )
+
+    def dict(self) -> dict[str, Any]:
+        out = {
+            "schema_name": self.schema_name,
+            "rule": self.rule,
+            "generator": self.generator,
+            "withdrawn_scope": self.withdrawn_scope,
+            "checked_fields": list(self.checked_fields),
+            "checked_entities": [entry.dict() for entry in self.checked_entities],
+            "findings": [finding.dict() for finding in self.findings],
+        }
+        out.update(self.extras)
+        return out

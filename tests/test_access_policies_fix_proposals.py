@@ -74,3 +74,22 @@ def test_access_policies_treats_duo_underscore_and_colon_as_same_term():
 
     warnings = AccessPolicies().check(DirectoryUnderscoreStub(), args=None)
     assert not any(warning.dataCheckID == "AP:DiseaseDuoMissing" for warning in warnings)
+
+
+def test_access_policies_skips_bio_duo_missing_for_nav_only_materials():
+    class DirectoryNavMaterialsStub(DirectoryStub):
+        def getCollections(self):
+            return [
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "withdrawn": False,
+                    "materials": ["NAV"],
+                    "type": ["SAMPLE"],
+                    "data_use": ["DUO:0000006"],
+                    "data_categories": ["BIOLOGICAL_SAMPLES"],
+                    "biobank": {"id": "bb1"},
+                }
+            ]
+
+    warnings = AccessPolicies().check(DirectoryNavMaterialsStub(), args=None)
+    assert not any(warning.dataCheckID == "AP:BioDuoMissing" for warning in warnings)
