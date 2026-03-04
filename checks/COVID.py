@@ -309,6 +309,10 @@ class COVID(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			biobank_covid = []
+			biobank_capabilities = []
+			if 'capabilities' in biobank:
+				for c in biobank['capabilities']:
+					biobank_capabilities.append(c['id'])
 			biobank_networks = []
 			if 'network' in biobank:
 				for n in biobank['network']:
