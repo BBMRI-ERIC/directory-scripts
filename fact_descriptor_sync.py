@@ -12,17 +12,20 @@ from fact_sheet_utils import analyze_collection_fact_sheet, normalize_fact_dimen
 
 ICD10_PREFIX = "urn:miriam:icd:"
 OPEN_AGE_HIGH = None
-AGE_RANGE_LABEL_BOUNDS_YEARS = {
-    "NEWBORN": (0, 0),
-    "INFANT": (0, 1),
-    "CHILD": (2, 12),
-    "ADOLESCENT": (13, 18),
-    "YOUNG ADULT": (19, 24),
-    "ADULT": (19, 44),
-    "MIDDLE-AGED": (45, 64),
-    "AGED (65-79 YEARS)": (65, 79),
-    "AGED (>80 YEARS)": (80, OPEN_AGE_HIGH),
+AGE_RANGE_LABEL_BOUNDS = {
+    # Aligned with DirectoryOntologies/AgeRanges labels in ERIC.
+    "NEWBORN": (0, 1, "MONTH"),
+    "INFANT": (2, 23, "MONTH"),
+    "CHILD": (2, 12, "YEAR"),
+    "ADOLESCENT": (13, 17, "YEAR"),
+    "YOUNG ADULT": (18, 24, "YEAR"),
+    "ADULT": (25, 44, "YEAR"),
+    "MIDDLE-AGED": (45, 64, "YEAR"),
+    "AGED (65-79 YEARS)": (65, 79, "YEAR"),
+    "AGED (>80 YEARS)": (80, OPEN_AGE_HIGH, "YEAR"),
 }
+AGE_LABEL_LOW_SUPPORT_OUTLIER = 0
+AGE_LABEL_HIGH_SUPPORT_THRESHOLD = 5
 
 
 def normalize_descriptor_value(value: Any) -> str:
@@ -184,14 +187,49 @@ def merge_descriptor_values(
 
 def derive_age_range_update(facts: list[dict[str, Any]]) -> dict[str, Any]:
     """Return a conservative age-range proposal from fact rows."""
-    bounds = []
-    has_open_high = False
-    units = []
+    parsed_rows = []
     for fact in facts:
         age_range = normalize_descriptor_value(fact.get("age_range"))
         if not age_range or age_range in {"*", "Unknown", "Undefined"}:
             continue
         age_low, age_high, age_unit = _parse_age_range_bounds(age_range)
+        if age_low is None and age_high is None and age_unit is None:
+            continue
+        parsed_rows.append(
+            {
+                "age_range": age_range,
+                "low": age_low,
+                "high": age_high,
+                "unit": age_unit,
+                "label_based": age_range.strip().upper() in AGE_RANGE_LABEL_BOUNDS,
+                "support": _fact_row_support_count(fact),
+            }
+        )
+
+    if not parsed_rows:
+        return {"age_low": None, "age_high": None, "age_unit": None, "notes": []}
+
+    has_high_support_label_rows = any(
+        row["label_based"]
+        and isinstance(row["support"], int)
+        and row["support"] >= AGE_LABEL_HIGH_SUPPORT_THRESHOLD
+        for row in parsed_rows
+    )
+
+    bounds = []
+    has_open_high = False
+    units = []
+    notes = []
+    low_support_rows_ignored = False
+    for row in parsed_rows:
+        if row["label_based"] and has_high_support_label_rows:
+            support = row["support"]
+            if isinstance(support, int) and support <= AGE_LABEL_LOW_SUPPORT_OUTLIER:
+                low_support_rows_ignored = True
+                continue
+        age_low = row["low"]
+        age_high = row["high"]
+        age_unit = row["unit"]
         if age_low is None and age_high is None and age_unit is None:
             continue
         bounds.append((age_low, age_high))
@@ -201,11 +239,18 @@ def derive_age_range_update(facts: list[dict[str, Any]]) -> dict[str, Any]:
             has_open_high = True
 
     if not bounds:
-        return {"age_low": None, "age_high": None, "age_unit": None, "notes": []}
+        if low_support_rows_ignored:
+            notes.append(
+                "Low-support label-based age rows were ignored: rows with max(number_of_donors, number_of_samples)=0 are treated as non-evidence when at least one other label row has support >=5."
+            )
+        return {"age_low": None, "age_high": None, "age_unit": None, "notes": notes}
 
     low_values = [low for low, _ in bounds if low is not None]
     high_values = [high for _, high in bounds if high is not None]
-    notes = []
+    if low_support_rows_ignored:
+        notes.append(
+            "Low-support label-based age rows were ignored: rows with max(number_of_donors, number_of_samples)=0 are treated as non-evidence when at least one other label row has support >=5."
+        )
     normalized_units = ordered_unique(units)
     if len(normalized_units) > 1:
         notes.append(
@@ -217,7 +262,7 @@ def derive_age_range_update(facts: list[dict[str, Any]]) -> dict[str, Any]:
     age_high = None if has_open_high else (max(high_values) if high_values else None)
     if has_open_high:
         notes.append(
-            "Open-ended fact-sheet age groups are present; age_high cannot be derived conservatively."
+            "Open-ended fact-sheet age groups are present (for example 'Aged (>80 years)'); these have no finite upper bound, so age_high cannot be derived conservatively."
         )
     derived_unit = normalized_units[0] if normalized_units else None
     return {
@@ -359,9 +404,9 @@ def _is_missing_value(value: Any) -> bool:
 
 def _parse_age_range_bounds(age_range: str) -> tuple[int | None, int | None, str | None]:
     label_key = age_range.strip().upper()
-    if label_key in AGE_RANGE_LABEL_BOUNDS_YEARS:
-        low, high = AGE_RANGE_LABEL_BOUNDS_YEARS[label_key]
-        return low, high, "YEAR"
+    if label_key in AGE_RANGE_LABEL_BOUNDS:
+        low, high, unit = AGE_RANGE_LABEL_BOUNDS[label_key]
+        return low, high, unit
 
     age_unit = _infer_age_range_unit(age_range)
     range_match = re.search(r"(\d+)\s*-\s*(\d+)", age_range)
@@ -434,3 +479,13 @@ def _infer_age_range_unit(age_range: str) -> str | None:
     if "year" in normalized:
         return "YEAR"
     return None
+
+
+def _fact_row_support_count(fact: dict[str, Any]) -> int | None:
+    """Return the strongest available row support from sample/donor counts."""
+    donors = _coerce_optional_int(fact.get("number_of_donors"))
+    samples = _coerce_optional_int(fact.get("number_of_samples"))
+    counts = [count for count in (donors, samples) if isinstance(count, int)]
+    if not counts:
+        return None
+    return max(counts)

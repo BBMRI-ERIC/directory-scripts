@@ -7,10 +7,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from validation_helpers import warn_from_validation_error
-from validation_models import WarningSuppressionEntryModel
+from validation_models import ValidationError, WarningSuppressionEntryModel
 
 DEFAULT_WARNING_SUPPRESSIONS_PATH = Path(__file__).resolve().parent / "warning-suppressions.json"
 

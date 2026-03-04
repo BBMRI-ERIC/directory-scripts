@@ -15,7 +15,6 @@ from pprint import PrettyPrinter
 import pandas as pd
 from dotenv import load_dotenv
 from molgenis_emx2.directory_client.directory_client import DirectorySession
-from pydantic import ValidationError
 
 from directory import Directory
 from fact_descriptor_sync import (
@@ -24,7 +23,7 @@ from fact_descriptor_sync import (
 )
 from nncontacts import NNContacts
 from validation_helpers import format_validation_error
-from validation_models import FactsheetUpdaterSettingsModel
+from validation_models import FactsheetUpdaterSettingsModel, ValidationError
 
 
 load_dotenv()

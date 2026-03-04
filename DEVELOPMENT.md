@@ -28,9 +28,9 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - This is acceptable for the current operating model, but it means alternate Directory targets share the same cache namespace.
 - When switching a tool to a non-default Directory instance, purge the `directory` cache before switching back or comparing runs across targets.
 
-### Scoped Pydantic validation
+### Scoped local validation
 
-Pydantic is used narrowly in this repository.
+A lightweight in-repo validation layer is used narrowly in this repository.
 
 - Use it for local inputs and repository-owned artifacts:
   - tool/runtime settings
@@ -311,11 +311,13 @@ python3 data-check.py -N | rg 'AI:Curated'
 ## Withdrawal scope
 
 Directory-backed tools exclude withdrawn biobanks/collections by default.
+Directory cache directories are schema-qualified (`directory-ERIC`, `directory-BBMRI-EU`, ...). Cache purging for `directory` must affect only the currently selected schema cache; target-URL separation is still not provided.
 
 For `data-check.py` and similar read/check entrypoints, non-`ERIC` staging schemas must be selected only after authentication. The user-facing behavior should be:
 - read credentials from CLI or `.env`
 - fail early with a clear input/configuration error if a non-`ERIC` schema is requested without credentials
 - authenticate first, then set the target schema, so private staging areas do not fail with a misleading low-level schema-not-found exception
+- treat quality-info tables as optional for non-`ERIC` schemas and degrade to empty DataFrames instead of failing when those tables are absent
 
 Collection withdrawal is logically inherited:
 - withdrawn collection -> withdrawn

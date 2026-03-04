@@ -13,10 +13,9 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 from molgenis_emx2.directory_client.directory_client import DirectorySession
-from pydantic import ValidationError
 
 from validation_helpers import format_validation_error
-from validation_models import TableModifierSettingsModel
+from validation_models import TableModifierSettingsModel, ValidationError
 
 # Get credentials from .env
 load_dotenv()
