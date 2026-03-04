@@ -81,11 +81,12 @@
 - QC-derived updates are only appropriate when the node edits the Directory staging area directly. If the staging area is synchronized/imported from another authoritative system, fixes must be made in that primary source instead.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
 - For `data-check.py` and other read/check tools, non-`ERIC` schema access must authenticate first and only then select the schema; missing credentials for a non-`ERIC` schema should fail as a user-facing configuration error rather than as a low-level schema exception.
-- For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`.
+- For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`, and field separator can be overridden with `-S/--separator` (for example `;`).
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
 - Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.
 - `directory-tables-modifier.py` should normally target node staging areas, not `ERIC`; if `ERIC` is explicitly requested, the script must require an extra confirmation unless `-f/--force` is used.
 - Table tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--id-regex`, `--collection-id`) and should always be documented in `README.md` with examples.
+- `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is truncate+import and non-atomic; document and warn users accordingly, and recommend dry-run plus pre-sync backup (`--export-on-delete`).
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.
