@@ -22,6 +22,7 @@ Use this skill before commit/push when `checks/`, `text_consistency.py`, `checks
 - Review matching `CHECK_DOCS`, tests, and README/manual references.
 - Inspect `ai-check-cache/` categories and rationales when AI checks are involved.
 - Inspect `text_consistency.py` and other deterministic helpers when narrative-vs-structure coverage is involved.
+- If structured QC fix proposals or updater-facing module labels changed, verify that the exported `module` values still match the visible QC check-prefix family seen by users and that no second competing naming scheme was introduced.
 
 ### Step 2: overlap analysis
 

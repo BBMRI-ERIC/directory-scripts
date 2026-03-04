@@ -90,6 +90,7 @@ Rule of thumb:
 - Design note for age updates:
   - preserve fact-sheet month/day/week/year units when they can be inferred consistently
   - do not auto-update age metadata when fact rows mix incompatible units
+  - when facts use one consistent unit, age proposals should cover the full min..max span represented by the fact rows even if the fact table has gaps between age buckets
 
 - `checks/FactTables.py`
   - runtime QC warning producer
@@ -255,10 +256,14 @@ python3 data-check.py -N | rg 'AI:Curated'
 - Dry-run must follow the same interactive per-update review path as a real apply; the only behavioral difference is that it stops before `save_table(...)`.
 - The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
 - The current updater apply path supports collection-level fixes only. Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
+- `--list` is the non-writing inspection mode and should use the same canonical multi-value formatting as interactive review so order-only differences are not presented as live mismatches.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
 - Every update also carries `expected_current_value`; apply logic must compare it with the live staging-area value and warn before writing when the values diverge.
+- Unordered multi-value fields must be compared canonically; order-only differences in `data_use`, `type`, `diagnosis_available`, `materials`, or `sex` are not meaningful.
+- Review output must show the real effect of append updates: the final target value plus the incremental addition, not a replacement-looking payload.
 - `uncertain` proposals are still exported because they can represent genuine alternative curator choices; do not auto-merge or auto-apply them blindly.
 - Ontology-backed fixes such as DUO terms must carry explanations validated against the official ontology source during development; do not improvise ontology descriptions at runtime.
+- DUO terms must be normalized across `DUO_0000000` and `DUO:0000000` forms before comparison and duplicate detection.
 - This workflow only makes sense when the staging area is the authoritative editable source. If a node imports/synchronizes data from another primary system, fix that primary source instead.
 
 ### Current fix-producing module labels
@@ -276,6 +281,8 @@ python3 data-check.py -N | rg 'AI:Curated'
   - `TXT`
     - deterministic narrative-to-structure fixes from `checks/TextConsistency.py`
 - keep the semantic category in `update_id`; do not overload `module` with a second naming scheme
+- keep field-specific rationale specific: notes from one domain (for example age-range caveats) must not leak into unrelated diagnosis/material/count proposals
+- when an ontology-backed value is already present under an equivalent storage form (for example `DUO_0000007` vs `DUO:0000007`), both the checks and the updater must treat the proposal as a no-op rather than prompting for a duplicate addition
 
 ### Confidence handling
 
