@@ -388,7 +388,7 @@ Key behavior:
 - workflow:
   - run `data-check.py -U ...` on `ERIC`
   - inspect the generated plan with `qcheck-updater.py --list`
-  - dry-run the selected subset with `-n/--dry-run`
+  - dry-run the selected subset with `-n/--dry-run`; it uses the same interactive per-update review flow as a real apply, but stops before writing data
   - apply the reviewed subset interactively or with `-f/--force`
 - the exported JSON plan contains per-update and whole-file checksums; the updater warns when the file or individual updates were edited after export, but the user can still proceed deliberately
 - each update carries the expected current field value seen at export time; if the live staging-area value changed before apply, the updater warns and requires explicit confirmation unless `-f/--force` is used

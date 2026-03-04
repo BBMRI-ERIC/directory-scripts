@@ -72,6 +72,45 @@ DUO_TERM_METADATA = {
 }
 
 
+def normalize_duo_term_id(term_id: str) -> str:
+    """Return a canonical DUO term id using the DUO:0000000 form."""
+    value = str(term_id or "").strip()
+    if not value:
+        return value
+    if value.upper().startswith("DUO_"):
+        return "DUO:" + value.split("_", 1)[1]
+    return value
+
+
+def normalize_duo_term_ids(term_ids) -> list[str]:
+    """Return canonical DUO term ids, preserving first-seen order."""
+    normalized = []
+    for term_id in term_ids or []:
+        canonical = normalize_duo_term_id(term_id)
+        if canonical and canonical not in normalized:
+            normalized.append(canonical)
+    return normalized
+
+
+def detect_duo_term_storage_style(term_ids) -> str:
+    """Return the preferred DUO storage style inferred from existing values."""
+    for term_id in term_ids or []:
+        value = str(term_id or "").strip()
+        if value.upper().startswith("DUO_"):
+            return "underscore"
+        if value.upper().startswith("DUO:"):
+            return "colon"
+    return "underscore"
+
+
+def serialize_duo_term_id(term_id: str, *, style: str) -> str:
+    """Serialize a DUO term id in the requested style."""
+    canonical = normalize_duo_term_id(term_id)
+    if style == "underscore" and canonical.upper().startswith("DUO:"):
+        return "DUO_" + canonical.split(":", 1)[1]
+    return canonical
+
+
 def get_duo_term_metadata(term_id: str) -> dict:
     """Return validated DUO term metadata for a term id."""
-    return dict(DUO_TERM_METADATA[term_id])
+    return dict(DUO_TERM_METADATA[normalize_duo_term_id(term_id)])

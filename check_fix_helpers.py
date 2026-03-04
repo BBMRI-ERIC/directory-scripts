@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from duo_terms import get_duo_term_metadata
+from duo_terms import get_duo_term_metadata, normalize_duo_term_ids
 from fact_descriptor_sync import (
     build_collection_descriptor_proposal,
     parse_collection_multi_value_field,
@@ -24,7 +24,10 @@ MULTI_VALUE_COLLECTION_FIELDS = {
 def current_collection_field_value(collection: dict[str, Any], field: str) -> Any:
     """Return a normalized collection field value for fix export."""
     if field in MULTI_VALUE_COLLECTION_FIELDS:
-        return parse_collection_multi_value_field(collection.get(field))
+        values = parse_collection_multi_value_field(collection.get(field))
+        if field == "data_use":
+            return normalize_duo_term_ids(values)
+        return values
     value = collection.get(field)
     if value in (None, ""):
         return None
@@ -135,8 +138,7 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
     proposal = build_collection_descriptor_proposal(collection, facts, replace_existing=False)
     fix_proposals = []
     change_map = {change["field"]: change for change in proposal["changes"]}
-    notes = proposal.get("notes", [])
-    note_text = " ".join(notes).strip()
+    field_notes = proposal.get("field_notes", {})
 
     for field, update_family in (
         ("diagnosis_available", "diagnoses"),
@@ -151,6 +153,7 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
         change = change_map.get(field)
         if change is None:
             continue
+        note_text = " ".join(field_notes.get(field, [])).strip()
         confidence = "certain" if update_family in {"diagnoses", "materials", "counts"} else "almost_certain"
         if update_family == "age" and note_text:
             confidence = "uncertain"

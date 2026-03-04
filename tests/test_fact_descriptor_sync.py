@@ -1,4 +1,5 @@
 from fact_descriptor_sync import build_collection_descriptor_proposal
+from check_fix_helpers import build_fact_alignment_fix_proposals
 
 
 def test_descriptor_proposal_preserves_broader_icd_codes_and_replaces_totals():
@@ -227,3 +228,69 @@ def test_descriptor_proposal_skips_age_update_for_mixed_fact_units():
     assert proposed["age_high"] is None
     assert proposed["age_unit"] is None
     assert any("mixed units" in note for note in proposal["notes"])
+
+
+def test_descriptor_proposal_widens_existing_age_range_to_cover_fact_span():
+    collection = {
+        "id": "bbmri-eric:ID:CZ_demo:collection:col5",
+        "age_low": "20",
+        "age_high": "60",
+        "age_unit": "YEAR",
+    }
+    facts = [
+        {
+            "id": "f1",
+            "sex": "*",
+            "age_range": "Adult",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 5,
+            "number_of_donors": 4,
+        },
+        {
+            "id": "f2",
+            "sex": "*",
+            "age_range": "Aged (65-79 years)",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 3,
+            "number_of_donors": 3,
+        },
+    ]
+
+    proposal = build_collection_descriptor_proposal(collection, facts, replace_existing=False)
+    proposed = proposal["proposed"]
+
+    assert proposed["age_low"] == 19
+    assert proposed["age_high"] == 79
+    assert proposed["age_unit"] == "YEAR"
+
+
+def test_fact_alignment_fix_proposals_keep_age_notes_on_age_only():
+    collection = {
+        "id": "bbmri-eric:ID:CZ_demo:collection:col6",
+        "diagnosis_available": "urn:miriam:icd:C18.0",
+        "materials": "",
+        "sex": "",
+        "age_low": "",
+        "age_high": "",
+        "age_unit": "",
+    }
+    facts = [
+        {
+            "id": "f1",
+            "sex": "*",
+            "age_range": "Aged (>80 years)",
+            "sample_type": "PLASMA",
+            "disease": {"name": "urn:miriam:icd:C18.9"},
+            "number_of_samples": 5,
+            "number_of_donors": 4,
+        },
+    ]
+
+    proposals = build_fact_alignment_fix_proposals(collection, facts)
+    proposal_map = {proposal.field: proposal for proposal in proposals}
+
+    assert "Open-ended fact-sheet age groups" not in proposal_map["diagnosis_available"].rationale
+    assert "Open-ended fact-sheet age groups" not in proposal_map["materials"].rationale
+    assert "Open-ended fact-sheet age groups" in proposal_map["age_low"].rationale
