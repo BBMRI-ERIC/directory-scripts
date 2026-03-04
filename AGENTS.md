@@ -86,7 +86,7 @@
 - Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.
 - `directory-tables-modifier.py` should normally target node staging areas, not `ERIC`; if `ERIC` is explicitly requested, the script must require an extra confirmation unless `-f/--force` is used.
 - Table tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--id-regex`, `--collection-id`) and should always be documented in `README.md` with examples.
-- `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is truncate+import and non-atomic; document and warn users accordingly, and recommend dry-run plus pre-sync backup (`--export-on-delete`).
+- `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is non-atomic (full-table uses truncate+import; filtered scope uses delete+import); document and warn users accordingly, and recommend dry-run plus pre-sync backup (`--export-on-delete`).
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.

@@ -47,7 +47,7 @@ action_group = parser.add_mutually_exclusive_group(required=True)
 action_group.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the CSV/TSV file containing the records to modify/add.", default=None)
 action_group.add_argument("-x", "--delete-data", dest="delete_data", nargs="?", const="__FILTER_ONLY__", type=str, help="Path to the CSV/TSV file containing the records to delete (or use --delete-filter-only with -R/-C).", default=None)
 action_group.add_argument("-e", "--export-data", dest="export_data", type=str, help="Export table data to a CSV/TSV file without modifying it.", default=None)
-action_group.add_argument("-y", "--sync-data", dest="sync_data", type=str, help="Replace table contents with records from a CSV/TSV file (truncate + import, non-atomic).", default=None)
+action_group.add_argument("-y", "--sync-data", dest="sync_data", type=str, help="Sync table rows from a CSV/TSV file (full table: truncate+import; filtered scope: delete+import; non-atomic).", default=None)
 
 parser.add_argument("--delete-filter-only", dest="delete_filter_only", action="store_true", help="Allow deletion using -R/-C filters without a delete file.")
 parser.add_argument("--export-on-delete", dest="export_on_delete", type=str, help="Export (backup) rows that will be deleted to CSV/TSV before deletion.", default=None)
@@ -55,8 +55,8 @@ parser.add_argument("--export-on-delete", dest="export_on_delete", type=str, hel
 parser.add_argument("-N", "--national-node", dest="national_node", type=str, help="Set national_node for all imported rows when missing in the file.", default=None)
 parser.add_argument("-F", "--file-format", dest="file_format", choices=["auto", "csv", "tsv"], default="auto", help="File format override (csv/tsv). Default: auto by extension.")
 parser.add_argument("-S", "--separator", dest="separator", type=str, default=None, help="Field separator override for CSV/TSV import/delete/export (for example ';' or \\\\t).")
-parser.add_argument("-R", "--id-regex", dest="id_regex", type=str, help="Regex filter on record IDs (default column: id). Applies to import/delete/export.", default=None)
-parser.add_argument("-C", "--collection-id", dest="collection_ids", action="append", help="Collection ID filter (default column: collection; repeat or comma-separated). Applies to import/delete/export.", default=None)
+parser.add_argument("-R", "--id-regex", dest="id_regex", type=str, help="Regex filter on record IDs (default column: id). Applies to import/delete/export/sync.", default=None)
+parser.add_argument("-C", "--collection-id", dest="collection_ids", action="append", help="Collection ID filter (default column: collection; repeat or comma-separated). Applies to import/delete/export/sync.", default=None)
 parser.add_argument("--id-column", dest="id_column", type=str, help="Column name for -R filtering (default: id).", default=None)
 parser.add_argument("--collection-column", dest="collection_column", type=str, help="Column name for -C filtering (default: collection).", default=None)
 parser.add_argument("--tsvQuoteChar", type=str, default="\"", help="Quote character for TSV parsing. Default: \"")
@@ -333,29 +333,26 @@ def summarize_import(session, schema, table, df, id_column):
     }
 
 
-def summarize_sync(session, schema, table, df, id_column):
-    if df is None:
-        raise InputError("Unable to parse sync file for record details.")
-    report_column_mismatches(session, schema, table, df)
-    current_df = session.get(table=table, schema=schema, as_df=True)
-    current_count = len(current_df.index)
-    target_count = len(df.index)
+def summarize_sync_scope(schema, table, current_scope_df, target_scope_df, id_column, scope_label):
+    current_count = len(current_scope_df.index)
+    target_count = len(target_scope_df.index)
 
-    current_id_column = resolve_id_column(current_df, id_column)
-    target_id_column = resolve_id_column(df, id_column)
+    current_id_column = resolve_id_column(current_scope_df, id_column)
+    target_id_column = resolve_id_column(target_scope_df, id_column)
     deleted_ids = []
     new_ids = []
     updated_ids = []
     if current_id_column and target_id_column:
-        current_ids = set(current_df[current_id_column].astype(str))
-        target_ids = set(df[target_id_column].astype(str))
+        current_ids = set(current_scope_df[current_id_column].astype(str))
+        target_ids = set(target_scope_df[target_id_column].astype(str))
         deleted_ids = sorted(current_ids - target_ids)
         new_ids = sorted(target_ids - current_ids)
         updated_ids = sorted(target_ids & current_ids)
     logging.info(
-        "Sync summary for %s::%s: current=%s, target=%s, delete=%s, add=%s, update=%s.",
+        "Sync summary for %s::%s (%s): current=%s, target=%s, delete=%s, add=%s, update=%s.",
         schema,
         table,
+        scope_label,
         current_count,
         target_count,
         len(deleted_ids),
@@ -375,6 +372,7 @@ def summarize_sync(session, schema, table, df, id_column):
         "deleted_ids": deleted_ids,
         "new_ids": new_ids,
         "updated_ids": updated_ids,
+        "scope_label": scope_label,
     }
 
 
@@ -430,6 +428,21 @@ def apply_filters(df, id_regex, collections, id_column, collection_column, conte
             raise InputError(f"{context} requires a collection column named 'collection' or --collection-column.")
         filtered = filtered[filtered[collection_col].astype(str).isin(collections)]
     return filtered
+
+
+def partition_sync_input_rows(df, id_regex, collections, id_column, collection_column):
+    if not (id_regex or collections):
+        return df, df.iloc[0:0]
+    matching = apply_filters(
+        df,
+        id_regex,
+        collections,
+        id_column,
+        collection_column,
+        "Sync input filtering",
+    )
+    nonmatching = df.loc[~df.index.isin(matching.index)]
+    return matching, nonmatching
 
 
 def export_table_data(df, output_path, file_format):
@@ -636,44 +649,93 @@ async def sync_directory():
                     logging.info("Added national_node=%s to %s synced record(s).", national_node, len(sync_df.index))
                 else:
                     logging.warning("Sync file already contains %s column; --national-node will be ignored.", column_name)
-            if id_regex or collection_ids:
-                raise InputError("Sync mode does not support -R/-C filters; provide the exact target table contents in the sync file.")
-            if sync_df.empty:
+            report_column_mismatches(session, schema, table_name, sync_df)
+            sync_target_df, sync_nonmatching_df = partition_sync_input_rows(
+                sync_df,
+                id_regex,
+                collections,
+                id_column_override,
+                collection_column_override,
+            )
+            if len(sync_nonmatching_df.index) > 0:
+                logging.warning(
+                    "Sync input contains %s row(s) that do not match -R/-C filters and will be ignored.",
+                    len(sync_nonmatching_df.index),
+                )
+                if verbose:
+                    nonmatching_id_col = resolve_id_column(sync_nonmatching_df, id_column_override)
+                    if nonmatching_id_col:
+                        logging.warning(
+                            "Ignored sync input row IDs: %s",
+                            sorted(sync_nonmatching_df[nonmatching_id_col].astype(str)),
+                        )
+            current_df = session.get(table=table_name, schema=schema, as_df=True)
+            current_scope_df = apply_filters(
+                current_df,
+                id_regex,
+                collections,
+                id_column_override,
+                collection_column_override,
+                "Sync scope filtering",
+            )
+            scope_label = "full table" if not (id_regex or collection_ids) else "filtered scope"
+            if sync_target_df.empty and not sync_nonmatching_df.empty:
+                logging.warning("No sync input rows matched the selected filter scope.")
+            if sync_target_df.empty and not (id_regex or collection_ids):
                 logging.warning("Sync file is empty. Sync would clear table %s::%s.", schema, table_name)
-            log_records("Planned sync target", table_name, sync_df)
-            sync_summary = summarize_sync(session, schema, table_name, sync_df, id_column_override)
+            log_records("Planned sync target", table_name, sync_target_df)
+            sync_summary = summarize_sync_scope(
+                schema,
+                table_name,
+                current_scope_df,
+                sync_target_df,
+                id_column_override,
+                scope_label,
+            )
 
             if export_on_delete:
                 backup_path = Path(export_on_delete)
                 backup_format = detect_format(backup_path, file_format)
                 if backup_format is None:
                     raise InputError("Export-on-delete format could not be determined. Use --file-format or a .csv/.tsv filename.")
-                pre_sync_df = session.get(table=table_name, schema=schema, as_df=True)
-                export_table_data(pre_sync_df, backup_path, backup_format)
-                logging.info("Exported %s pre-sync record(s) to %s.", len(pre_sync_df.index), backup_path)
+                export_table_data(current_scope_df, backup_path, backup_format)
+                logging.info("Exported %s pre-sync record(s) to %s.", len(current_scope_df.index), backup_path)
 
             confirm_action(
                 f"Proceed with syncing {schema}::{table_name}? "
-                f"This replaces {sync_summary['current_count']} existing record(s) with {sync_summary['target_count']} record(s)."
+                f"This replaces {sync_summary['current_count']} existing record(s) in {sync_summary['scope_label']} "
+                f"with {sync_summary['target_count']} record(s)."
             )
             if dry_run:
                 logging.info("Dry run enabled. Skipping sync for %s.", syncData)
             else:
-                logging.info("Syncing %s::%s via truncate + import (non-atomic operation).", schema, table_name)
-                session.truncate(table_name, schema)
-                if not sync_df.empty:
+                if not (id_regex or collection_ids):
+                    logging.info("Syncing %s::%s via truncate + import (non-atomic operation).", schema, table_name)
+                    session.truncate(table_name, schema)
+                else:
+                    logging.info("Syncing %s::%s filtered scope via delete + import (non-atomic operation).", schema, table_name)
+                    if not current_scope_df.empty:
+                        delete_id_column = resolve_id_column(current_scope_df, id_column_override)
+                        if delete_id_column is None:
+                            raise InputError("Filtered sync requires an ID column named 'id' or --id-column.")
+                        session.delete_records(
+                            table_name,
+                            schema,
+                            data=current_scope_df[[delete_id_column]],
+                        )
+                if not sync_target_df.empty:
                     try:
-                        session.save_table(table=table_name, schema=schema, data=sync_df)
+                        session.save_table(table=table_name, schema=schema, data=sync_target_df)
                     except Exception as exc:
                         if (not national_node) and "national_node" in str(exc).lower():
                             logging.warning(
                                 "Sync import failed due to missing national_node. Using schema %s as fallback for all rows.",
                                 schema,
                             )
-                            column_name = resolve_column_case_insensitive(sync_df, "national_node")
+                            column_name = resolve_column_case_insensitive(sync_target_df, "national_node")
                             if column_name is None:
-                                sync_df["national_node"] = schema
-                            session.save_table(table=table_name, schema=schema, data=sync_df)
+                                sync_target_df["national_node"] = schema
+                            session.save_table(table=table_name, schema=schema, data=sync_target_df)
                         else:
                             raise
                 logging.info("Sync completed for %s::%s.", schema, table_name)
