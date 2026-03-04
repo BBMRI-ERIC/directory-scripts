@@ -6,8 +6,10 @@ import time
 from typing import Any, Optional
 
 import networkx as nx
+import pandas as pd
 from diskcache import Cache
 from molgenis_emx2_pyclient import Client
+from molgenis_emx2_pyclient.exceptions import NoSuchTableException
 from nncontacts import NNContacts
 
 #logging.basicConfig(level=logging.DEBUG)
@@ -56,7 +58,8 @@ class Directory:
         self._ai_checksum_snapshot = {}
         log.debug('Checking data in schema: ' + schema)
 
-        cache_dir = 'data-check-cache/directory'
+        schema_cache_suffix = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(schema))
+        cache_dir = f'data-check-cache/directory-{schema_cache_suffix}'
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         cache = Cache(cache_dir)
@@ -90,8 +93,8 @@ class Directory:
                 log.info(f'   ... retrieved {len(self.biobanks)} biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
             log.info('   ... retrieving collections')
 
-            self.qualBBtable = session.get(table='QualityInfoBiobanks', as_df=True)
-            self.qualColltable = session.get(table='QualityInfoCollections', as_df=True)
+            self.qualBBtable = self._load_quality_table(session, 'QualityInfoBiobanks', schema)
+            self.qualColltable = self._load_quality_table(session, 'QualityInfoCollections', schema)
 
             if 'collections' in cache:
                 self.collections = cache['collections']
@@ -217,6 +220,15 @@ class Directory:
             biobank = service.get('biobank')
             if biobank and 'id' in biobank:
                 self.biobankServiceMap.setdefault(biobank['id'], []).append(service)
+
+    @staticmethod
+    def _load_quality_table(session: Client, table_name: str, schema: str) -> pd.DataFrame:
+        """Load an optional quality-info table or return an empty DataFrame when absent."""
+        try:
+            return session.get(table=table_name, as_df=True)
+        except NoSuchTableException:
+            log.info("Skipping optional quality table %s in schema %s.", table_name, schema)
+            return pd.DataFrame()
 
         # check forward pointers from biobanks
         for b in self.biobanks:

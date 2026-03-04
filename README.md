@@ -64,13 +64,14 @@ Cache scope is now tool-specific:
 - `geocoding_2022.py` exposes `directory` and `geocoding`
 - `data-check.py` keeps the full QC cache and check/plugin control surface
 
-Directory cache entries are not partitioned by target URL. If you intentionally point a tool at a different Directory instance than the default public target, purge the `directory` cache before switching back or between targets; otherwise later runs can temporarily reuse cached entities from the wrong instance.
+Directory cache entries are partitioned by schema (`data-check-cache/directory-ERIC`, `data-check-cache/directory-BBMRI-EU`, ...), but not by target URL. If you intentionally point a tool at a different Directory instance than the default public target, purge the schema-specific `directory` cache before switching back or between targets; otherwise later runs can temporarily reuse cached entities from the wrong instance.
 
 Legacy long option spellings remain accepted where needed, but the normalized lowercase kebab-case variants are preferred in documentation and automation.
 
 `data-check.py` excludes withdrawn biobanks and collections by default. Collection withdrawal is treated logically: a collection is considered withdrawn when it is withdrawn itself, when its biobank is withdrawn, or when one of its ancestor collections is withdrawn. Use `-w` / `--include-withdrawn` only when you explicitly want to review withdrawn content as well, or `--only-withdrawn` when you want to review only withdrawn content.
 
 When you intentionally target a non-`ERIC` schema with `data-check.py -P/--schema`, authenticate with `-u/-p` or `.env` (`DIRECTORYUSERNAME`, `DIRECTORYPASSWORD`). Anonymous access is assumed only for the public `ERIC` schema.
+Quality-info tables are optional outside `ERIC`; `data-check.py` and exporters skip them automatically when the target schema does not expose them.
 
 The XLSX warning workbook is split into tabs by BBMRI node / staging area derived from entity IDs (`AT`, `SK`, `EXT`, `EU`, ...), not by reported country. This keeps non-member biobanks hosted in countries such as `US` or `VN` grouped under the `EXT` tab. Reported country values remain available separately where scripts explicitly report country-level statistics.
 
