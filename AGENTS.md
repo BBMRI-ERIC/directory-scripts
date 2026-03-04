@@ -80,6 +80,7 @@
 - Checksums on exported QC update plans are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits of the JSON plan remain possible.
 - QC-derived updates are only appropriate when the node edits the Directory staging area directly. If the staging area is synchronized/imported from another authoritative system, fixes must be made in that primary source instead.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
+- For `data-check.py` and other read/check tools, non-`ERIC` schema access must authenticate first and only then select the schema; missing credentials for a non-`ERIC` schema should fail as a user-facing configuration error rather than as a low-level schema exception.
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`.
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
 - Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.

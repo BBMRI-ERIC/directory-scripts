@@ -1,4 +1,7 @@
+import importlib
 import logging
+
+import cli_common
 
 from cli_common import (
     add_directory_auth_arguments,
@@ -85,6 +88,19 @@ def test_qc_arguments_can_be_enabled_selectively():
     assert args.username == "alice"
     assert args.password == "secret"
     assert args.outputWEXLSX == ["warnings.xlsx"]
+
+
+def test_directory_auth_arguments_default_from_environment(monkeypatch):
+    monkeypatch.setenv("DIRECTORYUSERNAME", "env-user")
+    monkeypatch.setenv("DIRECTORYPASSWORD", "env-secret")
+    reloaded = importlib.reload(cli_common)
+    parser = reloaded.build_parser()
+    reloaded.add_directory_auth_arguments(parser)
+
+    args = parser.parse_args([])
+
+    assert args.username == "env-user"
+    assert args.password == "env-secret"
 
 
 def test_qc_arguments_support_short_option_for_disabling_all_remote_checks():

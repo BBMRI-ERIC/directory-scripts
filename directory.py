@@ -66,87 +66,89 @@ class Directory:
         #self.__directoryURL = "https://directory-acc.molgenis.net/"
         self.__directoryURL = directory_url or "https://directory.bbmri-eric.eu"
         log.info('Retrieving directory content from ' + self.__directoryURL)
-        session = Client(self.__directoryURL, schema=schema)
-        if username is not None and password is not None:
-            log.info("Logging in to MOLGENIS with a user account.")
-            log.debug('username: ' + username)
-            log.debug('password: ' + password)
-            session.signin(username, password)
-        elif token is not None:
-            session.set_token(token)
-        else:
-            log.warning("Continuing without authorization.")
-        log.info('   ... retrieving biobanks')
-        if 'biobanks' in cache:
-            self.biobanks = cache['biobanks']
-            log.info(f'   ... retrieved {len(self.biobanks)} biobanks from cache')
-        else:
-            start_time = time.perf_counter()
-            self.biobanks = session.get_graphql(table="Biobanks")
-            cache['biobanks'] = self.biobanks
-            end_time = time.perf_counter()
-            log.info(f'   ... retrieved {len(self.biobanks)} biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
-        log.info('   ... retrieving collections')
-
-        self.qualBBtable = session.get(table = 'QualityInfoBiobanks', as_df= True)
-        self.qualColltable = session.get(table = 'QualityInfoCollections', as_df= True)
-        
-        if 'collections' in cache:
-            self.collections = cache['collections']
-            log.info(f'   ... retrieved {len(self.collections)} collections from cache')
-        else:
-            start_time = time.perf_counter()
-            self.collections = session.get_graphql(table="Collections")
-            cache['collections'] = self.collections
-            end_time = time.perf_counter()
-            if debug and self.__pp is not None:
-                for c in self.collections:
-                    self.__pp.pprint(c)
-            log.info(f'   ... retrieved {len(self.collections)} collections in ' + "%0.3f" % (end_time-start_time) + 's')
-        log.info('   ... retrieving contacts')
-        if 'contacts' in cache:
-            self.contacts = cache['contacts']
-            log.info(f'   ... retrieved {len(self.contacts)} contacts from cache')
-        else:
-            start_time = time.perf_counter()
-            self.contacts = session.get_graphql(table="Persons")
-            cache['contacts'] = self.contacts
-            end_time = time.perf_counter()
-            log.info(f'   ... retrieved {len(self.contacts)} contacts in ' + "%0.3f" % (end_time-start_time) + 's')
-
-        log.info('   ... retrieving networks')
-        if 'networks' in cache:
-            self.networks = cache['networks']
-            log.info(f'   ... retrieved {len(self.networks)} networks from cache')
-        else:
-            start_time = time.perf_counter()
-            self.networks = session.get_graphql("Networks")
-            cache['networks'] = self.networks
-            end_time = time.perf_counter()
-            log.info(f'   ... retrieved {len(self.networks)} networks in ' + "%0.3f" % (end_time-start_time) + 's')
-        if 'facts' in cache:
-            self.facts = cache['facts']
-            log.info(f'   ... retrieved {len(self.facts)} networks from cache')
-        else:
-            start_time = time.perf_counter()
-            self.facts = session.get_graphql("CollectionFacts")
-            cache['facts'] = self.facts
-            end_time = time.perf_counter()
-            log.info(f'   ... retrieved {len(self.facts)} facts in ' + "%0.3f" % (end_time-start_time) + 's')
-        log.info('   ... retrieving services')
-        if 'services' in cache:
-            self.services = cache['services']
-            log.info(f'   ... retrieved {len(self.services)} services from cache')
-        else:
-            try:
+        client_kwargs = {}
+        if token is not None:
+            client_kwargs["token"] = token
+        with Client(self.__directoryURL, **client_kwargs) as session:
+            if username is not None and password is not None:
+                log.info("Logging in to MOLGENIS with a user account.")
+                log.debug('username: ' + username)
+                log.debug('password: ' + password)
+                session.signin(username, password)
+            elif token is None:
+                log.warning("Continuing without authorization.")
+            session.set_schema(schema)
+            log.info('   ... retrieving biobanks')
+            if 'biobanks' in cache:
+                self.biobanks = cache['biobanks']
+                log.info(f'   ... retrieved {len(self.biobanks)} biobanks from cache')
+            else:
                 start_time = time.perf_counter()
-                self.services = session.get_graphql("Services")
-                cache['services'] = self.services
+                self.biobanks = session.get_graphql(table="Biobanks")
+                cache['biobanks'] = self.biobanks
                 end_time = time.perf_counter()
-                log.info(f'   ... retrieved {len(self.services)} services in ' + "%0.3f" % (end_time-start_time) + 's')
-            except Exception as exc:
-                log.warning('Unable to retrieve services: %s', exc)
-                self.services = []
+                log.info(f'   ... retrieved {len(self.biobanks)} biobanks in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info('   ... retrieving collections')
+
+            self.qualBBtable = session.get(table='QualityInfoBiobanks', as_df=True)
+            self.qualColltable = session.get(table='QualityInfoCollections', as_df=True)
+
+            if 'collections' in cache:
+                self.collections = cache['collections']
+                log.info(f'   ... retrieved {len(self.collections)} collections from cache')
+            else:
+                start_time = time.perf_counter()
+                self.collections = session.get_graphql(table="Collections")
+                cache['collections'] = self.collections
+                end_time = time.perf_counter()
+                if debug and self.__pp is not None:
+                    for c in self.collections:
+                        self.__pp.pprint(c)
+                log.info(f'   ... retrieved {len(self.collections)} collections in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info('   ... retrieving contacts')
+            if 'contacts' in cache:
+                self.contacts = cache['contacts']
+                log.info(f'   ... retrieved {len(self.contacts)} contacts from cache')
+            else:
+                start_time = time.perf_counter()
+                self.contacts = session.get_graphql(table="Persons")
+                cache['contacts'] = self.contacts
+                end_time = time.perf_counter()
+                log.info(f'   ... retrieved {len(self.contacts)} contacts in ' + "%0.3f" % (end_time-start_time) + 's')
+
+            log.info('   ... retrieving networks')
+            if 'networks' in cache:
+                self.networks = cache['networks']
+                log.info(f'   ... retrieved {len(self.networks)} networks from cache')
+            else:
+                start_time = time.perf_counter()
+                self.networks = session.get_graphql("Networks")
+                cache['networks'] = self.networks
+                end_time = time.perf_counter()
+                log.info(f'   ... retrieved {len(self.networks)} networks in ' + "%0.3f" % (end_time-start_time) + 's')
+            if 'facts' in cache:
+                self.facts = cache['facts']
+                log.info(f'   ... retrieved {len(self.facts)} networks from cache')
+            else:
+                start_time = time.perf_counter()
+                self.facts = session.get_graphql("CollectionFacts")
+                cache['facts'] = self.facts
+                end_time = time.perf_counter()
+                log.info(f'   ... retrieved {len(self.facts)} facts in ' + "%0.3f" % (end_time-start_time) + 's')
+            log.info('   ... retrieving services')
+            if 'services' in cache:
+                self.services = cache['services']
+                log.info(f'   ... retrieved {len(self.services)} services from cache')
+            else:
+                try:
+                    start_time = time.perf_counter()
+                    self.services = session.get_graphql("Services")
+                    cache['services'] = self.services
+                    end_time = time.perf_counter()
+                    log.info(f'   ... retrieved {len(self.services)} services in ' + "%0.3f" % (end_time-start_time) + 's')
+                except Exception as exc:
+                    log.warning('Unable to retrieve services: %s', exc)
+                    self.services = []
         log.info('   ... all entities retrieved')
 
         self.contactHashmap = {}

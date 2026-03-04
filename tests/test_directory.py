@@ -1,6 +1,8 @@
 import networkx as nx
+import pandas as pd
 import pytest
 
+import directory as directory_module
 from directory import Directory
 
 
@@ -224,6 +226,47 @@ def test_get_direct_subcollections_respects_withdrawn_filter():
 
     assert [collection["id"] for collection in directory.getDirectSubcollections("col1")] == ["col2"]
     assert directory.getDirectSubcollections("col3") == []
+
+
+def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_path):
+    calls = []
+
+    class ClientStub:
+        def __init__(self, url, **kwargs):
+            calls.append(("init", url, kwargs))
+
+        def __enter__(self):
+            calls.append(("enter",))
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            calls.append(("exit",))
+            return False
+
+        def signin(self, username, password):
+            calls.append(("signin", username, password))
+
+        def set_schema(self, schema):
+            calls.append(("set_schema", schema))
+            return schema
+
+        def get_graphql(self, table=None):
+            calls.append(("get_graphql", table))
+            return []
+
+        def get(self, table=None, as_df=False):
+            calls.append(("get", table, as_df))
+            return pd.DataFrame()
+
+    monkeypatch.setattr(directory_module, "Client", ClientStub)
+    monkeypatch.chdir(tmp_path)
+
+    directory = Directory(schema="BBMRI-EU", username="user", password="secret")
+
+    assert directory.getSchema() == "BBMRI-EU"
+    assert ("signin", "user", "secret") in calls
+    assert ("set_schema", "BBMRI-EU") in calls
+    assert calls.index(("signin", "user", "secret")) < calls.index(("set_schema", "BBMRI-EU"))
 
 
 def test_directory_can_return_only_withdrawn_entities():

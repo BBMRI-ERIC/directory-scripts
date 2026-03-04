@@ -312,6 +312,11 @@ python3 data-check.py -N | rg 'AI:Curated'
 
 Directory-backed tools exclude withdrawn biobanks/collections by default.
 
+For `data-check.py` and similar read/check entrypoints, non-`ERIC` staging schemas must be selected only after authentication. The user-facing behavior should be:
+- read credentials from CLI or `.env`
+- fail early with a clear input/configuration error if a non-`ERIC` schema is requested without credentials
+- authenticate first, then set the target schema, so private staging areas do not fail with a misleading low-level schema-not-found exception
+
 Collection withdrawal is logically inherited:
 - withdrawn collection -> withdrawn
 - biobank withdrawn -> all child collections treated as withdrawn

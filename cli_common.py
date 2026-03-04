@@ -4,7 +4,16 @@
 
 import argparse
 import logging as log
+import os
 from typing import Iterable, Optional
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+DEFAULT_DIRECTORY_USERNAME = os.getenv("DIRECTORYUSERNAME")
+DEFAULT_DIRECTORY_PASSWORD = os.getenv("DIRECTORYPASSWORD")
 
 
 class ExtendAction(argparse.Action):
@@ -209,12 +218,14 @@ def add_directory_auth_arguments(parser: argparse.ArgumentParser) -> None:
         "-u",
         "--username",
         dest="username",
+        default=DEFAULT_DIRECTORY_USERNAME,
         help="username of the account used to log in to the Directory",
     )
     parser.add_argument(
         "-p",
         "--password",
         dest="password",
+        default=DEFAULT_DIRECTORY_PASSWORD,
         help="password of the account used to log in to the Directory",
     )
 
