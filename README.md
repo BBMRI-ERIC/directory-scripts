@@ -359,6 +359,7 @@ Key behavior:
 - numbers of samples and donors are updated from the all-star fact row when that row is present, even without `--replace-existing`
 - `NAV` fact-sheet material does not propagate to collection metadata when other material types are present; `*` fact-sheet aggregates are ignored for descriptor derivation
 - ICD-10 hierarchy is respected when appending diagnoses: broader existing codes such as `urn:miriam:icd:C18` are retained and cover specific fact-sheet codes such as `urn:miriam:icd:C18.0`
+- age updates cover the full fact-sheet span from minimum to maximum age represented by the fact rows; holes between fact-sheet age buckets are ignored because collection metadata can advertise only one continuous range
 
 Examples:
 ```bash
@@ -390,8 +391,10 @@ Key behavior:
   - inspect the generated plan with `qcheck-updater.py --list`
   - dry-run the selected subset with `-n/--dry-run`; it uses the same interactive per-update review flow as a real apply, but stops before writing data
   - apply the reviewed subset interactively or with `-f/--force`
+- `--list` is the non-destructive human-readable inspection mode; it shows the same normalized multi-value field presentation as interactive review
 - the exported JSON plan contains per-update and whole-file checksums; the updater warns when the file or individual updates were edited after export, but the user can still proceed deliberately
 - each update carries the expected current field value seen at export time; if the live staging-area value changed before apply, the updater warns and requires explicit confirmation unless `-f/--force` is used
+- unordered multi-value fields such as `data_use`, `type`, `diagnosis_available`, `materials`, and `sex` are compared canonically, so pure field reordering does not create false mismatches during review/apply
 - filtering is supported by exact entity ID, hierarchy root ID (biobank or collection), staging area, originating check ID, update ID, module, and confidence
 - hierarchy selection:
   - `--entity-id` selects one exact target entity
@@ -407,4 +410,7 @@ Key behavior:
 - semantic detail still lives in `update_id`, for example `access.duo.disease_specific_research` or `diagnoses.add.covid_acute_u07_1`
 - current implementation of `qcheck-updater.py` applies collection-level updates only
 - ontology-backed fixes carry human-readable explanations in the update plan so the reviewer can see what a term such as `DUO:...` means before approving the change
+- DUO identifiers are normalized internally, so `DUO_0000007` and `DUO:0000007` are treated as the same term during checks and update application
+- append-mode review shows both the final target value and the incremental value being added, to avoid giving the impression that a multi-value field would be replaced
+- fact-derived and QC-derived rationales stay field-specific; age-range caveats are shown only on age updates, not on diagnoses, materials, or counts
 - this workflow is only appropriate when the BBMRI Node maintains metadata directly in the Directory staging area; if the staging area is synchronized or imported from another authoritative source, fix the primary source instead of applying updates here

@@ -41,6 +41,11 @@ Apply this workflow as a required gate before push, and as the default process f
   - boundary conditions
   - invalid inputs and failure paths
   - regression tests for fixed bugs
+- For updater/review workflows, add tests that the user-facing review output matches the real effect of the change:
+  - append updates must not look like replacements
+  - unordered multi-value fields must not produce order-only mismatches
+  - equivalent ontology term spellings (for example `DUO_...` vs `DUO:...`) must be treated as no-op duplicates
+  - field-specific rationale text must stay attached only to the relevant field/fix
 - If full test coverage is not feasible in one change, document the precise gap and risk.
 
 ## Step 5: Keep developer documentation current

@@ -63,12 +63,19 @@
 - `collection-factsheet-descriptor-updater.py` intentionally reads the public `ERIC` schema without authentication and uses credentials only for the staging-area write session; do not treat missing ERIC read credentials as a bug in reviews unless the operating model changes.
 - `collection-factsheet-descriptor-updater.py` should only append missing multi-value descriptors by default; only `--replace-existing` may remove/replace existing diagnosis/material/sex values, while all-star sample/donor totals may still replace numeric totals without that option.
 - `collection-factsheet-descriptor-updater.py` must treat fact-sheet `*` rows as aggregates only and must not propagate `NAV` sample type to collection metadata when other fact/metadata material types exist.
+- `collection-factsheet-descriptor-updater.py` age proposals must span the full min..max range represented in the fact sheet when one consistent unit is available, even if the fact sheet contains holes between age buckets.
 - `data-check.py --export-update-plan ...` exports structured fix proposals attached to warnings; `qcheck-updater.py` consumes that plan instead of recomputing QC logic independently.
 - exported QC fix-plan `module` values must match the visible QC check-prefix family seen by users (`AP`, `CC`, `C19`, `FT`, `TXT`); keep semantic detail in `update_id`, not in a second competing module naming scheme.
 - Structured QC fix proposals must carry human-readable explanations, expected current values, confidence (`certain`, `almost_certain`, `uncertain`), and any validated ontology-term explanations needed for user review.
 - `qcheck-updater.py` must reuse `.env` (`DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD`) consistently with the other write-capable tools.
 - `qcheck-updater.py` must support exact-entity, hierarchy-root, staging-area, check-id, update-id, module, and confidence filtering; the hierarchy can be biobank->collections or collection->subcollections, but not contact-sharing relationships.
+- `qcheck-updater.py` must support a human-readable `--list` mode for inspecting updates without applying them.
 - `qcheck-updater.py` dry runs must execute the same interactive per-update review logic as real applies and differ only in skipping the final write to the Directory.
+- `qcheck-updater.py` must compare unordered multi-value fields canonically; pure reordering of `data_use`, `type`, `diagnosis_available`, `materials`, or `sex` must not trigger false mismatches.
+- `qcheck-updater.py` review output for append updates must show both the final target value and the incremental addition, not a replacement-looking payload.
+- DUO term comparison must normalize `DUO_0000000` and `DUO:0000000` forms so already-present terms are not proposed again under a different separator.
+- Equivalent ontology-term storage forms that are already present in live data must be treated as no-op updates, not as additions requiring user approval.
+- Fact-sheet/QC fix rationales must stay field-specific; age caveats must not leak into diagnosis or other unrelated update rationales.
 - Checksums on exported QC update plans are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits of the JSON plan remain possible.
 - QC-derived updates are only appropriate when the node edits the Directory staging area directly. If the staging area is synchronized/imported from another authoritative system, fixes must be made in that primary source instead.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.
