@@ -230,6 +230,61 @@ def test_descriptor_proposal_skips_age_update_for_mixed_fact_units():
     assert any("mixed units" in note for note in proposal["notes"])
 
 
+def test_descriptor_proposal_ignores_zero_support_age_label_outliers_when_high_support_rows_exist():
+    collection = {
+        "id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
+        "age_low": "18",
+        "age_high": "99",
+        "age_unit": "YEAR",
+    }
+    facts = [
+        {
+            "id": "f_infant_zero",
+            "sex": "*",
+            "age_range": "Infant",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 0,
+            "number_of_donors": 0,
+        },
+        {
+            "id": "f_child_sparse",
+            "sex": "*",
+            "age_range": "Child",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 1,
+            "number_of_donors": 1,
+        },
+        {
+            "id": "f_young_adult",
+            "sex": "*",
+            "age_range": "Young Adult",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 45,
+            "number_of_donors": 13,
+        },
+        {
+            "id": "f_aged_open",
+            "sex": "*",
+            "age_range": "Aged (>80 years)",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 100,
+            "number_of_donors": 80,
+        },
+    ]
+
+    proposal = build_collection_descriptor_proposal(collection, facts, replace_existing=False)
+    proposed = proposal["proposed"]
+
+    assert proposed["age_low"] == 2
+    assert proposed["age_high"] == 99
+    assert proposed["age_unit"] == "YEAR"
+    assert any("Low-support label-based age rows were ignored" in note for note in proposal["notes"])
+
+
 def test_descriptor_proposal_widens_existing_age_range_to_cover_fact_span():
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col5",
@@ -261,7 +316,7 @@ def test_descriptor_proposal_widens_existing_age_range_to_cover_fact_span():
     proposal = build_collection_descriptor_proposal(collection, facts, replace_existing=False)
     proposed = proposal["proposed"]
 
-    assert proposed["age_low"] == 19
+    assert proposed["age_low"] == 20
     assert proposed["age_high"] == 79
     assert proposed["age_unit"] == "YEAR"
 

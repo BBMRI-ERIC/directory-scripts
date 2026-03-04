@@ -221,15 +221,6 @@ class Directory:
             if biobank and 'id' in biobank:
                 self.biobankServiceMap.setdefault(biobank['id'], []).append(service)
 
-    @staticmethod
-    def _load_quality_table(session: Client, table_name: str, schema: str) -> pd.DataFrame:
-        """Load an optional quality-info table or return an empty DataFrame when absent."""
-        try:
-            return session.get(table=table_name, as_df=True)
-        except NoSuchTableException:
-            log.info("Skipping optional quality table %s in schema %s.", table_name, schema)
-            return pd.DataFrame()
-
         # check forward pointers from biobanks
         for b in self.biobanks:
             for c in b.get('collections', []):
@@ -315,6 +306,15 @@ class Directory:
         log.info('Directory structure initialized')
         self.__orphacodesmapper = None
         self._collection_withdrawn_cache = {}
+
+    @staticmethod
+    def _load_quality_table(session: Client, table_name: str, schema: str) -> pd.DataFrame:
+        """Load an optional quality-info table or return an empty DataFrame when absent."""
+        try:
+            return session.get(table=table_name, as_df=True)
+        except NoSuchTableException:
+            log.info("Skipping optional quality table %s in schema %s.", table_name, schema)
+            return pd.DataFrame()
 
     def prepare_ai_cache_checksum_state(self):
         """Capture pristine entities for AI-cache checksum validation.
