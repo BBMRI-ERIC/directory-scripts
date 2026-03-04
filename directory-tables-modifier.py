@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(description="Script for modifying/adding or del
 parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output. Includes detailed records to be added/deleted.")
 parser.add_argument("-d", "--debug", action="store_true", help="Debug output. Implies verbose and includes connection/auth details.")
 parser.add_argument("-n", "--dry-run", action="store_true", help="Show planned changes without modifying data.")
-parser.add_argument("-f", "--force", action="store_true", help="Skip interactive approval for deletions.")
+parser.add_argument("-f", "--force", action="store_true", help="Skip interactive approval for data-modifying operations.")
 parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-error output on STDOUT.")
 parser.add_argument("--suppress-validation-warnings", action="store_true", help="reserved for suppressing non-fatal local validation warnings")
 
@@ -47,12 +47,14 @@ action_group = parser.add_mutually_exclusive_group(required=True)
 action_group.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the CSV/TSV file containing the records to modify/add.", default=None)
 action_group.add_argument("-x", "--delete-data", dest="delete_data", nargs="?", const="__FILTER_ONLY__", type=str, help="Path to the CSV/TSV file containing the records to delete (or use --delete-filter-only with -R/-C).", default=None)
 action_group.add_argument("-e", "--export-data", dest="export_data", type=str, help="Export table data to a CSV/TSV file without modifying it.", default=None)
+action_group.add_argument("-y", "--sync-data", dest="sync_data", type=str, help="Replace table contents with records from a CSV/TSV file (truncate + import, non-atomic).", default=None)
 
 parser.add_argument("--delete-filter-only", dest="delete_filter_only", action="store_true", help="Allow deletion using -R/-C filters without a delete file.")
 parser.add_argument("--export-on-delete", dest="export_on_delete", type=str, help="Export (backup) rows that will be deleted to CSV/TSV before deletion.", default=None)
 
 parser.add_argument("-N", "--national-node", dest="national_node", type=str, help="Set national_node for all imported rows when missing in the file.", default=None)
 parser.add_argument("-F", "--file-format", dest="file_format", choices=["auto", "csv", "tsv"], default="auto", help="File format override (csv/tsv). Default: auto by extension.")
+parser.add_argument("-S", "--separator", dest="separator", type=str, default=None, help="Field separator override for CSV/TSV import/delete/export (for example ';' or \\\\t).")
 parser.add_argument("-R", "--id-regex", dest="id_regex", type=str, help="Regex filter on record IDs (default column: id). Applies to import/delete/export.", default=None)
 parser.add_argument("-C", "--collection-id", dest="collection_ids", action="append", help="Collection ID filter (default column: collection; repeat or comma-separated). Applies to import/delete/export.", default=None)
 parser.add_argument("--id-column", dest="id_column", type=str, help="Column name for -R filtering (default: id).", default=None)
@@ -73,6 +75,8 @@ csvDeleteData = None if args.delete_data in {None, "__FILTER_ONLY__"} else args.
 exportData = args.export_data
 export_action = args.export_data is not None
 import_action = args.import_data is not None
+syncData = args.sync_data
+sync_action = args.sync_data is not None
 delete_filter_only = args.delete_filter_only
 export_on_delete = args.export_on_delete
 national_node = args.national_node
@@ -86,6 +90,7 @@ dry_run = args.dry_run
 force = args.force
 quiet = args.quiet
 file_format = args.file_format
+separator = args.separator
 id_regex = args.id_regex
 collection_ids = args.collection_ids
 id_column_override = args.id_column
@@ -126,9 +131,10 @@ def read_tsv_as_dataframe(file_path):
     quoting = TSV_QUOTING_MAP[tsvQuoting]
     if quoting == csv.QUOTE_NONE and tsvEscapeChar is None:
         logging.warning("TSV quoting is set to 'none' without an escape character. Tabs and quotes must be literal.")
+    effective_separator = get_effective_separator("tsv")
     return pd.read_csv(
         file_path,
-        sep="\t",
+        sep=effective_separator,
         dtype=str,
         keep_default_na=False,
         na_filter=False,
@@ -141,9 +147,10 @@ def read_tsv_as_dataframe(file_path):
 
 
 def read_csv_as_dataframe(file_path):
+    effective_separator = get_effective_separator("csv")
     return pd.read_csv(
         file_path,
-        sep=",",
+        sep=effective_separator,
         dtype=str,
         keep_default_na=False,
         na_filter=False,
@@ -175,6 +182,14 @@ def load_dataframe_for_file(file_path, file_format):
     if file_format == "csv":
         return read_csv_as_dataframe(file_path)
     return None
+
+
+def get_effective_separator(file_format):
+    if separator:
+        return separator
+    if file_format == "tsv":
+        return "\t"
+    return ","
 
 
 def log_records(action, table, df):
@@ -318,6 +333,51 @@ def summarize_import(session, schema, table, df, id_column):
     }
 
 
+def summarize_sync(session, schema, table, df, id_column):
+    if df is None:
+        raise InputError("Unable to parse sync file for record details.")
+    report_column_mismatches(session, schema, table, df)
+    current_df = session.get(table=table, schema=schema, as_df=True)
+    current_count = len(current_df.index)
+    target_count = len(df.index)
+
+    current_id_column = resolve_id_column(current_df, id_column)
+    target_id_column = resolve_id_column(df, id_column)
+    deleted_ids = []
+    new_ids = []
+    updated_ids = []
+    if current_id_column and target_id_column:
+        current_ids = set(current_df[current_id_column].astype(str))
+        target_ids = set(df[target_id_column].astype(str))
+        deleted_ids = sorted(current_ids - target_ids)
+        new_ids = sorted(target_ids - current_ids)
+        updated_ids = sorted(target_ids & current_ids)
+    logging.info(
+        "Sync summary for %s::%s: current=%s, target=%s, delete=%s, add=%s, update=%s.",
+        schema,
+        table,
+        current_count,
+        target_count,
+        len(deleted_ids),
+        len(new_ids),
+        len(updated_ids),
+    )
+    if verbose:
+        if deleted_ids:
+            logging.info("IDs to delete during sync: %s", deleted_ids)
+        if new_ids:
+            logging.info("IDs to add during sync: %s", new_ids)
+        if updated_ids:
+            logging.info("IDs to update during sync: %s", updated_ids)
+    return {
+        "current_count": current_count,
+        "target_count": target_count,
+        "deleted_ids": deleted_ids,
+        "new_ids": new_ids,
+        "updated_ids": updated_ids,
+    }
+
+
 def summarize_delete(session, schema, table, df, id_column):
     if df is None:
         return
@@ -373,13 +433,14 @@ def apply_filters(df, id_regex, collections, id_column, collection_column, conte
 
 
 def export_table_data(df, output_path, file_format):
+    effective_separator = get_effective_separator(file_format)
     if file_format == "csv":
-        df.to_csv(output_path, index=False, encoding="utf-8", quoting=csv.QUOTE_NONNUMERIC)
+        df.to_csv(output_path, index=False, encoding="utf-8", sep=effective_separator, quoting=csv.QUOTE_NONNUMERIC)
         return
     df.to_csv(
         output_path,
         index=False,
-        sep="\t",
+        sep=effective_separator,
         encoding="utf-8",
         quoting=csv.QUOTE_MINIMAL,
         quotechar=tsvQuoteChar,
@@ -518,7 +579,7 @@ async def sync_directory():
                         raise
             elif resolved_format == "csv":
                 logging.info("Importing data from %s", csvImportData)
-                if import_path.suffix.lower() == ".csv" and not added_national_node:
+                if import_path.suffix.lower() == ".csv" and not added_national_node and not separator:
                     try:
                         await session.upload_file(csvImportData, schema)
                     except Exception as exc:
@@ -555,6 +616,67 @@ async def sync_directory():
             else:
                 logging.info("Importing data from %s", csvImportData)
                 await session.upload_file(csvImportData, schema)
+
+        if sync_action:
+            sync_path = Path(syncData)
+            resolved_format = detect_format(sync_path, file_format)
+            if resolved_format is None:
+                raise InputError("Sync format could not be determined. Use --file-format or a .csv/.tsv file.")
+            sync_df = None
+            try:
+                sync_df = load_dataframe_for_file(sync_path, resolved_format)
+            except Exception as exc:
+                logging.warning("Failed to read sync file %s for record details: %s", syncData, exc)
+            if sync_df is None:
+                raise InputError("Unable to parse sync file for record details.")
+            if national_node:
+                column_name = resolve_column_case_insensitive(sync_df, "national_node")
+                if column_name is None:
+                    sync_df["national_node"] = national_node
+                    logging.info("Added national_node=%s to %s synced record(s).", national_node, len(sync_df.index))
+                else:
+                    logging.warning("Sync file already contains %s column; --national-node will be ignored.", column_name)
+            if id_regex or collection_ids:
+                raise InputError("Sync mode does not support -R/-C filters; provide the exact target table contents in the sync file.")
+            if sync_df.empty:
+                logging.warning("Sync file is empty. Sync would clear table %s::%s.", schema, table_name)
+            log_records("Planned sync target", table_name, sync_df)
+            sync_summary = summarize_sync(session, schema, table_name, sync_df, id_column_override)
+
+            if export_on_delete:
+                backup_path = Path(export_on_delete)
+                backup_format = detect_format(backup_path, file_format)
+                if backup_format is None:
+                    raise InputError("Export-on-delete format could not be determined. Use --file-format or a .csv/.tsv filename.")
+                pre_sync_df = session.get(table=table_name, schema=schema, as_df=True)
+                export_table_data(pre_sync_df, backup_path, backup_format)
+                logging.info("Exported %s pre-sync record(s) to %s.", len(pre_sync_df.index), backup_path)
+
+            confirm_action(
+                f"Proceed with syncing {schema}::{table_name}? "
+                f"This replaces {sync_summary['current_count']} existing record(s) with {sync_summary['target_count']} record(s)."
+            )
+            if dry_run:
+                logging.info("Dry run enabled. Skipping sync for %s.", syncData)
+            else:
+                logging.info("Syncing %s::%s via truncate + import (non-atomic operation).", schema, table_name)
+                session.truncate(table_name, schema)
+                if not sync_df.empty:
+                    try:
+                        session.save_table(table=table_name, schema=schema, data=sync_df)
+                    except Exception as exc:
+                        if (not national_node) and "national_node" in str(exc).lower():
+                            logging.warning(
+                                "Sync import failed due to missing national_node. Using schema %s as fallback for all rows.",
+                                schema,
+                            )
+                            column_name = resolve_column_case_insensitive(sync_df, "national_node")
+                            if column_name is None:
+                                sync_df["national_node"] = schema
+                            session.save_table(table=table_name, schema=schema, data=sync_df)
+                        else:
+                            raise
+                logging.info("Sync completed for %s::%s.", schema, table_name)
 
         #########################################################
         # DELETE RECORDS
@@ -665,8 +787,9 @@ def setup_logging():
 
 
 def validate_inputs():
+    global separator
     try:
-        TableModifierSettingsModel.parse_obj(
+        settings = TableModifierSettingsModel.parse_obj(
             {
                 "schema": schema,
                 "table": table_name,
@@ -674,10 +797,12 @@ def validate_inputs():
                 "directory_username": username,
                 "directory_password": password,
                 "file_format": file_format,
+                "separator": separator,
                 "tsv_quote_char": tsvQuoteChar,
                 "tsv_escape_char": tsvEscapeChar,
             }
         )
+        separator = settings.separator
     except ValidationError as exc:
         raise InputError(
             format_validation_error(
@@ -685,6 +810,8 @@ def validate_inputs():
                 exc,
             )
         ) from exc
+    if separator:
+        logging.info("Using custom field separator override: %r", separator)
     if schema.strip().upper() == "ERIC":
         logging.warning(
             "Schema ERIC should not be edited with this script; it is auto-populated nightly from per-node staging areas."
@@ -692,8 +819,8 @@ def validate_inputs():
         confirm_action("Proceed anyway with schema ERIC?")
     if not table_name:
         raise InputError("Table name is required. Use -T/--table.")
-    if not (import_action or delete_action or export_action):
-        raise InputError("No action specified. Provide import (-i), delete (-x), or export (-e) options.")
+    if not (import_action or delete_action or export_action or sync_action):
+        raise InputError("No action specified. Provide import (-i), delete (-x), export (-e), or sync (-y) options.")
     if csvImportData:
         import_path = Path(csvImportData)
         if not import_path.exists():
@@ -722,6 +849,14 @@ def validate_inputs():
             raise InputError(f"Export directory not found: {export_path.parent}")
         if file_format in {"csv", "tsv"} and export_path.suffix.lower() not in {".csv", ".tsv", ".tab", ""}:
             logging.warning("File format forced to %s for file %s.", file_format, exportData)
+    if syncData:
+        sync_path = Path(syncData)
+        if not sync_path.exists():
+            raise InputError(f"Sync file not found: {syncData}")
+        if delete_filter_only:
+            raise InputError("--delete-filter-only cannot be used with --sync-data.")
+        if file_format in {"csv", "tsv"} and sync_path.suffix.lower() not in {".csv", ".tsv", ".tab", ""}:
+            logging.warning("File format forced to %s for file %s.", file_format, syncData)
     if export_on_delete:
         export_path = Path(export_on_delete)
         if not export_path.parent.exists():

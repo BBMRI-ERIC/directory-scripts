@@ -39,3 +39,52 @@ def test_factsheet_updater_settings_model_requires_credentials():
         assert "field must not be empty" in str(exc)
     else:
         raise AssertionError("Expected ValidationError for empty connection settings")
+
+
+def test_table_modifier_settings_model_accepts_semicolon_separator():
+    settings = TableModifierSettingsModel.parse_obj(
+        {
+            "schema": "BBMRI-CZ",
+            "table": "CollectionFacts",
+            "directory_target": "https://directory.example.org",
+            "directory_username": "user",
+            "directory_password": "secret",
+            "file_format": "csv",
+            "separator": ";",
+        }
+    )
+    assert settings.separator == ";"
+
+
+def test_table_modifier_settings_model_rejects_invalid_separator():
+    try:
+        TableModifierSettingsModel.parse_obj(
+            {
+                "schema": "BBMRI-CZ",
+                "table": "CollectionFacts",
+                "directory_target": "https://directory.example.org",
+                "directory_username": "user",
+                "directory_password": "secret",
+                "file_format": "csv",
+                "separator": ";;",
+            }
+        )
+    except ValidationError as exc:
+        assert "single character" in str(exc)
+    else:
+        raise AssertionError("Expected ValidationError for invalid separator")
+
+
+def test_table_modifier_settings_model_accepts_tab_separator_alias():
+    settings = TableModifierSettingsModel.parse_obj(
+        {
+            "schema": "BBMRI-CZ",
+            "table": "CollectionFacts",
+            "directory_target": "https://directory.example.org",
+            "directory_username": "user",
+            "directory_password": "secret",
+            "file_format": "tsv",
+            "separator": r"\t",
+        }
+    )
+    assert settings.separator == "\t"
