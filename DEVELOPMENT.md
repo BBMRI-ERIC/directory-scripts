@@ -259,6 +259,7 @@ python3 data-check.py -N | rg 'AI:Curated'
 - `--list` is the non-writing inspection mode and should use the same canonical multi-value formatting as interactive review so order-only differences are not presented as live mismatches.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
 - Every update also carries `expected_current_value`; apply logic must compare it with the live staging-area value and warn before writing when the values diverge.
+- In interactive mode, expected-current-value mismatches must be handled per update during review; declining one mismatched proposal must not abort unrelated updates.
 - Unordered multi-value fields must be compared canonically; order-only differences in `data_use`, `type`, `diagnosis_available`, `materials`, or `sex` are not meaningful.
 - Review output must show the real effect of append updates: the final target value plus the incremental addition, not a replacement-looking payload.
 - `uncertain` proposals are still exported because they can represent genuine alternative curator choices; do not auto-merge or auto-apply them blindly.
