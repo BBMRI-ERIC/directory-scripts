@@ -118,7 +118,7 @@ class TextConsistency(IPlugin):
 			fixes.append(
 				make_collection_scalar_set_fix(
 					update_id=f'age.{field}.from_text',
-					module='age',
+					module='TXT',
 					collection=collection,
 					field=field,
 					proposed_value=value,
@@ -139,7 +139,7 @@ class TextConsistency(IPlugin):
 		return [
 			make_collection_multi_value_fix(
 				update_id=f'collection_type.add.{suggested_type.lower()}',
-				module='collection_types',
+				module='TXT',
 				collection=collection,
 				field='type',
 				proposed_values=[suggested_type],
@@ -160,7 +160,7 @@ class TextConsistency(IPlugin):
 		return [
 			make_collection_multi_value_fix(
 				update_id='materials.add.tissue_paraffin_embedded',
-				module='materials',
+				module='TXT',
 				collection=collection,
 				field='materials',
 				proposed_values=suggested_materials,
@@ -176,7 +176,7 @@ class TextConsistency(IPlugin):
 			fixes.append(
 				make_collection_multi_value_fix(
 					update_id=f"diagnoses.add.{diagnosis.split(':')[-1].lower()}",
-					module='diagnoses',
+					module='TXT',
 					collection=collection,
 					field='diagnosis_available',
 					proposed_values=[diagnosis],
@@ -190,7 +190,7 @@ class TextConsistency(IPlugin):
 			fixes.append(
 				make_collection_multi_value_fix(
 					update_id=f'diagnoses.add.covid_acute_option_{index}',
-					module='diagnoses',
+					module='TXT',
 					collection=collection,
 					field='diagnosis_available',
 					proposed_values=candidate_values,

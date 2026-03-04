@@ -138,7 +138,7 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
     notes = proposal.get("notes", [])
     note_text = " ".join(notes).strip()
 
-    for field, module in (
+    for field, update_family in (
         ("diagnosis_available", "diagnoses"),
         ("materials", "materials"),
         ("sex", "clinical_profile"),
@@ -151,13 +151,13 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
         change = change_map.get(field)
         if change is None:
             continue
-        confidence = "certain" if module in {"diagnoses", "materials", "counts"} else "almost_certain"
-        if module == "age" and note_text:
+        confidence = "certain" if update_family in {"diagnoses", "materials", "counts"} else "almost_certain"
+        if update_family == "age" and note_text:
             confidence = "uncertain"
         fix_proposals.append(
             make_fix_proposal(
-                update_id=f"{module}.{field}.from_facts",
-                module=module,
+                update_id=f"{update_family}.{field}.from_facts",
+                module="FT",
                 entity_type="COLLECTION",
                 entity_id=collection["id"],
                 field=field,

@@ -279,7 +279,7 @@ class COVID(IPlugin):
 					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have DISEASE_SPECIFIC as one of its types", fix_proposals=[
 						make_collection_multi_value_fix(
 							update_id='collection_type.add.disease_specific',
-							module='collection_types',
+							module='C19',
 							collection=collection,
 							field='type',
 							proposed_values=['DISEASE_SPECIFIC'],
@@ -292,7 +292,7 @@ class COVID(IPlugin):
 					warnings.append(DataCheckWarning(make_check_id(self, "ProsNeedsType"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Prospective COVID-19 collections must have PROSPECTIVE_COLLECTION as one of its types", fix_proposals=[
 						make_collection_multi_value_fix(
 							update_id='collection_type.add.prospective_collection',
-							module='collection_types',
+							module='C19',
 							collection=collection,
 							field='type',
 							proposed_values=['PROSPECTIVE_COLLECTION'],
@@ -324,7 +324,7 @@ class COVID(IPlugin):
 					warnings.append(DataCheckWarning(make_check_id(self, "NeedsDisease"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Existing COVID-19 collections must have DISEASE_SPECIFIC as one of its types", fix_proposals=[
 						make_collection_multi_value_fix(
 							update_id='collection_type.add.disease_specific',
-							module='collection_types',
+							module='C19',
 							collection=collection,
 							field='type',
 							proposed_values=['DISEASE_SPECIFIC'],
@@ -341,7 +341,7 @@ class COVID(IPlugin):
 					warnings.append(DataCheckWarning(make_check_id(self, "CovidDiagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19 collection misses COVID-19 diagnosis filled in", fix_proposals=[
 						make_collection_multi_value_fix(
 							update_id='diagnoses.add.covid_acute_u07_1',
-							module='diagnoses',
+							module='C19',
 							collection=collection,
 							field='diagnosis_available',
 							proposed_values=['urn:miriam:icd:U07.1'],
@@ -353,7 +353,7 @@ class COVID(IPlugin):
 						),
 						make_collection_multi_value_fix(
 							update_id='diagnoses.add.covid_acute_u07_2',
-							module='diagnoses',
+							module='C19',
 							collection=collection,
 							field='diagnosis_available',
 							proposed_values=['urn:miriam:icd:U07.2'],
