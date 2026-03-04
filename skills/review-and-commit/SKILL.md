@@ -51,8 +51,10 @@ Run this workflow before creating a commit in this repository.
 - Include source, tests, docs, AGENTS, skill files, and manual files needed for the new behavior.
 - Exclude local artifacts such as XLSX outputs, caches, generated temporary files, editor backups, and ad hoc review outputs unless the user explicitly wants them committed.
 - Be careful with renames so required runtime files are not accidentally left untracked.
+- Verify that all files required for correct runtime operation of the updated tooling are tracked and staged as needed; do not leave newly introduced runtime/source files untracked just because the current diff happens to exercise them locally.
 
-8. Commit clearly.
+8. Commit after validations pass.
+- Once the required validations succeed, create the commit at the end of the workflow.
 - Use a short present-tense subject.
 - Add a comprehensive body that covers:
   - the main behavior changes
@@ -68,6 +70,7 @@ Run this workflow before creating a commit in this repository.
   - run redundancy review
   - check CHECK_DOCS/manual consistency when relevant
 - updater or fixer workflow changed:
+  - check that any newly introduced helper/runtime files are actually present in the repository and not only in the local worktree
   - test dry-run, interactive, and force semantics as relevant
   - test mismatch handling, append/replacement presentation, and no-op handling
   - update README, DEVELOPMENT, AGENTS, and the manual when QC helper behavior changed
