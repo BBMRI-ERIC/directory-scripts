@@ -7,6 +7,7 @@ import logging as log
 from yapsy.IPlugin import IPlugin
 from check_fix_helpers import make_collection_term_append_fix
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
+from duo_terms import normalize_duo_term_ids
 
 from directory import Directory
 
@@ -208,7 +209,7 @@ class AccessPolicies(IPlugin):
 			#collection_types = Directory.getListOfEntityAttributeIds(collection, 'type') # EMX2 types does not have ID, then:
 			collection_types = Directory.getListOfEntityAttributes(collection, 'type')
 			#DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use') # EMX2 types does not have ID, then:
-			DUOs = Directory.getListOfEntityAttributes(collection, 'data_use')
+			DUOs = normalize_duo_term_ids(Directory.getListOfEntityAttributes(collection, 'data_use'))
 			data_categories = []
 			other_data = False
 			for c in collection.get('data_categories', []):

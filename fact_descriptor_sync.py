@@ -249,6 +249,16 @@ def build_collection_descriptor_proposal(
     }
     proposed = dict(current)
     notes = []
+    field_notes = {
+        "diagnosis_available": [],
+        "materials": [],
+        "sex": [],
+        "age_low": [],
+        "age_high": [],
+        "age_unit": [],
+        "size": [],
+        "number_of_donors": [],
+    }
 
     proposed["diagnosis_available"] = merge_diagnosis_values(
         current["diagnosis_available"],
@@ -269,10 +279,12 @@ def build_collection_descriptor_proposal(
     age_update = derive_age_range_update(facts)
     notes.extend(age_update["notes"])
     for field in ("age_low", "age_high", "age_unit"):
+        field_notes[field].extend(age_update["notes"])
+    for field in ("age_low", "age_high", "age_unit"):
         derived_value = age_update[field]
         if derived_value is None:
             continue
-        if replace_existing or current[field] in (None, ""):
+        if _age_field_should_update(field, current, age_update, replace_existing=replace_existing):
             proposed[field] = derived_value
 
     if isinstance(fact_sheet["all_star_number_of_samples"], int):
@@ -307,6 +319,7 @@ def build_collection_descriptor_proposal(
         "fact_values": fact_values,
         "all_star_row_present": fact_sheet["all_star_rows"] == 1,
         "notes": notes,
+        "field_notes": field_notes,
     }
 
 
@@ -358,8 +371,56 @@ def _parse_age_range_bounds(age_range: str) -> tuple[int | None, int | None, str
     greater_match = re.search(r">\s*(\d+)", age_range)
     if greater_match:
         return int(greater_match.group(1)), OPEN_AGE_HIGH, age_unit or "YEAR"
-
     return None, None, None
+
+
+def _age_field_should_update(
+    field: str,
+    current: dict[str, Any],
+    age_update: dict[str, Any],
+    *,
+    replace_existing: bool,
+) -> bool:
+    """Return whether one age field should be updated from derived fact-sheet span."""
+    derived_value = age_update[field]
+    if derived_value is None:
+        return False
+    if replace_existing:
+        return True
+
+    current_low = current["age_low"]
+    current_high = current["age_high"]
+    current_unit = current["age_unit"]
+    derived_low = age_update["age_low"]
+    derived_high = age_update["age_high"]
+    derived_unit = age_update["age_unit"]
+
+    if field == "age_unit":
+        if current_unit in (None, ""):
+            return True
+        if derived_unit and current_unit != derived_unit and (
+            _age_field_should_update("age_low", current, age_update, replace_existing=False)
+            or _age_field_should_update("age_high", current, age_update, replace_existing=False)
+        ):
+            return True
+        return False
+
+    if current_unit in (None, ""):
+        return True
+    if derived_unit and current_unit != derived_unit:
+        return False
+
+    if field == "age_low":
+        if current_low is None:
+            return True
+        return derived_low is not None and derived_low < current_low
+
+    if field == "age_high":
+        if current_high is None:
+            return False
+        return derived_high is not None and derived_high > current_high
+
+    return False
 
 
 def _infer_age_range_unit(age_range: str) -> str | None:

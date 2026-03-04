@@ -68,6 +68,7 @@
 - Structured QC fix proposals must carry human-readable explanations, expected current values, confidence (`certain`, `almost_certain`, `uncertain`), and any validated ontology-term explanations needed for user review.
 - `qcheck-updater.py` must reuse `.env` (`DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD`) consistently with the other write-capable tools.
 - `qcheck-updater.py` must support exact-entity, hierarchy-root, staging-area, check-id, update-id, module, and confidence filtering; the hierarchy can be biobank->collections or collection->subcollections, but not contact-sharing relationships.
+- `qcheck-updater.py` dry runs must execute the same interactive per-update review logic as real applies and differ only in skipping the final write to the Directory.
 - Checksums on exported QC update plans are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits of the JSON plan remain possible.
 - QC-derived updates are only appropriate when the node edits the Directory staging area directly. If the staging area is synchronized/imported from another authoritative system, fixes must be made in that primary source instead.
 - All other Directory-backed scripts default to schema `ERIC`; use `-P/--schema` only when you intentionally want a different staging area.

@@ -95,12 +95,15 @@ def test_collection_qcheck_updater_list_mode_outputs_human_readable_plan(tmp_pat
     assert result == module.EXIT_OK
     assert "bbmri-eric:ID:CZ_demo:collection:col1" in captured.out
     assert "DUO:0000020 = collaboration required" in captured.out
+    assert "add: DUO:0000020" in captured.out
 
 
 def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_save(tmp_path, monkeypatch):
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
+    review_prompts = []
+    confirm_prompts = []
 
     class SessionStub:
         def __init__(self, url):
@@ -131,7 +134,8 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
-    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module, "confirm_action", lambda prompt, **kwargs: confirm_prompts.append(prompt))
+    monkeypatch.setattr(module, "prompt_yes_no", lambda prompt, **kwargs: review_prompts.append(prompt) or True)
 
     args = Namespace(
         input=str(path),
@@ -159,6 +163,8 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
 
     assert result == module.EXIT_OK
     assert saved == []
+    assert review_prompts
+    assert any("simulated apply" in prompt for prompt in confirm_prompts)
 
 
 def test_collection_qcheck_updater_module_filter_accepts_check_prefix(tmp_path):
@@ -232,6 +238,7 @@ def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
     monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
 
     args = Namespace(
         input=str(path),
@@ -261,3 +268,160 @@ def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp
     assert result == module.EXIT_OK
     assert saved == []
     assert "Live value mismatch" not in caplog.text
+
+
+def test_collection_qcheck_updater_review_display_normalizes_multi_value_order(tmp_path, monkeypatch, capsys):
+    module = load_module()
+    path = build_plan(tmp_path)
+
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["updates"][0]["field"] = "data_use"
+    payload["updates"][0]["current_value_at_export"] = ["DUO_0000007", "DUO_0000029", "DUO_0000006"]
+    payload["updates"][0]["expected_current_value"] = ["DUO_0000007", "DUO_0000029", "DUO_0000006"]
+    payload["updates"][0]["proposed_value"] = ["DUO:0000007"]
+    payload["updates"][0]["update_checksum"] = compute_checksum(
+        {key: value for key, value in payload["updates"][0].items() if key != "update_checksum"}
+    )
+    payload["file_checksum"] = compute_checksum({key: value for key, value in payload.items() if key != "file_checksum"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            assert table == "Collections"
+            assert schema == "BBMRI-CZ"
+            assert as_df is True
+            return pd.DataFrame([
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "data_use": "DUO_0000007,DUO_0000006,DUO_0000029",
+                }
+            ])
+
+        def save_table(self, **kwargs):
+            raise AssertionError("dry-run must not save")
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+
+    args = Namespace(
+        input=str(path),
+        schema="BBMRI-CZ",
+        entity_id=None,
+        root_id=None,
+        staging_area=None,
+        check_id=[],
+        update_id=[],
+        module=[],
+        confidence=None,
+        list=False,
+        dry_run=True,
+        force=False,
+        replace_existing=False,
+        verbose=False,
+        debug=False,
+        quiet=False,
+        directory_target="https://directory.example.org",
+        directory_username="user",
+        directory_password="secret",
+    )
+
+    result = module.run_updater(args)
+    captured = capsys.readouterr()
+
+    assert result == module.EXIT_OK
+    assert "live: DUO:0000006, DUO:0000007, DUO:0000029" in captured.err
+    assert "expected at export: DUO:0000006, DUO:0000007, DUO:0000029" in captured.err
+    assert "target after update: DUO:0000006, DUO:0000007, DUO:0000029" in captured.err
+
+
+def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_separator(tmp_path, monkeypatch):
+    module = load_module()
+    path = build_plan(tmp_path)
+    saved = []
+
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["updates"][0]["field"] = "data_use"
+    payload["updates"][0]["expected_current_value"] = ["DUO:0000020"]
+    payload["updates"][0]["proposed_value"] = ["DUO:0000020"]
+    payload["updates"][0]["update_checksum"] = compute_checksum(
+        {key: value for key, value in payload["updates"][0].items() if key != "update_checksum"}
+    )
+    payload["file_checksum"] = compute_checksum({key: value for key, value in payload.items() if key != "file_checksum"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            assert table == "Collections"
+            assert schema == "BBMRI-CZ"
+            assert as_df is True
+            return pd.DataFrame([
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "data_use": "DUO_0000020",
+                }
+            ])
+
+        def save_table(self, **kwargs):
+            saved.append(kwargs)
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+
+    args = Namespace(
+        input=str(path),
+        schema="BBMRI-CZ",
+        entity_id=None,
+        root_id=None,
+        staging_area=None,
+        check_id=[],
+        update_id=[],
+        module=[],
+        confidence=None,
+        list=False,
+        dry_run=False,
+        force=False,
+        replace_existing=False,
+        verbose=False,
+        debug=False,
+        quiet=False,
+        directory_target="https://directory.example.org",
+        directory_username="user",
+        directory_password="secret",
+    )
+
+    result = module.run_updater(args)
+
+    assert result == module.EXIT_OK
+    assert saved == []

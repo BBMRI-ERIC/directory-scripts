@@ -54,3 +54,23 @@ def test_access_policies_attach_duo_fix_proposals():
     assert warning_map["AP:JointDuo"].fix_proposals[0].proposed_value == ["DUO:0000020"]
     assert warning_map["AP:DiseaseDuoMissing"].fix_proposals[0].proposed_value == ["DUO:0000007"]
     assert any(warning.dataCheckID == "AP:GenericDuoMissing" and len(warning.fix_proposals) == 2 for warning in warnings)
+
+
+def test_access_policies_treats_duo_underscore_and_colon_as_same_term():
+    class DirectoryUnderscoreStub(DirectoryStub):
+        def getCollections(self):
+            return [
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "withdrawn": False,
+                    "materials": ["DNA"],
+                    "type": ["DISEASE_SPECIFIC"],
+                    "data_use": ["DUO_0000007"],
+                    "data_categories": ["BIOLOGICAL_SAMPLES"],
+                    "sample_access_joint_project": True,
+                    "biobank": {"id": "bb1"},
+                }
+            ]
+
+    warnings = AccessPolicies().check(DirectoryUnderscoreStub(), args=None)
+    assert not any(warning.dataCheckID == "AP:DiseaseDuoMissing" for warning in warnings)
