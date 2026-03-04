@@ -36,10 +36,15 @@
 - Share common parsing/formatting (e.g., email parsing, ID/NN extraction) through utilities rather than reimplementing in multiple scripts.
 - Keep domain-specific analytics in dedicated exporter scripts; if reused by multiple exporters, extract to a module with a clear API.
 - Prefer pure functions for computations; keep I/O (Directory access, XLSX read/write) at script boundaries.
+- In checks with multiple entity loops or second-pass validation, reinitialize all loop-local derived variables inside each loop. Do not rely on values computed in a previous loop iteration or a previous entity pass; this caused real bugs in `checks/COVID.py`.
+- When a check is meant to validate collection-level fields, iterate collections, not biobanks or another nearby entity type; this caused a real bug in `checks/CheckURLs.py`.
+- When building warning messages/actions from related entities, derive the referenced entity explicitly in the local scope instead of relying on a nearby variable name; this caused a real bug in `checks/OrphanedCollections.py`.
+- Be careful with the positional `DataCheckWarning(...)` signature: keep the `directoryEntityWithdrawn` argument in place before `message`/`action`, otherwise warnings silently shift fields; this caused a real bug in `checks/AccessPolicies.py`.
 
 ## Exporters: Development, Deployment & Documentation
 - Exporters are the `exporter-*.py` scripts (for example `exporter-all.py`, `exporter-country.py`, `exporter-diagnosis.py`, `exporter-quality-label.py`).
 - New exporters should read data via `directory.py`, accept CLI arguments, and keep output schemas stable.
+- Importer/synchronizer scripts such as `importer-ecrin-mdr.py` and `sync_directory_with_fdp.py` may target external systems and are not normal exporters; keep their authentication optional when the CLI/env input is optional, and preserve their authorship/acknowledgement headers when editing them.
 - Deployment: treat exporters as runnable CLIs; document required credentials, input files, output locations, and expected file formats (CSV/XLSX/XML/JSON).
 - For each exporter, document the exact command line used in production (including flags, package, and cache settings) and where outputs are published or uploaded.
 - If deployed on a schedule, record the trigger (cron/job name), environment (host/container), and any required secrets or config files.
