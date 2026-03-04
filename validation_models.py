@@ -131,6 +131,7 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
     schema_name: str
     table: str
     file_format: str = "auto"
+    separator: Optional[str] = None
     tsv_quote_char: str = '"'
     tsv_escape_char: Optional[str] = None
 
@@ -161,6 +162,21 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
         if file_format not in {"auto", "csv", "tsv"}:
             errors.append(_make_error(("file_format",), "must be one of: auto, csv, tsv"))
 
+        separator_raw = payload.get("separator")
+        if separator_raw in (None, ""):
+            separator = None
+        else:
+            separator = str(separator_raw)
+            if separator == r"\t" or separator.lower() == "tab":
+                separator = "\t"
+            if len(separator) != 1:
+                errors.append(
+                    _make_error(
+                        ("separator",),
+                        "must be a single character (or use \\\\t/tab for tab)",
+                    )
+                )
+
         quote_raw = payload.get("tsv_quote_char", '"')
         try:
             quote_char = _non_empty_string(quote_raw, field_name="tsv_quote_char")
@@ -186,6 +202,7 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
             schema_name=schema_name,
             table=table,
             file_format=file_format,
+            separator=separator,
             tsv_quote_char=quote_char,
             tsv_escape_char=escape_char,
         )
