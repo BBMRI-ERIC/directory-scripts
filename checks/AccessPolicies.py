@@ -270,7 +270,7 @@ class AccessPolicies(IPlugin):
 			# checks on different modes of collaboration - this is still a bit messy as DUO does not fit perfectly to our needs
 			DUO_term_joint_project = 'DUO:0000020'
 			if any((x in collection and collection[x] == True) for x in ['sample_access_joint_project', 'data_access_joint_project', 'image_joint_projects']) and DUO_term_joint_project not in DUOs:
-				warnings.append(DataCheckWarning(make_check_id(self, "JointDuo"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, f"Joint projects for sample/data/image access specified and {DUO_term_joint_project} is not specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term_joint_project)}"))
+				warnings.append(DataCheckWarning(make_check_id(self, "JointDuo"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Joint projects for sample/data/image access specified and {DUO_term_joint_project} is not specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term_joint_project)}"))
 
 			# DUO term DUO:0000018 seems not only to allow non-for-profit collaboration, but also forbids commercial collaboration
 			for attributes,negative_attributes,DUO_term in [(['collaboration_non_for_profit'], ['collaboration_commercial'], 'DUO:0000018')]:
