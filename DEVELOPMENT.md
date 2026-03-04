@@ -150,7 +150,7 @@ Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
   - maps `check ID -> entity ID`
   - used only to hide known residual false positives from QC output
 - exported QC update-plan JSON
-  - checksum-signed fix-plan artifact produced by `data-check.py --export-update-plan ...`
+  - checksum-signed fix-plan artifact produced by `data-check.py -U/--export-update-plan ...`
   - consumed by `collection-qcheck-updater.py`
   - carries both per-update integrity checksums and expected current field values
 - `warning_suppressions.py`
@@ -250,13 +250,55 @@ python3 data-check.py -N | rg 'AI:Curated'
 ## QC-derived update workflow
 
 - `DataCheckWarning` may carry structured `fix_proposals` alongside the human warning text.
-- `data-check.py --export-update-plan ...` serializes those proposals into a JSON fix plan.
+- `data-check.py -U/--export-update-plan ...` serializes those proposals into a JSON fix plan.
 - `collection-qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
+- The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
+- The current updater apply path supports collection-level fixes only. Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
 - Every update also carries `expected_current_value`; apply logic must compare it with the live staging-area value and warn before writing when the values diverge.
 - `uncertain` proposals are still exported because they can represent genuine alternative curator choices; do not auto-merge or auto-apply them blindly.
 - Ontology-backed fixes such as DUO terms must carry explanations validated against the official ontology source during development; do not improvise ontology descriptions at runtime.
 - This workflow only makes sense when the staging area is the authoritative editable source. If a node imports/synchronizes data from another primary system, fix that primary source instead.
+
+### Current fix-producing modules
+
+- `access`
+  - DUO/access-policy proposals from `checks/AccessPolicies.py`
+- `collection_types`
+  - structured type fixes from `checks/CollectionContent.py`, `checks/COVID.py`, and cautious narrative suggestions from `checks/TextConsistency.py`
+- `age`
+  - fact-sheet-derived age fixes from `checks/FactTables.py` and cautious narrative suggestions from `checks/TextConsistency.py`
+- `materials`
+  - fact-sheet-derived material fixes from `checks/FactTables.py` and deterministic FFPE text suggestions from `checks/TextConsistency.py`
+- `diagnoses`
+  - fact-sheet-derived diagnosis fixes from `checks/FactTables.py` and deterministic COVID text suggestions from `checks/TextConsistency.py`
+- `clinical_profile`
+  - currently used for deterministic sex/profile alignment from fact sheets
+- `counts`
+  - sample/donor total alignment from fact-sheet all-star rows
+
+### Confidence handling
+
+- `certain`
+  - deterministic, directly implied by structured source data
+- `almost_certain`
+  - still deterministic, but with a small policy/curation assumption that must stay visible to the user
+- `uncertain`
+  - export and list these proposals, but treat them as curator-choice candidates rather than safe batch updates
+
+### Selection and conflict handling
+
+- Filters combine as `AND`; comma-separated/repeated values within the same filter combine as `OR`.
+- Supported selectors:
+  - exact entity id
+  - hierarchy root id
+  - staging area
+  - `check_id`
+  - `update_id`
+  - `module`
+  - `confidence`
+- Use `exclusive_group` for mutually exclusive alternatives in one field; the updater must not auto-merge those proposals.
+- If multiple updates for the same entity/field disagree on mode or target value, keep them as conflicts and skip automatic apply.
 
 ## Withdrawal scope
 

@@ -223,21 +223,21 @@ class AccessPolicies(IPlugin):
 				if((not 'sample_access_fee' in collection or collection['sample_access_fee'] == False) and 
 						(not 'sample_access_joint_project' in collection or collection['sample_access_joint_project'] == False) and 
 						(not 'sample_access_description' in collection or collection['sample_access_description'] == False) and 
-						(not 'sample_access_uri' in collection or re.search('^\s*$', collection['sample_access_uri']))):
+						(not 'sample_access_uri' in collection or re.search(r'^\s*$', collection['sample_access_uri']))):
 					warnings.append(DataCheckWarning(make_check_id(self, "SampleAccess"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No sample access mode enabled and no sample access policy (description nor URI) provided for collection"))
 
 			if other_data:
 				if((not 'data_access_fee' in collection or collection['data_access_fee'] == False) and 
 						(not 'data_access_joint_project' in collection or collection['data_access_joint_project'] == False) and 
 						(not 'data_access_description' in collection or collection['data_access_description'] == False) and 
-						(not 'data_access_uri' in collection or re.search('^\s*$', collection['data_access_uri']))):
+						(not 'data_access_uri' in collection or re.search(r'^\s*$', collection['data_access_uri']))):
 					warnings.append(DataCheckWarning(make_check_id(self, "DataAccessMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No data access mode enabled and no data access policy (description nor URI) provided for collection"))
 
 			if 'IMAGING_DATA' in data_categories:
 				if((not 'image_access_fee' in collection or collection['image_access_fee'] == False) and 
 						(not 'image_joint_project' in collection or collection['image_joint_project'] == False) and 
 						(not 'image_access_description' in collection or collection['image_access_description'] == False) and 
-						(not 'image_access_uri' in collection or re.search('^\s*$', collection['image_access_uri']))):
+						(not 'image_access_uri' in collection or re.search(r'^\s*$', collection['image_access_uri']))):
 					warnings.append(DataCheckWarning(make_check_id(self, "ImgAccess"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No imaging access mode enabled and no imaging access policy (description nor URI) provided for a collection which contains imaging data"))
 
 			# DUO specific checks
