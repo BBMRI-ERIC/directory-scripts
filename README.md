@@ -243,8 +243,8 @@ Key safety points:
 - Schema is required (`-s/--schema`) and corresponds to the staging area name shown in the Molgenis Navigator (for example `BBMRI-EU`).
 - Use a node staging area for normal edits. `ERIC` is the aggregated public schema and should normally not be edited with this tool.
 - If you explicitly request `-s ERIC`, the script requires an extra interactive approval unless `-f/--force` is used.
-- Table name is required for import, delete, and export (`-T/--table`).
-- Actions are mutually exclusive: import (`-i`), delete (`-x`), export (`-e`).
+- Table name is required for import, delete, export, and sync (`-T/--table`).
+- Actions are mutually exclusive: import (`-i`), delete (`-x`), export (`-e`), sync (`-y`).
 - Deletions always require interactive confirmation unless `-f/--force` is used.
 - Use `-n/--dry-run` to preview changes without modifying data.
 - `-v/--verbose` shows record-level details; `-d/--debug` adds connection/auth details.
@@ -253,6 +253,7 @@ Key safety points:
 ### Import records
 - Use `-i/--import-data` with `-T/--table`.
 - Format auto-detects by extension; override with `-F/--file-format csv|tsv` if the filename is wrong or missing an extension.
+- Use `-S/--separator` to override the field separator for CSV/TSV import/delete/export (for example `';'` or `\\t`).
 - Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
 - Use `-R/--id-regex` and/or `-C/--collection-id` to import only matching rows (defaults to `id`/`collection` columns; override with `--id-column`/`--collection-column`).
 - If Molgenis rejects an import due to a missing `national_node` and `-N` is not set, the script falls back to `-s/--schema` as the `national_node` and warns.
@@ -267,6 +268,8 @@ python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.csv
 python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.data -F csv -n -v
 
 python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.tsv -N BBMRI-EU
+
+python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.csv -S ';'
 
 python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.tsv -R '^COLL_' -C BB_001
 ```
@@ -300,9 +303,25 @@ python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.tsv
 python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.csv -R '^FACT_' -C BB_001 -C BB_002
 ```
 
+### Sync table contents
+- Sync mode (`-y/--sync-data`) makes table contents match exactly the input file by:
+  1) truncating current table contents, then
+  2) importing file contents.
+- This operation is **non-atomic** (not a single server transaction). If import fails after truncate, the table can remain partially or fully empty.
+- Use `-n/--dry-run` first and strongly consider `--export-on-delete` as a backup.
+- Sync mode does not accept `-R/-C` filters; provide the full desired table content in the sync file.
+
+Examples:
+```bash
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -y facts-sync.tsv -n -v
+
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -y facts-sync.tsv --export-on-delete facts-pre-sync-backup.tsv
+```
+
 ### TSV parsing overrides
 If TSV files use non-standard quoting/escaping, adjust with:
 - `--tsvQuoteChar`, `--tsvEscapeChar`, `--tsvQuoting`, `--tsvNoDoublequote`.
+- `-S/--separator` can override CSV/TSV delimiters (for example `;` or `\\t`).
 
 ### Working examples (sanitized)
 The following are adapted from real runs. Collection IDs are masked consistently as `bbmri-eric:ID:EU_BBMRI-ERIC:collection:COLL_EXAMPLE`.
