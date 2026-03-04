@@ -440,13 +440,16 @@ def _review_updates_interactively(
     live_rows: dict[str, dict],
     *,
     verbose: bool,
+    mismatch_update_keys: set[tuple[str, str, str]] | None = None,
 ) -> list[EntityFixProposal]:
     """Return the subset of updates approved interactively by the user."""
+    mismatch_update_keys = mismatch_update_keys or set()
     approved_updates = []
     total = len(updates)
     for index, update in enumerate(updates, start=1):
         live_value = _normalize_live_row_value(live_rows[update.entity_id], update.field)
         effective_value = _effective_field_value(update.field, live_value, update)
+        update_key = (update.entity_id, update.field, update.update_id)
         sys.stderr.write(
             f"Review {index}/{total}: {update.entity_id} [{update.confidence}] {update.module}/{update.update_id}\n"
         )
@@ -467,7 +470,12 @@ def _review_updates_interactively(
             sys.stderr.write(f"  rationale: {update.rationale}\n")
         if update.blocking_reason:
             sys.stderr.write(f"  note: {update.blocking_reason}\n")
-        if prompt_yes_no("  Select this update?", default_no=True):
+        if update_key in mismatch_update_keys:
+            sys.stderr.write("  note: live value no longer matches the exported expected value; review carefully before applying.\n")
+        if prompt_yes_no(
+            "  Select this update despite the live mismatch?" if update_key in mismatch_update_keys else "  Select this update?",
+            default_no=True,
+        ):
             approved_updates.append(update)
         sys.stderr.write("\n")
     return approved_updates
@@ -599,16 +607,18 @@ def run_updater(args: argparse.Namespace) -> int:
                     _render_field_value(update.field, update.expected_current_value),
                     _render_field_value(update.field, _normalize_live_row_value(live_rows[update.entity_id], update.field)),
                 )
-            confirm_action(
-                f"Proceed even though {len(mismatch_updates)} selected updates no longer match the exported expected values?",
-                force=args.force,
-            )
+            if args.force:
+                confirm_action(
+                    f"Proceed even though {len(mismatch_updates)} selected updates no longer match the exported expected values?",
+                    force=args.force,
+                )
 
         if not args.force:
             updated_rows = _review_updates_interactively(
                 updated_rows,
                 live_rows,
                 verbose=args.verbose or args.debug,
+                mismatch_update_keys={(update.entity_id, update.field, update.update_id) for update in mismatch_updates},
             )
             if not updated_rows:
                 logging.info("No updates were approved during interactive review.")
@@ -627,8 +637,8 @@ def run_updater(args: argparse.Namespace) -> int:
             logging.info("Dry run enabled. No data was written.")
             return EXIT_OK
 
-        updated_df = table_df.copy()
         changed_entity_ids = set()
+        changed_rows_by_id: dict[str, dict] = {}
         for update in updated_rows:
             current_row = live_rows[update.entity_id]
             next_row = _apply_update_to_row(current_row, update)
@@ -636,13 +646,20 @@ def run_updater(args: argparse.Namespace) -> int:
                 continue
             live_rows[update.entity_id] = next_row
             changed_entity_ids.add(update.entity_id)
-            updated_df.loc[updated_df["id"].astype(str) == update.entity_id, list(next_row.keys())] = pd.Series(next_row)
+            changed_rows_by_id[update.entity_id] = next_row
 
         if not changed_entity_ids:
             logging.info("All approved updates were no-ops against the live data. Nothing was written.")
             return EXIT_OK
 
-        changed_rows = updated_df[updated_df["id"].astype(str).isin(changed_entity_ids)]
+        changed_rows = pd.DataFrame(
+            [
+                {column: changed_rows_by_id[row_id].get(column) for column in table_df.columns}
+                for row_id in table_df["id"].astype(str)
+                if row_id in changed_entity_ids
+            ],
+            columns=table_df.columns,
+        )
         session.save_table(table="Collections", schema=args.schema, data=changed_rows)
         logging.info("Applied %d update(s) affecting %d collection(s) in schema %s.", len(updated_rows), len(changed_entity_ids), args.schema)
     return EXIT_OK

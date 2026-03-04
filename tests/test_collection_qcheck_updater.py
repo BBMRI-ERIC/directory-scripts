@@ -2,8 +2,10 @@ from argparse import Namespace
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-import pandas as pd
 import logging
+import warnings
+
+import pandas as pd
 
 from fix_proposals import compute_checksum
 
@@ -425,3 +427,193 @@ def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_
 
     assert result == module.EXIT_OK
     assert saved == []
+
+
+def test_collection_qcheck_updater_saves_changed_rows_without_dtype_assignment_futurewarnings(tmp_path, monkeypatch):
+    module = load_module()
+    path = build_plan(tmp_path)
+    saved = []
+
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["updates"][0]["field"] = "data_use"
+    payload["updates"][0]["expected_current_value"] = []
+    payload["updates"][0]["proposed_value"] = ["DUO:0000007"]
+    payload["updates"][0]["update_checksum"] = compute_checksum(
+        {key: value for key, value in payload["updates"][0].items() if key != "update_checksum"}
+    )
+    payload["file_checksum"] = compute_checksum({key: value for key, value in payload.items() if key != "file_checksum"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            assert table == "Collections"
+            assert schema == "BBMRI-CZ"
+            assert as_df is True
+            return pd.DataFrame(
+                [
+                    {
+                        "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                        "data_use": "",
+                        "some_bool": True,
+                        "some_int": 7,
+                    }
+                ]
+            )
+
+        def save_table(self, **kwargs):
+            saved.append(kwargs)
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+
+    args = Namespace(
+        input=str(path),
+        schema="BBMRI-CZ",
+        entity_id=None,
+        root_id=None,
+        staging_area=None,
+        check_id=[],
+        update_id=[],
+        module=[],
+        confidence=None,
+        list=False,
+        dry_run=False,
+        force=False,
+        replace_existing=False,
+        verbose=False,
+        debug=False,
+        quiet=False,
+        directory_target="https://directory.example.org",
+        directory_username="user",
+        directory_password="secret",
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        result = module.run_updater(args)
+
+    assert result == module.EXIT_OK
+    assert len(saved) == 1
+    saved_df = saved[0]["data"]
+    assert list(saved_df.columns) == ["id", "data_use", "some_bool", "some_int"]
+    assert saved_df.iloc[0]["some_bool"] == True
+    assert saved_df.iloc[0]["some_int"] == 7
+
+
+def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interactive_mode(tmp_path, monkeypatch, caplog):
+    module = load_module()
+    path = build_plan(tmp_path)
+    saved = []
+    confirm_prompts = []
+    review_prompts = []
+
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    first = payload["updates"][0]
+    second = dict(first)
+    second["entity_id"] = "bbmri-eric:ID:CZ_demo:collection:col2"
+    second["update_id"] = "access.duo.data_return_required"
+    second["expected_current_value"] = []
+    first["expected_current_value"] = []
+    for update in payload["updates"]:
+        update["update_checksum"] = compute_checksum({key: value for key, value in update.items() if key != "update_checksum"})
+    second["update_checksum"] = compute_checksum({key: value for key, value in second.items() if key != "update_checksum"})
+    payload["updates"].append(second)
+    payload["file_checksum"] = compute_checksum({key: value for key, value in payload.items() if key != "file_checksum"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            assert table == "Collections"
+            assert schema == "BBMRI-CZ"
+            assert as_df is True
+            return pd.DataFrame(
+                [
+                    {
+                        "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                        "data_use": "DUO:0000020",
+                    },
+                    {
+                        "id": "bbmri-eric:ID:CZ_demo:collection:col2",
+                        "data_use": "",
+                    },
+                ]
+            )
+
+        def save_table(self, **kwargs):
+            saved.append(kwargs)
+
+    prompt_answers = iter([False, True])
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "confirm_action", lambda prompt, **kwargs: confirm_prompts.append(prompt))
+    monkeypatch.setattr(
+        module,
+        "prompt_yes_no",
+        lambda prompt, **kwargs: review_prompts.append(prompt) or next(prompt_answers),
+    )
+
+    args = Namespace(
+        input=str(path),
+        schema="BBMRI-CZ",
+        entity_id=None,
+        root_id=None,
+        staging_area=None,
+        check_id=[],
+        update_id=[],
+        module=[],
+        confidence=None,
+        list=False,
+        dry_run=False,
+        force=False,
+        replace_existing=False,
+        verbose=False,
+        debug=False,
+        quiet=False,
+        directory_target="https://directory.example.org",
+        directory_username="user",
+        directory_password="secret",
+    )
+
+    with caplog.at_level(logging.WARNING):
+        result = module.run_updater(args)
+
+    assert result == module.EXIT_OK
+    assert len(saved) == 1
+    saved_ids = list(saved[0]["data"]["id"])
+    assert saved_ids == ["bbmri-eric:ID:CZ_demo:collection:col2"]
+    assert len(review_prompts) == 2
+    assert review_prompts[0] == "  Select this update despite the live mismatch?"
+    assert review_prompts[1] == "  Select this update?"
+    assert not any("Proceed even though" in prompt for prompt in confirm_prompts)
+    assert "Live value mismatch" in caplog.text

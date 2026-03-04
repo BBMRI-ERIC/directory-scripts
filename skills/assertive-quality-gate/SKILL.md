@@ -45,6 +45,7 @@ Apply this workflow as a required gate before push, and as the default process f
   - append updates must not look like replacements
   - unordered multi-value fields must not produce order-only mismatches
   - equivalent ontology term spellings (for example `DUO_...` vs `DUO:...`) must be treated as no-op duplicates
+  - live-value mismatches must be handled per update in interactive review rather than through one abortive global prompt
   - field-specific rationale text must stay attached only to the relevant field/fix
 - If full test coverage is not feasible in one change, document the precise gap and risk.
 

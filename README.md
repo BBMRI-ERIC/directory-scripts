@@ -394,6 +394,7 @@ Key behavior:
 - `--list` is the non-destructive human-readable inspection mode; it shows the same normalized multi-value field presentation as interactive review
 - the exported JSON plan contains per-update and whole-file checksums; the updater warns when the file or individual updates were edited after export, but the user can still proceed deliberately
 - each update carries the expected current field value seen at export time; if the live staging-area value changed before apply, the updater warns and requires explicit confirmation unless `-f/--force` is used
+- in interactive mode, live-value mismatches are reviewed per update; declining one mismatched update skips only that update instead of aborting the whole run
 - unordered multi-value fields such as `data_use`, `type`, `diagnosis_available`, `materials`, and `sex` are compared canonically, so pure field reordering does not create false mismatches during review/apply
 - filtering is supported by exact entity ID, hierarchy root ID (biobank or collection), staging area, originating check ID, update ID, module, and confidence
 - hierarchy selection:
