@@ -288,6 +288,33 @@ python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.t
 python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -i facts.tsv -k 10 -K 10
 ```
 
+### CollectionFacts k-anonymity scenarios
+
+For non-`ERIC` checks/updates, ensure Directory credentials are available (CLI `-u/-p` or `.env`).
+
+1) Source is already k-anonymized (import as-is):
+```bash
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -i facts-k10.tsv -N EU -v
+```
+
+2) Source exports complete facts, apply k-anonymity during import (recommended donor filter, optional sample filter):
+```bash
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -i facts-full.tsv -N EU -k 10
+
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -i facts-full.tsv -N EU -k 10 -K 10
+```
+
+3) Existing staging data cleanup via QC update plan (`-U`) + updater:
+```bash
+python3 data-check.py -P BBMRI-EU -U qc-updates.json -r -N
+
+python3 qcheck-updater.py -i qc-updates.json -s BBMRI-EU --module FT --check-id FT:KAnonViolation --list
+
+python3 qcheck-updater.py -i qc-updates.json -s BBMRI-EU --module FT --check-id FT:KAnonViolation -n
+```
+
+Note: Directory CollectionFacts intentionally uses k-anonymity as the baseline for public aggregated discovery data. More advanced metrics (for example l-diversity or t-closeness) are not enforced at this layer because they would often suppress too many low-dimensional aggregate rows and significantly reduce findability/utility.
+
 ### Delete records (table contents only)
 - Provide `-x/--delete-data` with `-T/--table`.
 - Deletes only matching records, not the whole table.

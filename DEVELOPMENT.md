@@ -106,6 +106,8 @@ Rule of thumb:
   - supports human-readable listing, dry-run, interactive apply, and forced batch apply
 - `directory-tables-modifier.py`
   - for `CollectionFacts` k-anonymity filtering in import/sync, keep semantics aligned with `FT:KAnonViolation`: skip only rows with `0 < number_of_donors < k` / `0 < number_of_samples < k` (do not auto-drop zero-valued rows)
+- `k_anonymity.py`
+  - shared helper for the `0 < value < k` rule; use it from both check code (`checks/FactTables.py`, fix proposals) and table tooling (`directory-tables-modifier.py`) to prevent semantic drift
 
 If descriptor-alignment logic changes, keep both the check and the updater behavior consistent.
 

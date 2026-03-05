@@ -15,6 +15,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from molgenis_emx2.directory_client.directory_client import DirectorySession
 
+from k_anonymity import positive_below_k_mask
 from validation_helpers import format_validation_error
 from validation_models import TableModifierSettingsModel, ValidationError
 
@@ -477,7 +478,7 @@ def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, co
                 f"{context} with --k-donors requires column 'number_of_donors' in CollectionFacts input."
             )
         donors_values = _coerce_numeric_column(df, donors_column, context)
-        donors_mask = (donors_values > 0) & (donors_values < k_donors_threshold)
+        donors_mask = positive_below_k_mask(donors_values, k_donors_threshold)
     if k_samples_threshold is not None:
         samples_column = resolve_column_case_insensitive(df, "number_of_samples")
         if samples_column is None:
@@ -485,7 +486,7 @@ def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, co
                 f"{context} with --k-samples requires column 'number_of_samples' in CollectionFacts input."
             )
         samples_values = _coerce_numeric_column(df, samples_column, context)
-        samples_mask = (samples_values > 0) & (samples_values < k_samples_threshold)
+        samples_mask = positive_below_k_mask(samples_values, k_samples_threshold)
     combined_mask = donors_mask | samples_mask
     skipped_df = df.loc[combined_mask]
     filtered_df = df.loc[~combined_mask]

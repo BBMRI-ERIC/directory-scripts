@@ -10,6 +10,7 @@ from fact_descriptor_sync import (
     parse_collection_multi_value_field,
 )
 from fix_proposals import make_fix_proposal
+from k_anonymity import donor_value_violates_k
 
 
 MULTI_VALUE_COLLECTION_FIELDS = {
@@ -223,8 +224,7 @@ def build_fact_k_anonymity_drop_fixes(
     """Return a fix proposal that drops fact-sheet rows violating donor k-anonymity."""
     violating_ids = []
     for fact in facts:
-        donors = fact.get("number_of_donors")
-        if isinstance(donors, int) and 0 < donors < k_limit and fact.get("id"):
+        if donor_value_violates_k(fact.get("number_of_donors"), k_limit) and fact.get("id"):
             violating_ids.append(str(fact["id"]))
     if not violating_ids:
         return []

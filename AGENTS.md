@@ -85,6 +85,7 @@
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`, and field separator can be overridden with `-S/--separator` (for example `;`).
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
 - `directory-tables-modifier.py` supports CollectionFacts k-anonymization filters during import/sync: `-k/--k-donors` for `0 < number_of_donors < k` and `-K/--k-samples` for `0 < number_of_samples < k`; retain zero-valued rows and keep behavior aligned with `FT:KAnonViolation` fix generation; report skipped-row counts and keep this limited to `-T CollectionFacts`.
+- Keep k-anonymity rule semantics in one shared helper (`k_anonymity.py`) and reuse it from both `checks/*` and `directory-tables-modifier.py`; avoid duplicating `0 < value < k` logic in multiple places.
 - Recommended baseline for public Directory fact data is donor `k=10`; exceptions are possible for documented pre-anonymized collections/pipelines.
 - Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.
 - `directory-tables-modifier.py` should normally target node staging areas, not `ERIC`; if `ERIC` is explicitly requested, the script must require an extra confirmation unless `-f/--force` is used.
