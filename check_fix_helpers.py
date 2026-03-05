@@ -157,13 +157,36 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
         confidence = "certain" if update_family in {"diagnoses", "materials", "counts"} else "almost_certain"
         if update_family == "age" and note_text:
             confidence = "uncertain"
-        if update_family == "age":
+        if update_family == "counts":
             base_rationale = (
-                "Age proposal uses conservative normalization: Directory age labels/ranges are mapped to numeric bounds, aggregate/unknown rows ('*', Unknown, Undefined) are ignored, and automatic updates only widen coverage unless explicit replace mode is used."
+                "Counts proposal uses conservative normalization: totals are taken only from a single all-star aggregate fact row (sex='*', age_range='*', sample_type='*', disease='*'). "
+                "Here, '*' means 'aggregated over all values', so this all-star row is the authoritative total. "
+                "No count update is proposed when that all-star row is missing/duplicated or not numeric."
+            )
+        elif update_family == "age":
+            base_rationale = (
+                "Age proposal uses conservative normalization: Directory age labels/ranges are mapped to numeric bounds. "
+                "For descriptor derivation, '*' and Unknown/Undefined age labels are treated as aggregated/unspecified buckets (not concrete age groups). "
+                "Automatic updates only widen coverage unless explicit replace mode is used."
+            )
+        elif update_family == "materials":
+            base_rationale = (
+                "Materials proposal uses conservative normalization: for descriptor derivation, '*' is treated as an aggregated/unspecified sample_type bucket, not a concrete material value. "
+                "NAV is treated as non-specific unless it is the only material signal."
+            )
+        elif update_family == "diagnoses":
+            base_rationale = (
+                "Diagnoses proposal uses conservative normalization: for descriptor derivation, '*' is treated as an aggregated/unspecified disease bucket, not a concrete diagnosis code. "
+                "Existing broader ICD-10 metadata codes are preserved when they already cover more specific fact-sheet codes."
+            )
+        elif update_family == "clinical_profile":
+            base_rationale = (
+                "Sex proposal uses conservative normalization: for descriptor derivation, '*' is treated as an aggregated/unspecified sex bucket, not a concrete sex value. "
+                "Only explicit fact-sheet sex values are compared."
             )
         else:
             base_rationale = (
-                "Fact-sheet proposal uses conservative normalization: aggregate rows ('*') are ignored, Unknown/Undefined age labels are ignored, and NAV material is treated as non-specific unless it is the only material signal."
+                "Fact-sheet proposal uses conservative normalization: for descriptor derivation, '*' is treated as aggregated/unspecified rather than as a concrete category value."
             )
         fix_proposals.append(
             make_fix_proposal(
