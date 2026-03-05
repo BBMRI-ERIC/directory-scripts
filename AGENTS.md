@@ -156,6 +156,7 @@
 - Keep [`README.md`](README.md) accurate and add per-script usage examples as interfaces evolve.
 - If a change also affects the Directory Data Manager manual tooling, update the corresponding files in `../BBMRI-ERIC-Directory-Data-Manager-Manual/` as a coordinated follow-up; that repo contains the check-documentation generator and is not updated automatically by changes here.
 - When `CHECK_DOCS.fields` differ from AST-extracted fields by design, document the real intended fields explicitly and validate that the manual generator uses the documented fields rather than falling back to `None explicitly detected`.
+- When updating `AGENTS.md` itself: adding new knowledge is allowed directly; removing existing knowledge or merging/consolidating it with older guidance requires explicit human-in-the-loop approval.
 
 ## Security & Configuration Tips
 - Keep credentials out of the repo; prefer CLI flags (`-u`, `-p`) or local config files not committed.
