@@ -74,6 +74,8 @@ cachesList = ['directory', 'emails', 'geocoding', 'URLs']
 
 parser = build_parser()
 add_logging_arguments(parser)
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default='ERIC')
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
 add_validation_warning_argument(parser)
@@ -100,8 +102,6 @@ parser.add_argument(
     default=None,
     help='write structured fix proposals attached to warnings into the provided JSON update-plan file',
 )
-add_directory_auth_arguments(parser)
-add_directory_schema_argument(parser, default='ERIC')
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()

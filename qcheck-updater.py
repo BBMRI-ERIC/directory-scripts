@@ -59,6 +59,26 @@ def build_parser() -> argparse.ArgumentParser:
             "entity updates, list them in a human-readable form, or apply them to a staging schema."
         )
     )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output.")
+    parser.add_argument("-d", "--debug", action="store_true", help="Debug output. Implies verbose.")
+    parser.add_argument("-n", "--dry-run", action="store_true", help="Show what would be updated in the target schema without writing data.")
+    parser.add_argument("-f", "--force", action="store_true", help="Apply all selected non-conflicting updates without interactive confirmation.")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-error stdout output.")
+    parser.add_argument(
+        "--directory-target",
+        default=DEFAULT_TARGET,
+        help="Directory base URL (overrides DIRECTORYTARGET env var).",
+    )
+    parser.add_argument(
+        "--directory-username",
+        default=DEFAULT_USERNAME,
+        help="Directory username (overrides DIRECTORYUSERNAME env var).",
+    )
+    parser.add_argument(
+        "--directory-password",
+        default=DEFAULT_PASSWORD,
+        help="Directory password (overrides DIRECTORYPASSWORD env var).",
+    )
     parser.add_argument("-i", "--input", required=True, help="Path to the JSON update-plan exported by data-check.py.")
     parser.add_argument(
         "-s",
@@ -83,30 +103,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-delimited confidence filter. Supported values: certain, almost_certain, uncertain, all.",
     )
     parser.add_argument("--list", action="store_true", help="List selected updates in human-readable form without connecting to the staging schema.")
-    parser.add_argument("-n", "--dry-run", action="store_true", help="Show what would be updated in the target schema without writing data.")
-    parser.add_argument("-f", "--force", action="store_true", help="Apply all selected non-conflicting updates without interactive confirmation.")
     parser.add_argument(
         "--replace-existing",
         action="store_true",
         help="Allow replace/clear updates that remove or overwrite existing metadata values.",
-    )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output.")
-    parser.add_argument("-d", "--debug", action="store_true", help="Debug output. Implies verbose.")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-error stdout output.")
-    parser.add_argument(
-        "--directory-target",
-        default=DEFAULT_TARGET,
-        help="Directory base URL (overrides DIRECTORYTARGET env var).",
-    )
-    parser.add_argument(
-        "--directory-username",
-        default=DEFAULT_USERNAME,
-        help="Directory username (overrides DIRECTORYUSERNAME env var).",
-    )
-    parser.add_argument(
-        "--directory-password",
-        default=DEFAULT_PASSWORD,
-        help="Directory password (overrides DIRECTORYPASSWORD env var).",
     )
     return parser
 

@@ -174,6 +174,7 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 - Keep exporters thin: CLI + orchestration only.
 - Keep shared Directory logic in `directory.py`.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.
+- Keep CLI help output consistent across scripts: standard options first (`-h`, `-v`, `-d`, then Directory target/auth options), then tool-specific options.
 - Use explicit runtime validation for assumptions that depend on input/data/config.
 - Prefer clear exceptions and actionable messages over silent fallback.
 - For reusable/public Python APIs, keep docstrings complete and consistent.

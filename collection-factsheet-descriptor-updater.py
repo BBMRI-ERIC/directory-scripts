@@ -54,17 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
             "to the corresponding staging-area Collections table."
         )
     )
-    parser.add_argument("-c", "--collection-id", required=True, help="Collection ID to analyze.")
-    parser.add_argument(
-        "-s",
-        "--schema",
-        required=True,
-        help=(
-            "Target staging-area schema to update (for example BBMRI-CZ or BBMRI-EU). "
-            "The script analyzes facts from ERIC in the configured Directory target but "
-            "writes to this schema."
-        ),
-    )
     parser.add_argument(
         "-v",
         "--verbose",
@@ -96,14 +85,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Suppress non-error stdout output.",
     )
     parser.add_argument(
-        "--replace-existing",
-        action="store_true",
-        help=(
-            "Allow removal/replacement of existing multi-value descriptors that are not "
-            "supported by the fact sheet. Without this option, only missing values are added."
-        ),
-    )
-    parser.add_argument(
         "--directory-target",
         default=DEFAULT_TARGET,
         help="Directory base URL (overrides DIRECTORYTARGET env var).",
@@ -117,6 +98,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--directory-password",
         default=DEFAULT_PASSWORD,
         help="Directory password (overrides DIRECTORYPASSWORD env var).",
+    )
+    parser.add_argument("-c", "--collection-id", required=True, help="Collection ID to analyze.")
+    parser.add_argument(
+        "-s",
+        "--schema",
+        required=True,
+        help=(
+            "Target staging-area schema to update (for example BBMRI-CZ or BBMRI-EU). "
+            "The script analyzes facts from ERIC in the configured Directory target but "
+            "writes to this schema."
+        ),
+    )
+    parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help=(
+            "Allow removal/replacement of existing multi-value descriptors that are not "
+            "supported by the fact sheet. Without this option, only missing values are added."
+        ),
     )
     parser.add_argument(
         "--suppress-validation-warnings",

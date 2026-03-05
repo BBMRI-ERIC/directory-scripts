@@ -94,8 +94,8 @@ def get_nn_for_collection(collection_id, collection):
 
 
 parser = build_parser()
-parser.add_argument('input_xlsx', help='input XLSX (Negotiator representatives list)')
 add_logging_arguments(parser)
+parser.add_argument('input_xlsx', help='input XLSX (Negotiator representatives list)')
 add_xlsx_output_argument(parser)
 add_no_stdout_argument(parser)
 add_directory_schema_argument(parser, default="ERIC")

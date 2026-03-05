@@ -31,12 +31,12 @@ cachesList = ['directory']
 #####################
 
 parser = build_parser()
-add_purge_cache_arguments(parser, cachesList)
-parser.add_argument('-o', '--out-name', '--outName', dest='outNameExcludedBiobanks', default='bbmri-directory-missing-COVID19DataPortal-Values.tsv', help='Output file name')
-parser.add_argument('-x', '--out-xml', '--outNameXML', dest='outXML', default='bbmriDirectory_Covid19DataPortal.xml', help='Output XML name')
 add_logging_arguments(parser)
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default='ERIC')
+add_purge_cache_arguments(parser, cachesList)
+parser.add_argument('-o', '--out-name', '--outName', dest='outNameExcludedBiobanks', default='bbmri-directory-missing-COVID19DataPortal-Values.tsv', help='Output file name')
+parser.add_argument('-x', '--out-xml', '--outNameXML', dest='outXML', default='bbmriDirectory_Covid19DataPortal.xml', help='Output XML name')
 add_withdrawn_scope_arguments(parser)
 
 parser.set_defaults(purgeCaches=[])
