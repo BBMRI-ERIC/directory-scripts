@@ -328,6 +328,20 @@ def _effective_field_value(field: str, current_value, update: EntityFixProposal)
     return update.proposed_value
 
 
+def _has_live_value_mismatch(update: EntityFixProposal, live_value) -> bool:
+    """Return whether live data still matches the exported expected value."""
+    if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
+        # For delete_rows fixes, expected_current_value carries rows expected to be deleted.
+        # Additional fact rows may legitimately exist; mismatch matters only when any expected
+        # row is already missing or changed since plan export.
+        expected_ids = set(_canonical_field_value(update.field, update.expected_current_value))
+        live_ids = set(_canonical_field_value(update.field, live_value))
+        return not expected_ids.issubset(live_ids)
+    return _canonical_field_value(update.field, live_value) != _canonical_field_value(
+        update.field, update.expected_current_value
+    )
+
+
 def _merge_updates(selected_updates: list[EntityFixProposal]) -> tuple[list[EntityFixProposal], list[str]]:
     grouped = defaultdict(list)
     conflicts = []
@@ -716,7 +730,7 @@ def run_updater(args: argparse.Namespace) -> int:
             update_key = (update.entity_id, update.field, update.update_id)
             live_value = _live_value_for_update(update)
             live_value_by_update_key[update_key] = live_value
-            if _canonical_field_value(update.field, live_value) != _canonical_field_value(update.field, update.expected_current_value):
+            if _has_live_value_mismatch(update, live_value):
                 mismatch_updates.append(update)
             if update.replace_required and not args.replace_existing:
                 skipped_replace_required.append(update)

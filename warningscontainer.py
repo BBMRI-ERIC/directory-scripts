@@ -87,6 +87,33 @@ class WarningsContainer:
             warnings.extend(warning_list)
         return warnings
 
+    def dumpSuppressedWarningsDebug(self, max_items: int = 100):
+        """Log suppressed warnings for debug troubleshooting."""
+        total = len(self.suppressedWarnings)
+        if total == 0:
+            log.debug("No warnings were suppressed in this run.")
+            return
+        log.debug("Suppressed warnings in this run: %s", total)
+        for warning in self.suppressedWarnings[:max_items]:
+            reason = self._suppression_reason(warning)
+            if reason:
+                log.debug(
+                    "Suppressed %s for %s (%s): %s",
+                    warning.dataCheckID,
+                    warning.directoryEntityID,
+                    reason,
+                    warning.message,
+                )
+            else:
+                log.debug(
+                    "Suppressed %s for %s: %s",
+                    warning.dataCheckID,
+                    warning.directoryEntityID,
+                    warning.message,
+                )
+        if total > max_items:
+            log.debug("Suppressed warning list truncated to %s entries.", max_items)
+
     @staticmethod
     def _write_headers(worksheet, headers, bold):
         for col_idx, (header, width) in enumerate(headers):

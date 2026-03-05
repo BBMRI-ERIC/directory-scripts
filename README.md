@@ -93,9 +93,18 @@ Email validation in `ContactFields` is split into local/static checks and option
 - disabling remote checks does not suppress the local placeholder-domain or syntax checks
 
 Known false positives can be suppressed in `warning-suppressions.json`:
-- mapping is `check ID -> entity ID`
+- legacy mapping `check ID -> entity ID` is still accepted
+- recommended format is a structured list with metadata (`check_id`, `entity_id`, optional `entity_type`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`)
 - suppressed warnings are omitted from stdout and XLSX output
+- matching QC fix proposals are also omitted from `data-check.py --export-update-plan ...`
+- suppression keys can target either warning check IDs (for example `FT:KAnonViolation`) or module-prefixed update IDs (for example `FT/facts.k_anonymity.drop_rows_k10`)
+- in `data-check.py -d` debug mode, each suppressed warning is listed with check ID/entity ID and suppression reason (if provided)
 - use this only for reviewed false positives; fix the check logic whenever the pattern can be expressed deterministically
+- use `warning-suppressions-manage.py` to maintain suppressions safely:
+  - `python3 warning-suppressions-manage.py list`
+  - `python3 warning-suppressions-manage.py add --check-id FT:KAnonViolation --entity-id <ENTITY_ID> --entity-type COLLECTION --reason \"...\" --added-by <USER>`
+  - `python3 warning-suppressions-manage.py validate`
+  - `python3 warning-suppressions-manage.py prune-stale --dry-run`
 
 Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ```bash
