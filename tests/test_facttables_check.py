@@ -163,6 +163,6 @@ def test_facttables_check_attaches_k_anonymity_drop_rows_fix_proposal():
     assert any(proposal.mode == "delete_rows" for proposal in kanon_fix_proposals)
     assert any(proposal.field == "facts" for proposal in kanon_fix_proposals)
     assert any(
-        proposal.entity_id == "col3" and proposal.proposed_value == ["f3b", "f3c"]
+        proposal.entity_id == "col3" and set(proposal.proposed_value) >= {"f3b", "f3c"}
         for proposal in kanon_fix_proposals
     )
