@@ -97,8 +97,9 @@ class ToolConnectionSettingsModel(_BaseModel):
     """Validate common Directory connection settings for local CLIs."""
 
     directory_target: str
-    directory_username: str
-    directory_password: str
+    directory_username: str = ""
+    directory_password: str = ""
+    directory_token: Optional[str] = None
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "ToolConnectionSettingsModel":
@@ -114,13 +115,23 @@ class ToolConnectionSettingsModel(_BaseModel):
                 return ""
 
         target = parse_required("directory_target")
-        username = parse_required("directory_username")
-        password = parse_required("directory_password")
+
+        token_raw = payload.get("directory_token")
+        token = str(token_raw).strip() if token_raw not in (None, "") else None
+
+        if token:
+            username = str(payload.get("directory_username") or "")
+            password = str(payload.get("directory_password") or "")
+        else:
+            username = parse_required("directory_username")
+            password = parse_required("directory_password")
+
         _raise_if_errors(errors)
         return cls(
             directory_target=target,
             directory_username=username,
             directory_password=password,
+            directory_token=token,
         )
 
 
@@ -128,8 +139,8 @@ class ToolConnectionSettingsModel(_BaseModel):
 class TableModifierSettingsModel(ToolConnectionSettingsModel):
     """Validate resolved ``directory-tables-modifier.py`` runtime settings."""
 
-    schema_name: str
-    table: str
+    schema_name: str = ""
+    table: str = ""
     file_format: str = "auto"
     separator: Optional[str] = None
     tsv_quote_char: str = '"'
@@ -199,6 +210,7 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
             directory_target=base.directory_target,
             directory_username=base.directory_username,
             directory_password=base.directory_password,
+            directory_token=base.directory_token,
             schema_name=schema_name,
             table=table,
             file_format=file_format,
@@ -212,8 +224,8 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
 class FactsheetUpdaterSettingsModel(ToolConnectionSettingsModel):
     """Validate resolved ``collection-factsheet-descriptor-updater.py`` settings."""
 
-    schema_name: str
-    collection_id: str
+    schema_name: str = ""
+    collection_id: str = ""
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "FactsheetUpdaterSettingsModel":
@@ -242,6 +254,7 @@ class FactsheetUpdaterSettingsModel(ToolConnectionSettingsModel):
             directory_target=base.directory_target,
             directory_username=base.directory_username,
             directory_password=base.directory_password,
+            directory_token=base.directory_token,
             schema_name=schema_name,
             collection_id=collection_id,
         )
