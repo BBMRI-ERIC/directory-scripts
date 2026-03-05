@@ -166,7 +166,8 @@ class BBMRICohorts(IPlugin):
 
 			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
 			collection_networks = set()  # set is sufficient since we only collect all the networks in which any of the collections of a biobank are participating
-			for collection in collections:
+			for node_id in collections:
+				collection = collections.nodes[node_id]['data']
 				if 'network' in collection:
 					for n in collection['network']:
 						collection_networks.add(n['id'])
