@@ -53,8 +53,8 @@ parser.add_argument("--delete-filter-only", dest="delete_filter_only", action="s
 parser.add_argument("--export-on-delete", dest="export_on_delete", type=str, help="Export (backup) rows that will be deleted to CSV/TSV before deletion.", default=None)
 
 parser.add_argument("-N", "--national-node", dest="national_node", type=str, help="Set national_node for all imported rows when missing in the file.", default=None)
-parser.add_argument("-k", "--k-donors", dest="k_donors", type=int, default=None, help="For CollectionFacts import/sync: skip rows with number_of_donors < k.")
-parser.add_argument("-K", "--k-samples", dest="k_samples", type=int, default=None, help="For CollectionFacts import/sync: skip rows with number_of_samples < k.")
+parser.add_argument("-k", "--k-donors", dest="k_donors", type=int, default=None, help="For CollectionFacts import/sync: skip rows where number_of_donors is >0 and <k.")
+parser.add_argument("-K", "--k-samples", dest="k_samples", type=int, default=None, help="For CollectionFacts import/sync: skip rows where number_of_samples is >0 and <k.")
 parser.add_argument("-F", "--file-format", dest="file_format", choices=["auto", "csv", "tsv"], default="auto", help="File format override (csv/tsv). Default: auto by extension.")
 parser.add_argument("-S", "--separator", dest="separator", type=str, default=None, help="Field separator override for CSV/TSV import/delete/export/sync (for example ';' or \\\\t).")
 parser.add_argument("-R", "--id-regex", dest="id_regex", type=str, help="Regex filter on record IDs (default column: id). Applies to import/delete/export/sync.", default=None)
@@ -477,7 +477,7 @@ def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, co
                 f"{context} with --k-donors requires column 'number_of_donors' in CollectionFacts input."
             )
         donors_values = _coerce_numeric_column(df, donors_column, context)
-        donors_mask = donors_values < k_donors_threshold
+        donors_mask = (donors_values > 0) & (donors_values < k_donors_threshold)
     if k_samples_threshold is not None:
         samples_column = resolve_column_case_insensitive(df, "number_of_samples")
         if samples_column is None:
@@ -485,7 +485,7 @@ def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, co
                 f"{context} with --k-samples requires column 'number_of_samples' in CollectionFacts input."
             )
         samples_values = _coerce_numeric_column(df, samples_column, context)
-        samples_mask = samples_values < k_samples_threshold
+        samples_mask = (samples_values > 0) & (samples_values < k_samples_threshold)
     combined_mask = donors_mask | samples_mask
     skipped_df = df.loc[combined_mask]
     filtered_df = df.loc[~combined_mask]
@@ -499,7 +499,7 @@ def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, co
         "threshold_samples": k_samples_threshold,
     }
     logging.info(
-        "k-anonymity filter results for %s: skipped total=%s (donors<k: %s, samples<k: %s, overlap: %s), remaining=%s.",
+        "k-anonymity filter results for %s: skipped total=%s (0<donors<k: %s, 0<samples<k: %s, overlap: %s), remaining=%s.",
         context,
         stats["skipped_total"],
         stats["skipped_donors"],

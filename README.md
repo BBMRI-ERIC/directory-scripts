@@ -266,7 +266,7 @@ Key safety points:
 - Use `-S/--separator` to override the field separator for CSV/TSV import/delete/export/sync (for example `';'` or `\\t`).
 - Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
 - Use `-R/--id-regex` and/or `-C/--collection-id` to import only matching rows (defaults to `id`/`collection` columns; override with `--id-column`/`--collection-column`).
-- For `-T CollectionFacts`, use `-k/--k-donors <k>` and/or `-K/--k-samples <k>` to enforce k-anonymity during import/sync: rows below threshold are skipped and counted in statistics.
+- For `-T CollectionFacts`, use `-k/--k-donors <k>` and/or `-K/--k-samples <k>` to enforce k-anonymity during import/sync: rows with `0 < value < k` are skipped and counted in statistics (rows with value `0` are retained, consistent with QC fix generation for `FT:KAnonViolation`).
 - For publicly exposed, highly aggregated Directory data, the recommended donor baseline is `k=10`. For specific justified cases (for example already pre-anonymized collections under a documented policy), this may be relaxed or waived.
 - If Molgenis rejects an import due to a missing `national_node` and `-N` is not set, the script falls back to `-s/--schema` as the `national_node` and warns.
 

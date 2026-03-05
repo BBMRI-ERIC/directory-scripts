@@ -104,6 +104,8 @@ Rule of thumb:
   - explicit maintenance CLI for QC-derived fix plans
   - consumes structured `fix_proposals` exported from `data-check.py`
   - supports human-readable listing, dry-run, interactive apply, and forced batch apply
+- `directory-tables-modifier.py`
+  - for `CollectionFacts` k-anonymity filtering in import/sync, keep semantics aligned with `FT:KAnonViolation`: skip only rows with `0 < number_of_donors < k` / `0 < number_of_samples < k` (do not auto-drop zero-valued rows)
 
 If descriptor-alignment logic changes, keep both the check and the updater behavior consistent.
 

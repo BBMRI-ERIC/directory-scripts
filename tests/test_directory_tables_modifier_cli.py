@@ -83,3 +83,10 @@ def test_k_anonymity_requires_positive_threshold() -> None:
     )
     assert result.returncode == 2
     assert "--k-samples must be a positive integer." in result.stderr
+
+
+def test_k_anonymity_help_documents_positive_range_only() -> None:
+    result = _run_modifier("-h")
+    assert result.returncode == 0
+    assert "number_of_donors is >0 and <k" in result.stdout
+    assert "number_of_samples is >0 and <k" in result.stdout
