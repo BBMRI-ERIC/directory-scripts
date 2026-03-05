@@ -229,7 +229,7 @@ CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
                                                       'donors_present',
                                                       'facts',
                                                       'id'],
-                                           'fix': 'Drop fact rows whose number_of_donors is below the configured k-anonymity threshold.',
+                                           'fix': 'For public Directory data, apply a donor k-anonymity baseline of k=10 and remove fact rows below that threshold. If the collection is already pre-anonymized under a documented policy, this rule may be reviewed as an explicit exception.',
                                            'severity': 'WARNING',
                                            'summary': 'the '
                                                       '{len(kAnonymityViolatingList)} '
@@ -297,12 +297,12 @@ class FactTables(IPlugin):
 						warnings.append(DataCheckWarning(make_check_id(self, "DonorsZero"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "fact table information has 0 donors/patients"))
 					else:
 						kAnonymityViolatingList = []
-						kAnonymityLimit = 5
+						kAnonymityLimit = 10
 						for f in collectionFacts:
 							if 'number_of_donors' in f and f['number_of_donors'] > 0 and f['number_of_donors'] < kAnonymityLimit:
 								kAnonymityViolatingList.append([f['id'], f"{f['number_of_donors']} donor(s)"])
 						if kAnonymityViolatingList:
-							warnings.append(DataCheckWarning(make_check_id(self, "KAnonViolation"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}", fix_proposals=build_fact_k_anonymity_drop_fixes(collection, collectionFacts, k_limit=kAnonymityLimit)))
+							warnings.append(DataCheckWarning(make_check_id(self, "KAnonViolation"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}", f"For publicly exposed highly aggregated Directory data, the recommended donor k-anonymity baseline is k={kAnonymityLimit}. Drop violating fact rows unless this collection is already pre-anonymized under a documented exception policy.", fix_proposals=build_fact_k_anonymity_drop_fixes(collection, collectionFacts, k_limit=kAnonymityLimit)))
 
 					compareFactsColl(self, dir, fact_descriptor_values['diagnosis_available'], diags, collection, "Diagnoses of collection and facts table do not match", "Check diagnosis entries of the collection description with diagnoses from the facts table and correct as necessary", warnings)
 
