@@ -17,6 +17,7 @@ from fact_descriptor_sync import (
 )
 from check_fix_helpers import build_fact_alignment_fix_proposals
 from check_fix_helpers import build_fact_k_anonymity_drop_fixes
+from k_anonymity import donor_value_violates_k
 
 from yapsy.IPlugin import IPlugin
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
@@ -299,7 +300,7 @@ class FactTables(IPlugin):
 						kAnonymityViolatingList = []
 						kAnonymityLimit = 10
 						for f in collectionFacts:
-							if 'number_of_donors' in f and f['number_of_donors'] > 0 and f['number_of_donors'] < kAnonymityLimit:
+							if donor_value_violates_k(f.get('number_of_donors'), kAnonymityLimit):
 								kAnonymityViolatingList.append([f['id'], f"{f['number_of_donors']} donor(s)"])
 						if kAnonymityViolatingList:
 							warnings.append(DataCheckWarning(make_check_id(self, "KAnonViolation"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"the {len(kAnonymityViolatingList)} records of fact table violates {kAnonymityLimit}-anonymity: {kAnonymityViolatingList}", f"For publicly exposed highly aggregated Directory data, the recommended donor k-anonymity baseline is k={kAnonymityLimit}. Drop violating fact rows unless this collection is already pre-anonymized under a documented exception policy.", fix_proposals=build_fact_k_anonymity_drop_fixes(collection, collectionFacts, k_limit=kAnonymityLimit)))
