@@ -437,7 +437,7 @@ Key behavior:
   - `FT` for fact-sheet-derived diagnosis/material/sex/age/count fixes from `FactTables`
   - `TXT` for deterministic narrative-to-structure fixes from `TextConsistency`
 - semantic detail still lives in `update_id`, for example `access.duo.disease_specific_research` or `diagnoses.add.covid_acute_u07_1`
-- current implementation of `qcheck-updater.py` applies collection-level updates only
+- `qcheck-updater.py` applies collection metadata updates and can also apply fact-row deletion fixes (for example `FT:KAnonViolation`) by deleting specific `CollectionFacts` rows from the target staging area
 - ontology-backed fixes carry human-readable explanations in the update plan so the reviewer can see what a term such as `DUO:...` means before approving the change
 - DUO identifiers are normalized internally, so `DUO_0000007` and `DUO:0000007` are treated as the same term during checks and update application
 - append-mode review shows both the final target value and the incremental value being added, to avoid giving the impression that a multi-value field would be replaced

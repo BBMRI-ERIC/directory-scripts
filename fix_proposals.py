@@ -15,7 +15,7 @@ from nncontacts import NNContacts
 
 FIX_PLAN_FORMAT_VERSION = 1
 APPLICABLE_CONFIDENCE_LEVELS = {"certain", "almost_certain", "uncertain"}
-APPLICABLE_MODES = {"append", "replace", "set", "clear", "enable_flag", "disable_flag"}
+APPLICABLE_MODES = {"append", "replace", "set", "clear", "enable_flag", "disable_flag", "delete_rows"}
 
 
 @dataclass

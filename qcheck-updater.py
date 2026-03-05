@@ -33,6 +33,8 @@ DEFAULT_PASSWORD = os.getenv("DIRECTORYPASSWORD")
 MULTI_VALUE_FIELDS = {"data_use", "type", "diagnosis_available", "materials", "sex"}
 INTEGER_FIELDS = {"age_low", "age_high", "size", "number_of_donors"}
 SUPPORTED_ENTITY_TYPES = {"COLLECTION"}
+FACT_ROW_DELETE_FIELD = "facts"
+FACT_ROW_DELETE_MODE = "delete_rows"
 
 EXIT_OK = 0
 EXIT_RUNTIME_ERROR = 1
@@ -259,6 +261,8 @@ def _normalize_scalar(value):
 
 
 def _normalize_live_row_value(row: dict, field: str):
+    if field == FACT_ROW_DELETE_FIELD:
+        return _canonical_field_value(field, row.get(field))
     value = row.get(field)
     if field in MULTI_VALUE_FIELDS:
         values = parse_collection_multi_value_field(value)
@@ -274,6 +278,14 @@ def _normalize_live_row_value(row: dict, field: str):
 
 def _canonical_field_value(field: str, value):
     """Return a comparison-stable value for one field."""
+    if field == FACT_ROW_DELETE_FIELD:
+        if value in (None, ""):
+            return []
+        if isinstance(value, (list, tuple, set)):
+            return sorted(str(item) for item in value if item not in (None, ""))
+        if isinstance(value, str):
+            return sorted(part.strip() for part in value.split(",") if part.strip())
+        return [str(value)]
     if field in MULTI_VALUE_FIELDS:
         if value in (None, ""):
             return []
@@ -303,6 +315,10 @@ def _render_field_value(field: str, value) -> str:
 
 def _effective_field_value(field: str, current_value, update: EntityFixProposal):
     """Return the effective post-update value for display/review purposes."""
+    if update.mode == FACT_ROW_DELETE_MODE and field == FACT_ROW_DELETE_FIELD:
+        current_ids = list(_canonical_field_value(field, current_value))
+        drop_ids = set(_canonical_field_value(field, update.proposed_value))
+        return [row_id for row_id in current_ids if row_id not in drop_ids]
     if update.mode == "append" and field in MULTI_VALUE_FIELDS:
         merged = list(_canonical_field_value(field, current_value))
         for value in _canonical_field_value(field, update.proposed_value):
@@ -391,6 +407,54 @@ def _merge_updates(selected_updates: list[EntityFixProposal]) -> tuple[list[Enti
                 base.finalize_checksum()
                 merged_updates.append(base)
             continue
+        if mode == FACT_ROW_DELETE_MODE and field == FACT_ROW_DELETE_FIELD:
+            base = updates[0]
+            delete_ids = []
+            source_check_ids = []
+            source_messages = []
+            source_actions = []
+            term_explanations = []
+            confidences = []
+            blocking_reasons = []
+            for update in updates:
+                if _canonical_field_value(field, update.current_value_at_export) != _canonical_field_value(field, base.current_value_at_export):
+                    conflicts.append(f"{entity_id} field {field} has inconsistent expected current values across delete_rows updates.")
+                    break
+                for row_id in _canonical_field_value(field, update.proposed_value):
+                    if row_id not in delete_ids:
+                        delete_ids.append(row_id)
+                for check_id in update.source_check_ids:
+                    if check_id not in source_check_ids:
+                        source_check_ids.append(check_id)
+                for message in update.source_warning_messages:
+                    if message not in source_messages:
+                        source_messages.append(message)
+                for action in update.source_warning_actions:
+                    if action not in source_actions:
+                        source_actions.append(action)
+                for explanation in update.term_explanations:
+                    if explanation not in term_explanations:
+                        term_explanations.append(explanation)
+                confidences.append(update.confidence)
+                if update.blocking_reason:
+                    blocking_reasons.append(update.blocking_reason)
+            else:
+                base.proposed_value = delete_ids
+                base.source_check_ids = source_check_ids
+                base.source_warning_messages = source_messages
+                base.source_warning_actions = source_actions
+                base.term_explanations = term_explanations
+                if "uncertain" in confidences:
+                    base.confidence = "uncertain"
+                elif "almost_certain" in confidences:
+                    base.confidence = "almost_certain"
+                else:
+                    base.confidence = "certain"
+                if blocking_reasons:
+                    base.blocking_reason = " ".join(dict.fromkeys(blocking_reasons))
+                base.finalize_checksum()
+                merged_updates.append(base)
+            continue
 
         unique_payloads = {
             (_canonical_field_value(field, update.proposed_value), update.confidence)
@@ -421,6 +485,8 @@ def _list_updates(selected_updates: list[EntityFixProposal], *, verbose: bool) -
             )
             if update.mode == "append":
                 print(f"    add: {_render_field_value(update.field, update.proposed_value)}")
+            elif update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
+                print(f"    delete rows: {_render_field_value(update.field, update.proposed_value)}")
             print(f"    checks: {', '.join(update.source_check_ids)}")
             print(f"    why: {update.human_explanation}")
             if update.term_explanations:
@@ -437,7 +503,7 @@ def _list_updates(selected_updates: list[EntityFixProposal], *, verbose: bool) -
 
 def _review_updates_interactively(
     updates: list[EntityFixProposal],
-    live_rows: dict[str, dict],
+    live_values: dict[tuple[str, str, str], object],
     *,
     verbose: bool,
     mismatch_update_keys: set[tuple[str, str, str]] | None = None,
@@ -447,9 +513,9 @@ def _review_updates_interactively(
     approved_updates = []
     total = len(updates)
     for index, update in enumerate(updates, start=1):
-        live_value = _normalize_live_row_value(live_rows[update.entity_id], update.field)
-        effective_value = _effective_field_value(update.field, live_value, update)
         update_key = (update.entity_id, update.field, update.update_id)
+        live_value = live_values.get(update_key)
+        effective_value = _effective_field_value(update.field, live_value, update)
         sys.stderr.write(
             f"Review {index}/{total}: {update.entity_id} [{update.confidence}] {update.module}/{update.update_id}\n"
         )
@@ -459,6 +525,8 @@ def _review_updates_interactively(
         sys.stderr.write(f"  target after update: {_render_field_value(update.field, effective_value)}\n")
         if update.mode == "append":
             sys.stderr.write(f"  add: {_render_field_value(update.field, update.proposed_value)}\n")
+        elif update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
+            sys.stderr.write(f"  delete rows: {_render_field_value(update.field, update.proposed_value)}\n")
         sys.stderr.write(f"  checks: {', '.join(update.source_check_ids)}\n")
         sys.stderr.write(f"  why: {update.human_explanation}\n")
         if update.term_explanations:
@@ -482,6 +550,8 @@ def _review_updates_interactively(
 
 
 def _fetch_target_rows(session: DirectorySession, schema: str, entity_ids: list[str]) -> tuple[pd.DataFrame, dict[str, dict]]:
+    if not entity_ids:
+        return pd.DataFrame(), {}
     table_df = session.get(table="Collections", schema=schema, as_df=True)
     rows = {}
     for entity_id in entity_ids:
@@ -492,8 +562,41 @@ def _fetch_target_rows(session: DirectorySession, schema: str, entity_ids: list[
     return table_df, rows
 
 
+def _resolve_column_case_insensitive(df: pd.DataFrame, column_name: str) -> str | None:
+    if column_name in df.columns:
+        return column_name
+    lower_name = column_name.lower()
+    for col in df.columns:
+        if str(col).lower() == lower_name:
+            return col
+    return None
+
+
+def _fetch_collection_fact_ids(
+    session: DirectorySession,
+    schema: str,
+    collection_ids: list[str],
+) -> tuple[pd.DataFrame, dict[str, list[str]]]:
+    if not collection_ids:
+        return pd.DataFrame(), {}
+    table_df = session.get(table="CollectionFacts", schema=schema, as_df=True)
+    if table_df.empty:
+        return table_df, {collection_id: [] for collection_id in collection_ids}
+    id_column = _resolve_column_case_insensitive(table_df, "id")
+    collection_column = _resolve_column_case_insensitive(table_df, "collection")
+    if id_column is None or collection_column is None:
+        raise InputError("CollectionFacts table must contain 'id' and 'collection' columns for delete_rows fixes.")
+    by_collection: dict[str, list[str]] = {}
+    for collection_id in collection_ids:
+        subset = table_df[table_df[collection_column].astype(str) == collection_id]
+        by_collection[collection_id] = sorted(subset[id_column].astype(str))
+    return table_df, by_collection
+
+
 def _apply_update_to_row(row: dict, update: EntityFixProposal) -> dict:
     updated = dict(row)
+    if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
+        raise InputError("delete_rows updates are not applied through collection row mutation.")
     if update.field in MULTI_VALUE_FIELDS:
         current_values = parse_collection_multi_value_field(updated.get(update.field))
         proposed_values = list(update.proposed_value)
@@ -561,7 +664,7 @@ def run_updater(args: argparse.Namespace) -> int:
     if unsupported:
         unsupported_ids = ", ".join(sorted({f"{update.entity_type}:{update.entity_id}" for update in unsupported}))
         raise InputError(
-            "The current updater implementation supports collection updates only. Unsupported selected updates: "
+            "The current updater implementation supports collection-targeted updates only. Unsupported selected updates: "
             + unsupported_ids
         )
 
@@ -575,13 +678,44 @@ def run_updater(args: argparse.Namespace) -> int:
 
     with DirectorySession(url=args.directory_target) as session:
         session.signin(args.directory_username, args.directory_password)
-        entity_ids = sorted({update.entity_id for update in merged_updates})
-        table_df, live_rows = _fetch_target_rows(session, args.schema, entity_ids)
+        fact_row_updates = [
+            update
+            for update in merged_updates
+            if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD
+        ]
+        collection_updates = [update for update in merged_updates if update not in fact_row_updates]
+
+        collection_entity_ids = sorted({update.entity_id for update in collection_updates})
+        table_df, live_rows = _fetch_target_rows(session, args.schema, collection_entity_ids)
+
+        fact_collection_ids = sorted({update.entity_id for update in fact_row_updates})
+        collection_facts_df, live_fact_ids_by_collection = _fetch_collection_fact_ids(
+            session,
+            args.schema,
+            fact_collection_ids,
+        )
+
+        def _live_value_for_update(update: EntityFixProposal):
+            if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
+                return _canonical_field_value(
+                    update.field,
+                    live_fact_ids_by_collection.get(update.entity_id, []),
+                )
+            row = live_rows.get(update.entity_id)
+            if row is None:
+                raise InputError(
+                    f"Collection {update.entity_id!r} does not exist in schema {args.schema!r}; no update was applied."
+                )
+            return _normalize_live_row_value(row, update.field)
+
+        live_value_by_update_key: dict[tuple[str, str, str], object] = {}
         updated_rows = []
         mismatch_updates = []
         skipped_replace_required = []
         for update in merged_updates:
-            live_value = _normalize_live_row_value(live_rows[update.entity_id], update.field)
+            update_key = (update.entity_id, update.field, update.update_id)
+            live_value = _live_value_for_update(update)
+            live_value_by_update_key[update_key] = live_value
             if _canonical_field_value(update.field, live_value) != _canonical_field_value(update.field, update.expected_current_value):
                 mismatch_updates.append(update)
             if update.replace_required and not args.replace_existing:
@@ -605,7 +739,10 @@ def run_updater(args: argparse.Namespace) -> int:
                     update.entity_id,
                     update.field,
                     _render_field_value(update.field, update.expected_current_value),
-                    _render_field_value(update.field, _normalize_live_row_value(live_rows[update.entity_id], update.field)),
+                    _render_field_value(
+                        update.field,
+                        live_value_by_update_key[(update.entity_id, update.field, update.update_id)],
+                    ),
                 )
             if args.force:
                 confirm_action(
@@ -616,7 +753,7 @@ def run_updater(args: argparse.Namespace) -> int:
         if not args.force:
             updated_rows = _review_updates_interactively(
                 updated_rows,
-                live_rows,
+                live_value_by_update_key,
                 verbose=args.verbose or args.debug,
                 mismatch_update_keys={(update.entity_id, update.field, update.update_id) for update in mismatch_updates},
             )
@@ -637,31 +774,53 @@ def run_updater(args: argparse.Namespace) -> int:
             logging.info("Dry run enabled. No data was written.")
             return EXIT_OK
 
-        changed_entity_ids = set()
+        changed_collection_ids = set()
         changed_rows_by_id: dict[str, dict] = {}
+        fact_rows_to_delete: set[str] = set()
         for update in updated_rows:
+            if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
+                live_ids = set(live_fact_ids_by_collection.get(update.entity_id, []))
+                for fact_id in _canonical_field_value(update.field, update.proposed_value):
+                    if fact_id in live_ids:
+                        fact_rows_to_delete.add(fact_id)
+                continue
             current_row = live_rows[update.entity_id]
             next_row = _apply_update_to_row(current_row, update)
             if next_row == current_row:
                 continue
             live_rows[update.entity_id] = next_row
-            changed_entity_ids.add(update.entity_id)
+            changed_collection_ids.add(update.entity_id)
             changed_rows_by_id[update.entity_id] = next_row
 
-        if not changed_entity_ids:
+        if not changed_collection_ids and not fact_rows_to_delete:
             logging.info("All approved updates were no-ops against the live data. Nothing was written.")
             return EXIT_OK
 
-        changed_rows = pd.DataFrame(
-            [
-                {column: changed_rows_by_id[row_id].get(column) for column in table_df.columns}
-                for row_id in table_df["id"].astype(str)
-                if row_id in changed_entity_ids
-            ],
-            columns=table_df.columns,
+        if changed_collection_ids:
+            changed_rows = pd.DataFrame(
+                [
+                    {column: changed_rows_by_id[row_id].get(column) for column in table_df.columns}
+                    for row_id in table_df["id"].astype(str)
+                    if row_id in changed_collection_ids
+                ],
+                columns=table_df.columns,
+            )
+            session.save_table(table="Collections", schema=args.schema, data=changed_rows)
+
+        if fact_rows_to_delete:
+            facts_id_column = _resolve_column_case_insensitive(collection_facts_df, "id")
+            if facts_id_column is None:
+                raise InputError("CollectionFacts table does not expose an 'id' column required for delete_rows fixes.")
+            delete_df = pd.DataFrame({facts_id_column: sorted(fact_rows_to_delete)})
+            session.delete_records(table="CollectionFacts", schema=args.schema, data=delete_df)
+
+        logging.info(
+            "Applied %d update(s): %d collection change(s), %d fact row deletion(s), in schema %s.",
+            len(updated_rows),
+            len(changed_collection_ids),
+            len(fact_rows_to_delete),
+            args.schema,
         )
-        session.save_table(table="Collections", schema=args.schema, data=changed_rows)
-        logging.info("Applied %d update(s) affecting %d collection(s) in schema %s.", len(updated_rows), len(changed_entity_ids), args.schema)
     return EXIT_OK
 
 

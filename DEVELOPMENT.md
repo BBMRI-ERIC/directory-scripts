@@ -256,7 +256,7 @@ python3 data-check.py -N | rg 'AI:Curated'
 - `qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
 - Dry-run must follow the same interactive per-update review path as a real apply; the only behavioral difference is that it stops before `save_table(...)`.
 - The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
-- The current updater apply path supports collection-level fixes only. Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
+- The current updater apply path supports collection-scoped fixes: collection metadata updates in `Collections` and explicit row deletions in `CollectionFacts` (for example k-anonymity cleanup). Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
 - `--list` is the non-writing inspection mode and should use the same canonical multi-value formatting as interactive review so order-only differences are not presented as live mismatches.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
 - Every update also carries `expected_current_value`; apply logic must compare it with the live staging-area value and warn before writing when the values diverge.

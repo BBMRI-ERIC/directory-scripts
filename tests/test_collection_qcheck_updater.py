@@ -617,3 +617,100 @@ def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interacti
     assert review_prompts[1] == "  Select this update?"
     assert not any("Proceed even though" in prompt for prompt in confirm_prompts)
     assert "Live value mismatch" in caplog.text
+
+
+def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, monkeypatch):
+    module = load_module()
+    path = build_plan(tmp_path)
+    deleted = []
+
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    update = payload["updates"][0]
+    update["update_id"] = "facts.k_anonymity.drop_rows_k5"
+    update["field"] = "facts"
+    update["mode"] = "delete_rows"
+    update["current_value_at_export"] = ["fact1", "fact2"]
+    update["expected_current_value"] = ["fact1", "fact2"]
+    update["proposed_value"] = ["fact1", "fact2"]
+    update["human_explanation"] = "Drop fact rows that violate k-anonymity."
+    update["rationale"] = "Rows below donor threshold k=5 are unsafe to expose."
+    update["source_check_ids"] = ["FT:KAnonViolation"]
+    update["term_explanations"] = []
+    update["update_checksum"] = compute_checksum(
+        {key: value for key, value in update.items() if key != "update_checksum"}
+    )
+    payload["file_checksum"] = compute_checksum({key: value for key, value in payload.items() if key != "file_checksum"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            assert schema == "BBMRI-CZ"
+            assert as_df is True
+            if table == "Collections":
+                return pd.DataFrame(
+                    [{"id": "bbmri-eric:ID:CZ_demo:collection:col1", "data_use": ""}]
+                )
+            if table == "CollectionFacts":
+                return pd.DataFrame(
+                    [
+                        {"id": "fact1", "collection": "bbmri-eric:ID:CZ_demo:collection:col1"},
+                        {"id": "fact2", "collection": "bbmri-eric:ID:CZ_demo:collection:col1"},
+                        {"id": "fact3", "collection": "bbmri-eric:ID:CZ_demo:collection:col1"},
+                    ]
+                )
+            raise AssertionError(f"unexpected table {table}")
+
+        def save_table(self, **kwargs):
+            raise AssertionError("Fact-row delete update should not write Collections.")
+
+        def delete_records(self, *, table, schema, data):
+            assert table == "CollectionFacts"
+            assert schema == "BBMRI-CZ"
+            deleted.append(data.copy())
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+
+    args = Namespace(
+        input=str(path),
+        schema="BBMRI-CZ",
+        entity_id=None,
+        root_id=None,
+        staging_area=None,
+        check_id=[],
+        update_id=[],
+        module=[],
+        confidence=None,
+        list=False,
+        dry_run=False,
+        force=False,
+        replace_existing=False,
+        verbose=False,
+        debug=False,
+        quiet=False,
+        directory_target="https://directory.example.org",
+        directory_username="user",
+        directory_password="secret",
+    )
+
+    result = module.run_updater(args)
+
+    assert result == module.EXIT_OK
+    assert len(deleted) == 1
+    assert sorted(deleted[0]["id"].astype(str).tolist()) == ["fact1", "fact2"]
