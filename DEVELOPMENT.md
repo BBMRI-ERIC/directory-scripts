@@ -260,6 +260,28 @@ Typical follow-up validation:
 python3 data-check.py -N | rg 'AI:Curated'
 ```
 
+## Codex skills workflow
+
+Use repository skills from `skills/` (and installed global skills) as operational guardrails, not optional hints.
+
+- `review-and-commit` (default pre-commit workflow):
+  - use before every commit in this repository
+  - enforces scope review, correctness/safety review, required tests, and documentation sync
+  - ensures only required files are staged (no local artifacts/caches)
+  - requires comprehensive commit message body (behavior changes, safety implications, tests run, deferred limits)
+  - when both repositories are touched (`directory-scripts` and `../BBMRI-ERIC-Directory-Data-Manager-Manual`), prepare separate commits unless explicitly requested otherwise
+- `assertive-quality-gate`:
+  - required before push, and whenever code review/testing is requested
+  - focuses on assertive programming, API docstrings, and regression-oriented tests
+- `review-check-redundancy`:
+  - required when touching `checks/`, `text_consistency.py`, `checks/AIFindings.py`, `ai_cache.py`, or `ai-check-cache/`
+  - verifies no duplicate/overlapping checks are introduced without justification
+- `run-ai-checks`:
+  - only when live AI-reviewed findings are intentionally refreshed
+  - keeps deterministic rules out of AI cache and validates checksum/cache freshness
+
+Practical rule: if you are going to commit, start with `review-and-commit`; this keeps commit quality and cross-file consistency stable over time.
+
 ## QC-derived update workflow
 
 - `DataCheckWarning` may carry structured `fix_proposals` alongside the human warning text.
