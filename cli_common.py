@@ -14,6 +14,7 @@ load_dotenv()
 
 DEFAULT_DIRECTORY_USERNAME = os.getenv("DIRECTORYUSERNAME")
 DEFAULT_DIRECTORY_PASSWORD = os.getenv("DIRECTORYPASSWORD")
+DEFAULT_DIRECTORY_TOKEN = os.getenv("DIRECTORYTOKEN")
 
 
 class ExtendAction(argparse.Action):
@@ -213,7 +214,7 @@ def add_purge_cache_arguments(
 
 
 def add_directory_auth_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add username/password arguments for Directory login."""
+    """Add username/password and token arguments for Directory login."""
     parser.add_argument(
         "-u",
         "--username",
@@ -227,6 +228,13 @@ def add_directory_auth_arguments(parser: argparse.ArgumentParser) -> None:
         dest="password",
         default=DEFAULT_DIRECTORY_PASSWORD,
         help="password of the account used to log in to the Directory",
+    )
+    parser.add_argument(
+        "-t",
+        "--token",
+        dest="token",
+        default=DEFAULT_DIRECTORY_TOKEN,
+        help="access token for the Directory (alternative to username/password)",
     )
 
 

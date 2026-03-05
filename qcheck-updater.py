@@ -29,6 +29,7 @@ load_dotenv()
 DEFAULT_TARGET = os.getenv("DIRECTORYTARGET")
 DEFAULT_USERNAME = os.getenv("DIRECTORYUSERNAME")
 DEFAULT_PASSWORD = os.getenv("DIRECTORYPASSWORD")
+DEFAULT_TOKEN = os.getenv("DIRECTORYTOKEN")
 
 MULTI_VALUE_FIELDS = {"data_use", "type", "diagnosis_available", "materials", "sex"}
 INTEGER_FIELDS = {"age_low", "age_high", "size", "number_of_donors"}
@@ -110,6 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow replace/clear updates that remove or overwrite existing metadata values.",
     )
+    parser.add_argument(
+        "--directory-token",
+        default=DEFAULT_TOKEN,
+        help="Directory access token (overrides DIRECTORYTOKEN env var, alternative to username/password).",
+    )
     return parser
 
 
@@ -129,9 +135,13 @@ def validate_args(args: argparse.Namespace) -> None:
         raise InputError("--force and --list cannot be used together.")
     if args.force and args.dry_run:
         raise InputError("--force and --dry-run cannot be used together.")
-    if not args.list and (not args.directory_target or not args.directory_username or not args.directory_password):
+    if not args.list and not args.directory_target:
         raise InputError(
-            "Applying or simulating updates against a staging schema requires --directory-target, --directory-username, and --directory-password (or DIRECTORYTARGET/DIRECTORYUSERNAME/DIRECTORYPASSWORD in .env)."
+            "Applying or simulating updates against a staging schema requires --directory-target (or DIRECTORYTARGET in .env)."
+        )
+    if not args.list and not args.directory_token and (not args.directory_username or not args.directory_password):
+        raise InputError(
+            "Applying or simulating updates against a staging schema requires --directory-token or --directory-username and --directory-password (or DIRECTORYTOKEN/DIRECTORYUSERNAME/DIRECTORYPASSWORD in .env)."
         )
 
 
@@ -202,13 +212,16 @@ def _confidence_filter(args: argparse.Namespace) -> set[str]:
 
 def _load_eric_directory(args: argparse.Namespace) -> Directory:
     pp = PrettyPrinter(indent=2)
-    return Directory(
+    directory_kwargs = dict(
         schema="ERIC",
         debug=args.debug,
         pp=pp,
         directory_url=args.directory_target,
         include_withdrawn_entities=True,
     )
+    if args.directory_token:
+        directory_kwargs["token"] = args.directory_token
+    return Directory(**directory_kwargs)
 
 
 def _entity_ids_for_root(directory: Directory, root_id: str) -> set[str]:
@@ -690,8 +703,14 @@ def run_updater(args: argparse.Namespace) -> int:
         logging.info("All selected updates are conflicting or unsupported; nothing to apply.")
         return EXIT_OK
 
-    with DirectorySession(url=args.directory_target) as session:
-        session.signin(args.directory_username, args.directory_password)
+    client_kwargs = {"url": args.directory_target}
+    if args.directory_token:
+        client_kwargs["token"] = args.directory_token
+    with DirectorySession(**client_kwargs) as session:
+        if args.directory_token:
+            logging.debug("Using token-based authentication.")
+        else:
+            session.signin(args.directory_username, args.directory_password)
         fact_row_updates = [
             update
             for update in merged_updates

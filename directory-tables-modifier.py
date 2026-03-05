@@ -25,9 +25,10 @@ load_dotenv()
 target = os.getenv("DIRECTORYTARGET")
 username = os.getenv("DIRECTORYUSERNAME")
 password = os.getenv("DIRECTORYPASSWORD")
+token = os.getenv("DIRECTORYTOKEN")
 
 # Get args from stdin
-parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in a BBMRI Directory staging area. Use node staging areas for normal edits; ERIC is the aggregated public schema and requires explicit confirmation. Make sure you have an .env file in this folder, containing: DIRECTORYTARGET, DIRECTORYUSERNAME, DIRECTORYPASSWORD.")
+parser = argparse.ArgumentParser(description="Script for modifying/adding or deleting records from tables in a BBMRI Directory staging area. Use node staging areas for normal edits; ERIC is the aggregated public schema and requires explicit confirmation. Make sure you have an .env file in this folder, containing: DIRECTORYTARGET and either DIRECTORYTOKEN or DIRECTORYUSERNAME/DIRECTORYPASSWORD.")
 
 # Keep these immediately after -h in help output
 parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output. Includes detailed records to be added/deleted.")
@@ -38,6 +39,7 @@ parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-err
 parser.add_argument("--directory-target", dest="directory_target", type=str, help="Directory base URL (overrides DIRECTORYTARGET env var).", default=None)
 parser.add_argument("--directory-username", dest="directory_username", type=str, help="Directory username (overrides DIRECTORYUSERNAME env var).", default=None)
 parser.add_argument("--directory-password", dest="directory_password", type=str, help="Directory password (overrides DIRECTORYPASSWORD env var).", default=None)
+parser.add_argument("--directory-token", dest="directory_token", type=str, help="Directory access token (overrides DIRECTORYTOKEN env var, alternative to username/password).", default=None)
 parser.add_argument("--suppress-validation-warnings", action="store_true", help="reserved for suppressing non-fatal local validation warnings")
 
 parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU). Use node staging areas for edits; ERIC requires explicit confirmation and should normally not be modified with this tool.")
@@ -106,6 +108,8 @@ if args.directory_username:
     username = args.directory_username
 if args.directory_password:
     password = args.directory_password
+if args.directory_token:
+    token = args.directory_token
 
 EXIT_OK = 0
 EXIT_INPUT_ERROR = 2
@@ -640,11 +644,16 @@ async def sync_directory():
     # Login to the directory with a DirectorySession
     if debug:
         logging.debug("Preparing DirectorySession for target %s.", target)
-    with DirectorySession(url=target) as session:
-        # Apply the 'signin' method with the username and password
-        if debug:
-            logging.debug("Signing in to Directory as %s.", username or "<missing username>")
-        session.signin(username, password)
+    client_kwargs = {"url": target}
+    if token:
+        client_kwargs["token"] = token
+    with DirectorySession(**client_kwargs) as session:
+        if token:
+            logging.debug("Using token-based authentication.")
+        else:
+            if debug:
+                logging.debug("Signing in to Directory as %s.", username or "<missing username>")
+            session.signin(username, password)
         if debug:
             signin_status = getattr(session, "signin_status", None)
             if signin_status is not None:
@@ -1048,6 +1057,7 @@ def validate_inputs():
                 "directory_target": target,
                 "directory_username": username,
                 "directory_password": password,
+                "directory_token": token,
                 "file_format": file_format,
                 "separator": separator,
                 "tsv_quote_char": tsvQuoteChar,
