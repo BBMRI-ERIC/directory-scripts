@@ -112,6 +112,8 @@ class BBMRICohorts(IPlugin):
 			
 			if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
 				#OoM = collection['order_of_magnitude']['id']  # EMX2 OoM does not have ID, then:
+				if 'order_of_magnitude' not in collection:
+					continue
 				OoM = int(collection['order_of_magnitude'])
 				
 				data_categories = []
