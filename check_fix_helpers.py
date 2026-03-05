@@ -212,3 +212,40 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
             )
         )
     return fix_proposals
+
+
+def build_fact_k_anonymity_drop_fixes(
+    collection: dict[str, Any],
+    facts: list[dict[str, Any]],
+    *,
+    k_limit: int,
+) -> list[dict[str, Any]]:
+    """Return a fix proposal that drops fact-sheet rows violating donor k-anonymity."""
+    violating_ids = []
+    for fact in facts:
+        donors = fact.get("number_of_donors")
+        if isinstance(donors, int) and 0 < donors < k_limit and fact.get("id"):
+            violating_ids.append(str(fact["id"]))
+    if not violating_ids:
+        return []
+    violating_ids = sorted(dict.fromkeys(violating_ids))
+    return [
+        make_fix_proposal(
+            update_id=f"facts.k_anonymity.drop_rows_k{k_limit}",
+            module="FT",
+            entity_type="COLLECTION",
+            entity_id=collection["id"],
+            field="facts",
+            mode="delete_rows",
+            confidence="certain",
+            current_value_at_export=violating_ids,
+            proposed_value=violating_ids,
+            human_explanation=(
+                f"Delete fact-sheet rows that violate donor k-anonymity (number_of_donors < {k_limit})."
+            ),
+            rationale=(
+                "This update drops only fact rows whose explicit donor count is greater than 0 and below the "
+                f"k-anonymity threshold k={k_limit}. Rows with 0/empty donor values are not auto-dropped."
+            ),
+        )
+    ]

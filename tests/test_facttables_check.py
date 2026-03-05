@@ -145,3 +145,24 @@ def test_facttables_check_attaches_fact_alignment_fix_proposals():
 
     assert proposals
     assert any(proposal.module == "FT" for proposal in proposals)
+
+
+def test_facttables_check_attaches_k_anonymity_drop_rows_fix_proposal():
+    plugin = FactTables()
+    warnings = plugin.check(FactTablesDirectoryStub(), args=None)
+
+    kanon_warnings = [warning for warning in warnings if warning.dataCheckID == "FT:KAnonViolation"]
+    assert kanon_warnings
+    kanon_fix_proposals = [
+        proposal
+        for warning in kanon_warnings
+        for proposal in warning.fix_proposals
+        if proposal.update_id.startswith("facts.k_anonymity.drop_rows_k")
+    ]
+    assert kanon_fix_proposals
+    assert any(proposal.mode == "delete_rows" for proposal in kanon_fix_proposals)
+    assert any(proposal.field == "facts" for proposal in kanon_fix_proposals)
+    assert any(
+        proposal.entity_id == "col3" and proposal.proposed_value == ["f3b", "f3c"]
+        for proposal in kanon_fix_proposals
+    )

@@ -73,6 +73,7 @@
 - `qcheck-updater.py` dry runs must execute the same interactive per-update review logic as real applies and differ only in skipping the final write to the Directory.
 - `qcheck-updater.py` live-value mismatches against `expected_current_value` must be handled per update during interactive review; declining one mismatched update must skip only that update, not abort the whole run.
 - `qcheck-updater.py` must compare unordered multi-value fields canonically; pure reordering of `data_use`, `type`, `diagnosis_available`, `materials`, or `sex` must not trigger false mismatches.
+- `qcheck-updater.py` supports CollectionFacts row-deletion fixes (`mode=delete_rows`, field `facts`) for collection-scoped updates such as `FT:KAnonViolation`; these must delete only the explicitly proposed fact row IDs and remain no-op-safe when rows are already absent.
 - `qcheck-updater.py` review output for append updates must show both the final target value and the incremental addition, not a replacement-looking payload.
 - DUO term comparison must normalize `DUO_0000000` and `DUO:0000000` forms so already-present terms are not proposed again under a different separator.
 - Equivalent ontology-term storage forms that are already present in live data must be treated as no-op updates, not as additions requiring user approval.
