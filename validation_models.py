@@ -253,7 +253,13 @@ class WarningSuppressionEntryModel(_BaseModel):
 
     check_id: str
     entity_id: str
+    entity_type: str = ""
     reason: str = ""
+    added_by: str = ""
+    added_on: str = ""
+    expires_on: str = ""
+    ticket: str = ""
+    extras: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "WarningSuppressionEntryModel":
@@ -275,8 +281,63 @@ class WarningSuppressionEntryModel(_BaseModel):
         reason = payload.get("reason")
         normalized_reason = "" if reason is None else str(reason)
 
+        entity_type = payload.get("entity_type")
+        normalized_entity_type = "" if entity_type is None else str(entity_type).strip().upper()
+        if normalized_entity_type and normalized_entity_type not in {"BIOBANK", "COLLECTION", "CONTACT", "NETWORK"}:
+            errors.append(
+                _make_error(
+                    ("entity_type",),
+                    "must be one of: BIOBANK, COLLECTION, CONTACT, NETWORK",
+                )
+            )
+
+        def parse_optional_date(field_name: str) -> str:
+            value = payload.get(field_name)
+            if value in (None, ""):
+                return ""
+            text = str(value).strip()
+            parts = text.split("-")
+            if len(parts) != 3 or not all(part.isdigit() for part in parts):
+                errors.append(_make_error((field_name,), "must be in YYYY-MM-DD format"))
+                return text
+            year, month, day = (int(part) for part in parts)
+            if year < 1900 or month < 1 or month > 12 or day < 1 or day > 31:
+                errors.append(_make_error((field_name,), "must be in YYYY-MM-DD format"))
+            return text
+
+        added_by = "" if payload.get("added_by") is None else str(payload.get("added_by")).strip()
+        added_on = parse_optional_date("added_on")
+        expires_on = parse_optional_date("expires_on")
+        ticket = "" if payload.get("ticket") is None else str(payload.get("ticket")).strip()
+
+        extras = {
+            key: value
+            for key, value in payload.items()
+            if key
+            not in {
+                "check_id",
+                "entity_id",
+                "entity_type",
+                "reason",
+                "added_by",
+                "added_on",
+                "expires_on",
+                "ticket",
+            }
+        }
+
         _raise_if_errors(errors)
-        return cls(check_id=check_id, entity_id=entity_id, reason=normalized_reason)
+        return cls(
+            check_id=check_id,
+            entity_id=entity_id,
+            entity_type=normalized_entity_type,
+            reason=normalized_reason,
+            added_by=added_by,
+            added_on=added_on,
+            expires_on=expires_on,
+            ticket=ticket,
+            extras=extras,
+        )
 
 
 @dataclass

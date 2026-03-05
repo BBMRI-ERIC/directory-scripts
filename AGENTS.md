@@ -73,6 +73,7 @@
 - `qcheck-updater.py` dry runs must execute the same interactive per-update review logic as real applies and differ only in skipping the final write to the Directory.
 - `qcheck-updater.py` live-value mismatches against `expected_current_value` must be handled per update during interactive review; declining one mismatched update must skip only that update, not abort the whole run.
 - `qcheck-updater.py` must compare unordered multi-value fields canonically; pure reordering of `data_use`, `type`, `diagnosis_available`, `materials`, or `sex` must not trigger false mismatches.
+- `qcheck-updater.py` supports CollectionFacts row-deletion fixes (`mode=delete_rows`, field `facts`) for collection-scoped updates such as `FT:KAnonViolation`; these must delete only the explicitly proposed fact row IDs and remain no-op-safe when rows are already absent.
 - `qcheck-updater.py` review output for append updates must show both the final target value and the incremental addition, not a replacement-looking payload.
 - DUO term comparison must normalize `DUO_0000000` and `DUO:0000000` forms so already-present terms are not proposed again under a different separator.
 - Equivalent ontology-term storage forms that are already present in live data must be treated as no-op updates, not as additions requiring user approval.
@@ -83,10 +84,13 @@
 - For `data-check.py` and other read/check tools, non-`ERIC` schema access must authenticate first and only then select the schema; missing credentials for a non-`ERIC` schema should fail as a user-facing configuration error rather than as a low-level schema exception.
 - For `directory-tables-modifier.py`, use explicit `-T/--table`; CSV/TSV format is auto-detected but can be overridden with `-F/--file-format`, and field separator can be overridden with `-S/--separator` (for example `;`).
 - `directory-tables-modifier.py` supports `--national-node` to populate missing `national_node` values on import; warn if the column already exists in the input.
+- `directory-tables-modifier.py` supports CollectionFacts k-anonymization filters during import/sync: `-k/--k-donors` for `number_of_donors < k` and `-K/--k-samples` for `number_of_samples < k`; report skipped-row counts and keep this limited to `-T CollectionFacts`.
+- Recommended baseline for public Directory fact data is donor `k=10`; exceptions are possible for documented pre-anonymized collections/pipelines.
 - Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.
 - `directory-tables-modifier.py` should normally target node staging areas, not `ERIC`; if `ERIC` is explicitly requested, the script must require an extra confirmation unless `-f/--force` is used.
 - Table tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--id-regex`, `--collection-id`) and should always be documented in `README.md` with examples.
-- `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is non-atomic (full-table uses truncate+import; filtered scope uses delete+import); document and warn users accordingly, and recommend dry-run plus pre-sync backup (`--export-on-delete`).
+- `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is server-non-atomic (full-table uses truncate+import; filtered scope uses delete+import), but the script must create a temporary full-column backup of the sync scope and attempt rollback automatically when sync import fails.
+- For CLI help consistency, keep standard options first and in stable order: `-h`, `-v`, `-d`, then Directory auth/target options, then tool-specific options.
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.
@@ -95,7 +99,8 @@
 - QC CLI note: `data-check.py` and other QC tools using `cli_common.add_remote_check_disable_arguments(...)` expose `-r` / `--disable-checks-all-remote`.
 - Directory-backed tools and exporters exclude withdrawn biobanks/collections by default; `-w` / `--include-withdrawn` includes them and `--only-withdrawn` restricts the run to them.
 - `full-text-search.py` keeps separate index directories per schema and withdrawn scope; do not mix those caches manually.
-- Reviewed false positives belong in `warning-suppressions.json` as `check ID -> entity ID` suppressions. Prefer fixing deterministic logic first; use suppressions only for known residual false positives.
+- Reviewed false positives belong in `warning-suppressions.json`; prefer canonical v2 suppression entries (`check_id`, `entity_id`, optional `entity_type`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`), while legacy map format stays accepted for backward compatibility. Suppression keys can target warning check IDs (`FT:KAnonViolation`) and module-prefixed QC update IDs (`FT/facts.k_anonymity.drop_rows_k10`). Prefer fixing deterministic logic first; use suppressions only for known residual false positives.
+- `data-check.py` should emit non-fatal diagnostics for suppression metadata quality (unknown check IDs, stale entity IDs, expired entries) and, in debug mode, should log suppressed warnings with check/entity/reason for traceability.
 - Withdrawal for checks is logically inherited for collections: a collection counts as withdrawn if it is withdrawn itself, if its biobank is withdrawn, or if an ancestor collection is withdrawn.
 - AI-assisted findings that should be shareable belong in `ai-check-cache/`, not in private runtime caches such as `data-check-cache/`.
 - `ai-check-cache/` stores reviewable JSON findings committed to Git; regular `data-check.py` runs only read those findings and must not require live model access.
@@ -156,6 +161,7 @@
 - Keep [`README.md`](README.md) accurate and add per-script usage examples as interfaces evolve.
 - If a change also affects the Directory Data Manager manual tooling, update the corresponding files in `../BBMRI-ERIC-Directory-Data-Manager-Manual/` as a coordinated follow-up; that repo contains the check-documentation generator and is not updated automatically by changes here.
 - When `CHECK_DOCS.fields` differ from AST-extracted fields by design, document the real intended fields explicitly and validate that the manual generator uses the documented fields rather than falling back to `None explicitly detected`.
+- When updating `AGENTS.md` itself: adding new knowledge is allowed directly; removing existing knowledge or merging/consolidating it with older guidance requires explicit human-in-the-loop approval.
 
 ## Security & Configuration Tips
 - Keep credentials out of the repo; prefer CLI flags (`-u`, `-p`) or local config files not committed.

@@ -54,3 +54,31 @@ def test_dump_warnings_xlsx_uses_expected_column_widths_and_node_tabs(tmp_path):
     assert worksheet.column_dimensions["D"].width >= 24
     assert worksheet.column_dimensions["E"].width <= 12
     assert worksheet.column_dimensions["F"].width >= 100
+
+
+def test_dump_suppressed_warnings_debug_logs_suppressed_entries(caplog):
+    container = WarningsContainer(
+        {
+            "FT:KAnonViolation": {
+                "bbmri-eric:ID:EU_demo:collection:col1": "reviewed false positive"
+            }
+        }
+    )
+    container.newWarning(
+        DataCheckWarning(
+            "FT:KAnonViolation",
+            "",
+            "EU",
+            DataCheckWarningLevel.WARNING,
+            "bbmri-eric:ID:EU_demo:collection:col1",
+            DataCheckEntityType.COLLECTION,
+            "False",
+            "violates k-anonymity",
+        )
+    )
+
+    with caplog.at_level("DEBUG"):
+        container.dumpSuppressedWarningsDebug()
+
+    assert "Suppressed warnings in this run: 1" in caplog.text
+    assert "FT:KAnonViolation" in caplog.text

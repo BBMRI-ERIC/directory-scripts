@@ -157,13 +157,36 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
         confidence = "certain" if update_family in {"diagnoses", "materials", "counts"} else "almost_certain"
         if update_family == "age" and note_text:
             confidence = "uncertain"
-        if update_family == "age":
+        if update_family == "counts":
             base_rationale = (
-                "Age proposal uses conservative normalization: Directory age labels/ranges are mapped to numeric bounds, aggregate/unknown rows ('*', Unknown, Undefined) are ignored, and automatic updates only widen coverage unless explicit replace mode is used."
+                "Counts proposal uses conservative normalization: totals are taken only from a single all-star aggregate fact row (sex='*', age_range='*', sample_type='*', disease='*'). "
+                "Here, '*' means 'aggregated over all values', so this all-star row is the authoritative total. "
+                "No count update is proposed when that all-star row is missing/duplicated or not numeric."
+            )
+        elif update_family == "age":
+            base_rationale = (
+                "Age proposal uses conservative normalization: Directory age labels/ranges are mapped to numeric bounds. "
+                "For descriptor derivation, '*' and Unknown/Undefined age labels are treated as aggregated/unspecified buckets (not concrete age groups). "
+                "Automatic updates only widen coverage unless explicit replace mode is used."
+            )
+        elif update_family == "materials":
+            base_rationale = (
+                "Materials proposal uses conservative normalization: for descriptor derivation, '*' is treated as an aggregated/unspecified sample_type bucket, not a concrete material value. "
+                "NAV is treated as non-specific unless it is the only material signal."
+            )
+        elif update_family == "diagnoses":
+            base_rationale = (
+                "Diagnoses proposal uses conservative normalization: for descriptor derivation, '*' is treated as an aggregated/unspecified disease bucket, not a concrete diagnosis code. "
+                "Existing broader ICD-10 metadata codes are preserved when they already cover more specific fact-sheet codes."
+            )
+        elif update_family == "clinical_profile":
+            base_rationale = (
+                "Sex proposal uses conservative normalization: for descriptor derivation, '*' is treated as an aggregated/unspecified sex bucket, not a concrete sex value. "
+                "Only explicit fact-sheet sex values are compared."
             )
         else:
             base_rationale = (
-                "Fact-sheet proposal uses conservative normalization: aggregate rows ('*') are ignored, Unknown/Undefined age labels are ignored, and NAV material is treated as non-specific unless it is the only material signal."
+                "Fact-sheet proposal uses conservative normalization: for descriptor derivation, '*' is treated as aggregated/unspecified rather than as a concrete category value."
             )
         fix_proposals.append(
             make_fix_proposal(
@@ -189,3 +212,40 @@ def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[d
             )
         )
     return fix_proposals
+
+
+def build_fact_k_anonymity_drop_fixes(
+    collection: dict[str, Any],
+    facts: list[dict[str, Any]],
+    *,
+    k_limit: int,
+) -> list[dict[str, Any]]:
+    """Return a fix proposal that drops fact-sheet rows violating donor k-anonymity."""
+    violating_ids = []
+    for fact in facts:
+        donors = fact.get("number_of_donors")
+        if isinstance(donors, int) and 0 < donors < k_limit and fact.get("id"):
+            violating_ids.append(str(fact["id"]))
+    if not violating_ids:
+        return []
+    violating_ids = sorted(dict.fromkeys(violating_ids))
+    return [
+        make_fix_proposal(
+            update_id=f"facts.k_anonymity.drop_rows_k{k_limit}",
+            module="FT",
+            entity_type="COLLECTION",
+            entity_id=collection["id"],
+            field="facts",
+            mode="delete_rows",
+            confidence="certain",
+            current_value_at_export=violating_ids,
+            proposed_value=violating_ids,
+            human_explanation=(
+                f"Delete fact-sheet rows that violate donor k-anonymity (number_of_donors < {k_limit})."
+            ),
+            rationale=(
+                "This update drops only fact rows whose explicit donor count is greater than 0 and below the "
+                f"k-anonymity threshold k={k_limit}. Rows with 0/empty donor values are not auto-dropped."
+            ),
+        )
+    ]

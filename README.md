@@ -49,6 +49,7 @@ python3 data-check.py
 ```
 
 Common CLI conventions across validation/export tools:
+- help output keeps standard options first, in this order when supported: `-h`, `-v`, `-d`, then Directory auth/target options, then tool-specific options
 - `-v` / `--verbose` for progress logging, `-d` / `--debug` for debug logging
 - `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
 - `-N` / `--no-stdout` to suppress normal stdout output
@@ -92,9 +93,18 @@ Email validation in `ContactFields` is split into local/static checks and option
 - disabling remote checks does not suppress the local placeholder-domain or syntax checks
 
 Known false positives can be suppressed in `warning-suppressions.json`:
-- mapping is `check ID -> entity ID`
+- legacy mapping `check ID -> entity ID` is still accepted
+- recommended format is a structured list with metadata (`check_id`, `entity_id`, optional `entity_type`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`)
 - suppressed warnings are omitted from stdout and XLSX output
+- matching QC fix proposals are also omitted from `data-check.py --export-update-plan ...`
+- suppression keys can target either warning check IDs (for example `FT:KAnonViolation`) or module-prefixed update IDs (for example `FT/facts.k_anonymity.drop_rows_k10`)
+- in `data-check.py -d` debug mode, each suppressed warning is listed with check ID/entity ID and suppression reason (if provided)
 - use this only for reviewed false positives; fix the check logic whenever the pattern can be expressed deterministically
+- use `warning-suppressions-manage.py` to maintain suppressions safely:
+  - `python3 warning-suppressions-manage.py list`
+  - `python3 warning-suppressions-manage.py add --check-id FT:KAnonViolation --entity-id <ENTITY_ID> --entity-type COLLECTION --reason \"...\" --added-by <USER>`
+  - `python3 warning-suppressions-manage.py validate`
+  - `python3 warning-suppressions-manage.py prune-stale --dry-run`
 
 Purge all caches (directory + remote checks) and output both stdout and XLSX:  
 ```bash
@@ -253,9 +263,11 @@ Key safety points:
 ### Import records
 - Use `-i/--import-data` with `-T/--table`.
 - Format auto-detects by extension; override with `-F/--file-format csv|tsv` if the filename is wrong or missing an extension.
-- Use `-S/--separator` to override the field separator for CSV/TSV import/delete/export (for example `';'` or `\\t`).
+- Use `-S/--separator` to override the field separator for CSV/TSV import/delete/export/sync (for example `';'` or `\\t`).
 - Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
 - Use `-R/--id-regex` and/or `-C/--collection-id` to import only matching rows (defaults to `id`/`collection` columns; override with `--id-column`/`--collection-column`).
+- For `-T CollectionFacts`, use `-k/--k-donors <k>` and/or `-K/--k-samples <k>` to enforce k-anonymity during import/sync: rows below threshold are skipped and counted in statistics.
+- For publicly exposed, highly aggregated Directory data, the recommended donor baseline is `k=10`. For specific justified cases (for example already pre-anonymized collections under a documented policy), this may be relaxed or waived.
 - If Molgenis rejects an import due to a missing `national_node` and `-N` is not set, the script falls back to `-s/--schema` as the `national_node` and warns.
 
 Federated login note:
@@ -272,6 +284,8 @@ python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.tsv -N 
 python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.csv -S ';'
 
 python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.tsv -R '^COLL_' -C BB_001
+
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -i facts.tsv -k 10 -K 10
 ```
 
 ### Delete records (table contents only)
@@ -307,7 +321,7 @@ python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.csv -R 
 - Sync mode (`-y/--sync-data`) makes table contents match exactly the input file by:
   1) for full-table sync (no `-R/-C`): truncating current table contents, then importing file contents;
   2) for filtered sync (`-R` and/or `-C`): deleting only matching server rows, then importing only matching file rows.
-- This operation is **non-atomic** (not a single server transaction). If import fails after truncate/delete, the table (or filtered scope) can remain partially or fully unsynced.
+- The server operation is still non-atomic, but the script now creates a temporary pre-sync backup of the full matching server rows (all columns, including technical columns) and attempts rollback automatically if import fails.
 - Use `-n/--dry-run` first and strongly consider `--export-on-delete` as a backup.
 - In filtered sync mode, any file rows that do **not** match `-R/-C` are ignored and reported as warnings.
 
@@ -433,7 +447,7 @@ Key behavior:
   - `FT` for fact-sheet-derived diagnosis/material/sex/age/count fixes from `FactTables`
   - `TXT` for deterministic narrative-to-structure fixes from `TextConsistency`
 - semantic detail still lives in `update_id`, for example `access.duo.disease_specific_research` or `diagnoses.add.covid_acute_u07_1`
-- current implementation of `qcheck-updater.py` applies collection-level updates only
+- `qcheck-updater.py` applies collection metadata updates and can also apply fact-row deletion fixes (for example `FT:KAnonViolation`) by deleting specific `CollectionFacts` rows from the target staging area
 - ontology-backed fixes carry human-readable explanations in the update plan so the reviewer can see what a term such as `DUO:...` means before approving the change
 - DUO identifiers are normalized internally, so `DUO_0000007` and `DUO:0000007` are treated as the same term during checks and update application
 - append-mode review shows both the final target value and the incremental value being added, to avoid giving the impression that a multi-value field would be replaced

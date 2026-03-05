@@ -9,6 +9,11 @@ from customwarnings import (
 )
 import warning_suppressions
 from warning_suppressions import load_warning_suppressions
+from warning_suppressions import (
+    load_warning_suppressions_detailed,
+    serialize_suppression_entries,
+    summarize_suppression_diagnostics,
+)
 from warningscontainer import WarningsContainer
 
 
@@ -153,3 +158,98 @@ def test_warning_suppressions_default_path_is_repo_relative(tmp_path, monkeypatc
             "bbmri-eric:ID:EU_BBMRI-ERIC": "repo-relative default",
         }
     }
+
+
+def test_warning_suppressions_detailed_loader_parses_metadata_fields(tmp_path):
+    config_path = tmp_path / "warning-suppressions.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "suppressions": [
+                    {
+                        "check_id": "FT:KAnonViolation",
+                        "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
+                        "entity_type": "COLLECTION",
+                        "reason": "Reviewed false positive",
+                        "added_by": "tester@example.org",
+                        "added_on": "2026-03-05",
+                        "expires_on": "2026-12-31",
+                        "ticket": "DM-1",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = load_warning_suppressions_detailed(config_path)
+    assert result.issues == []
+    assert len(result.entries) == 1
+    entry = result.entries[0]
+    assert entry.entity_type == "COLLECTION"
+    assert entry.expires_on == "2026-12-31"
+    assert result.suppressions == {
+        "FT:KAnonViolation": {
+            "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort": "Reviewed false positive"
+        }
+    }
+
+
+def test_warning_suppression_diagnostics_report_unknown_expired_and_stale():
+    entry_result = load_warning_suppressions_detailed(
+        path=None
+    )
+    assert entry_result.entries == []
+    diagnostics = summarize_suppression_diagnostics(
+        [
+            warning_suppressions.WarningSuppressionEntryModel.parse_obj(
+                {
+                    "check_id": "UNK:Nope",
+                    "entity_id": "missing-id",
+                    "entity_type": "COLLECTION",
+                    "expires_on": "2020-01-01",
+                }
+            )
+        ],
+        known_check_ids={"FT:KAnonViolation"},
+        known_check_prefixes={"FT", "AP"},
+        known_entities={"COLLECTION": {"existing-id"}},
+    )
+    assert any("unknown check_id" in item for item in diagnostics)
+    assert any("expired" in item for item in diagnostics)
+    assert any("entity_id not found" in item for item in diagnostics)
+
+
+def test_serialize_suppression_entries_emits_v2_payload():
+    entry = warning_suppressions.WarningSuppressionEntryModel.parse_obj(
+        {
+            "check_id": "AP:BioDuoMissing",
+            "entity_id": "bbmri-eric:ID:EU_demo:collection:x",
+            "entity_type": "COLLECTION",
+            "reason": "known exception",
+            "ticket": "DM-42",
+        }
+    )
+    payload = serialize_suppression_entries([entry])
+    assert payload["version"] == 2
+    assert payload["suppressions"][0]["check_id"] == "AP:BioDuoMissing"
+    assert payload["suppressions"][0]["ticket"] == "DM-42"
+
+
+def test_warning_suppression_diagnostics_accept_module_prefixed_update_ids():
+    diagnostics = summarize_suppression_diagnostics(
+        [
+            warning_suppressions.WarningSuppressionEntryModel.parse_obj(
+                {
+                    "check_id": "FT/facts.k_anonymity.drop_rows_k10",
+                    "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN",
+                    "entity_type": "COLLECTION",
+                }
+            )
+        ],
+        known_check_ids={"FT:KAnonViolation"},
+        known_check_prefixes={"FT", "AP"},
+        known_entities={"COLLECTION": {"bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN"}},
+    )
+    assert not any("unknown check_id" in item for item in diagnostics)
