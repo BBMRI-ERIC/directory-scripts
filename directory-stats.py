@@ -53,10 +53,10 @@ def _build_warning_frame(rows: list[dict]) -> pd.DataFrame:
 
 parser = build_parser()
 add_logging_arguments(parser)
-add_xlsx_output_argument(parser)
-add_no_stdout_argument(parser)
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default="ERIC")
+add_xlsx_output_argument(parser)
+add_no_stdout_argument(parser)
 add_withdrawn_scope_arguments(
     parser,
     include_help_text="include explicitly and logically withdrawn biobanks/collections in the statistics",

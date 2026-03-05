@@ -117,6 +117,9 @@ remoteCheckList = ['emails', 'geocoding', 'URLs']
 #####################
 
 parser = build_parser()
+add_logging_arguments(parser)
+add_directory_auth_arguments(parser)
+add_directory_schema_argument(parser, default='ERIC')
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('-a', '--aggregator', dest='aggregator', nargs='+', default=['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'], help='Space-separated list of the aggregators used in stdout. Accepted values: Network Entity Country')
 add_xlsx_output_argument(
@@ -134,9 +137,6 @@ add_optional_xlsx_output_argument(
 )
 add_no_stdout_argument(parser)
 parser.add_argument('-W', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
-add_logging_arguments(parser)
-add_directory_auth_arguments(parser)
-add_directory_schema_argument(parser, default='ERIC')
 add_withdrawn_scope_arguments(parser)
 parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
 add_remote_check_disable_arguments(parser, remoteCheckList)

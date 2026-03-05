@@ -49,6 +49,7 @@ python3 data-check.py
 ```
 
 Common CLI conventions across validation/export tools:
+- help output keeps standard options first, in this order when supported: `-h`, `-v`, `-d`, then Directory auth/target options, then tool-specific options
 - `-v` / `--verbose` for progress logging, `-d` / `--debug` for debug logging
 - `-X` / `--output-xlsx` for XLSX output when the script supports workbook export
 - `-N` / `--no-stdout` to suppress normal stdout output
@@ -253,9 +254,10 @@ Key safety points:
 ### Import records
 - Use `-i/--import-data` with `-T/--table`.
 - Format auto-detects by extension; override with `-F/--file-format csv|tsv` if the filename is wrong or missing an extension.
-- Use `-S/--separator` to override the field separator for CSV/TSV import/delete/export (for example `';'` or `\\t`).
+- Use `-S/--separator` to override the field separator for CSV/TSV import/delete/export/sync (for example `';'` or `\\t`).
 - Use `-N/--national-node` to populate a missing `national_node` column for all imported rows (warns if the column already exists).
 - Use `-R/--id-regex` and/or `-C/--collection-id` to import only matching rows (defaults to `id`/`collection` columns; override with `--id-column`/`--collection-column`).
+- For `-T CollectionFacts`, use `-k/--k-donors <k>` and/or `-K/--k-samples <k>` to enforce k-anonymity during import/sync: rows below threshold are skipped and counted in statistics.
 - If Molgenis rejects an import due to a missing `national_node` and `-N` is not set, the script falls back to `-s/--schema` as the `national_node` and warns.
 
 Federated login note:
@@ -272,6 +274,8 @@ python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.tsv -N 
 python3 directory-tables-modifier.py -s BBMRI-EU -T Biobanks -i Biobanks.csv -S ';'
 
 python3 directory-tables-modifier.py -s BBMRI-EU -T Collections -i Collections.tsv -R '^COLL_' -C BB_001
+
+python3 directory-tables-modifier.py -s BBMRI-EU -T CollectionFacts -i facts.tsv -k 10 -K 10
 ```
 
 ### Delete records (table contents only)
@@ -307,7 +311,7 @@ python3 directory-tables-modifier.py -s ERIC -T CollectionFacts -e facts.csv -R 
 - Sync mode (`-y/--sync-data`) makes table contents match exactly the input file by:
   1) for full-table sync (no `-R/-C`): truncating current table contents, then importing file contents;
   2) for filtered sync (`-R` and/or `-C`): deleting only matching server rows, then importing only matching file rows.
-- This operation is **non-atomic** (not a single server transaction). If import fails after truncate/delete, the table (or filtered scope) can remain partially or fully unsynced.
+- The server operation is still non-atomic, but the script now creates a temporary pre-sync backup of the full matching server rows (all columns, including technical columns) and attempts rollback automatically if import fails.
 - Use `-n/--dry-run` first and strongly consider `--export-on-delete` as a backup.
 - In filtered sync mode, any file rows that do **not** match `-R/-C` are ignored and reported as warnings.
 
