@@ -112,6 +112,8 @@ class BBMRICohorts(IPlugin):
 			
 			if BBMRICohortsNetworkName in collection_networks or BBMRICohortsDNANetworkName in collection_networks:
 				#OoM = collection['order_of_magnitude']['id']  # EMX2 OoM does not have ID, then:
+				if 'order_of_magnitude' not in collection:
+					continue
 				OoM = int(collection['order_of_magnitude'])
 				
 				data_categories = []
@@ -164,7 +166,8 @@ class BBMRICohorts(IPlugin):
 
 			collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
 			collection_networks = set()  # set is sufficient since we only collect all the networks in which any of the collections of a biobank are participating
-			for collection in collections:
+			for node_id in collections:
+				collection = collections.nodes[node_id]['data']
 				if 'network' in collection:
 					for n in collection['network']:
 						collection_networks.add(n['id'])
@@ -173,5 +176,5 @@ class BBMRICohorts(IPlugin):
 				# if network in biobank_networks and not network in collection_networks:
 					# warnings.append(DataCheckWarning(self.__class__.__name__, "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, f"Biobank in BBMRI-Cohorts network {network} but has no collections in the same network network."))
 				 if network in biobank_networks:
-					 warnings.append(DataCheckWarning(make_check_id(self, "BBNetFlag"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), f"Biobanks are not expected to be part of BBMRI-Cohorts networks, only specific collections must be included. Biobank participates in BBMRI-Cohorts network: {network}.", "Remove BBMRI Cohorts/BBMRI Cohorts DNA network from the Biobank entry, check which collections shall be flagged with the networks BBMRI Cohorts / BBMRI Cohorts DNA and flag them", dir.getCollectionContact(biobank['id'])['email']))
+					 warnings.append(DataCheckWarning(make_check_id(self, "BBNetFlag"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), f"Biobanks are not expected to be part of BBMRI-Cohorts networks, only specific collections must be included. Biobank participates in BBMRI-Cohorts network: {network}.", "Remove BBMRI Cohorts/BBMRI Cohorts DNA network from the Biobank entry, check which collections shall be flagged with the networks BBMRI Cohorts / BBMRI Cohorts DNA and flag them", dir.getBiobankContact(biobank['id'])['email']))
 		return warnings

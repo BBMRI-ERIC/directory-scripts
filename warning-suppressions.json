@@ -1,1 +1,12 @@
-{}
+{
+  "suppressions": [
+    {
+      "added_by": "petr.holub@bbmri-eric.eu",
+      "added_on": "2026-03-05",
+      "check_id": "FT/facts.k_anonymity.drop_rows_k10",
+      "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN",
+      "reason": "Collection of anonymzied data, where further anonymization of fact sheet data is not needed."
+    }
+  ],
+  "version": 2
+}

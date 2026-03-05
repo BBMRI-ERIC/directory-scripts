@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -33,13 +34,12 @@ parser.add_argument("-d", "--debug", action="store_true", help="Debug output. Im
 parser.add_argument("-n", "--dry-run", action="store_true", help="Show planned changes without modifying data.")
 parser.add_argument("-f", "--force", action="store_true", help="Skip interactive approval for data-modifying operations.")
 parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-error output on STDOUT.")
-parser.add_argument("--suppress-validation-warnings", action="store_true", help="reserved for suppressing non-fatal local validation warnings")
-
-parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU). Use node staging areas for edits; ERIC requires explicit confirmation and should normally not be modified with this tool.")
-
 parser.add_argument("--directory-target", dest="directory_target", type=str, help="Directory base URL (overrides DIRECTORYTARGET env var).", default=None)
 parser.add_argument("--directory-username", dest="directory_username", type=str, help="Directory username (overrides DIRECTORYUSERNAME env var).", default=None)
 parser.add_argument("--directory-password", dest="directory_password", type=str, help="Directory password (overrides DIRECTORYPASSWORD env var).", default=None)
+parser.add_argument("--suppress-validation-warnings", action="store_true", help="reserved for suppressing non-fatal local validation warnings")
+
+parser.add_argument("-s", "--schema", type=str, required=True, help="Schema (staging area name shown in Molgenis Navigator, e.g., BBMRI-EU). Use node staging areas for edits; ERIC requires explicit confirmation and should normally not be modified with this tool.")
 
 parser.add_argument("-T", "--table", dest="table", type=str, help="Target table name for import/delete/export.", default=None)
 
@@ -47,14 +47,16 @@ action_group = parser.add_mutually_exclusive_group(required=True)
 action_group.add_argument("-i", "--import-data", dest="import_data", type=str, help="Path to the CSV/TSV file containing the records to modify/add.", default=None)
 action_group.add_argument("-x", "--delete-data", dest="delete_data", nargs="?", const="__FILTER_ONLY__", type=str, help="Path to the CSV/TSV file containing the records to delete (or use --delete-filter-only with -R/-C).", default=None)
 action_group.add_argument("-e", "--export-data", dest="export_data", type=str, help="Export table data to a CSV/TSV file without modifying it.", default=None)
-action_group.add_argument("-y", "--sync-data", dest="sync_data", type=str, help="Sync table rows from a CSV/TSV file (full table: truncate+import; filtered scope: delete+import; non-atomic).", default=None)
+action_group.add_argument("-y", "--sync-data", dest="sync_data", type=str, help="Sync table rows from a CSV/TSV file (full table: truncate+import; filtered scope: delete+import). Uses temporary rollback backup if import fails.", default=None)
 
 parser.add_argument("--delete-filter-only", dest="delete_filter_only", action="store_true", help="Allow deletion using -R/-C filters without a delete file.")
 parser.add_argument("--export-on-delete", dest="export_on_delete", type=str, help="Export (backup) rows that will be deleted to CSV/TSV before deletion.", default=None)
 
 parser.add_argument("-N", "--national-node", dest="national_node", type=str, help="Set national_node for all imported rows when missing in the file.", default=None)
+parser.add_argument("-k", "--k-donors", dest="k_donors", type=int, default=None, help="For CollectionFacts import/sync: skip rows with number_of_donors < k.")
+parser.add_argument("-K", "--k-samples", dest="k_samples", type=int, default=None, help="For CollectionFacts import/sync: skip rows with number_of_samples < k.")
 parser.add_argument("-F", "--file-format", dest="file_format", choices=["auto", "csv", "tsv"], default="auto", help="File format override (csv/tsv). Default: auto by extension.")
-parser.add_argument("-S", "--separator", dest="separator", type=str, default=None, help="Field separator override for CSV/TSV import/delete/export (for example ';' or \\\\t).")
+parser.add_argument("-S", "--separator", dest="separator", type=str, default=None, help="Field separator override for CSV/TSV import/delete/export/sync (for example ';' or \\\\t).")
 parser.add_argument("-R", "--id-regex", dest="id_regex", type=str, help="Regex filter on record IDs (default column: id). Applies to import/delete/export/sync.", default=None)
 parser.add_argument("-C", "--collection-id", dest="collection_ids", action="append", help="Collection ID filter (default column: collection; repeat or comma-separated). Applies to import/delete/export/sync.", default=None)
 parser.add_argument("--id-column", dest="id_column", type=str, help="Column name for -R filtering (default: id).", default=None)
@@ -95,6 +97,8 @@ id_regex = args.id_regex
 collection_ids = args.collection_ids
 id_column_override = args.id_column
 collection_column_override = args.collection_column
+k_donors = args.k_donors
+k_samples = args.k_samples
 if args.directory_target:
     target = args.directory_target
 if args.directory_username:
@@ -106,6 +110,7 @@ EXIT_OK = 0
 EXIT_INPUT_ERROR = 2
 EXIT_ABORTED = 3
 EXIT_RUNTIME_ERROR = 1
+COLLECTION_FACTS_TABLE = "CollectionFacts"
 
 
 class InputError(Exception):
@@ -121,6 +126,10 @@ TSV_QUOTING_MAP = {
     "all": csv.QUOTE_ALL,
     "none": csv.QUOTE_NONE,
 }
+
+
+def is_collection_facts_table(table_name):
+    return str(table_name).strip().lower() == COLLECTION_FACTS_TABLE.lower()
 
 
 def read_tsv_as_dataframe(file_path):
@@ -445,6 +454,70 @@ def partition_sync_input_rows(df, id_regex, collections, id_column, collection_c
     return matching, nonmatching
 
 
+def _coerce_numeric_column(df, column_name, context):
+    numeric_values = pd.to_numeric(df[column_name], errors="coerce")
+    invalid_mask = numeric_values.isna()
+    if invalid_mask.any():
+        raise InputError(
+            f"{context} requires numeric values in column {column_name!r}; "
+            f"{int(invalid_mask.sum())} row(s) are not numeric."
+        )
+    return numeric_values
+
+
+def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, context):
+    if k_donors_threshold is None and k_samples_threshold is None:
+        return df, None
+    donors_mask = pd.Series(False, index=df.index)
+    samples_mask = pd.Series(False, index=df.index)
+    if k_donors_threshold is not None:
+        donors_column = resolve_column_case_insensitive(df, "number_of_donors")
+        if donors_column is None:
+            raise InputError(
+                f"{context} with --k-donors requires column 'number_of_donors' in CollectionFacts input."
+            )
+        donors_values = _coerce_numeric_column(df, donors_column, context)
+        donors_mask = donors_values < k_donors_threshold
+    if k_samples_threshold is not None:
+        samples_column = resolve_column_case_insensitive(df, "number_of_samples")
+        if samples_column is None:
+            raise InputError(
+                f"{context} with --k-samples requires column 'number_of_samples' in CollectionFacts input."
+            )
+        samples_values = _coerce_numeric_column(df, samples_column, context)
+        samples_mask = samples_values < k_samples_threshold
+    combined_mask = donors_mask | samples_mask
+    skipped_df = df.loc[combined_mask]
+    filtered_df = df.loc[~combined_mask]
+    stats = {
+        "skipped_total": int(combined_mask.sum()),
+        "skipped_donors": int(donors_mask.sum()),
+        "skipped_samples": int(samples_mask.sum()),
+        "skipped_overlap": int((donors_mask & samples_mask).sum()),
+        "remaining": int((~combined_mask).sum()),
+        "threshold_donors": k_donors_threshold,
+        "threshold_samples": k_samples_threshold,
+    }
+    logging.info(
+        "k-anonymity filter results for %s: skipped total=%s (donors<k: %s, samples<k: %s, overlap: %s), remaining=%s.",
+        context,
+        stats["skipped_total"],
+        stats["skipped_donors"],
+        stats["skipped_samples"],
+        stats["skipped_overlap"],
+        stats["remaining"],
+    )
+    if verbose and stats["skipped_total"] > 0:
+        id_column = resolve_id_column(skipped_df, id_column_override)
+        if id_column is not None:
+            logging.info(
+                "k-anonymity skipped row IDs for %s: %s",
+                context,
+                sorted(skipped_df[id_column].astype(str)),
+            )
+    return filtered_df, stats
+
+
 def export_table_data(df, output_path, file_format):
     effective_separator = get_effective_separator(file_format)
     if file_format == "csv":
@@ -460,6 +533,99 @@ def export_table_data(df, output_path, file_format):
         escapechar=tsvEscapeChar,
         doublequote=not tsvNoDoublequote,
     )
+
+
+def export_internal_sync_backup(df):
+    backup_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".tsv",
+        prefix="dtm-sync-backup-",
+        delete=False,
+        encoding="utf-8",
+    )
+    backup_path = Path(backup_file.name)
+    backup_file.close()
+    df.to_csv(
+        backup_path,
+        index=False,
+        sep="\t",
+        encoding="utf-8",
+        quoting=csv.QUOTE_ALL,
+    )
+    return backup_path
+
+
+def load_internal_sync_backup(backup_path):
+    return pd.read_csv(
+        backup_path,
+        sep="\t",
+        dtype=str,
+        keep_default_na=False,
+        na_filter=False,
+        quoting=csv.QUOTE_ALL,
+        encoding="utf-8",
+    )
+
+
+def save_table_with_national_node_fallback(session, schema, table_name, data):
+    try:
+        session.save_table(table=table_name, schema=schema, data=data)
+    except Exception as exc:
+        if (not national_node) and "national_node" in str(exc).lower():
+            logging.warning(
+                "Table write failed due to missing national_node. Using schema %s as fallback for all rows.",
+                schema,
+            )
+            adjusted_data = data.copy()
+            column_name = resolve_column_case_insensitive(adjusted_data, "national_node")
+            if column_name is None:
+                adjusted_data["national_node"] = schema
+            session.save_table(table=table_name, schema=schema, data=adjusted_data)
+        else:
+            raise
+
+
+def delete_scope_rows(session, schema, table_name, scope_df, id_column):
+    if scope_df.empty:
+        return
+    delete_id_column = resolve_id_column(scope_df, id_column)
+    if delete_id_column is None:
+        raise InputError("Filtered sync requires an ID column named 'id' or --id-column.")
+    session.delete_records(
+        table_name,
+        schema,
+        data=scope_df[[delete_id_column]],
+    )
+
+
+def restore_sync_scope_from_backup(
+    session,
+    schema,
+    table_name,
+    backup_path,
+    *,
+    scope_is_filtered,
+    id_regex_value,
+    collection_filters,
+    id_column,
+    collection_column,
+):
+    backup_df = load_internal_sync_backup(backup_path)
+    if not scope_is_filtered:
+        session.truncate(table_name, schema)
+    else:
+        live_df = session.get(table=table_name, schema=schema, as_df=True)
+        live_scope_df = apply_filters(
+            live_df,
+            id_regex_value,
+            collection_filters,
+            id_column,
+            collection_column,
+            "Sync rollback filtering",
+        )
+        delete_scope_rows(session, schema, table_name, live_scope_df, id_column)
+    if not backup_df.empty:
+        session.save_table(table=table_name, schema=schema, data=backup_df)
 
 
 # Function
@@ -503,9 +669,12 @@ async def sync_directory():
                     logging.info("Planned import from file %s (record details unavailable).", csvImportData)
                 else:
                     raise InputError("Import format could not be determined. Use --file-format or a .csv/.tsv file.")
+            if (k_donors is not None or k_samples is not None) and resolved_format not in {"csv", "tsv"}:
+                raise InputError("--k-donors/--k-samples require CSV or TSV import input.")
             import_table = table_name
             data = None
             skip_import = False
+            import_data_modified = False
             if resolved_format in {"csv", "tsv"}:
                 try:
                     data = load_dataframe_for_file(import_path, resolved_format)
@@ -520,6 +689,7 @@ async def sync_directory():
                     data["national_node"] = national_node
                     logging.info("Added national_node=%s to %s imported record(s).", national_node, len(data.index))
                     added_national_node = True
+                    import_data_modified = True
                 else:
                     logging.warning("Import file already contains %s column; --national-node will be ignored.", column_name)
             if (id_regex or collection_ids) and resolved_format not in {"csv", "tsv"}:
@@ -537,8 +707,20 @@ async def sync_directory():
                     collection_column_override,
                     "Import filtering",
                 )
+                import_data_modified = True
                 if data.empty:
                     logging.info("Import filters matched no rows. Skipping import for %s.", csvImportData)
+                    skip_import = True
+            if data is not None and (k_donors is not None or k_samples is not None):
+                data, _ = apply_k_anonymity_filters(
+                    data,
+                    k_donors,
+                    k_samples,
+                    context="import",
+                )
+                import_data_modified = True
+                if data.empty:
+                    logging.info("k-anonymity filters removed all import rows. Skipping import for %s.", csvImportData)
                     skip_import = True
             import_summary = None
             if data is not None:
@@ -576,23 +758,15 @@ async def sync_directory():
                 logging.info("Importing TSV data from %s into table %s", csvImportData, import_table)
                 if data is None:
                     data = read_tsv_as_dataframe(import_path)
-                try:
-                    session.save_table(table=import_table, schema=schema, data=data)
-                except Exception as exc:
-                    if (not national_node) and "national_node" in str(exc).lower():
-                        logging.warning(
-                            "Import failed due to missing national_node. Using schema %s as fallback for all rows.",
-                            schema,
-                        )
-                        column_name = resolve_column_case_insensitive(data, "national_node")
-                        if column_name is None:
-                            data["national_node"] = schema
-                        session.save_table(table=import_table, schema=schema, data=data)
-                    else:
-                        raise
+                save_table_with_national_node_fallback(session, schema, import_table, data)
             elif resolved_format == "csv":
                 logging.info("Importing data from %s", csvImportData)
-                if import_path.suffix.lower() == ".csv" and not added_national_node and not separator:
+                if (
+                    import_path.suffix.lower() == ".csv"
+                    and not added_national_node
+                    and not import_data_modified
+                    and not separator
+                ):
                     try:
                         await session.upload_file(csvImportData, schema)
                     except Exception as exc:
@@ -603,29 +777,13 @@ async def sync_directory():
                             )
                             if data is None:
                                 data = read_csv_as_dataframe(import_path)
-                            column_name = resolve_column_case_insensitive(data, "national_node")
-                            if column_name is None:
-                                data["national_node"] = schema
-                            session.save_table(table=import_table, schema=schema, data=data)
+                            save_table_with_national_node_fallback(session, schema, import_table, data)
                         else:
                             raise
                 else:
                     if data is None:
                         data = read_csv_as_dataframe(import_path)
-                    try:
-                        session.save_table(table=import_table, schema=schema, data=data)
-                    except Exception as exc:
-                        if (not national_node) and "national_node" in str(exc).lower():
-                            logging.warning(
-                                "Import failed due to missing national_node. Using schema %s as fallback for all rows.",
-                                schema,
-                            )
-                            column_name = resolve_column_case_insensitive(data, "national_node")
-                            if column_name is None:
-                                data["national_node"] = schema
-                            session.save_table(table=import_table, schema=schema, data=data)
-                        else:
-                            raise
+                    save_table_with_national_node_fallback(session, schema, import_table, data)
             else:
                 logging.info("Importing data from %s", csvImportData)
                 await session.upload_file(csvImportData, schema)
@@ -635,6 +793,8 @@ async def sync_directory():
             resolved_format = detect_format(sync_path, file_format)
             if resolved_format is None:
                 raise InputError("Sync format could not be determined. Use --file-format or a .csv/.tsv file.")
+            if (k_donors is not None or k_samples is not None) and resolved_format not in {"csv", "tsv"}:
+                raise InputError("--k-donors/--k-samples require CSV or TSV sync input.")
             sync_df = None
             try:
                 sync_df = load_dataframe_for_file(sync_path, resolved_format)
@@ -657,6 +817,13 @@ async def sync_directory():
                 id_column_override,
                 collection_column_override,
             )
+            if k_donors is not None or k_samples is not None:
+                sync_target_df, _ = apply_k_anonymity_filters(
+                    sync_target_df,
+                    k_donors,
+                    k_samples,
+                    context="sync",
+                )
             if len(sync_nonmatching_df.index) > 0:
                 logging.warning(
                     "Sync input contains %s row(s) that do not match -R/-C filters and will be ignored.",
@@ -709,36 +876,58 @@ async def sync_directory():
             if dry_run:
                 logging.info("Dry run enabled. Skipping sync for %s.", syncData)
             else:
-                if not (id_regex or collection_ids):
-                    logging.info("Syncing %s::%s via truncate + import (non-atomic operation).", schema, table_name)
-                    session.truncate(table_name, schema)
-                else:
-                    logging.info("Syncing %s::%s filtered scope via delete + import (non-atomic operation).", schema, table_name)
-                    if not current_scope_df.empty:
-                        delete_id_column = resolve_id_column(current_scope_df, id_column_override)
-                        if delete_id_column is None:
-                            raise InputError("Filtered sync requires an ID column named 'id' or --id-column.")
-                        session.delete_records(
-                            table_name,
-                            schema,
-                            data=current_scope_df[[delete_id_column]],
-                        )
-                if not sync_target_df.empty:
+                scope_is_filtered = bool(id_regex or collection_ids)
+                backup_file_path = export_internal_sync_backup(current_scope_df)
+                keep_backup_on_disk = False
+                logging.info(
+                    "Created temporary pre-sync backup with all scope columns at %s.",
+                    backup_file_path,
+                )
+                try:
+                    if not scope_is_filtered:
+                        logging.info("Syncing %s::%s via truncate + import (non-atomic operation).", schema, table_name)
+                        session.truncate(table_name, schema)
+                    else:
+                        logging.info("Syncing %s::%s filtered scope via delete + import (non-atomic operation).", schema, table_name)
+                        delete_scope_rows(session, schema, table_name, current_scope_df, id_column_override)
+                    if not sync_target_df.empty:
+                        save_table_with_national_node_fallback(session, schema, table_name, sync_target_df)
+                    logging.info("Sync completed for %s::%s.", schema, table_name)
+                except Exception as import_exc:
+                    logging.error("Sync import failed for %s::%s: %s", schema, table_name, import_exc)
+                    logging.warning("Attempting rollback from temporary backup %s.", backup_file_path)
                     try:
-                        session.save_table(table=table_name, schema=schema, data=sync_target_df)
-                    except Exception as exc:
-                        if (not national_node) and "national_node" in str(exc).lower():
-                            logging.warning(
-                                "Sync import failed due to missing national_node. Using schema %s as fallback for all rows.",
-                                schema,
-                            )
-                            column_name = resolve_column_case_insensitive(sync_target_df, "national_node")
-                            if column_name is None:
-                                sync_target_df["national_node"] = schema
-                            session.save_table(table=table_name, schema=schema, data=sync_target_df)
-                        else:
-                            raise
-                logging.info("Sync completed for %s::%s.", schema, table_name)
+                        restore_sync_scope_from_backup(
+                            session,
+                            schema,
+                            table_name,
+                            backup_file_path,
+                            scope_is_filtered=scope_is_filtered,
+                            id_regex_value=id_regex,
+                            collection_filters=collections,
+                            id_column=id_column_override,
+                            collection_column=collection_column_override,
+                        )
+                        logging.warning(
+                            "Rollback completed for %s::%s using backup %s.",
+                            schema,
+                            table_name,
+                            backup_file_path,
+                        )
+                    except Exception as rollback_exc:
+                        keep_backup_on_disk = True
+                        raise RuntimeError(
+                            f"Sync failed and rollback failed for {schema}::{table_name}. "
+                            f"Backup file kept at {backup_file_path}. "
+                            f"Import error: {import_exc}; rollback error: {rollback_exc}"
+                        ) from rollback_exc
+                    raise
+                finally:
+                    if not keep_backup_on_disk:
+                        try:
+                            backup_file_path.unlink(missing_ok=True)
+                        except Exception as exc:
+                            logging.warning("Unable to remove temporary sync backup %s: %s", backup_file_path, exc)
 
         #########################################################
         # DELETE RECORDS
@@ -872,15 +1061,24 @@ def validate_inputs():
                 exc,
             )
         ) from exc
+    if not table_name:
+        raise InputError("Table name is required. Use -T/--table.")
     if separator:
         logging.info("Using custom field separator override: %r", separator)
+    if k_donors is not None and k_donors <= 0:
+        raise InputError("--k-donors must be a positive integer.")
+    if k_samples is not None and k_samples <= 0:
+        raise InputError("--k-samples must be a positive integer.")
+    if (k_donors is not None or k_samples is not None):
+        if not is_collection_facts_table(table_name):
+            raise InputError("--k-donors/--k-samples can only be used with -T/--table CollectionFacts.")
+        if not (import_action or sync_action):
+            raise InputError("--k-donors/--k-samples are only supported for import (-i) and sync (-y) operations.")
     if schema.strip().upper() == "ERIC":
         logging.warning(
             "Schema ERIC should not be edited with this script; it is auto-populated nightly from per-node staging areas."
         )
         confirm_action("Proceed anyway with schema ERIC?")
-    if not table_name:
-        raise InputError("Table name is required. Use -T/--table.")
     if not (import_action or delete_action or export_action or sync_action):
         raise InputError("No action specified. Provide import (-i), delete (-x), export (-e), or sync (-y) options.")
     if csvImportData:

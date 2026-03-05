@@ -148,16 +148,23 @@ Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
 
 - `warning-suppressions.json`
   - reviewed false-positive suppressions
-  - maps `check ID -> entity ID`
+  - supports legacy map format and structured v2 list format with metadata
+  - canonical v2 fields: `check_id`, `entity_id`, optional `entity_type`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`
+  - suppression keys may match either warning IDs (`FT:KAnonViolation`) or module/update IDs exported in fix plans (`FT/facts.k_anonymity.drop_rows_k10`)
   - used only to hide known residual false positives from QC output
 - exported QC update-plan JSON
   - checksum-signed fix-plan artifact produced by `data-check.py -U/--export-update-plan ...`
   - consumed by `qcheck-updater.py`
   - carries both per-update integrity checksums and expected current field values
+  - omits fix proposals that match configured warning suppressions
 - `warning_suppressions.py`
-  - loader/normalizer for the suppression JSON
+  - loader/normalizer for suppression JSON
+  - provides diagnostics for unknown check IDs, stale entity IDs, and expired suppressions
+- `warning-suppressions-manage.py`
+  - CLI for add/list/validate/prune-stale management of suppression entries
 - `warningscontainer.py`
   - applies suppressions before warnings are written to stdout/XLSX
+  - debug mode can print suppressed warning details for runtime traceability
 
 Suppressions are not a substitute for fixing deterministic logic. Prefer code fixes first; keep suppressions for reviewed residual cases.
 
@@ -174,6 +181,7 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 - Keep exporters thin: CLI + orchestration only.
 - Keep shared Directory logic in `directory.py`.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.
+- Keep CLI help output consistent across scripts: standard options first (`-h`, `-v`, `-d`, then Directory target/auth options), then tool-specific options.
 - Use explicit runtime validation for assumptions that depend on input/data/config.
 - Prefer clear exceptions and actionable messages over silent fallback.
 - For reusable/public Python APIs, keep docstrings complete and consistent.
@@ -255,7 +263,8 @@ python3 data-check.py -N | rg 'AI:Curated'
 - `qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
 - Dry-run must follow the same interactive per-update review path as a real apply; the only behavioral difference is that it stops before `save_table(...)`.
 - The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
-- The current updater apply path supports collection-level fixes only. Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
+- The current updater apply path supports collection-scoped fixes: collection metadata updates in `Collections` and explicit row deletions in `CollectionFacts` (for example k-anonymity cleanup). Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
+- Current default QC baseline for fact-row donor k-anonymity is `k=10` (`FT:KAnonViolation`) for public aggregated data; any lower/waived threshold should be an explicitly documented exception (for example pre-anonymized source data).
 - `--list` is the non-writing inspection mode and should use the same canonical multi-value formatting as interactive review so order-only differences are not presented as live mismatches.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
 - Every update also carries `expected_current_value`; apply logic must compare it with the live staging-area value and warn before writing when the values diverge.

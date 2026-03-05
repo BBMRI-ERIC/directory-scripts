@@ -15,7 +15,7 @@ from nncontacts import NNContacts
 
 FIX_PLAN_FORMAT_VERSION = 1
 APPLICABLE_CONFIDENCE_LEVELS = {"certain", "almost_certain", "uncertain"}
-APPLICABLE_MODES = {"append", "replace", "set", "clear", "enable_flag", "disable_flag"}
+APPLICABLE_MODES = {"append", "replace", "set", "clear", "enable_flag", "disable_flag", "delete_rows"}
 
 
 @dataclass
@@ -153,13 +153,50 @@ def _merge_term_explanations(left: list[dict[str, str]], right: Iterable[dict[st
     return merged
 
 
-def collect_fix_proposals(warnings: Iterable[DataCheckWarning]) -> list[EntityFixProposal]:
+def _is_entity_suppressed(
+    suppressions: dict[str, dict[str, str]] | None,
+    check_id: str,
+    entity_id: str,
+) -> bool:
+    if not suppressions:
+        return False
+    check_suppressions = suppressions.get(check_id, {})
+    if isinstance(check_suppressions, set):
+        return entity_id in check_suppressions
+    return entity_id in check_suppressions
+
+
+def _is_proposal_suppressed(
+    proposal: EntityFixProposal,
+    suppressions: dict[str, dict[str, str]] | None,
+) -> bool:
+    if not suppressions:
+        return False
+    candidate_update_ids = [proposal.update_id]
+    module_update_id = f"{proposal.module}/{proposal.update_id}" if proposal.module else proposal.update_id
+    if module_update_id not in candidate_update_ids:
+        candidate_update_ids.append(module_update_id)
+    for candidate_update_id in candidate_update_ids:
+        if _is_entity_suppressed(suppressions, candidate_update_id, proposal.entity_id):
+            return True
+    for source_check_id in proposal.source_check_ids:
+        if _is_entity_suppressed(suppressions, source_check_id, proposal.entity_id):
+            return True
+    return False
+
+
+def collect_fix_proposals(
+    warnings: Iterable[DataCheckWarning],
+    suppressions: dict[str, dict[str, str]] | None = None,
+) -> list[EntityFixProposal]:
     """Return deduplicated fix proposals collected from warnings."""
     merged: dict[tuple[Any, ...], EntityFixProposal] = {}
     for warning in warnings:
         for raw_proposal in getattr(warning, "fix_proposals", []) or []:
             proposal = raw_proposal if isinstance(raw_proposal, EntityFixProposal) else EntityFixProposal.from_dict(raw_proposal)
             proposal = attach_warning_context(proposal, warning)
+            if _is_proposal_suppressed(proposal, suppressions):
+                continue
             key = _proposal_merge_key(proposal)
             existing = merged.get(key)
             if existing is None:
@@ -182,12 +219,19 @@ def collect_fix_proposals(warnings: Iterable[DataCheckWarning]) -> list[EntityFi
     return list(merged.values())
 
 
-def build_fix_plan_payload(warnings: Iterable[DataCheckWarning], *, schema: str, include_withdrawn: bool, only_withdrawn: bool) -> dict[str, Any]:
+def build_fix_plan_payload(
+    warnings: Iterable[DataCheckWarning],
+    *,
+    schema: str,
+    include_withdrawn: bool,
+    only_withdrawn: bool,
+    suppressions: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
     """Return an exported fix-plan payload for the provided warnings."""
     updates = [
         proposal.to_dict()
         for proposal in sorted(
-            collect_fix_proposals(warnings),
+            collect_fix_proposals(warnings, suppressions=suppressions),
             key=lambda item: (item.entity_id, item.module, item.field, item.update_id),
         )
     ]
@@ -209,13 +253,22 @@ def build_fix_plan_payload(warnings: Iterable[DataCheckWarning], *, schema: str,
     return payload
 
 
-def write_fix_plan(path: str | Path, warnings: Iterable[DataCheckWarning], *, schema: str, include_withdrawn: bool, only_withdrawn: bool) -> dict[str, Any]:
+def write_fix_plan(
+    path: str | Path,
+    warnings: Iterable[DataCheckWarning],
+    *,
+    schema: str,
+    include_withdrawn: bool,
+    only_withdrawn: bool,
+    suppressions: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
     """Serialize a fix plan to disk and return the written payload."""
     payload = build_fix_plan_payload(
         warnings,
         schema=schema,
         include_withdrawn=include_withdrawn,
         only_withdrawn=only_withdrawn,
+        suppressions=suppressions,
     )
     output_path = Path(path)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

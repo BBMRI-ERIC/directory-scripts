@@ -36,11 +36,11 @@ cachesList = ['directory', 'geocoding']
 #####################
 
 parser = build_parser()
-parser.add_argument('configFile', help='Provide config file') #NOTE: Provide better description.
-parser.add_argument('-o', '--out-name', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
 add_logging_arguments(parser)
 add_directory_auth_arguments(parser)
 add_directory_schema_argument(parser, default='ERIC')
+parser.add_argument('configFile', help='Provide config file') #NOTE: Provide better description.
+parser.add_argument('-o', '--out-name', '--outName', dest='outName', default='bbmri-directory-5-0', help='Output file name')
 add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')

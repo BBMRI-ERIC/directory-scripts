@@ -349,3 +349,28 @@ def test_fact_alignment_fix_proposals_keep_age_notes_on_age_only():
     assert "Open-ended fact-sheet age groups" not in proposal_map["diagnosis_available"].rationale
     assert "Open-ended fact-sheet age groups" not in proposal_map["materials"].rationale
     assert "Open-ended fact-sheet age groups" in proposal_map["age_low"].rationale
+
+
+def test_fact_alignment_count_fix_rationale_mentions_all_star_requirement():
+    collection = {
+        "id": "bbmri-eric:ID:CZ_demo:collection:col7",
+        "size": "10",
+        "number_of_donors": "8",
+    }
+    facts = [
+        {
+            "id": "f_all_star",
+            "sex": "*",
+            "age_range": "*",
+            "sample_type": "*",
+            "disease": {"name": "*"},
+            "number_of_samples": 25,
+            "number_of_donors": 20,
+        },
+    ]
+
+    proposals = build_fact_alignment_fix_proposals(collection, facts)
+    proposal_map = {proposal.field: proposal for proposal in proposals}
+
+    assert "all-star aggregate fact row" in proposal_map["size"].rationale
+    assert "all-star aggregate fact row" in proposal_map["number_of_donors"].rationale
