@@ -36,7 +36,8 @@ from nncontacts import NNContacts
 from directory import Directory
 from warning_suppressions import (
     DEFAULT_WARNING_SUPPRESSIONS_PATH,
-    load_warning_suppressions,
+    load_warning_suppressions_detailed,
+    summarize_suppression_diagnostics,
 )
 
 from orphacodes import OrphaCodes
@@ -117,15 +118,49 @@ configure_logging(args)
 
 # Main code
 
+
+def collect_known_check_ids_and_prefixes():
+    """Collect check IDs/prefixes from loaded plugins for suppression diagnostics."""
+    check_ids = set()
+    check_prefixes = set()
+    for plugin_info in simplePluginManager.getAllPlugins():
+        plugin_obj = plugin_info.plugin_object
+        prefix = getattr(plugin_obj, "CHECK_ID_PREFIX", None)
+        if not prefix:
+            prefix = getattr(plugin_obj.__class__, "CHECK_ID_PREFIX", None)
+        if not prefix:
+            prefix = plugin_info.name
+        if prefix:
+            check_prefixes.add(prefix)
+        module = inspect.getmodule(plugin_obj.__class__)
+        check_docs = getattr(module, "CHECK_DOCS", None)
+        if isinstance(check_docs, dict):
+            for check_id in check_docs.keys():
+                check_ids.add(str(check_id))
+    return check_ids, check_prefixes
+
 dir = Directory(**build_directory_kwargs(args, pp=pp))
 dir.prepare_ai_cache_checksum_state()
 validation_warn = build_validation_warning_handler(
     enabled=not getattr(args, "suppress_validation_warnings", False),
     logger=log.getLogger("validation"),
 )
-warningContainer = WarningsContainer(
-    load_warning_suppressions(args.warning_suppressions, warn=validation_warn)
-)
+known_check_ids, known_check_prefixes = collect_known_check_ids_and_prefixes()
+suppression_result = load_warning_suppressions_detailed(args.warning_suppressions, warn=validation_warn)
+known_entities = {
+    "BIOBANK": {entity["id"] for entity in dir.getBiobanks()},
+    "COLLECTION": {entity["id"] for entity in dir.getCollections()},
+    "CONTACT": {entity["id"] for entity in dir.getContacts()},
+    "NETWORK": {entity["id"] for entity in dir.getNetworks()},
+}
+for diagnostic in summarize_suppression_diagnostics(
+    suppression_result.entries,
+    known_check_ids=known_check_ids,
+    known_check_prefixes=known_check_prefixes,
+    known_entities=known_entities,
+):
+    validation_warn(diagnostic)
+warningContainer = WarningsContainer(suppression_result.suppressions)
 
 orphacodes = None
 if args.orphacodesfile is not None:
@@ -160,6 +195,9 @@ for pluginInfo in simplePluginManager.getAllPlugins():
        for w in warnings:
            warningContainer.newWarning(w)
 
+if args.debug:
+    warningContainer.dumpSuppressedWarningsDebug()
+
 if not args.nostdout:
     log.info("Outputting warnings on stdout")
     warningContainer.dumpWarnings()
@@ -180,5 +218,6 @@ if args.update_plan:
         schema=dir.getSchema(),
         include_withdrawn=bool(getattr(args, "include_withdrawn", False)),
         only_withdrawn=bool(getattr(args, "only_withdrawn", False)),
+        suppressions=suppression_result.suppressions,
     )
     log.info("   ... exported %d fix proposals", len(payload.get("updates", [])))

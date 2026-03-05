@@ -619,7 +619,7 @@ def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interacti
     assert "Live value mismatch" in caplog.text
 
 
-def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, monkeypatch):
+def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, monkeypatch, caplog):
     module = load_module()
     path = build_plan(tmp_path)
     deleted = []
@@ -709,8 +709,10 @@ def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, mon
         directory_password="secret",
     )
 
-    result = module.run_updater(args)
+    with caplog.at_level(logging.WARNING):
+        result = module.run_updater(args)
 
     assert result == module.EXIT_OK
     assert len(deleted) == 1
     assert sorted(deleted[0]["id"].astype(str).tolist()) == ["fact1", "fact2"]
+    assert "Live value mismatch for facts.k_anonymity.drop_rows_k5" not in caplog.text

@@ -67,3 +67,79 @@ def test_load_fix_plan_reports_checksum_mismatch(tmp_path: Path):
     loaded = load_fix_plan(path)
     assert any("file checksum mismatch" in issue.lower() for issue in loaded.issues)
     assert any("update checksum mismatch" in issue.lower() for issue in loaded.issues)
+
+
+def test_fix_plan_payload_skips_suppressed_update_ids():
+    fix = make_fix_proposal(
+        update_id="FT/facts.k_anonymity.drop_rows_k10",
+        module="FT",
+        entity_type="COLLECTION",
+        entity_id="bbmri-eric:ID:EU_demo:collection:demo",
+        field="facts",
+        mode="delete_rows",
+        confidence="certain",
+        current_value_at_export=[],
+        proposed_value=[{"id": "row1"}],
+        human_explanation="Drop rows violating k-anonymity.",
+    )
+    warning = DataCheckWarning(
+        "FT:KAnonViolation",
+        "",
+        "EU",
+        DataCheckWarningLevel.WARNING,
+        "bbmri-eric:ID:EU_demo:collection:demo",
+        DataCheckEntityType.COLLECTION,
+        "False",
+        "Rows violate donor k-anonymity.",
+        fix_proposals=[fix],
+    )
+    payload = build_fix_plan_payload(
+        [warning],
+        schema="ERIC",
+        include_withdrawn=False,
+        only_withdrawn=False,
+        suppressions={
+            "FT/facts.k_anonymity.drop_rows_k10": {
+                "bbmri-eric:ID:EU_demo:collection:demo": "Reviewed false positive"
+            }
+        },
+    )
+    assert payload["updates"] == []
+
+
+def test_fix_plan_payload_skips_suppressed_module_prefixed_update_id():
+    fix = make_fix_proposal(
+        update_id="facts.k_anonymity.drop_rows_k10",
+        module="FT",
+        entity_type="COLLECTION",
+        entity_id="bbmri-eric:ID:EU_demo:collection:demo",
+        field="facts",
+        mode="delete_rows",
+        confidence="certain",
+        current_value_at_export=[],
+        proposed_value=[{"id": "row1"}],
+        human_explanation="Drop rows violating k-anonymity.",
+    )
+    warning = DataCheckWarning(
+        "FT:KAnonViolation",
+        "",
+        "EU",
+        DataCheckWarningLevel.WARNING,
+        "bbmri-eric:ID:EU_demo:collection:demo",
+        DataCheckEntityType.COLLECTION,
+        "False",
+        "Rows violate donor k-anonymity.",
+        fix_proposals=[fix],
+    )
+    payload = build_fix_plan_payload(
+        [warning],
+        schema="ERIC",
+        include_withdrawn=False,
+        only_withdrawn=False,
+        suppressions={
+            "FT/facts.k_anonymity.drop_rows_k10": {
+                "bbmri-eric:ID:EU_demo:collection:demo": "Reviewed false positive"
+            }
+        },
+    )
+    assert payload["updates"] == []
