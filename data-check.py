@@ -107,10 +107,10 @@ parser.add_argument(
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
 args = parser.parse_args()
 
-if args.schema != "ERIC" and not (args.username and args.password):
+if args.schema != "ERIC" and not args.token and not (args.username and args.password):
     parser.error(
-        "Checking a non-ERIC schema requires -u/--username and -p/--password, "
-        "or DIRECTORYUSERNAME/DIRECTORYPASSWORD in .env."
+        "Checking a non-ERIC schema requires -t/--token or -u/--username and -p/--password, "
+        "or DIRECTORYTOKEN or DIRECTORYUSERNAME/DIRECTORYPASSWORD in .env."
     )
 
 configure_logging(args)

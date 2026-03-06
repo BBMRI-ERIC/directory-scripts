@@ -1,6 +1,7 @@
 from validation_models import (
     FactsheetUpdaterSettingsModel,
     TableModifierSettingsModel,
+    ToolConnectionSettingsModel,
     ValidationError,
 )
 
@@ -88,3 +89,52 @@ def test_table_modifier_settings_model_accepts_tab_separator_alias():
         }
     )
     assert settings.separator == "\t"
+
+
+def test_connection_settings_accepts_token_without_credentials():
+    settings = ToolConnectionSettingsModel.parse_obj(
+        {
+            "directory_target": "https://directory.example.org",
+            "directory_token": "my-secret-token",
+        }
+    )
+    assert settings.directory_token == "my-secret-token"
+    assert settings.directory_username == ""
+    assert settings.directory_password == ""
+
+
+def test_connection_settings_rejects_missing_credentials_and_token():
+    try:
+        ToolConnectionSettingsModel.parse_obj(
+            {
+                "directory_target": "https://directory.example.org",
+            }
+        )
+    except ValidationError as exc:
+        assert "directory_username" in str(exc)
+    else:
+        raise AssertionError("Expected ValidationError when neither token nor credentials provided")
+
+
+def test_table_modifier_passes_token_through():
+    settings = TableModifierSettingsModel.parse_obj(
+        {
+            "schema": "BBMRI-CZ",
+            "table": "CollectionFacts",
+            "directory_target": "https://directory.example.org",
+            "directory_token": "tok-123",
+        }
+    )
+    assert settings.directory_token == "tok-123"
+
+
+def test_factsheet_updater_passes_token_through():
+    settings = FactsheetUpdaterSettingsModel.parse_obj(
+        {
+            "schema": "BBMRI-EU",
+            "collection_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN",
+            "directory_target": "https://directory.example.org",
+            "directory_token": "tok-456",
+        }
+    )
+    assert settings.directory_token == "tok-456"
