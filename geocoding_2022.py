@@ -223,7 +223,7 @@ for column, value in config['Filter dataset'].items():
             filtered_df = new_df
         else:
             filtered_df = pd.concat([filtered_df,new_df])
-            filtered_df.loc[filtered_df.astype(str).drop_duplicates().index]
+            filtered_df = filtered_df.loc[filtered_df.astype(str).drop_duplicates().index]
 
 # If there is not filtered dataframe because not filters were selected, use the original df:
 if not 'filtered_df' in locals():
