@@ -112,6 +112,153 @@ class FactTablesDirectoryStub:
         return self.contact
 
 
+class FactTablesAgeRangeBroadStub:
+    def __init__(self):
+        self.collection = {
+            "id": "col-age",
+            "name": "Collection with broad age range",
+            "biobank": {"id": "bb1"},
+            "contact": {"id": "ct1"},
+            "withdrawn": False,
+            "facts": [{"id": "f-age-1"}, {"id": "f-age-2"}],
+            "size": 20,
+            "number_of_donors": 20,
+            "age_unit": "YEAR",
+            "age_low": 0,
+            "age_high": 99,
+            "sex": ["MALE", "FEMALE"],
+            "materials": ["WHOLE_BLOOD"],
+            "diagnosis_available": [{"name": "urn:miriam:icd:C18"}],
+        }
+        self.biobank = {"id": "bb1", "withdrawn": False, "contact": {"id": "ct1"}}
+        self.contact = {"id": "ct1", "email": "ct1@example.org"}
+        self.facts = [
+            {
+                "id": "f-age-1",
+                "sex": "*",
+                "age_range": "*",
+                "sample_type": "*",
+                "disease": {"name": "*"},
+                "number_of_samples": 20,
+                "number_of_donors": 20,
+            },
+            {
+                "id": "f-age-2",
+                "sex": "MALE",
+                "age_range": "2-80 (years)",
+                "sample_type": "WHOLE_BLOOD",
+                "disease": {"name": "urn:miriam:icd:C18"},
+                "number_of_samples": 20,
+                "number_of_donors": 20,
+            },
+        ]
+
+    def getCollections(self):
+        return [self.collection]
+
+    def getCollectionFacts(self, collection_id):
+        return self.facts
+
+    def getCollectionBiobankId(self, collection_id):
+        return "bb1"
+
+    def getBiobankById(self, biobank_id):
+        return self.biobank
+
+    def getCollectionNN(self, collection_id):
+        return "EU"
+
+    def getCollectionContact(self, collection_id):
+        return self.contact
+
+
+class FactTablesCrcLikeAgeRangeStub:
+    def __init__(self):
+        self.collection = {
+            "id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
+            "name": "CRC-Cohort",
+            "biobank": {"id": "bb1"},
+            "contact": {"id": "ct1"},
+            "withdrawn": False,
+            "facts": [{"id": "f1"}, {"id": "f2"}, {"id": "f3"}, {"id": "f4"}, {"id": "f5"}],
+            "size": 100,
+            "number_of_donors": 90,
+            "age_unit": "YEAR",
+            "age_low": 18,
+            "age_high": 99,
+            "sex": ["MALE", "FEMALE"],
+            "materials": ["WHOLE_BLOOD"],
+            "diagnosis_available": [{"name": "urn:miriam:icd:C18"}],
+        }
+        self.biobank = {"id": "bb1", "withdrawn": False, "contact": {"id": "ct1"}}
+        self.contact = {"id": "ct1", "email": "ct1@example.org"}
+        self.facts = [
+            {
+                "id": "f1",
+                "sex": "*",
+                "age_range": "*",
+                "sample_type": "*",
+                "disease": {"name": "*"},
+                "number_of_samples": 100,
+                "number_of_donors": 90,
+            },
+            {
+                "id": "f2",
+                "sex": "*",
+                "age_range": "Child",
+                "sample_type": "*",
+                "disease": {"name": "*"},
+                "number_of_samples": 1,
+                "number_of_donors": 1,
+            },
+            {
+                "id": "f3",
+                "sex": "*",
+                "age_range": "Young Adult",
+                "sample_type": "*",
+                "disease": {"name": "*"},
+                "number_of_samples": 45,
+                "number_of_donors": 13,
+            },
+            {
+                "id": "f4",
+                "sex": "*",
+                "age_range": "Middle-aged",
+                "sample_type": "*",
+                "disease": {"name": "*"},
+                "number_of_samples": 55,
+                "number_of_donors": 45,
+            },
+            {
+                "id": "f5",
+                "sex": "*",
+                "age_range": "Aged (>80 years)",
+                "sample_type": "*",
+                "disease": {"name": "*"},
+                "number_of_samples": 10,
+                "number_of_donors": 9,
+            },
+        ]
+
+    def getCollections(self):
+        return [self.collection]
+
+    def getCollectionFacts(self, collection_id):
+        return self.facts
+
+    def getCollectionBiobankId(self, collection_id):
+        return "bb1"
+
+    def getBiobankById(self, biobank_id):
+        return self.biobank
+
+    def getCollectionNN(self, collection_id):
+        return "EU"
+
+    def getCollectionContact(self, collection_id):
+        return self.contact
+
+
 def test_facttables_check_reports_all_star_consistency_warnings():
     plugin = FactTables()
     warnings = plugin.check(FactTablesDirectoryStub(), args=None)
@@ -166,3 +313,31 @@ def test_facttables_check_attaches_k_anonymity_drop_rows_fix_proposal():
         proposal.entity_id == "col3" and set(proposal.proposed_value) >= {"f3b", "f3c"}
         for proposal in kanon_fix_proposals
     )
+
+
+def test_facttables_age_range_broad_warning_includes_current_and_fact_ranges():
+    plugin = FactTables()
+    warnings = plugin.check(FactTablesAgeRangeBroadStub(), args=None)
+
+    broad_warnings = [warning for warning in warnings if warning.dataCheckID == "FT:AgeRangeBroad"]
+    assert broad_warnings
+    message = broad_warnings[0].message
+    assert "Collection age range (0-99 YEAR)" in message
+    assert "fact-sheet age range (2-80 YEAR)" in message
+    assert "suggested range based on the fact sheet is 2-80 YEAR" in message
+
+
+def test_facttables_age_range_uses_label_based_rows_for_crc_like_cohort():
+    plugin = FactTables()
+    warnings = plugin.check(FactTablesCrcLikeAgeRangeStub(), args=None)
+
+    broad_warnings = [warning for warning in warnings if warning.dataCheckID == "FT:AgeRangeBroad"]
+    assert not broad_warnings
+
+    mismatch_warnings = [warning for warning in warnings if warning.dataCheckID == "FT:AgeRangeMismatch"]
+    assert mismatch_warnings
+    message = mismatch_warnings[0].message
+    assert "Child" not in message
+    assert "Fact-sheet age range (2+ YEAR (open upper bound))" in message
+    assert "collection age range (18-99 YEAR)" in message
+    assert "Open-ended fact-sheet age groups are present" in message
