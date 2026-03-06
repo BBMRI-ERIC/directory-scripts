@@ -94,7 +94,9 @@ Email validation in `ContactFields` is split into local/static checks and option
 
 Known false positives can be suppressed in `warning-suppressions.json`:
 - legacy mapping `check ID -> entity ID` is still accepted
-- recommended format is a structured list with metadata (`check_id`, `entity_id`, optional `entity_type`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`)
+- recommended format is a structured list with metadata (`check_id`, `entity_id`, optional `entity_type`, `suppress_warning`, `suppress_fix`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`)
+- by default one structured suppression entry suppresses both the warning row and attached QC fix proposals
+- set `suppress_warning: false` or `suppress_fix: false` when only one side should be suppressed
 - suppressed warnings are omitted from stdout and XLSX output
 - matching QC fix proposals are also omitted from `data-check.py --export-update-plan ...`
 - suppression keys can target either warning check IDs (for example `FT:KAnonViolation`) or module-prefixed update IDs (for example `FT/facts.k_anonymity.drop_rows_k10`)

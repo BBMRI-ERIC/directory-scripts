@@ -55,6 +55,16 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--reason", default="", help="Reason for suppression.")
     add_parser.add_argument("--added-by", default="", help="Who approved/added the suppression.")
     add_parser.add_argument(
+        "--warning-only",
+        action="store_true",
+        help="Suppress only the runtime warning, not attached fix proposals.",
+    )
+    add_parser.add_argument(
+        "--fix-only",
+        action="store_true",
+        help="Suppress only attached fix proposals, not the runtime warning.",
+    )
+    add_parser.add_argument(
         "--added-on",
         default=None,
         help="Date (YYYY-MM-DD). Defaults to current date when omitted.",
@@ -107,10 +117,16 @@ def _parse_entry_from_args(args: argparse.Namespace) -> WarningSuppressionEntryM
     added_on = args.added_on.strip() if isinstance(args.added_on, str) else args.added_on
     if not added_on:
         added_on = date.today().isoformat()
+    if args.warning_only and args.fix_only:
+        raise ValueError("Use either --warning-only or --fix-only, not both.")
+    suppress_warning = not args.fix_only
+    suppress_fix = not args.warning_only
     payload = {
         "check_id": args.check_id,
         "entity_id": args.entity_id,
         "entity_type": args.entity_type,
+        "suppress_warning": suppress_warning,
+        "suppress_fix": suppress_fix,
         "reason": args.reason,
         "added_by": args.added_by,
         "added_on": added_on,
@@ -131,6 +147,12 @@ def command_list(args: argparse.Namespace) -> int:
         pieces = [f"{entry.check_id} :: {entry.entity_id}"]
         if entry.entity_type:
             pieces.append(f"type={entry.entity_type}")
+        targets = []
+        if entry.suppress_warning:
+            targets.append("warning")
+        if entry.suppress_fix:
+            targets.append("fix")
+        pieces.append(f"targets={','.join(targets) if targets else 'none'}")
         if entry.reason:
             pieces.append(f"reason={entry.reason}")
         if entry.expires_on:

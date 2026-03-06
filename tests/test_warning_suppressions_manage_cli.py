@@ -85,3 +85,26 @@ def test_warning_suppressions_manage_add_defaults_added_on_to_today(tmp_path):
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["suppressions"][0]["added_on"] == date.today().isoformat()
+
+
+def test_warning_suppressions_manage_add_fix_only_records_target_flags(tmp_path):
+    path = tmp_path / "warning-suppressions.json"
+    path.write_text("{}", encoding="utf-8")
+
+    add_result = run_cli(
+        "--path",
+        str(path),
+        "add",
+        "--check-id",
+        "FT/facts.k_anonymity.drop_rows_k10",
+        "--entity-id",
+        "bbmri-eric:ID:EU_demo:collection:demo",
+        "--fix-only",
+    )
+    assert add_result.returncode == 0
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = payload["suppressions"][0]
+    assert entry["check_id"] == "FT/facts.k_anonymity.drop_rows_k10"
+    assert entry["suppress_warning"] is False
+    assert "suppress_fix" not in entry

@@ -153,8 +153,9 @@ Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
 - `warning-suppressions.json`
   - reviewed false-positive suppressions
   - supports legacy map format and structured v2 list format with metadata
-  - canonical v2 fields: `check_id`, `entity_id`, optional `entity_type`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`
-  - suppression keys may match either warning IDs (`FT:KAnonViolation`) or module/update IDs exported in fix plans (`FT/facts.k_anonymity.drop_rows_k10`)
+  - canonical v2 fields: `check_id`, `entity_id`, optional `entity_type`, `suppress_warning`, `suppress_fix`, `reason`, `added_by`, `added_on`, `expires_on`, `ticket`
+  - a single structured entry can suppress the runtime warning, the exported QC fixes, or both; default is both
+  - warning IDs (`FT:KAnonViolation`) suppress attached fixes too when `suppress_fix` is left enabled; module/update IDs (`FT/facts.k_anonymity.drop_rows_k10`) still suppress only the matching fix proposal path
   - used only to hide known residual false positives from QC output
 - exported QC update-plan JSON
   - checksum-signed fix-plan artifact produced by `data-check.py -U/--export-update-plan ...`

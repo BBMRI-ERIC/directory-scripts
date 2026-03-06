@@ -254,6 +254,8 @@ class WarningSuppressionEntryModel(_BaseModel):
     check_id: str
     entity_id: str
     entity_type: str = ""
+    suppress_warning: bool = True
+    suppress_fix: bool = True
     reason: str = ""
     added_by: str = ""
     added_on: str = ""
@@ -291,6 +293,21 @@ class WarningSuppressionEntryModel(_BaseModel):
                 )
             )
 
+        def parse_optional_bool(field_name: str, default: bool) -> bool:
+            value = payload.get(field_name)
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                normalized = value.strip().lower()
+                if normalized in {"true", "1", "yes", "y", "on"}:
+                    return True
+                if normalized in {"false", "0", "no", "n", "off"}:
+                    return False
+            errors.append(_make_error((field_name,), "must be a boolean"))
+            return default
+
         def parse_optional_date(field_name: str) -> str:
             value = payload.get(field_name)
             if value in (None, ""):
@@ -306,6 +323,8 @@ class WarningSuppressionEntryModel(_BaseModel):
             return text
 
         added_by = "" if payload.get("added_by") is None else str(payload.get("added_by")).strip()
+        suppress_warning = parse_optional_bool("suppress_warning", True)
+        suppress_fix = parse_optional_bool("suppress_fix", True)
         added_on = parse_optional_date("added_on")
         expires_on = parse_optional_date("expires_on")
         ticket = "" if payload.get("ticket") is None else str(payload.get("ticket")).strip()
@@ -318,6 +337,8 @@ class WarningSuppressionEntryModel(_BaseModel):
                 "check_id",
                 "entity_id",
                 "entity_type",
+                "suppress_warning",
+                "suppress_fix",
                 "reason",
                 "added_by",
                 "added_on",
@@ -331,6 +352,8 @@ class WarningSuppressionEntryModel(_BaseModel):
             check_id=check_id,
             entity_id=entity_id,
             entity_type=normalized_entity_type,
+            suppress_warning=suppress_warning,
+            suppress_fix=suppress_fix,
             reason=normalized_reason,
             added_by=added_by,
             added_on=added_on,

@@ -189,7 +189,14 @@ def test_warning_suppressions_detailed_loader_parses_metadata_fields(tmp_path):
     entry = result.entries[0]
     assert entry.entity_type == "COLLECTION"
     assert entry.expires_on == "2026-12-31"
-    assert result.suppressions == {
+    assert entry.suppress_warning is True
+    assert entry.suppress_fix is True
+    assert result.warning_suppressions == {
+        "FT:KAnonViolation": {
+            "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort": "Reviewed false positive"
+        }
+    }
+    assert result.fix_suppressions == {
         "FT:KAnonViolation": {
             "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort": "Reviewed false positive"
         }
@@ -253,3 +260,63 @@ def test_warning_suppression_diagnostics_accept_module_prefixed_update_ids():
         known_entities={"COLLECTION": {"bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN"}},
     )
     assert not any("unknown check_id" in item for item in diagnostics)
+
+
+def test_warning_suppressions_entry_can_target_warning_only(tmp_path):
+    config_path = tmp_path / "warning-suppressions.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "suppressions": [
+                    {
+                        "check_id": "FT:KAnonViolation",
+                        "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN",
+                        "entity_type": "COLLECTION",
+                        "suppress_warning": True,
+                        "suppress_fix": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = load_warning_suppressions_detailed(config_path)
+
+    assert result.warning_suppressions == {
+        "FT:KAnonViolation": {
+            "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN": ""
+        }
+    }
+    assert result.fix_suppressions == {}
+
+
+def test_warning_suppressions_entry_can_target_fix_only(tmp_path):
+    config_path = tmp_path / "warning-suppressions.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "suppressions": [
+                    {
+                        "check_id": "FT/facts.k_anonymity.drop_rows_k10",
+                        "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN",
+                        "entity_type": "COLLECTION",
+                        "suppress_warning": False,
+                        "suppress_fix": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = load_warning_suppressions_detailed(config_path)
+
+    assert result.warning_suppressions == {}
+    assert result.fix_suppressions == {
+        "FT/facts.k_anonymity.drop_rows_k10": {
+            "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN": ""
+        }
+    }
