@@ -31,6 +31,7 @@ load_dotenv()
 DEFAULT_TARGET = os.getenv("DIRECTORYTARGET")
 DEFAULT_USERNAME = os.getenv("DIRECTORYUSERNAME")
 DEFAULT_PASSWORD = os.getenv("DIRECTORYPASSWORD")
+DEFAULT_TOKEN = os.getenv("DIRECTORYTOKEN")
 
 EXIT_OK = 0
 EXIT_RUNTIME_ERROR = 1
@@ -119,6 +120,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--directory-token",
+        default=DEFAULT_TOKEN,
+        help="Directory access token (overrides DIRECTORYTOKEN env var, alternative to username/password).",
+    )
+    parser.add_argument(
         "--suppress-validation-warnings",
         action="store_true",
         help="reserved for suppressing non-fatal local validation warnings",
@@ -156,6 +162,7 @@ def validate_args(args: argparse.Namespace) -> None:
                 "directory_target": args.directory_target,
                 "directory_username": args.directory_username,
                 "directory_password": args.directory_password,
+                "directory_token": args.directory_token,
             }
         )
     except ValidationError as exc:
@@ -223,7 +230,7 @@ def update_collection_from_facts(args: argparse.Namespace) -> int:
     pp = PrettyPrinter(indent=2)
     if args.debug:
         logging.debug("Preparing live ERIC analysis snapshot for %s.", args.collection_id)
-    eric_directory = Directory(
+    directory_kwargs = dict(
         schema="ERIC",
         purgeCaches=["directory"],
         debug=args.debug,
@@ -231,6 +238,9 @@ def update_collection_from_facts(args: argparse.Namespace) -> int:
         directory_url=args.directory_target,
         include_withdrawn_entities=True,
     )
+    if args.directory_token:
+        directory_kwargs["token"] = args.directory_token
+    eric_directory = Directory(**directory_kwargs)
     eric_directory.getCollectionById(args.collection_id, raise_on_missing=True)
     facts = eric_directory.getCollectionFacts(args.collection_id)
     if not facts:
@@ -253,11 +263,17 @@ def update_collection_from_facts(args: argparse.Namespace) -> int:
 
     if args.debug:
         logging.debug("Connecting to Directory target %s.", args.directory_target)
-        logging.debug("Directory username: %s", args.directory_username)
-        logging.debug("Directory password: %s", args.directory_password)
 
-    with DirectorySession(url=args.directory_target) as session:
-        session.signin(args.directory_username, args.directory_password)
+    client_kwargs = {"url": args.directory_target}
+    if args.directory_token:
+        client_kwargs["token"] = args.directory_token
+    with DirectorySession(**client_kwargs) as session:
+        if args.directory_token:
+            logging.debug("Using token-based authentication.")
+        else:
+            if args.debug:
+                logging.debug("Signing in to Directory as %s.", args.directory_username)
+            session.signin(args.directory_username, args.directory_password)
         _, target_row = fetch_target_collection_row(
             session,
             schema=args.schema,

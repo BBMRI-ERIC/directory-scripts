@@ -103,6 +103,40 @@ def test_directory_auth_arguments_default_from_environment(monkeypatch):
     assert args.password == "env-secret"
 
 
+def test_directory_auth_arguments_include_token():
+    parser = build_parser()
+    add_directory_auth_arguments(parser)
+
+    args = parser.parse_args(["-t", "my-token"])
+
+    assert args.token == "my-token"
+
+
+def test_directory_auth_token_default_from_environment(monkeypatch):
+    monkeypatch.setenv("DIRECTORYTOKEN", "env-token")
+    reloaded = importlib.reload(cli_common)
+    parser = reloaded.build_parser()
+    reloaded.add_directory_auth_arguments(parser)
+
+    args = parser.parse_args([])
+
+    assert args.token == "env-token"
+
+
+def test_build_directory_kwargs_passes_token():
+    parser = build_parser()
+    add_directory_auth_arguments(parser)
+    add_directory_schema_argument(parser, default="ERIC")
+    add_withdrawn_scope_arguments(parser)
+    add_purge_cache_arguments(parser, ["directory"])
+
+    args = parser.parse_args(["-t", "my-token"])
+
+    kwargs = build_directory_kwargs(args)
+
+    assert kwargs["token"] == "my-token"
+
+
 def test_qc_arguments_support_short_option_for_disabling_all_remote_checks():
     parser = build_parser()
     add_remote_check_disable_arguments(parser, ["emails", "geocoding"])
