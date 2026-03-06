@@ -20,6 +20,8 @@ class WarningSuppressionLoadResult:
     """Detailed warning-suppression load result."""
 
     suppressions: dict[str, dict[str, str]]
+    warning_suppressions: dict[str, dict[str, str]]
+    fix_suppressions: dict[str, dict[str, str]]
     entries: list[WarningSuppressionEntryModel]
     issues: list[str]
 
@@ -34,6 +36,10 @@ def serialize_suppression_entries(entries: list[WarningSuppressionEntryModel]) -
         }
         if entry.entity_type:
             payload["entity_type"] = entry.entity_type
+        if not entry.suppress_warning:
+            payload["suppress_warning"] = False
+        if not entry.suppress_fix:
+            payload["suppress_fix"] = False
         if entry.reason:
             payload["reason"] = entry.reason
         if entry.added_by:
@@ -62,7 +68,7 @@ def load_warning_suppressions(
     warn=None,
 ) -> dict[str, dict[str, str]]:
     """Return ``check_id -> entity_id -> reason`` suppressions from JSON."""
-    return load_warning_suppressions_detailed(path, warn=warn).suppressions
+    return load_warning_suppressions_detailed(path, warn=warn).warning_suppressions
 
 
 def load_warning_suppressions_detailed(
@@ -72,11 +78,23 @@ def load_warning_suppressions_detailed(
 ) -> WarningSuppressionLoadResult:
     """Return detailed suppression load result for diagnostics and tooling."""
     if path is None:
-        return WarningSuppressionLoadResult(suppressions={}, entries=[], issues=[])
+        return WarningSuppressionLoadResult(
+            suppressions={},
+            warning_suppressions={},
+            fix_suppressions={},
+            entries=[],
+            issues=[],
+        )
     config_path = Path(path)
     if not config_path.exists():
         logging.debug("Warning suppression file %s does not exist.", config_path)
-        return WarningSuppressionLoadResult(suppressions={}, entries=[], issues=[])
+        return WarningSuppressionLoadResult(
+            suppressions={},
+            warning_suppressions={},
+            fix_suppressions={},
+            entries=[],
+            issues=[],
+        )
 
     try:
         with config_path.open("r", encoding="utf-8") as handle:
@@ -85,22 +103,41 @@ def load_warning_suppressions_detailed(
         message = f"{config_path}: invalid JSON: {exc}"
         if warn is not None:
             warn(message)
-        return WarningSuppressionLoadResult(suppressions={}, entries=[], issues=[message])
+        return WarningSuppressionLoadResult(
+            suppressions={},
+            warning_suppressions={},
+            fix_suppressions={},
+            entries=[],
+            issues=[message],
+        )
     try:
         entries = _parse_suppressions_payload(payload, warn=warn, source=str(config_path))
     except ValueError as exc:
         message = f"{config_path}: {exc}"
         if warn is not None:
             warn(message)
-        return WarningSuppressionLoadResult(suppressions={}, entries=[], issues=[message])
-    suppressions = _entries_to_suppression_map(entries)
+        return WarningSuppressionLoadResult(
+            suppressions={},
+            warning_suppressions={},
+            fix_suppressions={},
+            entries=[],
+            issues=[message],
+        )
+    warning_suppressions = _entries_to_suppression_map(entries, target="warning")
+    fix_suppressions = _entries_to_suppression_map(entries, target="fix")
     logging.info(
         "Loaded %s warning suppression(s) across %s check ID(s) from %s.",
-        sum(len(entities) for entities in suppressions.values()),
-        len(suppressions),
+        sum(len(entities) for entities in warning_suppressions.values()),
+        len(warning_suppressions),
         config_path,
     )
-    return WarningSuppressionLoadResult(suppressions=suppressions, entries=entries, issues=[])
+    return WarningSuppressionLoadResult(
+        suppressions=warning_suppressions,
+        warning_suppressions=warning_suppressions,
+        fix_suppressions=fix_suppressions,
+        entries=entries,
+        issues=[],
+    )
 
 
 def summarize_suppression_diagnostics(
@@ -251,9 +288,15 @@ def _parse_suppression_list(items: Any, *, warn=None, source: str) -> list[Warni
 
 def _entries_to_suppression_map(
     entries: list[WarningSuppressionEntryModel],
+    *,
+    target: str,
 ) -> dict[str, dict[str, str]]:
     suppressions: dict[str, dict[str, str]] = {}
     for record in entries:
+        if target == "warning" and not record.suppress_warning:
+            continue
+        if target == "fix" and not record.suppress_fix:
+            continue
         suppressions.setdefault(record.check_id, {})[record.entity_id] = record.reason
     return suppressions
 

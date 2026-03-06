@@ -160,7 +160,7 @@ for diagnostic in summarize_suppression_diagnostics(
     known_entities=known_entities,
 ):
     validation_warn(diagnostic)
-warningContainer = WarningsContainer(suppression_result.suppressions)
+warningContainer = WarningsContainer(suppression_result.warning_suppressions)
 
 orphacodes = None
 if args.orphacodesfile is not None:
@@ -218,6 +218,6 @@ if args.update_plan:
         schema=dir.getSchema(),
         include_withdrawn=bool(getattr(args, "include_withdrawn", False)),
         only_withdrawn=bool(getattr(args, "only_withdrawn", False)),
-        suppressions=suppression_result.suppressions,
+        suppressions=suppression_result.fix_suppressions,
     )
     log.info("   ... exported %d fix proposals", len(payload.get("updates", [])))
