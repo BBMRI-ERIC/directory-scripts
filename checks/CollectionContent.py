@@ -396,6 +396,7 @@ class CollectionContent(IPlugin):
 				]))
 
 			age_unit = None
+			age_units = []
 			if 'age_unit' in collection:
 				age_units = [collection['age_unit']]
 				if len(age_units) > 1:
