@@ -357,7 +357,7 @@ class CollectionContent(IPlugin):
 				for d in diags_orpha:
 					icd10codes = orphacodes.orphaToIcd10(d)
 					for c in icd10codes:
-						if 'urn:miriam:icd:' + c['code'] not in diags_icd10:
+						if c['code'] not in diags_icd10:
 							warnings.append(DataCheckWarning(make_check_id(self, "OrphaIcdSuggest"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "ORPHA code %s provided, but its translation to ICD-10 as %s is not provided (mapping is of %s type). It is recommended to provide this translation explicitly until Directory implements full semantic mapping search."%(d,c['code'],c['mapping_type'])))
 
 			modalities = []
