@@ -129,6 +129,7 @@
 - For `directory-stats.py` changes, keep cross-checks against other exporters where totals overlap, especially `exporter-all.py`.
 - When changing `nncontacts.py`, verify both warning routing and any staging/member-area classification tests.
 - When changing fact-sheet descriptor alignment logic, validate both `checks/FactTables.py` and `collection-factsheet-descriptor-updater.py` because they intentionally share comparison/derivation rules.
+- Age-range checks in `checks/FactTables.py` must reuse the structured age parsing from `fact_descriptor_sync.py` (`derive_age_range_update`) instead of ad hoc digit extraction; labels such as `Child`, `Young Adult`, `Adult`, `Middle-aged`, and aggregate `*` age rows must not be silently dropped from the effective fact-sheet span.
 - When changing structured QC fix proposals, validate both `data-check.py --export-update-plan ...` and `qcheck-updater.py`, because the warning emission and updater apply path must stay aligned.
 - When changing check documentation metadata or manual extraction, test both the local plugin tests and `../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py`.
 
