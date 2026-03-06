@@ -283,7 +283,7 @@ class CollectionContent(IPlugin):
 						diags_icd10.append(re.sub('^urn:miriam:icd:','',d['name']))
 					elif re.search('^ORPHA:', d['name']):
 						if dir.issetOrphaCodesMapper():
-							if orphacodes.isValidOrphaCode(d):
+							if orphacodes.isValidOrphaCode(d['name']):
 								diags_orpha.append(re.sub('^ORPHA:', '', d['name']))
 							else:
 								warnings.append(DataCheckWarning(make_check_id(self, "OrphaInvalid"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Invalid ORPHA code found: %s" % (d['name'])))
