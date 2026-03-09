@@ -80,6 +80,8 @@ class OrphaCodes:
         return self.__icd10_to_orpha_code_map[code]
 
     def orphaToNamesList(self, code : str) -> List[str]:
+        if code not in self.__orpha_to_name_map:
+            return None
         return self.__orpha_to_name_map[code]
 
     def orphaToNamesString(self, code : str) -> str:
