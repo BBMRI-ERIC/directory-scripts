@@ -97,7 +97,8 @@ if args.negotiator:
         for collection in collectionList:
             biobankId = dir.getCollectionBiobankId(collection['id'])
             biobank = dir.getBiobankById(biobankId)
-            print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'])
+            biobankName = biobank['name'] if biobank is not None else "N/A"
+            print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobankName)
 
     if not args.nostdout:
         for c in contactsToCollections:
