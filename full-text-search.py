@@ -159,6 +159,9 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
         log.debug("Analyzing collection " + collection['id'])
         biobankId = dir.getCollectionBiobankId(collection['id'])
         biobank = dir.getBiobankById(biobankId)
+        if biobank is None:
+            log.warning("Biobank %s not found for collection %s, skipping" % (biobankId, collection['id']))
+            continue
         contactId = None
         if 'contact' in collection:
             contactId = collection['contact']['id']
