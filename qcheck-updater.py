@@ -15,9 +15,9 @@ from pprint import PrettyPrinter
 
 import pandas as pd
 from dotenv import load_dotenv
-from molgenis_emx2.directory_client.directory_client import DirectorySession
 
 from directory import Directory
+from directory_session_compat import DirectorySession
 from duo_terms import detect_duo_term_storage_style, normalize_duo_term_ids, serialize_duo_term_id
 from fact_descriptor_sync import parse_collection_multi_value_field
 from fix_proposals import EntityFixProposal, load_fix_plan
@@ -703,11 +703,12 @@ def run_updater(args: argparse.Namespace) -> int:
         logging.info("All selected updates are conflicting or unsupported; nothing to apply.")
         return EXIT_OK
 
+    directory_token = getattr(args, "directory_token", None)
     client_kwargs = {"url": args.directory_target}
-    if args.directory_token:
-        client_kwargs["token"] = args.directory_token
+    if directory_token:
+        client_kwargs["token"] = directory_token
     with DirectorySession(**client_kwargs) as session:
-        if args.directory_token:
+        if directory_token:
             logging.debug("Using token-based authentication.")
         else:
             session.signin(args.directory_username, args.directory_password)

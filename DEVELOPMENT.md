@@ -18,6 +18,10 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - `directory.py`
   - single shared abstraction for Directory / Molgenis access
   - owns shared data retrieval, schema handling, withdrawal scoping, and graph helpers
+- `directory_session_compat.py`
+  - compatibility wrapper for write-capable Molgenis sessions
+  - provides the repository-local `DirectorySession` context-manager surface on top of `molgenis_emx2_pyclient.Client`
+  - use this from maintenance CLIs instead of importing the removed legacy `molgenis_emx2.directory_client...` path directly
 - `checks/`
   - owns actual QC logic that emits `DataCheckWarning(...)`
 - helper modules such as `nncontacts.py`, `warningscontainer.py`, `warning_suppressions.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`, `fact_descriptor_sync.py`
@@ -188,9 +192,11 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 - Keep shared Directory logic in `directory.py`.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.
 - Keep CLI help output consistent across scripts: standard options first (`-h`, `-v`, `-d`, then Directory target/auth options), then tool-specific options.
+- Keep short options globally consistent inside one CLI: do not reuse `-t` for tool-specific meanings in scripts that already expose `-t/--token` via shared auth helpers.
 - Use explicit runtime validation for assumptions that depend on input/data/config.
 - Prefer clear exceptions and actionable messages over silent fallback.
 - For reusable/public Python APIs, keep docstrings complete and consistent.
+- For helper entry points that may be called from tests with ad hoc `argparse.Namespace` objects, access optional CLI attributes defensively with `getattr(..., None)` instead of assuming every parser-added attribute is present.
 
 ## Testing
 

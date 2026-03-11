@@ -408,7 +408,7 @@ def test_directory_stats_script_supports_comma_delimited_filters_and_collection_
     globals_dict, _, _ = _run_script(
         monkeypatch,
         "directory-stats.py",
-        ["-N", "-c", "CZ,DE", "-t", "CASE_CONTROL,POPULATION"],
+        ["-N", "-c", "CZ,DE", "-T", "CASE_CONTROL,POPULATION"],
     )
 
     stats_df = globals_dict["stats_df"]

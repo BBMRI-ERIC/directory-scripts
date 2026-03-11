@@ -14,9 +14,9 @@ from pprint import PrettyPrinter
 
 import pandas as pd
 from dotenv import load_dotenv
-from molgenis_emx2.directory_client.directory_client import DirectorySession
 
 from directory import Directory
+from directory_session_compat import DirectorySession
 from fact_descriptor_sync import (
     apply_descriptor_proposal_to_dataframe_row,
     build_collection_descriptor_proposal,
@@ -238,8 +238,9 @@ def update_collection_from_facts(args: argparse.Namespace) -> int:
         directory_url=args.directory_target,
         include_withdrawn_entities=True,
     )
-    if args.directory_token:
-        directory_kwargs["token"] = args.directory_token
+    directory_token = getattr(args, "directory_token", None)
+    if directory_token:
+        directory_kwargs["token"] = directory_token
     eric_directory = Directory(**directory_kwargs)
     eric_directory.getCollectionById(args.collection_id, raise_on_missing=True)
     facts = eric_directory.getCollectionFacts(args.collection_id)
@@ -265,10 +266,10 @@ def update_collection_from_facts(args: argparse.Namespace) -> int:
         logging.debug("Connecting to Directory target %s.", args.directory_target)
 
     client_kwargs = {"url": args.directory_target}
-    if args.directory_token:
-        client_kwargs["token"] = args.directory_token
+    if directory_token:
+        client_kwargs["token"] = directory_token
     with DirectorySession(**client_kwargs) as session:
-        if args.directory_token:
+        if directory_token:
             logging.debug("Using token-based authentication.")
         else:
             if args.debug:

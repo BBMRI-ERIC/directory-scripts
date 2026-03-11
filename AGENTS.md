@@ -27,6 +27,7 @@
 - Avoid duplicating API logic in scripts; import and reuse the shared modules instead.
 - Use assertive runtime validation for assumptions that depend on input/data/configuration; raise clear exceptions instead of relying on `assert` for runtime safety.
 - Optional plugin-side dependencies must not be imported in a way that prevents the whole plugin from loading; keep local/deterministic checks active and degrade gracefully when optional remote-validation packages are missing.
+- Write-capable maintenance CLIs should import `DirectorySession` from the local `directory_session_compat.py` wrapper around `molgenis_emx2_pyclient.Client`; do not import the removed legacy `molgenis_emx2.directory_client...` package path directly.
 - `nncontacts.py` is the single source of truth for BBMRI node contacts, member-node classification, staging-area parsing, and non-member/global area detection; do not re-encode that logic elsewhere.
 - Keep permitted non-country staging prefixes (currently `EXT`, `EU`, `IARC`) and staging-prefix-to-schema expectations in `nncontacts.py`; checks and tools such as `ValidateIDs` and `collection-factsheet-descriptor-updater.py` must use that shared configuration rather than hardcoding `EXT` rules locally.
 
@@ -69,6 +70,7 @@
 - exported QC fix-plan `module` values must match the visible QC check-prefix family seen by users (`AP`, `CC`, `C19`, `FT`, `TXT`); keep semantic detail in `update_id`, not in a second competing module naming scheme.
 - Structured QC fix proposals must carry human-readable explanations, expected current values, confidence (`certain`, `almost_certain`, `uncertain`), and any validated ontology-term explanations needed for user review.
 - `qcheck-updater.py` must reuse `.env` (`DIRECTORYTARGET`, `DIRECTORYUSERNAME`, `DIRECTORYPASSWORD`) consistently with the other write-capable tools.
+- Helper functions used from tests as well as from CLI entry points should read optional argparse attributes defensively via `getattr(..., None)` when older/unit-test `Namespace` instances may not carry newly added options such as `directory_token`.
 - `qcheck-updater.py` must support exact-entity, hierarchy-root, staging-area, check-id, update-id, module, and confidence filtering; the hierarchy can be biobank->collections or collection->subcollections, but not contact-sharing relationships.
 - `qcheck-updater.py` must support a human-readable `--list` mode for inspecting updates without applying them.
 - `qcheck-updater.py` dry runs must execute the same interactive per-update review logic as real applies and differ only in skipping the final write to the Directory.
@@ -93,6 +95,7 @@
 - Table tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--id-regex`, `--collection-id`) and should always be documented in `README.md` with examples.
 - `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is server-non-atomic (full-table uses truncate+import; filtered scope uses delete+import), but the script must create a temporary full-column backup of the sync scope and attempt rollback automatically when sync import fails.
 - For CLI help consistency, keep standard options first and in stable order: `-h`, `-v`, `-d`, then Directory auth/target options, then tool-specific options.
+- When using shared auth helpers that already reserve `-t/--token`, do not reuse `-t` for unrelated tool-specific options in the same CLI; prefer another short option and keep `README.md` examples aligned.
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.

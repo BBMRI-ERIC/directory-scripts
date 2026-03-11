@@ -226,7 +226,7 @@ python3 COVID19DataPortal_XMLFromBBMRIDirectory.py -x bbmriDirectory_Covid19Data
 ```bash
 python3 add_orphacodes.py -d directory.xlsx -O en_product1.xml -o directory-with-orpha.xlsx
 ```
-- **directory-stats.py** - per-biobank statistics for collections, samples, donors, services, collection types, service types, and fact-sheet consistency. Sample and donor totals combine explicit countable values with order-of-magnitude fallback estimates for top-level collections only, so subcollections do not double-count parent holdings. Fact-sheet warnings report missing/invalid all-star rows and mismatches against collection-level totals. Withdrawn biobanks and collections are excluded by default; use `-w/--include-withdrawn` to include them, or `--only-withdrawn` to report only withdrawn content. You can filter by biobank `country` (`-c/--country`), by staging area code parsed from the biobank ID (`-A/--staging-area`, for example `EXT`), and by collection type (`-t/--collection-type`). Filter values accept comma-delimited OR semantics within each filter, while different filters are combined as AND. Biobank rows are listed in lexicographic ID order, except pure `EXT` views, which are sorted by country first and then by ID to make non-member output easier to scan.  
+- **directory-stats.py** - per-biobank statistics for collections, samples, donors, services, collection types, service types, and fact-sheet consistency. Sample and donor totals combine explicit countable values with order-of-magnitude fallback estimates for top-level collections only, so subcollections do not double-count parent holdings. Fact-sheet warnings report missing/invalid all-star rows and mismatches against collection-level totals. Withdrawn biobanks and collections are excluded by default; use `-w/--include-withdrawn` to include them, or `--only-withdrawn` to report only withdrawn content. You can filter by biobank `country` (`-c/--country`), by staging area code parsed from the biobank ID (`-A/--staging-area`, for example `EXT`), and by collection type (`-T/--collection-type`). Filter values accept comma-delimited OR semantics within each filter, while different filters are combined as AND. Biobank rows are listed in lexicographic ID order, except pure `EXT` views, which are sorted by country first and then by ID to make non-member output easier to scan.  
 ```bash
 python3 directory-stats.py -N
 
@@ -234,7 +234,7 @@ python3 directory-stats.py -X directory-stats.xlsx -N
 
 python3 directory-stats.py -c DE -A EXT -N
 
-python3 directory-stats.py -c DE,FR -A EXT -t CASE_CONTROL,POPULATION -N
+python3 directory-stats.py -c DE,FR -A EXT -T CASE_CONTROL,POPULATION -N
 
 python3 directory-stats.py --only-withdrawn -N
 ```

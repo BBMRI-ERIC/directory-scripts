@@ -58,4 +58,4 @@ def test_data_check_non_eric_schema_requires_auth():
         env=env,
     )
     assert result.returncode != 0
-    assert "requires -u/--username and -p/--password" in result.stderr
+    assert "requires -t/--token or -u/--username and -p/--password" in result.stderr

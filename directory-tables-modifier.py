@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from molgenis_emx2.directory_client.directory_client import DirectorySession
 
+from directory_session_compat import DirectorySession
 from k_anonymity import positive_below_k_mask
 from validation_helpers import format_validation_error
 from validation_models import TableModifierSettingsModel, ValidationError

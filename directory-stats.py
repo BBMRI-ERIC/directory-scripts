@@ -82,7 +82,7 @@ parser.add_argument(
     help="limit statistics to one or more staging-area codes parsed from biobank IDs (for example CZ, UK, EXT)",
 )
 parser.add_argument(
-    "-t",
+    "-T",
     "--collection-type",
     dest="collection_types",
     nargs="+",
