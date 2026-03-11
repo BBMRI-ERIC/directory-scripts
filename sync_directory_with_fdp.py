@@ -342,7 +342,7 @@ def sync(session, directory_prefix, reset, **kwargs):
 
     # if the reset flag is True, it deletes the old records
     if reset:
-        reset_catalog(session, new_records[FDP_COLLECTION])
+        reset_catalog(session, records[FDP_COLLECTION])
 
         for k, v in reversed(records.items()):
             if k not in (FDP_IRI, FDP_CONTACT) and len(v) > 0:

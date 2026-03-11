@@ -255,6 +255,10 @@ async def main(input_file, url, username, password, token, schema, output_dir, u
             else:
                 if collections.get(collection_id) is None:
                     collections[collection_id] = get_collection_data_from_directory(emx2_client, schema, collection_id)
+                if collections[collection_id] is None:
+                    logger.error("Collection %s not found in directory, skipping study %s" % (collection_id, mdr_id))
+                    failed_studies.append(mdr_id)
+                    continue
                 national_node = collections[collection_id]["national_node"]
                 logger.info("Found study details. Creating records")
                 aki, study = create_records(study_details, mdr_title, national_node)

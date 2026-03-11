@@ -57,6 +57,9 @@ for collection in dir.getCollections():
             print(f"Subcollections of parent collection {collection['id']} - {collection['name']}")
             for subcollection_Id in subcollection_graph.successors(collection['id']):
                 subcollection = dir.getCollectionById(subcollection_Id)
+                if subcollection is None:
+                    log.warning("Subcollection %s not found, skipping" % subcollection_Id)
+                    continue
                 if collection['name'].lower() in subcollection['name'].lower():
                     data_element = re.sub(re.escape(collection['name'] + ' - '), '', subcollection['name'], flags=re.IGNORECASE)
                     print(f"{subcollection_Id} - Data element: {data_element}")
