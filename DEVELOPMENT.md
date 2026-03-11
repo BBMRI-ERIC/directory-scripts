@@ -12,6 +12,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - `checks/` contains Yapsy plugins only. Files there should be warning-producing checks, plus their matching `*.yapsy-plugin` descriptors.
 - Plugin imports must distinguish hard dependencies from optional runtime helpers. Missing optional packages must not prevent the whole plugin from loading; degrade gracefully and keep the deterministic/local part of the check active when possible.
 - Reusable infrastructure belongs outside `checks/` in top-level helper modules.
+- Contact-assignment heuristics should reuse `contact_assignment_utils.py`; keep simple “contact reused across biobanks” visibility checks separate from stronger “likely foreign-institution contact” warnings so the informational signal can be disabled without losing the warning-level logic.
 
 ### Core module boundaries
 
@@ -24,6 +25,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
   - use this from maintenance CLIs instead of importing the removed legacy `molgenis_emx2.directory_client...` path directly
 - `checks/`
   - owns actual QC logic that emits `DataCheckWarning(...)`
+  - keep the easy-to-disable `INFO` plugin `checks/ContactReuse.py` separate from the warning-level probabilistic plugin `checks/ContactAssignments.py`
 - helper modules such as `nncontacts.py`, `warningscontainer.py`, `warning_suppressions.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`, `fact_descriptor_sync.py`
   - own reusable logic that can be consumed by multiple scripts or plugins
 

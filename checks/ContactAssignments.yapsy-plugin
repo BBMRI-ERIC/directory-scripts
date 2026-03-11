@@ -1,0 +1,8 @@
+[Core]
+Name = Check suspicious cross-biobank contact assignments
+Module = ContactAssignments
+
+[Documentation]
+Author = OpenAI Codex
+Version = 1.0
+Description = Warn when collection contacts look tied to another biobank or institution

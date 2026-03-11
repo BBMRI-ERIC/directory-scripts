@@ -27,6 +27,7 @@
 - Avoid duplicating API logic in scripts; import and reuse the shared modules instead.
 - Use assertive runtime validation for assumptions that depend on input/data/configuration; raise clear exceptions instead of relying on `assert` for runtime safety.
 - Optional plugin-side dependencies must not be imported in a way that prevents the whole plugin from loading; keep local/deterministic checks active and degrade gracefully when optional remote-validation packages are missing.
+- Keep the informational cross-biobank contact-reuse signal separate from warning-level foreign-institution contact heuristics: `checks/ContactReuse.py` should stay easy to disable on its own, while `checks/ContactAssignments.py` carries the stronger warning logic.
 - Write-capable maintenance CLIs should import `DirectorySession` from the local `directory_session_compat.py` wrapper around `molgenis_emx2_pyclient.Client`; do not import the removed legacy `molgenis_emx2.directory_client...` package path directly.
 - `nncontacts.py` is the single source of truth for BBMRI node contacts, member-node classification, staging-area parsing, and non-member/global area detection; do not re-encode that logic elsewhere.
 - Keep permitted non-country staging prefixes (currently `EXT`, `EU`, `IARC`) and staging-prefix-to-schema expectations in `nncontacts.py`; checks and tools such as `ValidateIDs` and `collection-factsheet-descriptor-updater.py` must use that shared configuration rather than hardcoding `EXT` rules locally.
@@ -174,3 +175,4 @@
 - For DNS-dependent checks, ensure `/etc/resolv.conf` is available as noted in `README.md`.
 - `directory.py` debug logs may intentionally include username/password for private troubleshooting; never share or commit such logs.
 - In `checks/ContactFields.py`, static placeholder-domain checks (for example `example.org`, `test.com`, `unknown.*`) must remain active even when remote email checks are disabled; `--disable-checks-all-remote` only suppresses MX/reachability validation, not local syntax or placeholder checks.
+- Probabilistic contact-assignment warnings should rely on strong institution evidence (for example a unique biobank-contact email domain in another biobank, or direct biobank-level contact reuse) rather than on contact-ID prefixes or sibling-majority patterns alone; those weaker patterns may appear in messages as context but should not be the primary trigger.

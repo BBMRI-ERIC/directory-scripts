@@ -1,0 +1,8 @@
+[Core]
+Name = Inform when contacts are reused across biobanks
+Module = ContactReuse
+
+[Documentation]
+Author = OpenAI Codex
+Version = 1.0
+Description = Information-level check for contacts reused by collections in multiple biobanks
