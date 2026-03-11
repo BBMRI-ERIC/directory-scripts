@@ -4,9 +4,7 @@ import logging as log
 import re
 import xml.etree.ElementTree as ET
 from builtins import *
-from typing import List
-
-from typing_extensions import TypedDict
+from typing import List, TypedDict
 
 from icd10codeshelper import ICD10CodesHelper
 

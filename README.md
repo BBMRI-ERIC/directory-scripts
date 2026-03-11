@@ -30,6 +30,7 @@ If you run into GraphQL errors when retrieving data from the Directory, upgrade 
   ```
 pip3 install --upgrade certifi
 ```
+- The `ContactFields` plugin uses `validate_email` for remote MX/reachability validation. It is now listed in `requirements.txt`; re-run `pip3 install -r requirements.txt` after Python upgrades so the plugin-side dependencies are restored in the new interpreter environment.
 - If you want support for checking mappings of ORPHA codes to ICD-10 codes for RD biobanks, you need to get en_product1.xml from
   http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html
 
@@ -90,6 +91,7 @@ Age-range updates from fact sheets are also conservative: month/day/week units a
 Email validation in `ContactFields` is split into local/static checks and optional remote checks:
 - local checks always run and cover missing/invalid addresses plus placeholder domains such as `example.org`, `test.com`, and `unknown.*`
 - remote checks cover MX/reachability validation and are disabled by `--disable-checks-all-remote` / `--disable-checks-remote emails`
+- if `validate_email` is missing, the plugin now logs a warning and skips only the remote MX validation path; it still performs the local syntax, placeholder-domain, and country-suffix checks
 - disabling remote checks does not suppress the local placeholder-domain or syntax checks
 
 Known false positives can be suppressed in `warning-suppressions.json`:

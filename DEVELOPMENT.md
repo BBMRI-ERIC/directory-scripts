@@ -10,6 +10,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 
 - Top-level scripts are CLIs for validation, export, search, and maintenance.
 - `checks/` contains Yapsy plugins only. Files there should be warning-producing checks, plus their matching `*.yapsy-plugin` descriptors.
+- Plugin imports must distinguish hard dependencies from optional runtime helpers. Missing optional packages must not prevent the whole plugin from loading; degrade gracefully and keep the deterministic/local part of the check active when possible.
 - Reusable infrastructure belongs outside `checks/` in top-level helper modules.
 
 ### Core module boundaries

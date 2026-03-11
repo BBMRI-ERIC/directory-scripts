@@ -2,15 +2,19 @@
 
 import re
 import logging as log
-#import DNS
 import os
+from email.utils import parseaddr
 
 # this is ugly and only for assertive programming
 import __main__ 
 
 from yapsy.IPlugin import IPlugin
-from validate_email import validate_email
 from diskcache import Cache
+
+try:
+	from validate_email import validate_email as remote_validate_email
+except ImportError:
+	remote_validate_email = None
 
 from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEntityType, make_check_id
 from nncontacts import NNContacts
@@ -134,6 +138,28 @@ def is_placeholder_email_domain(domain: str) -> bool:
     return domain.startswith("unknown.")
 
 
+def is_email_syntax_valid(email: str) -> bool:
+    """Return a conservative local syntax check for email addresses."""
+    if not isinstance(email, str):
+        return False
+    normalized = email.strip()
+    if not normalized or "@" not in normalized:
+        return False
+    parsed_name, parsed_email = parseaddr(normalized)
+    if parsed_name:
+        return False
+    if parsed_email != normalized:
+        return False
+    local_part, domain = normalized.rsplit("@", 1)
+    if not local_part or not domain:
+        return False
+    if domain.startswith(".") or domain.endswith(".") or "." not in domain:
+        return False
+    if ".." in normalized:
+        return False
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized))
+
+
 def get_email_country_suffix(email: str) -> str:
     """Return normalized country-code-like email suffix or empty string."""
     domain = get_email_domain(email)
@@ -210,6 +236,11 @@ class ContactFields(IPlugin):
 			ValidateEmails = False
 		else:
 			ValidateEmails = True
+		if ValidateEmails and remote_validate_email is None:
+			log.warning(
+				"validate_email package is not installed; skipping remote email reachability checks while keeping local syntax and placeholder checks enabled."
+			)
+			ValidateEmails = False
 
 		cache_dir = 'data-check-cache/emails'
 		if not os.path.exists(cache_dir):
@@ -219,13 +250,13 @@ class ContactFields(IPlugin):
 			cache.clear()
 			
 		for contact in dir.getContacts():
-			if(not 'first_name' in contact or re.search('^\s*$', contact['first_name'])):
+			if(not 'first_name' in contact or re.search(r'^\s*$', contact['first_name'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "FirstNameMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing first name for contact ('first_name' attribute is empty)"))
-			if(not 'last_name' in contact or re.search('^\s*$', contact['last_name'])):
+			if(not 'last_name' in contact or re.search(r'^\s*$', contact['last_name'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "LastNameMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing last name for contact ('last_name' attribute is empty)"))
-			if(not 'email' in contact or re.search('^\s*$', contact['email'])):
+			if(not 'email' in contact or re.search(r'^\s*$', contact['email'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "EmailMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing email for contact ('email' attribute is empty)"))
-			elif(not validate_email(contact['email'])):
+			elif(not is_email_syntax_valid(contact['email'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "EmailInvalid"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact is invalid - offending  'email' attribute value: " + contact['email']))
 			else:
 				email_domain = get_email_domain(contact['email'])
@@ -254,7 +285,7 @@ class ContactFields(IPlugin):
 								log_message += " -> failed"
 								warnings.append(cache_result['warning'])
 						else:
-							if(not validate_email(contact_email,check_mx=True)):
+							if(not remote_validate_email(contact_email, check_mx=True)):
 								log_message += " -> failed"
 								warning = DataCheckWarning(make_check_id(self, "EmailUnreachable"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Email for contact seems to be unreachable because of missing DNS MX record")
 								warnings.append(warning)
@@ -263,12 +294,12 @@ class ContactFields(IPlugin):
 								log_message += " -> OK"
 								cache[contact_email] = { 'valid' : True, 'warning' : None }
 						log.info(log_message)
-					except (DNS.Base.TimeoutError, DNS.Base.ServerError, DNS.Base.SocketError) as e:
+					except Exception as e:
 						log_message += " -> failed with exception (" + str(e) + ")"
 						log.error(log_message)
 
-			if(not 'phone' in contact or re.search('^\s*$', contact['phone'])):
+			if(not 'phone' in contact or re.search(r'^\s*$', contact['phone'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "PhoneMissing"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.WARNING, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Missing phone for contact ('phone' attribute is empty'"))
-			elif(not re.search('^\+(?:[0-9]??){6,14}[0-9]$', contact['phone'])):
+			elif(not re.search(r'^\+(?:[0-9]??){6,14}[0-9]$', contact['phone'])):
 				warnings.append(DataCheckWarning(make_check_id(self, "PhoneInvalid"), "", dir.getContactNN(contact['id']), DataCheckWarningLevel.ERROR, contact['id'], DataCheckEntityType.CONTACT, 'NA', "Phone number for contact does not conform to the E.123 international standard (means starts with + sign, no spaces) - offending phone number in 'phone' attribute: " + contact['phone']))
 		return warnings

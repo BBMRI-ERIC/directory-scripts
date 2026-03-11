@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import __main__
+import logging
 
 from checks.ContactFields import ContactFields
 
@@ -141,3 +142,22 @@ def test_contactfields_reports_placeholder_and_country_suffix_email_warnings():
         warning.dataCheckID for warning in warnings_by_contact.get("ct_ext_ok", [])
     }
     assert "CTF:EmailCountrySuffix" not in ext_warning_ids
+
+
+def test_contactfields_skips_remote_email_checks_when_validate_email_package_is_missing(caplog):
+    __main__.remoteCheckList = ["emails"]
+    args = SimpleNamespace(disableChecksRemote=[], purgeCaches=[])
+
+    plugin = ContactFields()
+    original_validator = plugin.check.__globals__["remote_validate_email"]
+    plugin.check.__globals__["remote_validate_email"] = None
+    try:
+        with caplog.at_level(logging.WARNING):
+            warnings = plugin.check(ContactFieldsDirectoryStub(), args)
+    finally:
+        plugin.check.__globals__["remote_validate_email"] = original_validator
+
+    assert any("validate_email package is not installed" in message for message in caplog.messages)
+    assert "CTF:EmailPlaceholder" in {warning.dataCheckID for warning in warnings}
+    assert "CTF:EmailCountrySuffix" in {warning.dataCheckID for warning in warnings}
+    assert "CTF:EmailUnreachable" not in {warning.dataCheckID for warning in warnings}
