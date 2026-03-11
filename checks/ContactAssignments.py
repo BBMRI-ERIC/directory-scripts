@@ -7,7 +7,12 @@ from yapsy.IPlugin import IPlugin
 from contact_assignment_utils import (
 	build_biobank_contact_maps,
 	build_collection_contact_usage,
+	biobanks_all_same_institution,
+	biobanks_same_institution,
+	count_institution_groups,
+	contact_matches_biobank_institution,
 	get_contact_ids,
+	get_contact_address_key,
 	get_email_domain,
 	get_single_biobank_domain_owner,
 )
@@ -49,7 +54,7 @@ class ContactAssignments(IPlugin):
 		log.info("Running probabilistic cross-biobank contact assignment checks (ContactAssignments)")
 
 		contact_to_collections, contact_to_biobank_counts = build_collection_contact_usage(dir)
-		_, main_contact_to_biobanks, domain_to_biobanks = build_biobank_contact_maps(dir)
+		_, main_contact_to_biobanks, domain_to_biobanks, address_to_biobanks, biobank_signatures = build_biobank_contact_maps(dir)
 
 		for contact in dir.getContacts():
 			contact_id = contact.get('id')
@@ -58,11 +63,23 @@ class ContactAssignments(IPlugin):
 			biobank_counts = contact_to_biobank_counts.get(contact_id, {})
 			if len(biobank_counts) <= 1:
 				continue
+			used_biobanks = sorted(biobank_counts.keys())
+			if biobanks_all_same_institution(used_biobanks, biobank_signatures):
+				continue
+			if count_institution_groups(used_biobanks, biobank_signatures) > 2:
+				continue
 			domain = get_email_domain(contact.get('email', ''))
 			domain_owner = get_single_biobank_domain_owner(domain, domain_to_biobanks)
+			address_key = get_contact_address_key(contact)
+			address_owners = sorted(address_to_biobanks.get(address_key, set())) if address_key else []
 			main_contact_biobanks = sorted(main_contact_to_biobanks.get(contact_id, set()))
+			# Biobank-level ownership must stay unique enough to be meaningful warning evidence.
+			# If the same contact is the main biobank contact for multiple biobanks, that pattern is
+			# only a shared cross-institution reuse signal and should remain INFO-only.
+			if len(main_contact_biobanks) > 1:
+				continue
 			reasons = []
-			if main_contact_biobanks:
+			if main_contact_biobanks and biobanks_all_same_institution(main_contact_biobanks, biobank_signatures):
 				reasons.append(
 					f"the contact is the biobank-level contact of {', '.join(_biobank_label(dir, biobank_id) for biobank_id in main_contact_biobanks)}"
 				)
@@ -70,9 +87,12 @@ class ContactAssignments(IPlugin):
 				reasons.append(
 					f"the institutional email domain '{domain}' is the biobank-contact domain of {_biobank_label(dir, domain_owner)}"
 				)
+			elif len(address_owners) == 1:
+				reasons.append(
+					f"the contact address matches the biobank-contact address of {_biobank_label(dir, address_owners[0])}"
+				)
 			if not reasons:
 				continue
-			used_biobanks = sorted(biobank_counts.keys())
 			example_collections = sorted(contact_to_collections.get(contact_id, []))[:3]
 			message = (
 				f"Contact is reused by collections in multiple biobanks ({', '.join(used_biobanks)}), but "
@@ -115,19 +135,43 @@ class ContactAssignments(IPlugin):
 					continue
 				domain = get_email_domain(contact.get('email', ''))
 				domain_owner = get_single_biobank_domain_owner(domain, domain_to_biobanks)
+				address_key = get_contact_address_key(contact)
+				address_owners = sorted(address_to_biobanks.get(address_key, set())) if address_key else []
+				if contact_matches_biobank_institution(contact, collection_biobank_id, biobank_signatures):
+					continue
 				foreign_reasons = []
 				main_contact_biobanks = sorted(main_contact_to_biobanks.get(contact_id, set()) - {collection_biobank_id})
-				if main_contact_biobanks:
-					foreign_reasons.append(
-						f"the contact is the biobank-level contact of {', '.join(_biobank_label(dir, biobank_id) for biobank_id in main_contact_biobanks)}"
-					)
+				if len(main_contact_biobanks) > 1:
+					continue
+				if main_contact_biobanks and biobanks_all_same_institution(main_contact_biobanks, biobank_signatures):
+					if not any(biobanks_same_institution(collection_biobank_id, biobank_id, biobank_signatures) for biobank_id in main_contact_biobanks):
+						foreign_reasons.append(
+							f"the contact is the biobank-level contact of {', '.join(_biobank_label(dir, biobank_id) for biobank_id in main_contact_biobanks)}"
+						)
 				if domain_owner and domain_owner != collection_biobank_id:
-					foreign_reasons.append(
-						f"the institutional email domain '{domain}' is the biobank-contact domain of {_biobank_label(dir, domain_owner)}"
-					)
+					if not biobanks_same_institution(collection_biobank_id, domain_owner, biobank_signatures):
+						foreign_reasons.append(
+							f"the institutional email domain '{domain}' is the biobank-contact domain of {_biobank_label(dir, domain_owner)}"
+						)
+				elif len(address_owners) == 1 and address_owners[0] != collection_biobank_id:
+					if not biobanks_same_institution(collection_biobank_id, address_owners[0], biobank_signatures):
+						foreign_reasons.append(
+							f"the contact address matches the biobank-contact address of {_biobank_label(dir, address_owners[0])}"
+						)
+				if len(main_contact_to_biobanks.get(contact_id, set())) > 1 and not foreign_reasons:
+					continue
 				if not foreign_reasons:
 					continue
-				other_biobanks = sorted(biobank_id for biobank_id in biobank_counts.keys() if biobank_id != collection_biobank_id)
+				other_biobanks = sorted(
+					biobank_id
+					for biobank_id in biobank_counts.keys()
+					if biobank_id != collection_biobank_id
+					and not biobanks_same_institution(collection_biobank_id, biobank_id, biobank_signatures)
+				)
+				if not other_biobanks:
+					continue
+				if count_institution_groups([collection_biobank_id, *other_biobanks], biobank_signatures) > 2:
+					continue
 				message = (
 					f"Collection {collection_id} belongs to {_biobank_label(dir, collection_biobank_id)} but uses contact {contact_id}, while "
 					+ " and ".join(foreign_reasons)

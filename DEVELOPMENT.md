@@ -13,6 +13,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - Plugin imports must distinguish hard dependencies from optional runtime helpers. Missing optional packages must not prevent the whole plugin from loading; degrade gracefully and keep the deterministic/local part of the check active when possible.
 - Reusable infrastructure belongs outside `checks/` in top-level helper modules.
 - Contact-assignment heuristics should reuse `contact_assignment_utils.py`; keep simple “contact reused across biobanks” visibility checks separate from stronger “likely foreign-institution contact” warnings so the informational signal can be disabled without losing the warning-level logic.
+- `checks/ContactReuse.py` must not emit `CTR:CrossBiobankReuse` for a contact that already qualifies for `CTA:CrossBiobankInstitutionContact`; stronger warning-level ownership evidence supersedes the weaker INFO for the same contact. Contacts serving as main biobank contacts for multiple biobanks should remain shared cross-institution INFO-only cases, not WARNINGs.
 
 ### Core module boundaries
 
