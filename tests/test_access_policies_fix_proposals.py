@@ -1,4 +1,4 @@
-from checks.AccessPolicies import AccessPolicies
+from checks.AccessPolicies import AccessPolicies, CHECK_DOCS
 
 
 class DirectoryStub:
@@ -22,7 +22,7 @@ class DirectoryStub:
                 "type": ["DISEASE_SPECIFIC"],
                 "data_use": [],
                 "data_categories": ["BIOLOGICAL_SAMPLES"],
-                "sample_access_joint_project": True,
+                "access_joint_project": "samples",
                 "biobank": {"id": "bb1"},
             }
         ]
@@ -67,7 +67,7 @@ def test_access_policies_treats_duo_underscore_and_colon_as_same_term():
                     "type": ["DISEASE_SPECIFIC"],
                     "data_use": ["DUO_0000007"],
                     "data_categories": ["BIOLOGICAL_SAMPLES"],
-                    "sample_access_joint_project": True,
+                    "access_joint_project": "samples",
                     "biobank": {"id": "bb1"},
                 }
             ]
@@ -93,3 +93,73 @@ def test_access_policies_skips_bio_duo_missing_for_nav_only_materials():
 
     warnings = AccessPolicies().check(DirectoryNavMaterialsStub(), args=None)
     assert not any(warning.dataCheckID == "AP:BioDuoMissing" for warning in warnings)
+
+
+def test_access_policies_use_generic_access_fields_only():
+    class DirectoryGenericAccessStub(DirectoryStub):
+        def getCollections(self):
+            return [
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "withdrawn": False,
+                    "materials": ["DNA"],
+                    "type": ["DISEASE_SPECIFIC"],
+                    "data_use": ["DUO:0000007"],
+                    "data_categories": ["BIOLOGICAL_SAMPLES", "MEDICAL_RECORDS"],
+                    "access_description": "Access subject to review.",
+                    "biobank": {"id": "bb1"},
+                }
+            ]
+
+    warnings = AccessPolicies().check(DirectoryGenericAccessStub(), args=None)
+    assert not any(warning.dataCheckID == "AP:AccessMissing" for warning in warnings)
+
+
+def test_access_policies_raise_generic_access_missing_once():
+    class DirectoryMissingAccessStub(DirectoryStub):
+        def getCollections(self):
+            return [
+                {
+                    "id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                    "withdrawn": False,
+                    "materials": ["DNA"],
+                    "type": ["DISEASE_SPECIFIC"],
+                    "data_use": ["DUO:0000007"],
+                    "data_categories": ["BIOLOGICAL_SAMPLES", "MEDICAL_RECORDS", "IMAGING_DATA"],
+                    "biobank": {"id": "bb1"},
+                }
+            ]
+
+    warnings = AccessPolicies().check(DirectoryMissingAccessStub(), args=None)
+    access_missing = [warning for warning in warnings if warning.dataCheckID == "AP:AccessMissing"]
+    assert len(access_missing) == 1
+    assert not any(warning.dataCheckID in {"AP:SampleAccess", "AP:DataAccessMissing", "AP:ImgAccess"} for warning in warnings)
+
+
+def test_access_policies_old_access_check_ids_do_not_return():
+    assert "AP:SampleAccess" not in CHECK_DOCS
+    assert "AP:DataAccessMissing" not in CHECK_DOCS
+    assert "AP:ImgAccess" not in CHECK_DOCS
+
+
+def test_access_policies_check_docs_do_not_reference_old_modality_access_fields():
+    deprecated_fields = {
+        "sample_access_description",
+        "sample_access_fee",
+        "sample_access_joint_project",
+        "sample_access_uri",
+        "data_access_description",
+        "data_access_fee",
+        "data_access_joint_project",
+        "data_access_uri",
+        "image_access_description",
+        "image_access_fee",
+        "image_joint_project",
+        "image_access_uri",
+    }
+    documented_fields = {
+        field
+        for check_doc in CHECK_DOCS.values()
+        for field in check_doc.get("fields", [])
+    }
+    assert documented_fields.isdisjoint(deprecated_fields)

@@ -14,6 +14,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - Reusable infrastructure belongs outside `checks/` in top-level helper modules.
 - Contact-assignment heuristics should reuse `contact_assignment_utils.py`; keep simple “contact reused across biobanks” visibility checks separate from stronger “likely foreign-institution contact” warnings so the informational signal can be disabled without losing the warning-level logic.
 - `checks/ContactReuse.py` must not emit `CTR:CrossBiobankReuse` for a contact that already qualifies for `CTA:CrossBiobankInstitutionContact`; stronger warning-level ownership evidence supersedes the weaker INFO for the same contact. Contacts serving as main biobank contacts for multiple biobanks should remain shared cross-institution INFO-only cases, not WARNINGs.
+- `checks/AccessPolicies.py` follows the current schema and must use only the generic `access_*` collection fields. Do not revive legacy modality-specific `sample_access_*`, `data_access_*`, or `image_access_*` field checks; regression tests should fail if those old check IDs or field names creep back in.
 
 ### Core module boundaries
 

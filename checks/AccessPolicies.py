@@ -47,18 +47,16 @@ CHECK_DOCS = {'AP:BBAvailNone': {'entity': 'BIOBANK',
                                                                 'documentation '
                                                                 'available at '
                                                                 '{DUOs_to_url(DUO_term_disease_specific)}'},
- 'AP:DataAccessMissing': {'entity': 'COLLECTION',
-                                                    'fields': ['data_access_description',
-                                                               'data_access_fee',
-                                                               'data_access_joint_project',
-                                                               'data_access_uri'],
-                                                    'severity': 'ERROR',
-                                                    'summary': 'No data access mode '
-                                                               'enabled and no data '
-                                                               'access policy '
-                                                               '(description nor URI) '
-                                                               'provided for '
-                                                               'collection'},
+ 'AP:AccessMissing': {'entity': 'COLLECTION',
+                                             'fields': ['access_description',
+                                                        'access_fee',
+                                                        'access_joint_project',
+                                                        'access_uri'],
+                                             'severity': 'ERROR',
+                                             'summary': 'No generic access mode '
+                                                        'enabled and no access '
+                                                        'policy (description nor URI) '
+                                                        'provided for collection'},
  'AP:DataRetDuo': {'entity': 'COLLECTION',
                                                   'fields': ['data_use'],
                                                   'severity': 'INFO',
@@ -80,19 +78,6 @@ CHECK_DOCS = {'AP:BBAvailNone': {'entity': 'BIOBANK',
                                                    'summary': 'No Data Use Ontology '
                                                               '(DUO) term provided in '
                                                               'data_use attribute'},
- 'AP:ImgAccess': {'entity': 'COLLECTION',
-                                                    'fields': ['image_access_description',
-                                                               'image_access_fee',
-                                                               'image_access_uri',
-                                                               'image_joint_project'],
-                                                    'severity': 'ERROR',
-                                                    'summary': 'No imaging access mode '
-                                                               'enabled and no imaging '
-                                                               'access policy '
-                                                               '(description nor URI) '
-                                                               'provided for a '
-                                                               'collection which '
-                                                               'contains imaging data'},
  'AP:JointDuo': {'entity': 'COLLECTION',
                                                  'fields': ['data_use'],
                                                  'severity': 'WARNING',
@@ -180,17 +165,36 @@ CHECK_DOCS = {'AP:BBAvailNone': {'entity': 'BIOBANK',
                                                               'documentation available '
                                                               'at '
                                                               '{DUOs_to_url(DUO_terms_research)}'},
- 'AP:SampleAccess': {'entity': 'COLLECTION',
-                                                  'fields': ['sample_access_description',
-                                                             'sample_access_fee',
-                                                             'sample_access_joint_project',
-                                                             'sample_access_uri'],
-                                                  'severity': 'ERROR',
-                                                  'summary': 'No sample access mode '
-                                                             'enabled and no sample '
-                                                             'access policy '
-                                                             '(description nor URI) '
-                                                             'provided for collection'}}
+}
+
+
+def _has_meaningful_access_value(value):
+	"""Return whether an access-policy field contains a meaningful non-empty value."""
+	if value is None:
+		return False
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, float):
+		# pandas/pyclient may expose missing values as NaN
+		return not (value != value)
+	if isinstance(value, str):
+		return not re.search(r'^\s*$', value)
+	if isinstance(value, (list, tuple, set, dict)):
+		return len(value) > 0
+	return bool(value)
+
+
+def _collection_has_generic_access_policy(collection):
+	"""Return whether the collection exposes any generic access-policy field."""
+	for field_name in ('access_fee', 'access_joint_project', 'access_description', 'access_uri'):
+		if _has_meaningful_access_value(collection.get(field_name)):
+			return True
+	return False
+
+
+def _collection_requires_joint_project_duo(collection):
+	"""Return whether generic access metadata says joint-project access is required."""
+	return _has_meaningful_access_value(collection.get('access_joint_project'))
 
 class AccessPolicies(IPlugin):
 	CHECK_ID_PREFIX = "AP"
@@ -217,35 +221,14 @@ class AccessPolicies(IPlugin):
 			#DUOs = Directory.getListOfEntityAttributeIds(collection, 'data_use') # EMX2 types does not have ID, then:
 			DUOs = normalize_duo_term_ids(Directory.getListOfEntityAttributes(collection, 'data_use'))
 			data_categories = []
-			other_data = False
 			for c in collection.get('data_categories', []):
 				data_categories.append(c)
-				if c not in ['BIOLOGICAL_SAMPLES', 'IMAGING_DATA']:
-					other_data = True
 
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
 			
-			if 'BIOLOGICAL_SAMPLES' in data_categories:
-				if((not 'sample_access_fee' in collection or collection['sample_access_fee'] == False) and 
-						(not 'sample_access_joint_project' in collection or collection['sample_access_joint_project'] == False) and 
-						(not 'sample_access_description' in collection or collection['sample_access_description'] == False) and 
-						(not 'sample_access_uri' in collection or re.search(r'^\s*$', collection['sample_access_uri']))):
-					warnings.append(DataCheckWarning(make_check_id(self, "SampleAccess"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No sample access mode enabled and no sample access policy (description nor URI) provided for collection"))
-
-			if other_data:
-				if((not 'data_access_fee' in collection or collection['data_access_fee'] == False) and 
-						(not 'data_access_joint_project' in collection or collection['data_access_joint_project'] == False) and 
-						(not 'data_access_description' in collection or collection['data_access_description'] == False) and 
-						(not 'data_access_uri' in collection or re.search(r'^\s*$', collection['data_access_uri']))):
-					warnings.append(DataCheckWarning(make_check_id(self, "DataAccessMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No data access mode enabled and no data access policy (description nor URI) provided for collection"))
-
-			if 'IMAGING_DATA' in data_categories:
-				if((not 'image_access_fee' in collection or collection['image_access_fee'] == False) and 
-						(not 'image_joint_project' in collection or collection['image_joint_project'] == False) and 
-						(not 'image_access_description' in collection or collection['image_access_description'] == False) and 
-						(not 'image_access_uri' in collection or re.search(r'^\s*$', collection['image_access_uri']))):
-					warnings.append(DataCheckWarning(make_check_id(self, "ImgAccess"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No imaging access mode enabled and no imaging access policy (description nor URI) provided for a collection which contains imaging data"))
+			if not _collection_has_generic_access_policy(collection):
+				warnings.append(DataCheckWarning(make_check_id(self, "AccessMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No generic access mode enabled and no access policy (description nor URI) provided for collection"))
 
 			# DUO specific checks
 							
@@ -314,7 +297,7 @@ class AccessPolicies(IPlugin):
 
 			# checks on different modes of collaboration - this is still a bit messy as DUO does not fit perfectly to our needs
 			DUO_term_joint_project = 'DUO:0000020'
-			if any((x in collection and collection[x] == True) for x in ['sample_access_joint_project', 'data_access_joint_project', 'image_joint_projects']) and DUO_term_joint_project not in DUOs:
+			if _collection_requires_joint_project_duo(collection) and DUO_term_joint_project not in DUOs:
 				warnings.append(DataCheckWarning(make_check_id(self, "JointDuo"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Joint projects for sample/data/image access specified and {DUO_term_joint_project} is not specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term_joint_project)}", fix_proposals=[
 					make_collection_term_append_fix(
 						update_id="access.duo.collaboration_required",
