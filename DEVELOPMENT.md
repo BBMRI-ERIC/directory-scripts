@@ -28,6 +28,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
   - owns actual QC logic that emits `DataCheckWarning(...)`
   - keep the easy-to-disable `INFO` plugin `checks/ContactReuse.py` separate from the warning-level probabilistic plugin `checks/ContactAssignments.py`
 - helper modules such as `nncontacts.py`, `warningscontainer.py`, `warning_suppressions.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`, `fact_descriptor_sync.py`
+- `warningscontainer.py` should write XLSX cells by actual value type; withdrawn flags may be real booleans in warning/entity listings and must not be forced through string-only worksheet APIs.
   - own reusable logic that can be consumed by multiple scripts or plugins
 
 ### Directory cache scope

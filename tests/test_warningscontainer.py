@@ -56,6 +56,36 @@ def test_dump_warnings_xlsx_uses_expected_column_widths_and_node_tabs(tmp_path):
     assert worksheet.column_dimensions["F"].width >= 100
 
 
+def test_dump_warnings_xlsx_writes_boolean_withdrawn_flags(tmp_path):
+    output_file = tmp_path / "warnings-bool.xlsx"
+    container = WarningsContainer()
+    container.newWarning(
+        DataCheckWarning(
+            "FT:Example",
+            "",
+            "EU",
+            DataCheckWarningLevel.WARNING,
+            "bbmri-eric:ID:EU_demo:collection:col1",
+            DataCheckEntityType.COLLECTION,
+            False,
+            "example warning",
+        )
+    )
+
+    container.dumpWarningsXLSX(
+        [str(output_file)],
+        {"bbmri-eric:ID:EU_demo": True},
+        {"bbmri-eric:ID:EU_demo:collection:col1": False},
+        True,
+    )
+
+    workbook = load_workbook(output_file)
+    worksheet = workbook["ALL"]
+    assert worksheet["C2"].value is False
+    assert workbook["AllBiobanks"]["C2"].value is True
+    assert workbook["AllCollections"]["C2"].value is False
+
+
 def test_dump_suppressed_warnings_debug_logs_suppressed_entries(caplog):
     container = WarningsContainer(
         {

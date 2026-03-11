@@ -120,6 +120,17 @@ class WarningsContainer:
             worksheet.write_string(0, col_idx, header, bold)
             worksheet.set_column(col_idx, col_idx, width)
 
+    @staticmethod
+    def _write_cell(worksheet, row, col, value):
+        """Write a worksheet cell while preserving booleans and avoiding type errors."""
+        if isinstance(value, bool):
+            worksheet.write_boolean(row, col, value)
+            return
+        if value is None:
+            worksheet.write_blank(row, col, None)
+            return
+        worksheet.write_string(row, col, str(value))
+
     def dumpWarningsXLSX(self, filename : List[str], allBiobanks: dict, allCollections: dict, allNNs_sheet: bool = False):
         workbook = xlsxwriter.Workbook(filename[0])
         bold = workbook.add_format({'bold': True})
@@ -148,39 +159,39 @@ class WarningsContainer:
             self._write_headers(worksheet, QC_SHEET_HEADERS, bold)
             for w in sorted(self.__warningsNNs[nn], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
                 worksheet_row += 1
-                worksheet.write_string(worksheet_row, 0, w.directoryEntityID)
-                worksheet.write_string(worksheet_row, 1, w.directoryEntityType.value)
-                worksheet.write_string(worksheet_row, 2, w.directoryEntityWithdrawn)
-                worksheet.write_string(worksheet_row, 3, w.dataCheckID)
-                worksheet.write_string(worksheet_row, 4, w.level.name)
-                worksheet.write_string(worksheet_row, 5, w.message)
-                worksheet.write_string(worksheet_row, 6, w.action)
-                worksheet.write_string(worksheet_row, 7, w.emailTo)
+                self._write_cell(worksheet, worksheet_row, 0, w.directoryEntityID)
+                self._write_cell(worksheet, worksheet_row, 1, w.directoryEntityType.value)
+                self._write_cell(worksheet, worksheet_row, 2, w.directoryEntityWithdrawn)
+                self._write_cell(worksheet, worksheet_row, 3, w.dataCheckID)
+                self._write_cell(worksheet, worksheet_row, 4, w.level.name)
+                self._write_cell(worksheet, worksheet_row, 5, w.message)
+                self._write_cell(worksheet, worksheet_row, 6, w.action)
+                self._write_cell(worksheet, worksheet_row, 7, w.emailTo)
 
                 if allNNs_sheet:
                     # Populate the "ALL" sheet
                     allNNs_row += 1
-                    allNNs_worksheet.write_string(allNNs_row, 0, w.directoryEntityID)
-                    allNNs_worksheet.write_string(allNNs_row, 1, w.directoryEntityType.value)
-                    allNNs_worksheet.write_string(allNNs_row, 2, w.directoryEntityWithdrawn)
-                    allNNs_worksheet.write_string(allNNs_row, 3, w.dataCheckID)
-                    allNNs_worksheet.write_string(allNNs_row, 4, w.level.name)
-                    allNNs_worksheet.write_string(allNNs_row, 5, w.message)
-                    allNNs_worksheet.write_string(allNNs_row, 6, w.action)
-                    allNNs_worksheet.write_string(allNNs_row, 7, w.emailTo)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 0, w.directoryEntityID)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 1, w.directoryEntityType.value)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 2, w.directoryEntityWithdrawn)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 3, w.dataCheckID)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 4, w.level.name)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 5, w.message)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 6, w.action)
+                    self._write_cell(allNNs_worksheet, allNNs_row, 7, w.emailTo)
                     
         if allBiobanks:
             for biobankID,BBWithdrawn in allBiobanks.items():
                 allBBs_row += 1
-                allBBs_worksheet.write_string(allBBs_row, 0, biobankID)
-                allBBs_worksheet.write_string(allBBs_row, 1, "Biobank")
-                allBBs_worksheet.write_string(allBBs_row, 2, BBWithdrawn)
+                self._write_cell(allBBs_worksheet, allBBs_row, 0, biobankID)
+                self._write_cell(allBBs_worksheet, allBBs_row, 1, "Biobank")
+                self._write_cell(allBBs_worksheet, allBBs_row, 2, BBWithdrawn)
         if allCollections:
             for collectionID,collWithdrawn in allCollections.items():
                 allColls_row += 1
-                allColls_worksheet.write_string(allColls_row, 0, collectionID)
-                allColls_worksheet.write_string(allColls_row, 1, "Collection")
-                allColls_worksheet.write_string(allColls_row, 2, collWithdrawn)
+                self._write_cell(allColls_worksheet, allColls_row, 0, collectionID)
+                self._write_cell(allColls_worksheet, allColls_row, 1, "Collection")
+                self._write_cell(allColls_worksheet, allColls_row, 2, collWithdrawn)
 
                 
             '''

@@ -37,6 +37,7 @@
 - Keep exporters thin: CLI + orchestration only; move reusable logic into helper modules.
 - Keep all the logic of BBMRI-ERIC Directory and Molgenis access confined into the directory.py module and enrich this as needed to have it universally reusable
 - Group related logic by concern (mappings in `orphacodes.py`/`icd10codeshelper.py`, warnings in `warningscontainer.py`/`customwarnings.py`, dataframe shaping in `pddfutils.py`).
+- `warningscontainer.py` XLSX export must handle real Python booleans for withdrawn flags (and blank values) without forcing them through `write_string(...)`; QC exports may now carry boolean withdrawn state directly.
 - Share common parsing/formatting (e.g., email parsing, ID/NN extraction) through utilities rather than reimplementing in multiple scripts.
 - Keep domain-specific analytics in dedicated exporter scripts; if reused by multiple exporters, extract to a module with a clear API.
 - Prefer pure functions for computations; keep I/O (Directory access, XLSX read/write) at script boundaries.
