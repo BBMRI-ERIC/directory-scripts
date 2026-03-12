@@ -54,7 +54,7 @@ def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFr
         factsProvided = 'N'
         warningProvided = 'N'
         errorProvided = 'N'
-        df_coll.loc[len(df)] = [network,entity,str(coll['country']['id']),str(coll['name']),str(coll['id'])]
+        df_coll.loc[len(df_coll)] = [network,entity,str(coll['country']['id']),str(coll['name']),str(coll['id'])]
         if 'size' in coll and 'number_of_donors' in coll:
             if isinstance(coll['size'], int) and isinstance(coll['number_of_donors'], int):
                 nrSampDonProv = 'Y'
@@ -67,7 +67,7 @@ def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFr
                         collsFactsSamples += fact['number_of_samples']
             if collsFactsSamples > 0:
                 factsProvided = 'Y'
-                df_collFactsSampleNumber.loc[len(df)] = [network,entity,str(coll['country']['id']),str(coll['name']),str(coll['id']),int(collsFactsSamples)]
+                df_collFactsSampleNumber.loc[len(df_collFactsSampleNumber)] = [network,entity,str(coll['country']['id']),str(coll['name']),str(coll['id']),int(collsFactsSamples)]
         if coll['id'] in collIDsWARNING:
             warningProvided = 'Y'
         if coll['id'] in collIDsERROR:
@@ -79,7 +79,7 @@ def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFr
 def addBB2Df(BBList : list, network : str, entity : str, df : pd.DataFrame, df_bb : pd.DataFrame):
     for biobank_cohort in BBList:
         df.loc[len(df)] = [network,entity,str(biobank_cohort['country']['id']),'NA','NA',int(0),'NA','NA']
-        df_bb.loc[len(df)] = [network,entity,str(biobank_cohort['country']['id']),str(biobank_cohort['name']),str(biobank_cohort['id'])]
+        df_bb.loc[len(df_bb)] = [network,entity,str(biobank_cohort['country']['id']),str(biobank_cohort['name']),str(biobank_cohort['id'])]
         log.info(network + '\t'+ entity +'\t' + str(biobank_cohort['country']['id']))
     return df, df_bb
 
