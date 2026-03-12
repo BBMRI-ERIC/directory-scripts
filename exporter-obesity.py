@@ -222,7 +222,7 @@ for collection in dir.getCollections():
         if 'number_of_donors' in collection and isinstance(collection['number_of_donors'], int):
             pediatricObesityDonorsExplicit += collection['number_of_donors']
     elif obesity:
-        log.info(f"Pediatric-only collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
+        log.info(f"Obesity collection detected: {collection['id']}, age range: {collection.get('age_low')}-{collection.get('age_high')}, diags: {diags + diag_ranges}")
         collectionsObesityDiagnosed.append(collection)
         biobanksObesityDiagnosed.add(biobankId)
         if 'size' in collection and isinstance(collection['size'], int):
