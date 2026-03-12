@@ -119,7 +119,7 @@ for collection in dir.getCollections():
         cohortCountries.add(country)
 
 pd_cohortCollections = pd.DataFrame(cohortCollections)
-pddfutils.tidyBiobankDf(pd_cohortCollections)
+pddfutils.tidyCollectionDf(pd_cohortCollections)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
     print(headerStr + " - " + str(len(collectionList)) + " collections")
