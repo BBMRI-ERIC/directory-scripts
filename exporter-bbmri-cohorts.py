@@ -203,6 +203,8 @@ df_collFactsSampleNumber  = pd.DataFrame(columns = ['Network','Entity','Country'
 
 # Retrieve the warnings
 warningContainer = WarningsContainer()
+collIDsERROR = []
+collIDsWARNING = []
 for pluginInfo in simplePluginManager.getAllPlugins():
     if os.path.basename(pluginInfo.path) in args.disablePlugins:
         continue
@@ -211,8 +213,8 @@ for pluginInfo in simplePluginManager.getAllPlugins():
     warnings = pluginInfo.plugin_object.check(dir, args)
     end_time = time.perf_counter()
     log.info('   ... check finished in ' + "%0.3f" % (end_time-start_time) + 's')
-    collIDsERROR= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.ERROR']
-    collIDsWARNING= [war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.WARNING']
+    collIDsERROR.extend(war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.ERROR')
+    collIDsWARNING.extend(war.directoryEntityID for war in warnings if str(war.level) == 'DataCheckWarningLevel.WARNING')
     if args.warnings and len(warnings) > 0:
         for w in warnings:
             #if w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_coll] or w.directoryEntityID in [coll['id'] for coll in bbmri_cohort_dna_coll]:
