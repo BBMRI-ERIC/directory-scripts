@@ -154,6 +154,8 @@ def analyseBBs():
         if dir.isBiobankWithdrawn(biobankId):
             withdrawnBiobanks.add(biobankId)
             log.debug("Detected a withdrawn biobank without any collection %s", biobankId)
+            if not (args.include_withdrawn or args.only_withdrawn):
+                continue
         allBiobanks.add(biobankId)
     return allBiobanks
 
