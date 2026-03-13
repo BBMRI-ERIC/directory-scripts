@@ -1,6 +1,7 @@
 from argparse import Namespace
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import json
 
 import logging
 import warnings
@@ -100,6 +101,25 @@ def test_collection_qcheck_updater_list_mode_outputs_human_readable_plan(tmp_pat
     assert "add: DUO:0000020" in captured.out
 
 
+def test_collection_qcheck_updater_main_handles_ctrl_c(monkeypatch, caplog):
+    module = load_module()
+
+    class ParserStub:
+        def parse_args(self):
+            return Namespace(verbose=False, debug=False, quiet=False)
+
+    monkeypatch.setattr(module, "build_parser", lambda: ParserStub())
+    monkeypatch.setattr(module, "configure_logging", lambda args: None)
+    monkeypatch.setattr(module, "validate_args", lambda args: None)
+    monkeypatch.setattr(module, "run_updater", lambda args: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    with caplog.at_level(logging.WARNING):
+        result = module.main()
+
+    assert result == module.EXIT_ABORTED
+    assert "qcheck-updater.py interrupted by Ctrl+C during interactive review/apply." in caplog.text
+
+
 def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_save(tmp_path, monkeypatch):
     module = load_module()
     path = build_plan(tmp_path)
@@ -137,7 +157,7 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
     monkeypatch.setattr(module, "confirm_action", lambda prompt, **kwargs: confirm_prompts.append(prompt))
-    monkeypatch.setattr(module, "prompt_yes_no", lambda prompt, **kwargs: review_prompts.append(prompt) or True)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda prompt, **kwargs: review_prompts.append(prompt) or "yes")
 
     args = Namespace(
         input=str(path),
@@ -240,7 +260,7 @@ def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
     monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
-    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda *args, **kwargs: "yes")
 
     args = Namespace(
         input=str(path),
@@ -318,7 +338,7 @@ def test_collection_qcheck_updater_review_display_normalizes_multi_value_order(t
             raise AssertionError("dry-run must not save")
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
-    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda *args, **kwargs: "yes")
     monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
 
     args = Namespace(
@@ -398,7 +418,7 @@ def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
-    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda *args, **kwargs: "yes")
     monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
 
     args = Namespace(
@@ -479,7 +499,7 @@ def test_collection_qcheck_updater_saves_changed_rows_without_dtype_assignment_f
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
-    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda *args, **kwargs: "yes")
     monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
 
     args = Namespace(
@@ -579,8 +599,8 @@ def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interacti
     monkeypatch.setattr(module, "confirm_action", lambda prompt, **kwargs: confirm_prompts.append(prompt))
     monkeypatch.setattr(
         module,
-        "prompt_yes_no",
-        lambda prompt, **kwargs: review_prompts.append(prompt) or next(prompt_answers),
+        "prompt_review_decision",
+        lambda prompt, **kwargs: review_prompts.append(prompt) or ("yes" if next(prompt_answers) else "no"),
     )
 
     args = Namespace(
@@ -684,8 +704,45 @@ def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, mon
             deleted.append(data.copy())
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
-    monkeypatch.setattr(module, "prompt_yes_no", lambda *args, **kwargs: True)
-    monkeypatch.setattr(module, "confirm_action", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda *args, **kwargs: "yes")
+
+
+def test_collection_qcheck_updater_can_ignore_and_record_false_positive(tmp_path, monkeypatch):
+    module = load_module()
+    path = build_plan(tmp_path)
+    suppressions_path = tmp_path / "warning-suppressions.json"
+    confirm_prompts = []
+
+    class SessionStub:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def signin(self, username, password):
+            assert username == "user"
+            assert password == "secret"
+
+        def get(self, *, table, schema, as_df):
+            if table == "Collections":
+                return pd.DataFrame(
+                    [{"id": "bbmri-eric:ID:CZ_demo:collection:col1", "data_use": ""}]
+                )
+            if table == "CollectionFacts":
+                return pd.DataFrame(columns=["id", "collection"])
+            raise AssertionError(f"unexpected table {table}")
+
+        def save_table(self, **kwargs):
+            raise AssertionError("Ignored updates must not write Collections.")
+
+    monkeypatch.setattr(module, "DirectorySession", SessionStub)
+    monkeypatch.setattr(module, "DEFAULT_WARNING_SUPPRESSIONS_PATH", suppressions_path)
+    monkeypatch.setattr(module, "prompt_review_decision", lambda *args, **kwargs: "ignore")
+    monkeypatch.setattr(module, "confirm_action", lambda prompt, **kwargs: confirm_prompts.append(prompt))
 
     args = Namespace(
         input=str(path),
@@ -709,10 +766,19 @@ def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, mon
         directory_password="secret",
     )
 
-    with caplog.at_level(logging.WARNING):
-        result = module.run_updater(args)
+    result = module.run_updater(args)
 
     assert result == module.EXIT_OK
-    assert len(deleted) == 1
-    assert sorted(deleted[0]["id"].astype(str).tolist()) == ["fact1", "fact2"]
-    assert "Live value mismatch for facts.k_anonymity.drop_rows_k5" not in caplog.text
+    assert confirm_prompts == []
+    payload = json.loads(suppressions_path.read_text(encoding="utf-8"))
+    assert payload["version"] == 2
+    assert payload["suppressions"] == [
+        {
+            "added_by": "user",
+            "added_on": payload["suppressions"][0]["added_on"],
+            "check_id": "AP:JointDuo",
+            "entity_id": "bbmri-eric:ID:CZ_demo:collection:col1",
+            "entity_type": "COLLECTION",
+            "reason": "Ignored interactively in qcheck-updater for AP/access.duo.collaboration_required: Add DUO collaboration-required term.",
+        }
+    ]

@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from molgenis_emx2_pyclient import Client
 
 
@@ -20,11 +18,9 @@ class DirectorySession(Client):
     """
 
     def __enter__(self) -> "DirectorySession":
+        super().__enter__()
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
-        try:
-            self.signout()
-        except Exception:  # pragma: no cover - best-effort cleanup only
-            logging.debug("DirectorySession cleanup failed during signout.", exc_info=True)
+        super().__exit__(exc_type, exc, tb)
         return False

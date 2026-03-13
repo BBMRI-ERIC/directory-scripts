@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from cli_interrupts import log_keyboard_interrupt
 from directory_session_compat import DirectorySession
 from k_anonymity import positive_below_k_mask
 from validation_helpers import format_validation_error
@@ -1144,6 +1145,9 @@ def main():
         sys.exit(exit_code)
     except OperationAborted as exc:
         logging.error("%s", exc)
+        sys.exit(EXIT_ABORTED)
+    except KeyboardInterrupt:
+        log_keyboard_interrupt("directory-tables-modifier.py", action="interactive review/apply")
         sys.exit(EXIT_ABORTED)
     except InputError as exc:
         logging.error("%s", exc)

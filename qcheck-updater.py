@@ -10,18 +10,26 @@ import logging
 import os
 import sys
 from collections import defaultdict
+from datetime import date
 from pathlib import Path
 from pprint import PrettyPrinter
 
 import pandas as pd
 from dotenv import load_dotenv
 
+from cli_interrupts import log_keyboard_interrupt
 from directory import Directory
 from directory_session_compat import DirectorySession
 from duo_terms import detect_duo_term_storage_style, normalize_duo_term_ids, serialize_duo_term_id
 from fact_descriptor_sync import parse_collection_multi_value_field
 from fix_proposals import EntityFixProposal, load_fix_plan
 from nncontacts import NNContacts
+from validation_models import WarningSuppressionEntryModel
+from warning_suppressions import (
+    DEFAULT_WARNING_SUPPRESSIONS_PATH,
+    load_warning_suppressions_detailed,
+    write_suppression_entries,
+)
 
 
 load_dotenv()
@@ -172,6 +180,61 @@ def prompt_yes_no(prompt: str, *, default_no: bool = True) -> bool:
     if not response:
         return not default_no
     return response in {"y", "yes"}
+
+
+def prompt_review_decision(prompt: str, *, allow_ignore: bool = True) -> str:
+    """Prompt for yes/no and optional ignore, returning ``yes``, ``no``, or ``ignore``."""
+    if not sys.stdin.isatty():
+        raise OperationAborted(
+            "Interactive confirmation required but stdin is not a TTY. Use --force to proceed."
+        )
+    suffix = " [y/N/i]: " if allow_ignore else " [y/N]: "
+    sys.stderr.write(prompt + suffix)
+    sys.stderr.flush()
+    response = sys.stdin.readline().strip().lower()
+    if response in {"y", "yes"}:
+        return "yes"
+    if allow_ignore and response in {"i", "ignore"}:
+        return "ignore"
+    return "no"
+
+
+def _record_false_positive_suppression(
+    update: EntityFixProposal,
+    *,
+    path: Path | None = None,
+    added_by: str = "",
+) -> list[str]:
+    """Persist coupled warning/fix suppressions for one ignored update."""
+    path = DEFAULT_WARNING_SUPPRESSIONS_PATH if path is None else path
+    result = load_warning_suppressions_detailed(path, warn=logging.warning)
+    entries = list(result.entries)
+    existing_keys = {(entry.check_id, entry.entity_id) for entry in entries}
+    added_check_ids: list[str] = []
+    for check_id in update.source_check_ids:
+        key = (check_id, update.entity_id)
+        if key in existing_keys:
+            continue
+        entries.append(
+            WarningSuppressionEntryModel.parse_obj(
+                {
+                    "check_id": check_id,
+                    "entity_id": update.entity_id,
+                    "entity_type": update.entity_type,
+                    "reason": (
+                        f"Ignored interactively in qcheck-updater for {update.module}/{update.update_id}: "
+                        f"{update.human_explanation}"
+                    ),
+                    "added_by": added_by,
+                    "added_on": date.today().isoformat(),
+                }
+            )
+        )
+        existing_keys.add(key)
+        added_check_ids.append(check_id)
+    if added_check_ids:
+        write_suppression_entries(path, entries)
+    return added_check_ids
 
 
 def _split_csv_values(raw_values: list[str] | str | None) -> set[str]:
@@ -534,6 +597,7 @@ def _review_updates_interactively(
     *,
     verbose: bool,
     mismatch_update_keys: set[tuple[str, str, str]] | None = None,
+    suppression_added_by: str = "",
 ) -> list[EntityFixProposal]:
     """Return the subset of updates approved interactively by the user."""
     mismatch_update_keys = mismatch_update_keys or set()
@@ -567,11 +631,24 @@ def _review_updates_interactively(
             sys.stderr.write(f"  note: {update.blocking_reason}\n")
         if update_key in mismatch_update_keys:
             sys.stderr.write("  note: live value no longer matches the exported expected value; review carefully before applying.\n")
-        if prompt_yes_no(
-            "  Select this update despite the live mismatch?" if update_key in mismatch_update_keys else "  Select this update?",
-            default_no=True,
-        ):
+        decision = prompt_review_decision(
+            "  Select this update despite the live mismatch?" if update_key in mismatch_update_keys else "  Select this update?"
+        )
+        if decision == "yes":
             approved_updates.append(update)
+        elif decision == "ignore":
+            added_check_ids = _record_false_positive_suppression(
+                update,
+                added_by=suppression_added_by,
+            )
+            if added_check_ids:
+                sys.stderr.write(
+                    "  ignored and recorded as false positive for: "
+                    + ", ".join(added_check_ids)
+                    + "\n"
+                )
+            else:
+                sys.stderr.write("  ignored; matching false-positive suppression entries already existed.\n")
         sys.stderr.write("\n")
     return approved_updates
 
@@ -790,6 +867,7 @@ def run_updater(args: argparse.Namespace) -> int:
                 live_value_by_update_key,
                 verbose=args.verbose or args.debug,
                 mismatch_update_keys={(update.entity_id, update.field, update.update_id) for update in mismatch_updates},
+                suppression_added_by=(args.directory_username or ""),
             )
             if not updated_rows:
                 logging.info("No updates were approved during interactive review.")
@@ -867,6 +945,9 @@ def main() -> int:
         return run_updater(args)
     except OperationAborted as exc:
         logging.error("%s", exc)
+        return EXIT_ABORTED
+    except KeyboardInterrupt:
+        log_keyboard_interrupt("qcheck-updater.py", action="interactive review/apply")
         return EXIT_ABORTED
     except InputError as exc:
         logging.error("%s", exc)

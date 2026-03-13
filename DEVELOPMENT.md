@@ -301,6 +301,8 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 - `data-check.py -U/--export-update-plan ...` serializes those proposals into a JSON fix plan.
 - `qcheck-updater.py` reads that file, filters it, lists it in a human-readable form, and can dry-run or apply the updates to a staging schema.
 - Dry-run must follow the same interactive per-update review path as a real apply; the only behavioral difference is that it stops before `save_table(...)`.
+- Interactive review must accept `y` to apply, `n` to skip, and `i` to ignore as false positive; the ignore path writes canonical coupled suppressions for the update's source check IDs into `warning-suppressions.json` and then continues with the next update.
+- Interactive maintenance CLIs should treat Ctrl+C as a normal user abort: catch `KeyboardInterrupt` in `main()`, log a short interruption message naming the script/action, and return the script's abort/runtime exit code instead of dumping a traceback.
 - The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
 - The current updater apply path supports collection-scoped fixes: collection metadata updates in `Collections` and explicit row deletions in `CollectionFacts` (for example k-anonymity cleanup). Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
 - Current default QC baseline for fact-row donor k-anonymity is `k=10` (`FT:KAnonViolation`) for public aggregated data; any lower/waived threshold should be an explicitly documented exception (for example pre-anonymized source data).

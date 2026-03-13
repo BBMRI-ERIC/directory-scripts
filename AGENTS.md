@@ -78,6 +78,8 @@
 - `qcheck-updater.py` must support a human-readable `--list` mode for inspecting updates without applying them.
 - `qcheck-updater.py` dry runs must execute the same interactive per-update review logic as real applies and differ only in skipping the final write to the Directory.
 - `qcheck-updater.py` live-value mismatches against `expected_current_value` must be handled per update during interactive review; declining one mismatched update must skip only that update, not abort the whole run.
+- `qcheck-updater.py` interactive review must support `i`/`I` as an ignore/false-positive action that records canonical coupled suppressions in `warning-suppressions.json` for the update's source check IDs on that entity, then continues with the next update.
+- Interactive maintenance CLIs with explicit `main()` wrappers must catch `KeyboardInterrupt` and emit a concise user-facing Ctrl+C interruption message instead of a traceback.
 - `qcheck-updater.py` must compare unordered multi-value fields canonically; pure reordering of `data_use`, `type`, `diagnosis_available`, `materials`, or `sex` must not trigger false mismatches.
 - `qcheck-updater.py` supports CollectionFacts row-deletion fixes (`mode=delete_rows`, field `facts`) for collection-scoped updates such as `FT:KAnonViolation`; these must delete only the explicitly proposed fact row IDs and remain no-op-safe when rows are already absent.
 - `qcheck-updater.py` review output for append updates must show both the final target value and the incremental addition, not a replacement-looking payload.

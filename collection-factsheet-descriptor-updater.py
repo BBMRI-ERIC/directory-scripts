@@ -15,6 +15,7 @@ from pprint import PrettyPrinter
 import pandas as pd
 from dotenv import load_dotenv
 
+from cli_interrupts import log_keyboard_interrupt
 from directory import Directory
 from directory_session_compat import DirectorySession
 from fact_descriptor_sync import (
@@ -327,6 +328,9 @@ def main() -> int:
         return update_collection_from_facts(args)
     except OperationAborted as exc:
         logging.error("%s", exc)
+        return EXIT_ABORTED
+    except KeyboardInterrupt:
+        log_keyboard_interrupt("collection-factsheet-descriptor-updater.py", action="interactive review/apply")
         return EXIT_ABORTED
     except InputError as exc:
         logging.error("%s", exc)

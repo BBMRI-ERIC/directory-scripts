@@ -11,6 +11,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from cli_interrupts import log_keyboard_interrupt
 from validation_models import WarningSuppressionEntryModel
 from warning_suppressions import (
     DEFAULT_WARNING_SUPPRESSIONS_PATH,
@@ -248,6 +249,9 @@ def main() -> int:
         if command == "prune-stale":
             return command_prune_stale(args)
         raise ValueError(f"Unsupported command {command!r}.")
+    except KeyboardInterrupt:
+        log_keyboard_interrupt("warning-suppressions-manage.py", action="command execution")
+        return EXIT_RUNTIME_ERROR
     except Exception as exc:
         logging.error("%s", exc)
         return EXIT_RUNTIME_ERROR

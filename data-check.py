@@ -9,6 +9,7 @@ from typing import List
 import os.path
 
 
+from cli_interrupts import log_keyboard_interrupt
 from cli_common import (
     add_validation_warning_argument,
     build_directory_kwargs,
@@ -105,18 +106,13 @@ parser.add_argument(
 )
 
 parser.set_defaults(disableChecksRemote = [], disablePlugins = [], purgeCaches=[])
-args = parser.parse_args()
-
-if args.schema != "ERIC" and not args.token and not (args.username and args.password):
-    parser.error(
-        "Checking a non-ERIC schema requires -t/--token or -u/--username and -p/--password, "
-        "or DIRECTORYTOKEN or DIRECTORYUSERNAME/DIRECTORYPASSWORD in .env."
-    )
-
-configure_logging(args)
 
 
 # Main code
+
+
+EXIT_OK = 0
+EXIT_ABORTED = 3
 
 
 def collect_known_check_ids_and_prefixes():
@@ -139,85 +135,106 @@ def collect_known_check_ids_and_prefixes():
                 check_ids.add(str(check_id))
     return check_ids, check_prefixes
 
-dir = Directory(**build_directory_kwargs(args, pp=pp))
-dir.prepare_ai_cache_checksum_state()
-validation_warn = build_validation_warning_handler(
-    enabled=not getattr(args, "suppress_validation_warnings", False),
-    logger=log.getLogger("validation"),
-)
-known_check_ids, known_check_prefixes = collect_known_check_ids_and_prefixes()
-suppression_result = load_warning_suppressions_detailed(args.warning_suppressions, warn=validation_warn)
-known_entities = {
-    "BIOBANK": {entity["id"] for entity in dir.getBiobanks()},
-    "COLLECTION": {entity["id"] for entity in dir.getCollections()},
-    "CONTACT": {entity["id"] for entity in dir.getContacts()},
-    "NETWORK": {entity["id"] for entity in dir.getNetworks()},
-}
-for diagnostic in summarize_suppression_diagnostics(
-    suppression_result.entries,
-    known_check_ids=known_check_ids,
-    known_check_prefixes=known_check_prefixes,
-    known_entities=known_entities,
-):
-    validation_warn(diagnostic)
-warningContainer = WarningsContainer(suppression_result.warning_suppressions)
 
-orphacodes = None
-if args.orphacodesfile is not None:
-    orphacodes = OrphaCodes(args.orphacodesfile[0])
-    dir.setOrphaCodesMapper(orphacodes)
+def main() -> int:
+    args = parser.parse_args()
 
-log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
-log.info('Total collections: ' + str(dir.getCollectionsCount()))
+    if args.schema != "ERIC" and not args.token and not (args.username and args.password):
+        parser.error(
+            "Checking a non-ERIC schema requires -t/--token or -u/--username and -p/--password, "
+            "or DIRECTORYTOKEN or DIRECTORYUSERNAME/DIRECTORYPASSWORD in .env."
+        )
 
-log.debug('MMCI collections: ')
-if args.debug:
-    for biobank in dir.getBiobanks():
-        if(re.search('MMCI', biobank['id'])):
-            pp.pprint(biobank)
-            collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
-            for e in collections.edges:
-                print("   "+str(e[0])+" -> "+str(e[1]))
+    configure_logging(args)
 
-    for collection in dir.getCollections():
-        if(re.search('MMCI', collection['id'])):
-            pp.pprint(collection)
+    try:
+        dir = Directory(**build_directory_kwargs(args, pp=pp))
+        dir.prepare_ai_cache_checksum_state()
+        validation_warn = build_validation_warning_handler(
+            enabled=not getattr(args, "suppress_validation_warnings", False),
+            logger=log.getLogger("validation"),
+        )
+        known_check_ids, known_check_prefixes = collect_known_check_ids_and_prefixes()
+        suppression_result = load_warning_suppressions_detailed(args.warning_suppressions, warn=validation_warn)
+        known_entities = {
+            "BIOBANK": {entity["id"] for entity in dir.getBiobanks()},
+            "COLLECTION": {entity["id"] for entity in dir.getCollections()},
+            "CONTACT": {entity["id"] for entity in dir.getContacts()},
+            "NETWORK": {entity["id"] for entity in dir.getNetworks()},
+        }
+        for diagnostic in summarize_suppression_diagnostics(
+            suppression_result.entries,
+            known_check_ids=known_check_ids,
+            known_check_prefixes=known_check_prefixes,
+            known_entities=known_entities,
+        ):
+            validation_warn(diagnostic)
+        warningContainer = WarningsContainer(suppression_result.warning_suppressions)
 
-for pluginInfo in simplePluginManager.getAllPlugins():
-    if os.path.basename(pluginInfo.path) in args.disablePlugins:
-        continue
-    simplePluginManager.activatePluginByName(pluginInfo.name)
-    start_time = time.perf_counter()
-    warnings = pluginInfo.plugin_object.check(dir, args)
-    end_time = time.perf_counter()
-    log.info('   ... check finished in ' + "%0.3f" % (end_time-start_time) + 's')
-    if len(warnings) > 0:
-       for w in warnings:
-           warningContainer.newWarning(w)
+        orphacodes = None
+        if args.orphacodesfile is not None:
+            orphacodes = OrphaCodes(args.orphacodesfile[0])
+            dir.setOrphaCodesMapper(orphacodes)
 
-if args.debug:
-    warningContainer.dumpSuppressedWarningsDebug()
+        log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
+        log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-if not args.nostdout:
-    log.info("Outputting warnings on stdout")
-    warningContainer.dumpWarnings()
-if args.outputXLSX is not None:
-    log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
-    allBiobanks = {}
-    allCollections = {}
-    for biobank in dir.getBiobanks():
-        allBiobanks[biobank['id']] = str(dir.isBiobankWithdrawn(biobank['id']))
-    for collection in dir.getCollections():
-        allCollections[collection['id']] = str(dir.isCollectionWithdrawn(collection['id']))
-    warningContainer.dumpWarningsXLSX(args.outputXLSX, allBiobanks, allCollections, True)
-if args.update_plan:
-    log.info("Outputting structured fix proposals in JSON update plan %s", args.update_plan)
-    payload = write_fix_plan(
-        args.update_plan,
-        warningContainer.getWarnings(),
-        schema=dir.getSchema(),
-        include_withdrawn=bool(getattr(args, "include_withdrawn", False)),
-        only_withdrawn=bool(getattr(args, "only_withdrawn", False)),
-        suppressions=suppression_result.fix_suppressions,
-    )
-    log.info("   ... exported %d fix proposals", len(payload.get("updates", [])))
+        log.debug('MMCI collections: ')
+        if args.debug:
+            for biobank in dir.getBiobanks():
+                if(re.search('MMCI', biobank['id'])):
+                    pp.pprint(biobank)
+                    collections = dir.getGraphBiobankCollectionsFromBiobank(biobank['id'])
+                    for e in collections.edges:
+                        print("   "+str(e[0])+" -> "+str(e[1]))
+
+            for collection in dir.getCollections():
+                if(re.search('MMCI', collection['id'])):
+                    pp.pprint(collection)
+
+        for pluginInfo in simplePluginManager.getAllPlugins():
+            if os.path.basename(pluginInfo.path) in args.disablePlugins:
+                continue
+            simplePluginManager.activatePluginByName(pluginInfo.name)
+            start_time = time.perf_counter()
+            warnings = pluginInfo.plugin_object.check(dir, args)
+            end_time = time.perf_counter()
+            log.info('   ... check finished in ' + "%0.3f" % (end_time-start_time) + 's')
+            if len(warnings) > 0:
+               for w in warnings:
+                   warningContainer.newWarning(w)
+
+        if args.debug:
+            warningContainer.dumpSuppressedWarningsDebug()
+
+        if not args.nostdout:
+            log.info("Outputting warnings on stdout")
+            warningContainer.dumpWarnings()
+        if args.outputXLSX is not None:
+            log.info("Outputting warnings in Excel file " + args.outputXLSX[0])
+            allBiobanks = {}
+            allCollections = {}
+            for biobank in dir.getBiobanks():
+                allBiobanks[biobank['id']] = str(dir.isBiobankWithdrawn(biobank['id']))
+            for collection in dir.getCollections():
+                allCollections[collection['id']] = str(dir.isCollectionWithdrawn(collection['id']))
+            warningContainer.dumpWarningsXLSX(args.outputXLSX, allBiobanks, allCollections, True)
+        if args.update_plan:
+            log.info("Outputting structured fix proposals in JSON update plan %s", args.update_plan)
+            payload = write_fix_plan(
+                args.update_plan,
+                warningContainer.getWarnings(),
+                schema=dir.getSchema(),
+                include_withdrawn=bool(getattr(args, "include_withdrawn", False)),
+                only_withdrawn=bool(getattr(args, "only_withdrawn", False)),
+                suppressions=suppression_result.fix_suppressions,
+            )
+            log.info("   ... exported %d fix proposals", len(payload.get("updates", [])))
+        return EXIT_OK
+    except KeyboardInterrupt:
+        log_keyboard_interrupt("data-check.py", action="directory retrieval/check execution")
+        return EXIT_ABORTED
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
