@@ -2,6 +2,14 @@
   "suppressions": [
     {
       "added_by": "petr.holub@bbmri-eric.eu",
+      "added_on": "2026-03-11",
+      "check_id": "AP:JointDuo",
+      "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
+      "entity_type": "COLLECTION",
+      "reason": "Ignored interactively in qcheck-updater for AP/access.duo.collaboration_required: Add DUO:0000020 (collaboration required) because the collection already advertises a joint-project access requirement."
+    },
+    {
+      "added_by": "petr.holub@bbmri-eric.eu",
       "added_on": "2026-03-05",
       "check_id": "FT:KAnonViolation",
       "entity_id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:MICAN",
