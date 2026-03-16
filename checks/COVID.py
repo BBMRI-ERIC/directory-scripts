@@ -366,6 +366,9 @@ class COVID(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			biobank_covid = []
+			if 'covid19biobank' in biobank:
+				for c in biobank['covid19biobank']:
+					biobank_covid.append(c['id'])
 			biobank_capabilities = []
 			if 'capabilities' in biobank:
 				for c in biobank['capabilities']:
