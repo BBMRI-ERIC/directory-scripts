@@ -328,9 +328,10 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
   - prefer `latexmk -pdfxe` for PDF builds when available; fall back to direct `xelatex` only when `latexmk` is unavailable
 - Resolution logic for survey respondents is intentionally conservative:
   - exact via biobank ID or collection ID when the survey provides them
-  - certain via institution-name match when the name maps uniquely
-  - approximate via institution-name similarity when there is no exact ID anchor
+  - certain via institution-name match when the normalized name, alias/acronym, or ID alias maps uniquely
+  - approximate via institution-name similarity when there is no exact ID anchor; fuzzy matching should be accent-insensitive and robust to small typos
   - unresolved/missing when the respondent does not map cleanly into the Directory
+- `directory.py` should stay cache-first for read workflows: when a complete schema snapshot is already cached, reuse it without forcing a live API session; if live refresh fails, fall back to the cached snapshot when it is complete and otherwise raise a clear runtime error.
 - Do not invert the workflow by reporting every Directory biobank missing from the survey; only analyze survey respondents and their matched/missing Directory scope.
 - WSI can currently only be analyzed through generic imaging signals (`type=IMAGE`, `data_categories=IMAGING_DATA`, imaging metadata, and free text). Do not invent a fake WSI-specific structured field until the Directory schema grows one.
 - Survey-derived update plans may target both `BIOBANK` and `COLLECTION` entities; keep update generation conservative and avoid auto-writing free-text rewrites.

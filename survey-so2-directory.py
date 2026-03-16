@@ -12,8 +12,10 @@ import re
 import shutil
 import subprocess
 import tempfile
+import unicodedata
 from collections import defaultdict
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from duo_terms import normalize_duo_term_ids
 from fix_proposals import EntityFixProposal, compute_checksum
 
 
@@ -68,6 +71,113 @@ BOOLEAN_UPDATE_FIELDS = {
     ("COLLECTION", "collaboration_non_for_profit"),
     ("COLLECTION", "collaboration_commercial"),
     ("COLLECTION", "commercial_use"),
+}
+
+GENERIC_INSTITUTION_TOKENS = {
+    "and",
+    "bank",
+    "biobank",
+    "center",
+    "centre",
+    "de",
+    "der",
+    "des",
+    "di",
+    "faculty",
+    "for",
+    "hospital",
+    "hospitals",
+    "hopitaux",
+    "infrastructure",
+    "institute",
+    "inst",
+    "la",
+    "medical",
+    "of",
+    "repository",
+    "resource",
+    "service",
+    "services",
+    "the",
+    "universitaire",
+    "universitaires",
+    "university",
+}
+INSTITUTION_ACRONYM_STOPWORDS = {
+    "and",
+    "de",
+    "der",
+    "des",
+    "di",
+    "for",
+    "la",
+    "of",
+    "the",
+}
+
+INLINE_BREAK_PATTERN = re.compile(
+    r"bbmri-eric:[A-Za-z0-9:._-]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+)
+WHOLE_IDENTIFIER_PATTERN = re.compile(r"^(?:\([A-Z]{2}\)\s+)?(?:BIOBANK|COLLECTION|CONTACT|NETWORK)\s+bbmri-eric:[A-Za-z0-9:._-]+$|^bbmri-eric:[A-Za-z0-9:._-]+$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$|^[A-Z]{2}_[A-Za-z0-9._-]+$")
+
+FINDING_TYPE_METADATA = {
+    "row_resolution": {
+        "directory_fields": ["BIOBANK.id", "BIOBANK.name", "BIOBANK.country", "COLLECTION.id"],
+        "comparison_description": (
+            "Resolve the survey row conservatively: explicit biobank ID first, explicit collection IDs second, "
+            "then institution-name matching (certain or approximate). Approximate name matches remain analysis-only."
+        ),
+    },
+    "geo.country": {
+        "directory_fields": ["BIOBANK.country"],
+        "comparison_description": "Normalize the survey country to ISO-2 and compare it exactly with the mapped Directory biobank country.",
+    },
+    "biobank.name": {
+        "directory_fields": ["BIOBANK.name"],
+        "comparison_description": (
+            "Normalize institution names (case, accents, common aliases) and compare them textually. "
+            "Differences remain manual-review findings because naming conventions differ."
+        ),
+    },
+    "contact.email": {
+        "directory_fields": ["CONTACT.email"],
+        "comparison_description": "Compare the respondent email with the mapped Directory contact email case-insensitively.",
+    },
+    "promotion.partnership_interest": {
+        "directory_fields": ["BIOBANK.collaboration_non_for_profit", "BIOBANK.collaboration_commercial"],
+        "comparison_description": (
+            "Translate the survey partnership-interest answer into expected collaboration flags directionally only. "
+            "This is intentionally a plausible/manual mapping, not an exact semantic equivalence."
+        ),
+    },
+    "promotion.partnership_interest.duo": {
+        "directory_fields": ["COLLECTION.data_use", "COLLECTION.collaboration_commercial", "BIOBANK.collaboration_commercial"],
+        "comparison_description": (
+            "For a survey row mapped to exactly one collection, treat an academic-only promotion answer as a plausible "
+            "signal for the existing AccessPolicies DUO restriction DUO:0000018 (not-for-profit, non-commercial use only), "
+            "but only when the collection is not already commercial."
+        ),
+    },
+    "sample_types.materials": {
+        "directory_fields": ["COLLECTION.materials"],
+        "comparison_description": (
+            "Map structured survey sample-type answers to Directory material terms. Compare at aggregate scope across the "
+            "mapped collections; emit collection-level update proposals only when the survey row maps to exactly one collection."
+        ),
+    },
+    "imaging.wsi_presence": {
+        "directory_fields": [
+            "COLLECTION.type",
+            "COLLECTION.data_categories",
+            "COLLECTION.imaging_modality",
+            "COLLECTION.image_dataset_type",
+            "COLLECTION.description",
+        ],
+        "comparison_description": (
+            "The Directory has no dedicated WSI field. Compare the survey WSI answer against generic imaging support "
+            "signals plus unstructured text hints only."
+        ),
+    },
 }
 
 
@@ -177,23 +287,37 @@ def build_directory(args: argparse.Namespace) -> Directory:
 
 
 def normalize_text(value: Any) -> str:
-    if value is None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
         return ""
-    text = str(value).strip().casefold()
-    text = re.sub(r"[\\.,;:/()\\[\\]{}_-]+", " ", text)
-    text = re.sub(r"\\s+", " ", text).strip()
+    text = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii")
+    text = text.strip().casefold()
+    text = re.sub(r"[\\.,;:/()\[\]{}_-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
     replacements = {
+        "berne": "bern",
+        "geneva": "geneve",
         "universitair": "university",
         "universitaire": "university",
+        "universitaires": "university",
+        "universite": "university",
         "universiteit": "university",
         "universitaet": "university",
         "medical center": "medical centre",
         "umc": "university medical centre",
         "bb ": "biobank ",
     }
-    for source, target in replacements.items():
-        text = text.replace(source, target)
-    return re.sub(r"\\s+", " ", text).strip()
+    for source, target in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
+        text = re.sub(rf"(?<![a-z0-9]){re.escape(source)}(?![a-z0-9])", target, text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def normalized_institution_signature(value: Any) -> tuple[str, ...]:
+    tokens = [
+        token
+        for token in normalize_text(value).split()
+        if token and token not in GENERIC_INSTITUTION_TOKENS
+    ]
+    return tuple(sorted(dict.fromkeys(tokens)))
 
 
 def normalize_country(value: Any) -> str:
@@ -221,6 +345,22 @@ def cell_text(value: Any) -> str:
     return "" if text.lower() == "nan" else text
 
 
+def get_row_value(row: pd.Series, *column_names: str) -> Any:
+    for column_name in column_names:
+        if column_name in row.index:
+            return row.get(column_name)
+    normalized_columns = {
+        normalize_text(column_name): column_name
+        for column_name in row.index
+        if isinstance(column_name, str)
+    }
+    for column_name in column_names:
+        matched_column = normalized_columns.get(normalize_text(column_name))
+        if matched_column is not None:
+            return row.get(matched_column)
+    return None
+
+
 def parse_material_value(value: Any) -> list[str]:
     if value is None:
         return []
@@ -239,7 +379,7 @@ def escape_latex(value: Any) -> str:
         "%": r"\%",
         "$": r"\$",
         "#": r"\#",
-        "_": r"\_",
+        "_": r"\_\allowbreak{}",
         "{": r"\{",
         "}": r"\}",
         "~": r"\textasciitilde{}",
@@ -250,31 +390,39 @@ def escape_latex(value: Any) -> str:
 
 def escape_latex_breakable_identifier(value: Any) -> str:
     text = "" if value is None else str(value)
-    fragments: list[str] = []
-    for char in text:
-        if char == "_":
-            fragments.append(r"\_\allowbreak{}")
-        elif char == ".":
-            fragments.append(r".\allowbreak{}")
-        else:
-            fragments.append(escape_latex(char))
-    return "".join(fragments)
+    return latex_breakable_token(text)
 
 
 def escape_latex_breakable_entity(value: Any) -> str:
     text = "" if value is None else str(value)
+    text = re.sub(r"(?<=[a-z])(?=[A-Z])", "-", text)
+    return latex_breakable_token(text)
+
+
+def escape_latex_breakable_email(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return latex_breakable_token(text)
+
+
+def latex_breakable_token(value: Any) -> str:
+    text = "" if value is None else str(value)
+    pdf_text = text.replace("{", "").replace("}", "")
+    return rf"\texorpdfstring{{\nolinkurl{{{text}}}}}{{{pdf_text}}}"
+
+
+def escape_latex_with_inline_breaks(value: Any) -> str:
+    text = "" if value is None else str(value)
     fragments: list[str] = []
-    for char in text:
-        if char == "_":
-            fragments.append(r"\_\allowbreak{}")
-        elif char == ".":
-            fragments.append(r".\allowbreak{}")
-        elif char == ":":
-            fragments.append(r":\allowbreak{}")
-        elif char == "-":
-            fragments.append(r"-\allowbreak{}")
+    last_index = 0
+    for match in INLINE_BREAK_PATTERN.finditer(text):
+        fragments.append(escape_latex(text[last_index:match.start()]))
+        token = match.group(0)
+        if "@" in token:
+            fragments.append(escape_latex_breakable_email(token))
         else:
-            fragments.append(escape_latex(char))
+            fragments.append(escape_latex_breakable_entity(token))
+        last_index = match.end()
+    fragments.append(escape_latex(text[last_index:]))
     return "".join(fragments)
 
 
@@ -329,9 +477,11 @@ def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
     survey_value = finding.get("survey_value")
     directory_value = finding.get("directory_value")
     if mapping_id == "sample_types.materials":
-        survey_expected = survey_value.get("expected_materials", []) if isinstance(survey_value, dict) else survey_value
-        directory_observed = directory_value.get("observed_materials", []) if isinstance(directory_value, dict) else directory_value
-        return summarize_sequence(survey_expected), summarize_sequence(directory_observed)
+        survey_expected = set(survey_value.get("expected_materials", []) if isinstance(survey_value, dict) else survey_value or [])
+        directory_observed = set(directory_value.get("observed_materials", []) if isinstance(directory_value, dict) else directory_value or [])
+        missing = sorted(survey_expected - directory_observed)
+        extra = sorted(directory_observed - survey_expected)
+        return summarize_sequence(missing), summarize_sequence(extra)
     if mapping_id == "promotion.partnership_interest":
         if isinstance(survey_value, dict):
             survey_text = (
@@ -344,6 +494,22 @@ def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
         if isinstance(directory_value, dict):
             directory_text = (
                 f"collaboration_non_for_profit={serialize_report_value(directory_value.get('collaboration_non_for_profit'))}, "
+                f"collaboration_commercial={serialize_report_value(directory_value.get('collaboration_commercial'))}"
+            )
+        else:
+            directory_text = serialize_report_value(directory_value)
+        return survey_text, directory_text
+    if mapping_id == "promotion.partnership_interest.duo":
+        if isinstance(survey_value, dict):
+            survey_text = (
+                f"interest={serialize_report_value(survey_value.get('interest'))}, "
+                f"expected_duo={serialize_report_value(survey_value.get('expected_duo'))}"
+            )
+        else:
+            survey_text = serialize_report_value(survey_value)
+        if isinstance(directory_value, dict):
+            directory_text = (
+                f"data_use={serialize_report_value(directory_value.get('data_use'))}, "
                 f"collaboration_commercial={serialize_report_value(directory_value.get('collaboration_commercial'))}"
             )
         else:
@@ -365,6 +531,15 @@ def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
     return summarize_detail(survey_value), summarize_detail(directory_value)
 
 
+def escape_report_value(value: str) -> str:
+    text = "" if value is None else str(value)
+    if WHOLE_IDENTIFIER_PATTERN.fullmatch(text):
+        if "@" in text:
+            return escape_latex_breakable_email(text)
+        return escape_latex_breakable_entity(text)
+    return escape_latex_with_inline_breaks(text)
+
+
 def finding_link(mapping_id: str) -> str:
     label = latex_label(f"appendix-{mapping_id}")
     return rf"\hyperref[{label}]{{{escape_latex_breakable_identifier(mapping_id)} {escape_latex('(appendix)')}}}"
@@ -381,8 +556,8 @@ def format_finding_result(finding: dict[str, Any], *, concise_consistent: bool) 
     if concise_consistent and status == "consistent":
         return "Consistent."
     survey_value, directory_value = format_finding_values(finding)
-    if status == "consistent":
-        return f"{explanation} Survey={survey_value}; Directory={directory_value}."
+    if str(finding.get("mapping_id", "")) == "sample_types.materials":
+        return f"{explanation} Missing in Directory={survey_value}; Extra in Directory={directory_value}."
     return f"{explanation} Survey={survey_value}; Directory={directory_value}."
 
 
@@ -400,6 +575,8 @@ def build_appendix_entries(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 "relation_type": str(finding.get("relation_type", "")).strip(),
                 "reliability_levels": set(),
                 "survey_fields": set(),
+                "directory_fields": set(FINDING_TYPE_METADATA.get(mapping_id, {}).get("directory_fields", [])),
+                "comparison_description": str(FINDING_TYPE_METADATA.get(mapping_id, {}).get("comparison_description", "")).strip(),
                 "strategic_objectives": set(),
             },
         )
@@ -409,12 +586,18 @@ def build_appendix_entries(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
             current["relation_type"] = str(finding.get("relation_type", "")).strip()
         current["reliability_levels"].add(str(finding.get("reliability", "")).strip())
         current["survey_fields"].update(str(item) for item in finding.get("survey_fields", []) if str(item).strip())
+        current["directory_fields"].update(
+            str(item) for item in finding.get("directory_fields", []) if str(item).strip()
+        )
+        if finding.get("comparison_description") and not current["comparison_description"]:
+            current["comparison_description"] = str(finding.get("comparison_description", "")).strip()
         current["strategic_objectives"].update(
             str(item) for item in finding.get("strategic_objectives", []) if str(item).strip()
         )
     for entry in entries.values():
         entry["reliability_levels"] = sorted(item for item in entry["reliability_levels"] if item)
         entry["survey_fields"] = sorted(entry["survey_fields"])
+        entry["directory_fields"] = sorted(entry["directory_fields"])
         entry["strategic_objectives"] = sorted(entry["strategic_objectives"])
     return dict(sorted(entries.items()))
 
@@ -449,6 +632,22 @@ def choose_contact(
 def get_collections_ids_from_biobank(directory: Directory, biobank_id: str) -> list[str]:
     graph = directory.getGraphBiobankCollectionsFromBiobank(biobank_id)
     return sorted(node_id for node_id in graph.nodes() if ":collection:" in str(node_id))
+
+
+def summarize_collection_scope(
+    matched_collection_ids: list[str],
+    all_biobank_collection_ids: list[str],
+) -> str:
+    matched = sorted(dict.fromkeys(matched_collection_ids))
+    all_collections = sorted(dict.fromkeys(all_biobank_collection_ids))
+    if not matched:
+        return "<none>"
+    if matched == all_collections:
+        return "all collections"
+    unmatched = [collection_id for collection_id in all_collections if collection_id not in set(matched)]
+    if len(all_collections) > 5 and 0 < len(unmatched) < 5:
+        return "All except " + ", ".join(unmatched)
+    return ", ".join(matched)
 
 
 def aggregate_scope(scope: dict[str, Any], collection_index: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -488,6 +687,166 @@ def aggregate_scope(scope: dict[str, Any], collection_index: dict[str, dict[str,
     }
 
 
+def normalize_collection_id(value: str) -> str:
+    collection_id = cell_text(value)
+    if not collection_id:
+        return ""
+    if collection_id.startswith("bbmri-eric:ID:"):
+        return collection_id
+    if ":collection:" in collection_id:
+        return f"bbmri-eric:ID:{collection_id}"
+    return collection_id
+
+
+def normalize_biobank_id(value: str) -> str:
+    biobank_id = cell_text(value)
+    if not biobank_id:
+        return ""
+    if biobank_id.startswith("bbmri-eric:ID:"):
+        return biobank_id
+    if ":collection:" in biobank_id:
+        return normalize_collection_id(biobank_id)
+    if ":" not in biobank_id:
+        return f"bbmri-eric:ID:{biobank_id}"
+    return biobank_id
+
+
+def institution_aliases(value: Any) -> set[str]:
+    raw_text = cell_text(value)
+    normalized = normalize_text(raw_text)
+    aliases = {normalized} if normalized else set()
+    normalized_tokens = [token for token in normalized.split() if token and token not in INSTITUTION_ACRONYM_STOPWORDS]
+    if len(normalized_tokens) >= 2:
+        aliases.add("".join(token[0] for token in normalized_tokens))
+    trimmed_tokens = [token for token in normalized_tokens if token not in {"bank", "biobank", "repository", "resource", "service", "services"}]
+    if len(trimmed_tokens) >= 2:
+        aliases.add("".join(token[0] for token in trimmed_tokens))
+    raw_upper_tokens = re.findall(r"\b[A-Z]{2,}\b", raw_text)
+    aliases.update(token.casefold() for token in raw_upper_tokens)
+    return {alias for alias in aliases if alias}
+
+
+def biobank_id_aliases(value: Any) -> set[str]:
+    normalized_id = normalize_biobank_id(value)
+    aliases = {normalized_id.casefold()} if normalized_id else set()
+    if normalized_id.startswith("bbmri-eric:ID:"):
+        suffix = normalized_id.removeprefix("bbmri-eric:ID:")
+        aliases.add(suffix.casefold())
+        if "_" in suffix:
+            _, local_id = suffix.split("_", 1)
+            aliases.add(local_id.casefold())
+            if local_id.endswith("BB") and len(local_id) > 2:
+                aliases.add(local_id[:-2].casefold())
+    return {alias for alias in aliases if alias}
+
+
+def match_biobank_alias_candidates(
+    aliases: set[str],
+    biobanks_by_alias: dict[str, list[dict[str, Any]]],
+    *,
+    country: str,
+) -> list[dict[str, Any]]:
+    candidates_by_id: dict[str, dict[str, Any]] = {}
+    for alias in aliases:
+        for candidate in biobanks_by_alias.get(alias, []):
+            if country and str(candidate.get("country") or "").upper() != country:
+                continue
+            candidates_by_id[candidate["id"]] = candidate
+    return [candidates_by_id[biobank_id] for biobank_id in sorted(candidates_by_id)]
+
+
+def extract_email_domain(value: Any) -> str:
+    email = cell_text(value).lower()
+    if "@" not in email:
+        return ""
+    return email.split("@", 1)[1]
+
+
+def build_collection_contact_domain_counts(
+    collection_index: dict[str, dict[str, Any]],
+    contact_index: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, int]]:
+    counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for collection in collection_index.values():
+        contact_value = collection.get("contact")
+        if not contact_value:
+            continue
+        contact_id = contact_value["id"] if isinstance(contact_value, dict) else str(contact_value)
+        contact = contact_index.get(contact_id) or {}
+        domain = extract_email_domain(contact.get("email"))
+        if not domain:
+            continue
+        biobank_value = collection.get("biobank")
+        biobank_id = biobank_value["id"] if isinstance(biobank_value, dict) else str(biobank_value)
+        counts[domain][biobank_id] += 1
+    return {domain: dict(per_biobank) for domain, per_biobank in counts.items()}
+
+
+def infer_collection_scope_from_row(
+    row: pd.Series,
+    candidate_collection_ids: list[str],
+    collection_index: dict[str, dict[str, Any]],
+) -> tuple[list[str], str]:
+    if len(candidate_collection_ids) <= 1:
+        return candidate_collection_ids, ""
+    survey_context = " ".join(
+        filter(
+            None,
+            [
+                cell_text(row.get("Name of Institution")),
+                cell_text(row.get("Research field")),
+                cell_text(row.get("What field of research does your biobank or biomolecular resource support? (Select all that apply)")),
+                cell_text(row.get("What is the origin of samples in your biobank? (Select all that apply)")),
+            ],
+        )
+    )
+    normalized_context = normalize_text(survey_context)
+    veterinary_signal = any(keyword in normalized_context for keyword in ("animal", "vetsuisse", "veterinary"))
+    human_signal = any(keyword in normalized_context for keyword in ("medical", "public health", "clinical", "patient", "human"))
+    pathogen_signal = any(keyword in normalized_context for keyword in ("pathogen", "infectious", "microorganism", "microbiology"))
+
+    collections = [collection_index[collection_id] for collection_id in candidate_collection_ids if collection_id in collection_index]
+    if not collections:
+        return candidate_collection_ids, ""
+
+    if veterinary_signal:
+        narrowed = [
+            collection["id"]
+            for collection in collections
+            if "NON_HUMAN" in parse_material_value(collection.get("type"))
+            or "vet" in normalize_text(collection.get("name"))
+            or "animal" in normalize_text(collection.get("description"))
+        ]
+        if len(narrowed) == 1:
+            return narrowed, "Survey wording indicates veterinary/animal scope; collection scope was narrowed accordingly."
+
+    if pathogen_signal:
+        narrowed = [
+            collection["id"]
+            for collection in collections
+            if "PATHOGEN" in parse_material_value(collection.get("materials"))
+            or "pathogen" in normalize_text(collection.get("description"))
+            or "infectious" in normalize_text(collection.get("description"))
+        ]
+        if len(narrowed) == 1:
+            return narrowed, "Survey wording indicates pathogen/infectious-disease scope; collection scope was narrowed accordingly."
+
+    if human_signal:
+        narrowed = []
+        for collection in collections:
+            collection_types = set(parse_material_value(collection.get("type")))
+            collection_materials = set(parse_material_value(collection.get("materials")))
+            if "NON_HUMAN" in collection_types:
+                continue
+            if "PATHOGEN" in collection_materials:
+                continue
+            narrowed.append(collection["id"])
+        if len(narrowed) == 1:
+            return narrowed, "Survey wording indicates human/medical scope; collection scope was narrowed accordingly."
+
+    return candidate_collection_ids, ""
+
+
 def resolve_row(
     row: pd.Series,
     row_index: int,
@@ -495,19 +854,38 @@ def resolve_row(
     biobank_index: dict[str, dict[str, Any]],
     collection_index: dict[str, dict[str, Any]],
     biobanks_by_normalized_name: dict[str, list[dict[str, Any]]],
+    biobanks_by_alias: dict[str, list[dict[str, Any]]],
+    biobanks_by_signature: dict[tuple[str, ...], list[dict[str, Any]]],
+    collection_contact_domain_counts: dict[str, dict[str, int]],
 ) -> dict[str, Any]:
     survey_row = row_index + 5
-    biobank_id = cell_text(row.get("BiobankID in the Directory (if available)"))
-    collection_ids = split_semicolon_values(
-        row.get("List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)")
-    )
+    raw_biobank_id = cell_text(get_row_value(row, "BiobankID in the Directory (if available)"))
+    biobank_id = normalize_biobank_id(raw_biobank_id)
+    collection_ids = [
+        normalized_collection_id
+        for normalized_collection_id in (
+            normalize_collection_id(value)
+            for value in split_semicolon_values(
+                get_row_value(
+                    row,
+                    'List of CollectionID in the Directory (if you only represent a part of a biobank; please use ";" as separator in case of more than 1 ID)',
+                    "List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)",
+                )
+            )
+        )
+        if normalized_collection_id
+    ]
     institution_name = cell_text(row.get("Name of Institution"))
     normalized_institution = normalize_text(institution_name)
+    institution_signature = normalized_institution_signature(institution_name)
+    survey_aliases = institution_aliases(institution_name)
+    survey_aliases.update(biobank_id_aliases(raw_biobank_id))
     country = normalize_country(row.get("Country"))
+    survey_email_domain = extract_email_domain(row.get("E-Mail address"))
     result = {
         "survey_row": survey_row,
         "institution_name": institution_name,
-        "biobank_id_from_survey": biobank_id,
+        "biobank_id_from_survey": raw_biobank_id,
         "collection_ids_from_survey": collection_ids,
         "resolution_status": "missing_from_directory",
         "resolution_reliability": "low",
@@ -516,17 +894,18 @@ def resolve_row(
         "matched_collection_ids": [],
         "matched_contact_ids": [],
     }
+    explicit_biobank_resolution_note = ""
 
     if biobank_id:
         if ":collection:" in biobank_id and biobank_id not in collection_ids:
-            collection_ids = [biobank_id] + collection_ids
+            collection_ids = [normalize_collection_id(biobank_id)] + collection_ids
             biobank_id = ""
         biobank = biobank_index.get(biobank_id) if biobank_id else None
         if biobank is None:
-            if biobank_id:
-                result["resolution_status"] = "missing_from_directory"
-                result["resolution_explanation"] = f"Survey biobank ID {biobank_id} does not exist in schema {directory.getSchema()}."
-                return result
+            if raw_biobank_id:
+                explicit_biobank_resolution_note = (
+                    f"Survey biobank ID {raw_biobank_id} does not exist in schema {directory.getSchema()}."
+                )
         else:
             result["matched_biobank_ids"] = [biobank_id]
             result["resolution_status"] = "resolved_by_biobank_id"
@@ -548,8 +927,16 @@ def resolve_row(
                 else:
                     result["resolution_explanation"] = f"Resolved via biobank ID {biobank_id} and explicit collection scope."
             else:
-                result["matched_collection_ids"] = get_collections_ids_from_biobank(directory, biobank_id)
+                candidate_collection_ids = get_collections_ids_from_biobank(directory, biobank_id)
+                narrowed_collection_ids, narrowing_note = infer_collection_scope_from_row(
+                    row,
+                    candidate_collection_ids,
+                    collection_index,
+                )
+                result["matched_collection_ids"] = narrowed_collection_ids
                 result["resolution_explanation"] = f"Resolved via biobank ID {biobank_id}; collection scope is all collections of the mapped biobank."
+                if narrowing_note:
+                    result["resolution_explanation"] += " " + narrowing_note
             return result
 
     if collection_ids:
@@ -580,6 +967,8 @@ def resolve_row(
         result["resolution_status"] = "resolved_by_institution_name_certain"
         result["resolution_reliability"] = "medium"
         result["resolution_explanation"] = f"Resolved by unambiguous normalized institution-name match to {biobank['id']}."
+        if explicit_biobank_resolution_note:
+            result["resolution_explanation"] = explicit_biobank_resolution_note + " " + result["resolution_explanation"]
         return result
     if len(exact_name_candidates) > 1:
         result["matched_biobank_ids"] = sorted(candidate["id"] for candidate in exact_name_candidates)
@@ -587,13 +976,70 @@ def resolve_row(
         result["resolution_explanation"] = "Multiple biobanks share the same normalized institution name."
         return result
 
-    approximate_candidates = []
-    from difflib import SequenceMatcher
+    alias_candidates = match_biobank_alias_candidates(survey_aliases, biobanks_by_alias, country=country)
+    if len(alias_candidates) == 1:
+        biobank = alias_candidates[0]
+        result["matched_biobank_ids"] = [biobank["id"]]
+        result["matched_collection_ids"] = get_collections_ids_from_biobank(directory, biobank["id"])
+        result["resolution_status"] = "resolved_by_institution_name_certain"
+        result["resolution_reliability"] = "medium"
+        result["resolution_explanation"] = f"Resolved by institution alias/acronym match to {biobank['id']}."
+        if explicit_biobank_resolution_note:
+            result["resolution_explanation"] = explicit_biobank_resolution_note + " " + result["resolution_explanation"]
+        return result
+    if len(alias_candidates) > 1:
+        result["matched_biobank_ids"] = sorted(candidate["id"] for candidate in alias_candidates)
+        result["resolution_status"] = "ambiguous"
+        result["resolution_explanation"] = "Multiple biobanks match the same institution alias or acronym."
+        return result
 
+    signature_candidates = list(biobanks_by_signature.get(institution_signature, []))
+    if country:
+        signature_candidates = [candidate for candidate in signature_candidates if str(candidate.get("country") or "").upper() == country]
+    if len(signature_candidates) == 1:
+        biobank = signature_candidates[0]
+        result["matched_biobank_ids"] = [biobank["id"]]
+        result["matched_collection_ids"] = get_collections_ids_from_biobank(directory, biobank["id"])
+        result["resolution_status"] = "resolved_by_institution_name_certain"
+        result["resolution_reliability"] = "medium"
+        result["resolution_explanation"] = f"Resolved by institution-name signature match to {biobank['id']}."
+        if explicit_biobank_resolution_note:
+            result["resolution_explanation"] = explicit_biobank_resolution_note + " " + result["resolution_explanation"]
+        return result
+    if len(signature_candidates) > 1:
+        result["matched_biobank_ids"] = sorted(candidate["id"] for candidate in signature_candidates)
+        result["resolution_status"] = "ambiguous"
+        result["resolution_explanation"] = "Multiple biobanks share the same institution-name signature."
+        return result
+
+    approximate_candidates = []
     for biobank in directory.getBiobanks():
         if country and str(biobank.get("country") or "").upper() != country:
             continue
-        score = SequenceMatcher(None, normalized_institution, normalize_text(biobank.get("name"))).ratio()
+        candidate_keys = institution_aliases(biobank.get("name"))
+        candidate_keys.update(biobank_id_aliases(biobank.get("id")))
+        candidate_signature = normalized_institution_signature(biobank.get("name"))
+        score = 0.0
+        for survey_key in survey_aliases or {normalized_institution}:
+            if not survey_key:
+                continue
+            for candidate_key in candidate_keys or {normalize_text(biobank.get("name"))}:
+                if not candidate_key:
+                    continue
+                score = max(score, SequenceMatcher(None, survey_key, candidate_key).ratio())
+        if (
+            score < 0.9
+            and institution_signature
+            and candidate_signature
+            and not set(institution_signature).intersection(candidate_signature)
+            and not survey_aliases.intersection(candidate_keys)
+        ):
+            continue
+        domain_bonus = 0.0
+        if survey_email_domain:
+            domain_counts = collection_contact_domain_counts.get(survey_email_domain, {})
+            domain_bonus = min(domain_counts.get(biobank["id"], 0), 3) * 0.03
+        score += domain_bonus
         if score >= 0.82:
             approximate_candidates.append((score, biobank))
     approximate_candidates.sort(key=lambda item: item[0], reverse=True)
@@ -608,6 +1054,8 @@ def resolve_row(
             result["resolution_explanation"] = (
                 f"Resolved approximately by institution-name similarity to {top_biobank['id']} (score {top_score:.2f})."
             )
+            if explicit_biobank_resolution_note:
+                result["resolution_explanation"] = explicit_biobank_resolution_note + " " + result["resolution_explanation"]
             return result
         result["matched_biobank_ids"] = [biobank["id"] for _, biobank in approximate_candidates[:5]]
         result["resolution_status"] = "ambiguous"
@@ -616,6 +1064,8 @@ def resolve_row(
 
     result["resolution_status"] = "missing_from_directory"
     result["resolution_explanation"] = "No exact-ID or institution-name-based match was found in the Directory."
+    if explicit_biobank_resolution_note:
+        result["resolution_explanation"] = explicit_biobank_resolution_note + " " + result["resolution_explanation"]
     return result
 
 
@@ -634,6 +1084,8 @@ def make_finding(
     explanation: str,
     survey_fields: list[str] | None = None,
     strategic_objectives: list[str] | None = None,
+    directory_fields: list[str] | None = None,
+    comparison_description: str = "",
     proposed_update: dict[str, Any] | None = None,
     export_update_plan: bool = False,
 ) -> dict[str, Any]:
@@ -653,6 +1105,8 @@ def make_finding(
         "why_relevant": why_relevant,
         "explanation": explanation,
         "survey_fields": list(survey_fields or []),
+        "directory_fields": list(directory_fields or []),
+        "comparison_description": comparison_description,
         "strategic_objectives": list(strategic_objectives or []),
         "manual_notes": "",
         "export_update_plan": export_update_plan,
@@ -724,8 +1178,14 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
     collection_index = {collection["id"]: collection for collection in directory.getCollections()}
     contact_index = {contact["id"]: contact for contact in directory.getContacts()}
     biobanks_by_normalized_name: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    biobanks_by_alias: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    biobanks_by_signature: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
     for biobank in biobank_index.values():
         biobanks_by_normalized_name[normalize_text(biobank.get("name"))].append(biobank)
+        for alias in institution_aliases(biobank.get("name")).union(biobank_id_aliases(biobank.get("id"))):
+            biobanks_by_alias[alias].append(biobank)
+        biobanks_by_signature[normalized_institution_signature(biobank.get("name"))].append(biobank)
+    collection_contact_domain_counts = build_collection_contact_domain_counts(collection_index, contact_index)
 
     row_resolutions = []
     findings = []
@@ -743,9 +1203,13 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
             biobank_index,
             collection_index,
             biobanks_by_normalized_name,
+            biobanks_by_alias,
+            biobanks_by_signature,
+            collection_contact_domain_counts,
         )
         row_resolutions.append(resolution)
         if resolution["resolution_status"] in {"missing_from_directory", "ambiguous"}:
+            survey_country = normalize_country(row.get("Country"))
             findings.append(
                 make_finding(
                     row_resolution=resolution,
@@ -757,6 +1221,7 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
                         "institution_name": resolution["institution_name"],
                         "biobank_id": resolution["biobank_id_from_survey"],
                         "collection_ids": resolution["collection_ids_from_survey"],
+                        "country": survey_country,
                     },
                     directory_value={"matched_biobank_ids": resolution["matched_biobank_ids"]},
                     relation_type="entity_resolution",
@@ -773,6 +1238,13 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
                 )
             )
             continue
+
+        if len(resolution.get("matched_biobank_ids", [])) == 1:
+            biobank_collection_ids = get_collections_ids_from_biobank(directory, resolution["matched_biobank_ids"][0])
+            resolution["collection_scope_display"] = summarize_collection_scope(
+                resolution.get("matched_collection_ids", []),
+                biobank_collection_ids,
+            )
 
         biobank_id = resolution["matched_biobank_ids"][0]
         biobank = biobank_index.get(biobank_id)
@@ -935,6 +1407,75 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
                     export_update_plan=export_update_plan,
                 )
             )
+
+            if len(scope["collection_ids"]) == 1:
+                collection_id = scope["collection_ids"][0]
+                collection = collection_index.get(collection_id)
+                if collection is not None:
+                    collection_duos = normalize_duo_term_ids(collection.get("data_use") or [])
+                    collection_commercial = bool(
+                        collection.get("collaboration_commercial") in (True, "true", "True", 1)
+                        or biobank.get("collaboration_commercial") in (True, "true", "True", 1)
+                    )
+                    expected_duo = None
+                    duo_status = "manual_review"
+                    duo_explanation = "Survey partner-promotion answer does not imply a clear DUO restriction for the mapped collection."
+                    duo_proposed_update = None
+                    duo_export_update_plan = False
+                    if interest_value == "Yes - academic" and not collection_commercial:
+                        expected_duo = "DUO:0000018"
+                        if expected_duo in collection_duos:
+                            duo_status = "consistent"
+                            duo_explanation = "Academic-only promotion answer is already reflected by the non-commercial DUO restriction."
+                        else:
+                            duo_status = "inconsistent"
+                            duo_explanation = "Academic-only promotion answer suggests a non-commercial DUO restriction is missing."
+                            duo_proposed_update = build_update(
+                                mapping_id="survey_so2.collection.duo_non_profit_non_commercial_from_promotion_interest",
+                                module="SO2",
+                                entity_type="COLLECTION",
+                                entity_id=collection_id,
+                                field="data_use",
+                                mode="append",
+                                confidence="uncertain",
+                                current_value=collection.get("data_use"),
+                                proposed_value=[expected_duo],
+                                explanation="Add DUO:0000018 (not for profit, non commercial use only) because the SO2 survey says the mapped collection should be promoted only to academic partners.",
+                                rationale="This reuses the same DUO interpretation as the AccessPolicies checks, but the survey answer is still only a directional policy signal and needs curator confirmation.",
+                                source_check_id="SO2:PromotionInterestDuo",
+                            )
+                            duo_export_update_plan = True
+                    findings.append(
+                        make_finding(
+                            row_resolution=resolution,
+                            mapping_id="promotion.partnership_interest.duo",
+                            entity_type="COLLECTION",
+                            entity_id=collection_id,
+                            status=duo_status,
+                            survey_value={"interest": interest_value, "expected_duo": expected_duo},
+                            directory_value={
+                                "data_use": collection_duos,
+                                "collaboration_commercial": collection.get("collaboration_commercial", biobank.get("collaboration_commercial")),
+                            },
+                            relation_type="derived_policy_mapping",
+                            reliability="low",
+                            why_relevant="Academic-only survey promotion answers can also imply a collection-level DUO non-commercial restriction when the mapped collection scope is unambiguous.",
+                            explanation=duo_explanation,
+                            survey_fields=[
+                                "Are you interested in promoting your biobank resources to new partners?",
+                                "Are you interested in promoting your biobank resources to new research or industry partners?",
+                            ],
+                            strategic_objectives=objectives_for_fields(
+                                question_objectives,
+                                [
+                                    "Are you interested in promoting your biobank resources to new partners?",
+                                    "Are you interested in promoting your biobank resources to new research or industry partners?",
+                                ],
+                            ),
+                            proposed_update=duo_proposed_update,
+                            export_update_plan=duo_export_update_plan,
+                        )
+                    )
 
         survey_sample_types = set(split_semicolon_values(row.get("Which types of samples do you manage?")))
         survey_sample_type_notes = set(split_semicolon_values(row.get("Sample types")))
@@ -1127,6 +1668,7 @@ def build_biobank_summary(report: dict[str, Any]) -> dict[str, list[dict[str, An
                     "resolution_reliability": resolution.get("resolution_reliability", ""),
                     "resolution_explanation": resolution.get("resolution_explanation", ""),
                     "matched_collection_ids": list(resolution.get("matched_collection_ids", [])),
+                    "collection_scope_display": resolution.get("collection_scope_display", ""),
                     "findings": sorted(
                         findings_by_row.get(int(resolution["survey_row"]), []),
                         key=lambda item: (str(item.get("status", "")), str(item.get("mapping_id", "")), str(item.get("entity_id", ""))),
@@ -1174,6 +1716,28 @@ def build_objective_summary(report: dict[str, Any]) -> dict[str, dict[str, Any]]
     return summary
 
 
+def display_entity_label(finding: dict[str, Any]) -> str:
+    entity_label = f"{finding['entity_type']} {finding['entity_id']}"
+    if str(finding.get("status", "")) == "missing_from_directory":
+        survey_value = finding.get("survey_value")
+        if isinstance(survey_value, dict):
+            country = cell_text(survey_value.get("country"))
+            if country:
+                return f"({country}) {entity_label}"
+    return entity_label
+
+
+def render_entity_label_latex(label: str) -> str:
+    match = re.fullmatch(r"(\([A-Z]{2}\)\s+)?(BIOBANK|COLLECTION|CONTACT|NETWORK)\s+(.+)", label)
+    if not match:
+        return escape_report_value(label)
+    country_prefix = match.group(1) or ""
+    entity_type = match.group(2)
+    entity_id = match.group(3)
+    prefix = f"{country_prefix}{entity_type} "
+    return escape_latex(prefix) + escape_latex_breakable_entity(entity_id)
+
+
 def render_tex(report: dict[str, Any]) -> str:
     summary = report.get("summary", {})
     findings = report.get("findings", [])
@@ -1187,15 +1751,19 @@ def render_tex(report: dict[str, Any]) -> str:
         r"\documentclass[11pt,a4paper]{article}",
         r"\usepackage{fontspec}",
         r"\usepackage[a4paper,margin=2.3cm]{geometry}",
+        r"\usepackage{array}",
         r"\usepackage{longtable}",
         r"\usepackage{booktabs}",
         r"\usepackage[table]{xcolor}",
         r"\usepackage{hyperref}",
+        r"\usepackage{xurl}",
         r"\setmainfont{DejaVu Serif}",
+        r"\urlstyle{same}",
         r"\definecolor{soGreen}{HTML}{1F6F3F}",
         r"\definecolor{soRed}{HTML}{9E2A2B}",
         r"\definecolor{soOrange}{HTML}{B26A00}",
         r"\definecolor{soBlue}{HTML}{1D4E89}",
+        r"\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}",
         r"\setcounter{tocdepth}{2}",
         r"\title{BBMRI-ERIC SO2 Survey vs Directory Report}",
         r"\date{" + escape_latex(report["report_metadata"]["generated_at"]) + "}",
@@ -1220,25 +1788,34 @@ def render_tex(report: dict[str, Any]) -> str:
         )
         for biobank_id, survey_answers in biobank_summary.items():
             row_count = len(survey_answers)
-            lines.append(r"\subsection{" + escape_latex(f"{biobank_id} ({row_count} survey answer{'s' if row_count != 1 else ''})") + "}")
+            lines.append(
+                r"\subsection{"
+                + escape_latex_breakable_entity(biobank_id)
+                + escape_latex(f" ({row_count} survey answer{'s' if row_count != 1 else ''})")
+                + "}"
+            )
             for answer in survey_answers:
                 lines.append(
                     r"\subsubsection*{"
-                    + escape_latex(
+                    + escape_latex_with_inline_breaks(
                         f"Survey row {answer['survey_row']}: {answer['institution_name'] or '<unnamed respondent>'}"
                     )
                     + "}"
                 )
                 lines.append(
-                    escape_latex(
+                    escape_latex_with_inline_breaks(
                         f"Resolution: {answer['resolution_status']} ({answer['resolution_reliability']}). {answer['resolution_explanation']}"
                     )
                     + r"\\"
                 )
                 if answer["matched_collection_ids"]:
+                    collection_scope_display = answer.get(
+                        "collection_scope_display",
+                        ", ".join(answer["matched_collection_ids"]),
+                    )
                     lines.append(
-                        escape_latex(
-                            "Mapped collections: " + ", ".join(answer["matched_collection_ids"])
+                        escape_latex_with_inline_breaks(
+                            "Mapped collections: " + collection_scope_display
                         )
                         + r"\\"
                     )
@@ -1252,8 +1829,10 @@ def render_tex(report: dict[str, Any]) -> str:
                             + colored_status_text(str(finding["status"]))
                             + escape_latex(": ")
                             + finding_link(str(finding["mapping_id"]))
-                            + escape_latex(
-                                f" -> {entity_label}. "
+                            + escape_latex(" -> ")
+                            + render_entity_label_latex(entity_label)
+                            + escape_latex(". ")
+                            + escape_report_value(
                                 f"{format_finding_result(finding, concise_consistent=True)}{update_suffix}"
                             )
                         )
@@ -1285,18 +1864,18 @@ def render_tex(report: dict[str, Any]) -> str:
             lines.append(r"\item " + escape_latex(f"Statuses: {status_summary}"))
             lines.append(r"\end{itemize}")
             if objective_findings:
-                lines.append(r"\begin{longtable}{p{1.5cm}p{3.2cm}p{3.2cm}p{6.5cm}}")
+                lines.append(r"\begin{longtable}{L{1.5cm}L{3.2cm}L{3.2cm}L{6.5cm}}")
                 lines.append(r"\toprule Row & Mapping & Entity & Explanation \\ \midrule")
                 for finding in sorted(
                     objective_findings,
                     key=lambda item: (int(item.get("survey_row", 0)), str(item.get("mapping_id", "")), str(item.get("entity_id", ""))),
                 ):
-                    entity_label = f"{finding['entity_type']} {finding['entity_id']}"
+                    entity_label = display_entity_label(finding)
                     lines.append(
                         f"{escape_latex(finding['survey_row'])} & "
                         f"{finding_link(str(finding['mapping_id']))} & "
-                        f"{escape_latex_breakable_entity(entity_label)} & "
-                        f"{escape_latex(format_finding_result(finding, concise_consistent=True))} \\\\"
+                        f"{render_entity_label_latex(entity_label)} & "
+                        f"{escape_report_value(format_finding_result(finding, concise_consistent=True))} \\\\"
                     )
                 lines.append(r"\bottomrule")
                 lines.append(r"\end{longtable}")
@@ -1305,7 +1884,7 @@ def render_tex(report: dict[str, Any]) -> str:
             lines.append(r"\subsubsection*{Per biobank}")
             if objective["biobanks"]:
                 for biobank_id in sorted(objective["biobanks"]):
-                    lines.append(r"\paragraph{}" + escape_latex(biobank_id) + r"\\")
+                    lines.append(r"\paragraph{}" + escape_latex_breakable_entity(biobank_id) + r"\\")
                     lines.append(r"\begin{itemize}")
                     for finding in sorted(
                         objective["biobanks"][biobank_id],
@@ -1320,10 +1899,11 @@ def render_tex(report: dict[str, Any]) -> str:
                             + escape_latex(" / ")
                             + finding_link(str(finding["mapping_id"]))
                             + escape_latex(" / ")
-                            + escape_latex_breakable_entity(f"{finding['entity_type']} {finding['entity_id']}")
+                            + render_entity_label_latex(display_entity_label(finding))
                             + escape_latex(
-                                f" / {format_finding_result(finding, concise_consistent=True)}"
+                                " / "
                             )
+                            + escape_report_value(format_finding_result(finding, concise_consistent=True))
                         )
                     lines.append(r"\end{itemize}")
             else:
@@ -1332,15 +1912,15 @@ def render_tex(report: dict[str, Any]) -> str:
         lines.append(r"\section{Findings by Status}")
     for status in sorted(grouped):
         lines.append(r"\subsection{" + colored_status_text(status) + "}")
-        lines.append(r"\begin{longtable}{p{1.5cm}p{3.2cm}p{3.2cm}p{6.5cm}}")
+        lines.append(r"\begin{longtable}{L{1.5cm}L{3.2cm}L{3.2cm}L{6.5cm}}")
         lines.append(r"\toprule Row & Mapping & Entity & Explanation \\ \midrule")
         for finding in grouped[status]:
-            entity_label = f"{finding['entity_type']} {finding['entity_id']}"
+            entity_label = display_entity_label(finding)
             lines.append(
                 f"{escape_latex(finding['survey_row'])} & "
                 f"{finding_link(str(finding['mapping_id']))} & "
-                f"{escape_latex_breakable_entity(entity_label)} & "
-                f"{escape_latex(format_finding_result(finding, concise_consistent=True))} \\\\"
+                f"{render_entity_label_latex(entity_label)} & "
+                f"{escape_report_value(format_finding_result(finding, concise_consistent=True))} \\\\"
             )
         lines.append(r"\bottomrule")
         lines.append(r"\end{longtable}")
@@ -1366,7 +1946,19 @@ def render_tex(report: dict[str, Any]) -> str:
             if entry["survey_fields"]:
                 lines.append(
                     r"\textbf{Survey field(s):} "
-                    + escape_latex("; ".join(entry["survey_fields"]))
+                    + escape_latex_with_inline_breaks("; ".join(entry["survey_fields"]))
+                    + r"\\"
+                )
+            if entry["directory_fields"]:
+                lines.append(
+                    r"\textbf{Directory field(s):} "
+                    + escape_latex_with_inline_breaks("; ".join(entry["directory_fields"]))
+                    + r"\\"
+                )
+            if entry["comparison_description"]:
+                lines.append(
+                    r"\textbf{Comparison method:} "
+                    + escape_latex_with_inline_breaks(entry["comparison_description"])
                     + r"\\"
                 )
             if entry["strategic_objectives"]:

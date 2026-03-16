@@ -308,6 +308,50 @@ def test_directory_uses_schema_specific_cache_and_skips_missing_quality_tables(m
     assert ("get", "QualityInfoCollections", True) in calls
 
 
+def test_directory_uses_complete_cache_without_live_client(monkeypatch, tmp_path):
+    cache_dir = tmp_path / "data-check-cache" / "directory-ERIC"
+    cache_dir.mkdir(parents=True)
+    from diskcache import Cache
+
+    with Cache(str(cache_dir)) as cache:
+        cache["biobanks"] = [{"id": "bb1"}]
+        cache["collections"] = [{"id": "col1", "biobank": {"id": "bb1"}}]
+        cache["contacts"] = [{"id": "ct1"}]
+        cache["networks"] = []
+        cache["facts"] = []
+        cache["services"] = []
+        cache["quality_info_biobanks"] = pd.DataFrame()
+        cache["quality_info_collections"] = pd.DataFrame()
+
+    class ClientStub:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("Live client should not be constructed when the cache is complete.")
+
+    monkeypatch.setattr(directory_module, "Client", ClientStub)
+    monkeypatch.chdir(tmp_path)
+
+    directory = Directory(schema="ERIC")
+
+    assert directory.biobanks == [{"id": "bb1"}]
+    assert directory.collections == [{"id": "col1", "biobank": {"id": "bb1"}}]
+    assert directory.contacts == [{"id": "ct1"}]
+    assert directory.networks == []
+    assert directory.facts == []
+    assert directory.services == []
+
+
+def test_directory_raises_clear_error_when_offline_without_complete_cache(monkeypatch, tmp_path):
+    class ClientStub:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("offline")
+
+    monkeypatch.setattr(directory_module, "Client", ClientStub)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(RuntimeError, match="no complete cached snapshot is available"):
+        Directory(schema="ERIC")
+
+
 def test_directory_can_return_only_withdrawn_entities():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = True

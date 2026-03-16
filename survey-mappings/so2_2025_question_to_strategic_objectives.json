@@ -206,6 +206,7 @@
     {
       "survey_field": "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.3",
         "SO2.5"
       ],
@@ -215,6 +216,7 @@
     {
       "survey_field": "Next-gen sequencing technology/vendor",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5"
       ],
       "rationale": "Sequencing technology access indicates on-demand data-generation capacity.",
@@ -223,6 +225,7 @@
     {
       "survey_field": "Radiology imaging technology/vendor",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -232,6 +235,7 @@
     {
       "survey_field": "Pathology imaging technology/vendor",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -241,6 +245,7 @@
     {
       "survey_field": "Proteomics technology/vendor",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5"
       ],
       "rationale": "Proteomics platforms indicate data-generation capability.",
@@ -249,6 +254,7 @@
     {
       "survey_field": "Metabolomics technology/vendor",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5"
       ],
       "rationale": "Metabolomics platforms indicate data-generation capability.",
@@ -257,6 +263,7 @@
     {
       "survey_field": "Technologies",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5"
       ],
       "rationale": "Free-text technologies complement the direct data-generation capability assessment.",
@@ -666,6 +673,7 @@
     {
       "survey_field": "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -675,6 +683,7 @@
     {
       "survey_field": "You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -684,6 +693,7 @@
     {
       "survey_field": "Does your biobank provide access to radiology datasets?",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -693,6 +703,7 @@
     {
       "survey_field": "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -702,6 +713,7 @@
     {
       "survey_field": "Does your biobank provide access to other imaging datasets?",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],
@@ -711,6 +723,7 @@
     {
       "survey_field": "You can provide more information about other available imaging data here (e.g., focus of the collections, more details on modalities):",
       "strategic_objectives": [
+        "SO2.1",
         "SO2.5",
         "SO2.3"
       ],

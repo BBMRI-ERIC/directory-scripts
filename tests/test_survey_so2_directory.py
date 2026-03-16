@@ -111,6 +111,7 @@ class DirectoryStub:
             "biobank": {"id": "bbmri-eric:ID:CZ_demo"},
             "contact": {"id": "bbmri-eric:contactID:CZ_demo_1"},
             "materials": "",
+            "data_use": [],
             "type": "",
             "data_categories": "",
             "description": "",
@@ -153,6 +154,70 @@ class DirectoryStub:
         return self._contact
 
 
+class SwissResolutionDirectoryStub:
+    def __init__(self):
+        self._biobanks = [
+            {"id": "bbmri-eric:ID:CH_UniversityOfBern", "name": "University of Bern", "country": "CH"},
+            {"id": "bbmri-eric:ID:CH_Unige", "name": "Université de Genève", "country": "CH"},
+            {"id": "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve", "name": "Hôpitaux Universitaires Genève", "country": "CH"},
+        ]
+        self._collections = [
+            {
+                "id": "bbmri-eric:ID:CH_UniversityOfBern:collection:CH_VetSuisseBiobankVETGENBERN",
+                "biobank": {"id": "bbmri-eric:ID:CH_UniversityOfBern"},
+                "name": "VetSuisse Biobank, VET_GEN_BERN",
+                "description": "Domestic animal samples.",
+                "type": ["NON_HUMAN", "SAMPLE"],
+                "materials": ["DNA", "WHOLE_BLOOD"],
+                "contact": {"id": "contact-vet"},
+            },
+            {
+                "id": "bbmri-eric:ID:CH_UniversityOfBern:collection:CH_TissueBiobankBern",
+                "biobank": {"id": "bbmri-eric:ID:CH_UniversityOfBern"},
+                "name": "Tissue Biobank Bern",
+                "description": "Human pathology samples from Inselspital.",
+                "type": ["DISEASE_SPECIFIC", "HOSPITAL"],
+                "materials": ["TISSUE_FROZEN"],
+                "contact": {"id": "contact-human"},
+            },
+            {
+                "id": "bbmri-eric:ID:CH_Unige:collection:CH_FABER",
+                "biobank": {"id": "bbmri-eric:ID:CH_Unige"},
+                "name": "FABER",
+                "description": "University of Geneva biomedical cohort.",
+                "type": ["SAMPLE"],
+                "materials": ["WHOLE_BLOOD"],
+                "contact": {"id": "contact-unige"},
+            },
+            {
+                "id": "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve:collection:CH_AneuX",
+                "biobank": {"id": "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve"},
+                "name": "AneuX",
+                "description": "Hospital cohort in Geneva.",
+                "type": ["SAMPLE"],
+                "materials": ["SERUM"],
+                "contact": {"id": "contact-hug"},
+            },
+        ]
+
+    def getBiobanks(self):
+        return list(self._biobanks)
+
+    def getCollections(self):
+        return list(self._collections)
+
+    def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
+        import networkx as nx
+
+        graph = nx.DiGraph()
+        graph.add_node(biobank_id)
+        for collection in self._collections:
+            if collection["biobank"]["id"] == biobank_id:
+                graph.add_node(collection["id"])
+                graph.add_edge(biobank_id, collection["id"])
+        return graph
+
+
 def test_survey_so2_analyze_generates_findings_and_proposed_updates(tmp_path, monkeypatch):
     module = load_module()
     mapping_path = write_mapping(tmp_path)
@@ -187,9 +252,13 @@ def test_survey_so2_analyze_generates_findings_and_proposed_updates(tmp_path, mo
     proposed = [finding for finding in payload["findings"] if finding.get("proposed_update")]
     assert {finding["mapping_id"] for finding in proposed} == {
         "promotion.partnership_interest",
+        "promotion.partnership_interest.duo",
         "sample_types.materials",
         "imaging.wsi_presence",
     }
+    duo_finding = next(finding for finding in proposed if finding["mapping_id"] == "promotion.partnership_interest.duo")
+    assert duo_finding["proposed_update"]["field"] == "data_use"
+    assert duo_finding["proposed_update"]["proposed_value"] == ["DUO:0000018"]
     assert any(finding["strategic_objectives"] for finding in payload["findings"])
 
 
@@ -313,8 +382,8 @@ def test_survey_so2_render_tex_escapes_special_characters():
 
     tex = module.render_tex(report)
 
-    assert r"NL\_\allowbreak{}LUMC" in tex
-    assert r"Demo\_1 \& needs manual review." in tex
+    assert r"BIOBANK \texorpdfstring{\nolinkurl{bbmri-eric:ID:NL_LUMC}}{bbmri-eric:ID:NL_LUMC}" in tex
+    assert r"Demo\_\allowbreak{}1 \& needs manual review." in tex
     assert r"NL\\_LUMC" not in tex
 
 
@@ -332,6 +401,7 @@ def test_survey_so2_render_tex_includes_biobank_grouped_summary():
                 "resolution_explanation": "Resolved via biobank ID.",
                 "matched_biobank_ids": ["bbmri-eric:ID:CZ_demo"],
                 "matched_collection_ids": ["bbmri-eric:ID:CZ_demo:collection:col1"],
+                "collection_scope_display": "all collections",
             },
             {
                 "survey_row": 7,
@@ -341,6 +411,7 @@ def test_survey_so2_render_tex_includes_biobank_grouped_summary():
                 "resolution_explanation": "Resolved via biobank ID.",
                 "matched_biobank_ids": ["bbmri-eric:ID:CZ_demo"],
                 "matched_collection_ids": ["bbmri-eric:ID:CZ_demo:collection:col2"],
+                "collection_scope_display": "All except bbmri-eric:ID:CZ_demo:collection:col1",
             },
         ],
         "findings": [
@@ -368,13 +439,18 @@ def test_survey_so2_render_tex_includes_biobank_grouped_summary():
     tex = module.render_tex(report)
 
     assert "Biobank-Oriented Summary" in tex
-    assert "bbmri-eric:ID:CZ\\_demo (2 survey answers)" in tex
+    assert r"\nolinkurl{bbmri-eric:ID:CZ_demo}" in tex
+    assert "(2 survey answers)" in tex
     assert "Survey row 6: Demo Biobank" in tex
     assert "Survey row 7: Demo Biobank follow-up" in tex
+    assert "Mapped collections: all collections" in tex
+    assert r"Mapped collections: All except \texorpdfstring{\nolinkurl{bbmri-eric:ID:CZ_demo:collection:col1}}{bbmri-eric:ID:CZ_demo:collection:col1}" in tex
     assert r"\textcolor{soGreen}{Consistent}" in tex
-    assert r"\hyperref[appendix-geo-country]{geo.\allowbreak{}country (appendix)}" in tex
+    assert r"\hyperref[appendix-geo-country]{" in tex
+    assert r"\nolinkurl{geo.country}" in tex
     assert r"\textcolor{soRed}{Inconsistent}" in tex
-    assert r"\hyperref[appendix-sample-types-materials]{sample\_\allowbreak{}types.\allowbreak{}materials (appendix)}" in tex
+    assert r"\hyperref[appendix-sample-types-materials]{" in tex
+    assert r"\nolinkurl{sample_types.materials}" in tex
     assert "[proposed update]" in tex
 
 
@@ -416,8 +492,8 @@ def test_survey_so2_render_tex_includes_objective_summary():
     assert "Strategic-Objective Summary" in tex
     assert "SO2.4 - Expand the Federated Platform" in tex
     assert "Per biobank" in tex
-    assert "bbmri-eric:ID:CZ\\_demo" in tex
-    assert "promotion.partnership\\_interest" in tex
+    assert r"\nolinkurl{bbmri-eric:ID:CZ_demo}" in tex
+    assert r"\nolinkurl{promotion.partnership_interest}" in tex
 
 
 def test_survey_so2_render_tex_keeps_empty_objectives_in_toc():
@@ -506,11 +582,13 @@ def test_survey_so2_render_tex_uses_appendix_and_detailed_inconsistent_values():
 
     assert r"\section{Finding-Type Reference}" in tex
     assert tex.count(r"geo.country\label{appendix-geo-country}") == 1
-    assert tex.count(r"sample\_types.materials\label{appendix-sample-types-materials}") == 1
-    assert r"\hyperref[appendix-geo-country]{geo.\allowbreak{}country (appendix)}" in tex
-    assert r"\hyperref[appendix-sample-types-materials]{sample\_\allowbreak{}types.\allowbreak{}materials (appendix)}" in tex
+    assert tex.count(r"sample\_\allowbreak{}types.materials\label{appendix-sample-types-materials}") == 1
+    assert r"\hyperref[appendix-geo-country]{" in tex
+    assert r"\nolinkurl{geo.country}" in tex
+    assert r"\hyperref[appendix-sample-types-materials]{" in tex
+    assert r"\nolinkurl{sample_types.materials}" in tex
     assert "Consistent." in tex
-    assert r"Survey=WHOLE\_BLOOD; Directory=<empty>." in tex
+    assert r"Missing in Directory=WHOLE\_\allowbreak{}BLOOD; Extra in Directory=<empty>." in tex
 
 
 def test_survey_so2_render_tex_breaks_entity_identifiers():
@@ -541,7 +619,15 @@ def test_survey_so2_render_tex_breaks_entity_identifiers():
 
     tex = module.render_tex(report)
 
-    assert r"COLLECTION bbmri-\allowbreak{}eric:\allowbreak{}ID:\allowbreak{}NL\_\allowbreak{}LUMC:\allowbreak{}collection:\allowbreak{}CRC.\allowbreak{}Cohort-\allowbreak{}1" in tex
+    assert r"COLLECTION \texorpdfstring{\nolinkurl{bbmri-eric:ID:NL_LUMC:collection:CRC.Cohort-1}}{bbmri-eric:ID:NL_LUMC:collection:CRC.Cohort-1}" in tex
+
+
+def test_escape_latex_breakable_entity_hyphenates_camel_case_segments():
+    module = load_module()
+
+    rendered = module.escape_latex_breakable_entity("bbmri-eric:ID:CH_FondazioneEpatocentroTicino")
+
+    assert r"\nolinkurl{bbmri-eric:ID:CH_Fondazione-Epatocentro-Ticino}" in rendered
 
 
 def test_survey_so2_render_tex_uses_status_colors():
@@ -592,3 +678,311 @@ def test_survey_so2_render_tex_includes_toc_and_clearpage_after_title():
     assert r"\tableofcontents" in tex
     assert r"\clearpage" in tex
     assert tex.index(r"\maketitle") < tex.index(r"\tableofcontents") < tex.index(r"\clearpage") < tex.index(r"\section{Summary}")
+
+
+def test_resolve_row_normalizes_collection_scope_and_avoids_geneva_bern_mixup():
+    module = load_module()
+    directory = SwissResolutionDirectoryStub()
+    biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
+    collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    biobanks_by_normalized_name = {}
+    biobanks_by_alias = {}
+    biobanks_by_signature = {}
+    for biobank in directory.getBiobanks():
+        biobanks_by_normalized_name.setdefault(module.normalize_text(biobank.get("name")), []).append(biobank)
+        for alias in module.institution_aliases(biobank.get("name")).union(module.biobank_id_aliases(biobank.get("id"))):
+            biobanks_by_alias.setdefault(alias, []).append(biobank)
+        biobanks_by_signature.setdefault(module.normalized_institution_signature(biobank.get("name")), []).append(biobank)
+    collection_contact_domain_counts = {
+        "unige.ch": {"bbmri-eric:ID:CH_Unige": 1, "bbmri-eric:ID:CH_HopitauxUniversitairesGeneve": 1},
+        "unibe.ch": {"bbmri-eric:ID:CH_UniversityOfBern": 2},
+    }
+
+    veterinary_row = {
+        "Name of Institution": "Insitute of Genetics, Vetsuisse Faculty, University of Bern",
+        "BiobankID in the Directory (if available)": "bbmri-eric:ID:CH_UniversityOfBern",
+        "List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)": "CH_UniversityOfBern:collection:CH_VetSuisseBiobankVETGENBERN",
+        "Country": "Switzerland",
+        "E-Mail address": "michaela.droegemueller@unibe.ch",
+        "Research field": "genetic traits and diseases in animals",
+        "What field of research does your biobank or biomolecular resource support? (Select all that apply)": "Other (please specify):",
+    }
+    veterinary_resolution = module.resolve_row(
+        __import__("pandas").Series(veterinary_row),
+        17,
+        directory,
+        biobank_index,
+        collection_index,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        collection_contact_domain_counts,
+    )
+    assert veterinary_resolution["matched_biobank_ids"] == ["bbmri-eric:ID:CH_UniversityOfBern"]
+    assert veterinary_resolution["matched_collection_ids"] == [
+        "bbmri-eric:ID:CH_UniversityOfBern:collection:CH_VetSuisseBiobankVETGENBERN"
+    ]
+
+    geneva_row = {
+        "Name of Institution": "University of Geneva",
+        "BiobankID in the Directory (if available)": "",
+        "List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)": "",
+        "Country": "Switzerland",
+        "E-Mail address": "valerie.dutoit@unige.ch",
+    }
+    geneva_resolution = module.resolve_row(
+        __import__("pandas").Series(geneva_row),
+        57,
+        directory,
+        biobank_index,
+        collection_index,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        collection_contact_domain_counts,
+    )
+    assert "bbmri-eric:ID:CH_UniversityOfBern" not in geneva_resolution["matched_biobank_ids"]
+
+
+def test_normalize_biobank_id_accepts_bare_directory_id():
+    module = load_module()
+
+    assert module.normalize_biobank_id("NL_AUMCBB") == "bbmri-eric:ID:NL_AUMCBB"
+    assert module.normalize_biobank_id("bbmri-eric:ID:NL_AUMCBB") == "bbmri-eric:ID:NL_AUMCBB"
+
+
+def test_resolve_row_matches_bare_biobank_id_and_falls_back_from_invalid_explicit_id():
+    module = load_module()
+    directory = DirectoryStub()
+    biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
+    collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    biobanks_by_normalized_name = {}
+    biobanks_by_alias = {}
+    biobanks_by_signature = {}
+    for biobank in directory.getBiobanks():
+        biobanks_by_normalized_name.setdefault(module.normalize_text(biobank.get("name")), []).append(biobank)
+        for alias in module.institution_aliases(biobank.get("name")).union(module.biobank_id_aliases(biobank.get("id"))):
+            biobanks_by_alias.setdefault(alias, []).append(biobank)
+        biobanks_by_signature.setdefault(module.normalized_institution_signature(biobank.get("name")), []).append(biobank)
+
+    row = {
+        "Name of Institution": "Demo Biobank",
+        "BiobankID in the Directory (if available)": "CZ_demo",
+        "List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)": "",
+        "Country": "Czech Republic",
+        "E-Mail address": "contact@example.org",
+    }
+    resolved = module.resolve_row(
+        __import__("pandas").Series(row),
+        0,
+        directory,
+        biobank_index,
+        collection_index,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        {},
+    )
+    assert resolved["resolution_status"] == "resolved_by_biobank_id"
+    assert resolved["matched_biobank_ids"] == ["bbmri-eric:ID:CZ_demo"]
+
+    row["BiobankID in the Directory (if available)"] = "CZ_missing"
+    resolved = module.resolve_row(
+        __import__("pandas").Series(row),
+        0,
+        directory,
+        biobank_index,
+        collection_index,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        {},
+    )
+    assert resolved["resolution_status"] == "resolved_by_institution_name_certain"
+    assert resolved["matched_biobank_ids"] == ["bbmri-eric:ID:CZ_demo"]
+    assert "Survey biobank ID CZ_missing does not exist in schema ERIC." in resolved["resolution_explanation"]
+
+
+def test_alias_and_acronym_matching_supports_chuv_and_small_typos():
+    module = load_module()
+
+    assert module.normalize_text(float("nan")) == ""
+    assert module.normalize_text("Hôpitaux Universitaires Genève") == "hopitaux university geneve"
+
+    aliases = module.institution_aliases("Centre Hospitalier Universitaire Vaudois")
+    assert "chuv" in aliases
+
+    biobank = {
+        "id": "bbmri-eric:ID:CH_CHUV",
+        "name": "Centre Hospitalier Universitaire Vaudois",
+        "country": "CH",
+    }
+    biobanks_by_alias = {}
+    for alias in module.institution_aliases(biobank["name"]).union(module.biobank_id_aliases(biobank["id"])):
+        biobanks_by_alias.setdefault(alias, []).append(biobank)
+
+    alias_candidates = module.match_biobank_alias_candidates({"chuv"}, biobanks_by_alias, country="CH")
+    assert [candidate["id"] for candidate in alias_candidates] == ["bbmri-eric:ID:CH_CHUV"]
+
+    score = max(
+        __import__("difflib").SequenceMatcher(None, survey_key, candidate_key).ratio()
+        for survey_key in module.institution_aliases("Leids Universtair Medical Center")
+        for candidate_key in module.institution_aliases("Leiden University Medical Center Biobank")
+    )
+    assert score >= 0.82
+
+
+def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
+    module = load_module()
+
+    class ChuvDirectoryStub:
+        def getSchema(self):
+            return "ERIC"
+
+        def getBiobanks(self):
+            return [
+                {
+                    "id": "bbmri-eric:ID:CH_CHUV",
+                    "name": "Centre Hospitalier Universitaire Vaudois",
+                    "country": "CH",
+                }
+            ]
+
+        def getCollections(self):
+            return [
+                {
+                    "id": "bbmri-eric:ID:CH_CHUV:collection:demo",
+                    "biobank": {"id": "bbmri-eric:ID:CH_CHUV"},
+                    "name": "Demo collection",
+                    "description": "",
+                    "type": ["SAMPLE"],
+                    "materials": ["SERUM"],
+                }
+            ]
+
+        def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
+            import networkx as nx
+
+            graph = nx.DiGraph()
+            graph.add_node(biobank_id)
+            graph.add_node("bbmri-eric:ID:CH_CHUV:collection:demo")
+            graph.add_edge(biobank_id, "bbmri-eric:ID:CH_CHUV:collection:demo")
+            return graph
+
+    directory = ChuvDirectoryStub()
+    biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
+    collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    biobanks_by_normalized_name = {}
+    biobanks_by_alias = {}
+    biobanks_by_signature = {}
+    for biobank in directory.getBiobanks():
+        biobanks_by_normalized_name.setdefault(module.normalize_text(biobank.get("name")), []).append(biobank)
+        for alias in module.institution_aliases(biobank.get("name")).union(module.biobank_id_aliases(biobank.get("id"))):
+            biobanks_by_alias.setdefault(alias, []).append(biobank)
+        biobanks_by_signature.setdefault(module.normalized_institution_signature(biobank.get("name")), []).append(biobank)
+
+    row = {
+        "Name of Institution": "CHUV",
+        "BiobankID in the Directory (if available)": "BB_038",
+        "Country": "Switzerland",
+        "E-Mail address": "nathalie.vionnet@chuv.ch",
+    }
+    resolved = module.resolve_row(
+        __import__("pandas").Series(row),
+        25,
+        directory,
+        biobank_index,
+        collection_index,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        {},
+    )
+    assert resolved["resolution_status"] == "resolved_by_institution_name_certain"
+    assert resolved["matched_biobank_ids"] == ["bbmri-eric:ID:CH_CHUV"]
+    assert "Resolved by institution alias/acronym match" in resolved["resolution_explanation"]
+
+
+def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_breakable_emails():
+    module = load_module()
+    report = {
+        "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
+        "summary": {"survey_rows": 2, "resolved_rows": 1, "missing_rows": 1, "ambiguous_rows": 0, "proposed_update_findings": 0},
+        "row_resolutions": [
+            {
+                "survey_row": 6,
+                "institution_name": "Demo Biobank",
+                "resolution_status": "resolved_by_biobank_id",
+                "resolution_reliability": "high",
+                "resolution_explanation": "Resolved via biobank ID bbmri-eric:ID:CZ_demo:collection:col1.",
+                "matched_biobank_ids": ["bbmri-eric:ID:CZ_demo"],
+                "matched_collection_ids": ["bbmri-eric:ID:CZ_demo:collection:col1"],
+            }
+        ],
+        "findings": [
+            {
+                "status": "missing_from_directory",
+                "survey_row": 7,
+                "mapping_id": "row_resolution",
+                "entity_type": "BIOBANK",
+                "entity_id": "NL_AUMCBB",
+                "explanation": "No exact-ID or institution-name-based match was found in the Directory.",
+                "why_relevant": "Mapping must be resolved first.",
+                "relation_type": "entity_resolution",
+                "reliability": "low",
+                "survey_fields": ["Country", "E-Mail address"],
+                "survey_value": {"country": "NL", "institution_name": "AUMC", "email": "contact.person@example.org"},
+                "directory_value": {"matched_biobank_ids": []},
+                "proposed_update": None,
+            },
+            {
+                "status": "manual_review",
+                "survey_row": 6,
+                "mapping_id": "contact.email",
+                "entity_type": "CONTACT",
+                "entity_id": "bbmri-eric:contactID:CZ_demo_1",
+                "explanation": "Respondent email differs from Directory contact email.",
+                "why_relevant": "Contact comparison.",
+                "relation_type": "exact_field",
+                "reliability": "high",
+                "survey_fields": ["E-Mail address"],
+                "survey_value": "contact.person@example.org",
+                "directory_value": "data.owner@example.org",
+                "proposed_update": None,
+            },
+            {
+                "status": "inconsistent",
+                "survey_row": 6,
+                "mapping_id": "sample_types.materials",
+                "entity_type": "COLLECTION",
+                "entity_id": "bbmri-eric:ID:CZ_demo:collection:col1",
+                "explanation": "Inconsistent material types between survey and Directory collection.",
+                "why_relevant": "Material comparison.",
+                "relation_type": "controlled_vocabulary_mapping",
+                "reliability": "medium",
+                "survey_fields": ["Which types of samples do you manage?"],
+                "survey_value": {"expected_materials": ["DNA", "SERUM"]},
+                "directory_value": {"observed_materials": ["DNA", "SALIVA"]},
+                "proposed_update": None,
+            },
+        ],
+    }
+
+    tex = module.render_tex(report)
+
+    assert r"\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}" in tex
+    assert r"\begin{longtable}{L{1.5cm}L{3.2cm}L{3.2cm}L{6.5cm}}" in tex
+    assert r"(NL) BIOBANK \texorpdfstring{\nolinkurl{NL_AUMCBB}}{NL_AUMCBB}" in tex
+    assert r"\nolinkurl{contact.person@example.org}" in tex
+    assert r"Missing in Directory=SERUM; Extra in Directory=SALIVA." in tex
+    assert r"\textbf{Directory field(s):} COLLECTION.materials\\" in tex
+    assert r"\textbf{Comparison method:} Map structured survey sample-type answers" in tex
+
+
+def test_summarize_collection_scope_uses_all_collections_and_all_except():
+    module = load_module()
+
+    assert module.summarize_collection_scope(["c1", "c2"], ["c1", "c2"]) == "all collections"
+    assert module.summarize_collection_scope(["c1", "c3"], ["c1", "c2", "c3"]) == "c1, c3"
+    assert module.summarize_collection_scope(["c1", "c3", "c4", "c5"], ["c1", "c2", "c3", "c4", "c5", "c6"]) == "All except c2, c6"
+    assert module.summarize_collection_scope(["c1"], ["c1", "c2", "c3", "c4", "c5", "c6"]) == "c1"
