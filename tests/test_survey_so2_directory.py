@@ -142,6 +142,9 @@ class DirectoryStub:
     def getContacts(self):
         return [self._contact]
 
+    def getNetworks(self):
+        return []
+
     def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
         import networkx as nx
         graph = nx.DiGraph()
@@ -205,6 +208,9 @@ class SwissResolutionDirectoryStub:
 
     def getCollections(self):
         return list(self._collections)
+
+    def getNetworks(self):
+        return []
 
     def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
         import networkx as nx
@@ -685,6 +691,9 @@ def test_resolve_row_normalizes_collection_scope_and_avoids_geneva_bern_mixup():
     directory = SwissResolutionDirectoryStub()
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
     collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    network_index = {}
+    contacts_by_email = {}
+    biobank_ids_by_contact, collection_ids_by_contact = module.build_contact_usage_indexes(biobank_index, collection_index)
     biobanks_by_normalized_name = {}
     biobanks_by_alias = {}
     biobanks_by_signature = {}
@@ -713,6 +722,10 @@ def test_resolve_row_normalizes_collection_scope_and_avoids_geneva_bern_mixup():
         directory,
         biobank_index,
         collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
         biobanks_by_normalized_name,
         biobanks_by_alias,
         biobanks_by_signature,
@@ -736,6 +749,10 @@ def test_resolve_row_normalizes_collection_scope_and_avoids_geneva_bern_mixup():
         directory,
         biobank_index,
         collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
         biobanks_by_normalized_name,
         biobanks_by_alias,
         biobanks_by_signature,
@@ -756,6 +773,9 @@ def test_resolve_row_matches_bare_biobank_id_and_falls_back_from_invalid_explici
     directory = DirectoryStub()
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
     collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    network_index = {}
+    contacts_by_email = {directory.getContacts()[0]["email"]: directory.getContacts()}
+    biobank_ids_by_contact, collection_ids_by_contact = module.build_contact_usage_indexes(biobank_index, collection_index)
     biobanks_by_normalized_name = {}
     biobanks_by_alias = {}
     biobanks_by_signature = {}
@@ -778,6 +798,10 @@ def test_resolve_row_matches_bare_biobank_id_and_falls_back_from_invalid_explici
         directory,
         biobank_index,
         collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
         biobanks_by_normalized_name,
         biobanks_by_alias,
         biobanks_by_signature,
@@ -793,12 +817,16 @@ def test_resolve_row_matches_bare_biobank_id_and_falls_back_from_invalid_explici
         directory,
         biobank_index,
         collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
         biobanks_by_normalized_name,
         biobanks_by_alias,
         biobanks_by_signature,
         {},
     )
-    assert resolved["resolution_status"] == "resolved_by_institution_name_certain"
+    assert resolved["resolution_status"] == "resolved_by_contact_email"
     assert resolved["matched_biobank_ids"] == ["bbmri-eric:ID:CZ_demo"]
     assert "Survey biobank ID CZ_missing does not exist in schema ERIC." in resolved["resolution_explanation"]
 
@@ -872,6 +900,9 @@ def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
     directory = ChuvDirectoryStub()
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
     collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    network_index = {}
+    contacts_by_email = {}
+    biobank_ids_by_contact, collection_ids_by_contact = module.build_contact_usage_indexes(biobank_index, collection_index)
     biobanks_by_normalized_name = {}
     biobanks_by_alias = {}
     biobanks_by_signature = {}
@@ -893,6 +924,10 @@ def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
         directory,
         biobank_index,
         collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
         biobanks_by_normalized_name,
         biobanks_by_alias,
         biobanks_by_signature,
@@ -901,6 +936,160 @@ def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
     assert resolved["resolution_status"] == "resolved_by_institution_name_certain"
     assert resolved["matched_biobank_ids"] == ["bbmri-eric:ID:CH_CHUV"]
     assert "Resolved by institution alias/acronym match" in resolved["resolution_explanation"]
+
+
+def test_resolve_row_uses_exact_contact_email_before_name_matching():
+    module = load_module()
+
+    class ContactDirectoryStub(DirectoryStub):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._biobank["name"] = "Different Official Name"
+            self._contact["email"] = "owner@example.org"
+
+    directory = ContactDirectoryStub()
+    biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
+    collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    contact_index = {contact["id"]: contact for contact in directory.getContacts()}
+    network_index = {}
+    contacts_by_email = {"owner@example.org": directory.getContacts()}
+    biobank_ids_by_contact, collection_ids_by_contact = module.build_contact_usage_indexes(biobank_index, collection_index)
+    biobanks_by_normalized_name = {}
+    biobanks_by_alias = {}
+    biobanks_by_signature = {}
+    for biobank in directory.getBiobanks():
+        biobanks_by_normalized_name.setdefault(module.normalize_text(biobank.get("name")), []).append(biobank)
+        for alias in module.institution_aliases(biobank.get("name")).union(module.biobank_id_aliases(biobank.get("id"))):
+            biobanks_by_alias.setdefault(alias, []).append(biobank)
+        biobanks_by_signature.setdefault(module.normalized_institution_signature(biobank.get("name")), []).append(biobank)
+    row = {
+        "Name of Institution": "Completely Different Survey Name",
+        "BiobankID in the Directory (if available)": "",
+        "Country": "Czech Republic",
+        "E-Mail address": "owner@example.org",
+    }
+    resolved = module.resolve_row(
+        __import__("pandas").Series(row),
+        0,
+        directory,
+        biobank_index,
+        collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        {},
+    )
+    assert resolved["resolution_status"] == "resolved_by_contact_email"
+    assert resolved["matched_biobank_ids"] == ["bbmri-eric:ID:CZ_demo"]
+    assert resolved["matched_contact_ids"] == ["bbmri-eric:contactID:CZ_demo_1"]
+
+
+def test_resolve_row_marks_dangling_contact_biobank_references_for_manual_review():
+    module = load_module()
+
+    class DanglingContactDirectoryStub:
+        def getSchema(self):
+            return "ERIC"
+
+        def getBiobanks(self):
+            return []
+
+        def getCollections(self):
+            return []
+
+        def getContacts(self):
+            return [
+                {
+                    "id": "bbmri-eric:contactID:ES_demo",
+                    "email": "demo@example.org",
+                    "biobanks": [{"id": "bbmri-eric:ID:ES_MISSING"}],
+                }
+            ]
+
+        def getNetworks(self):
+            return []
+
+    directory = DanglingContactDirectoryStub()
+    biobank_index = {}
+    collection_index = {}
+    contact_index = {contact["id"]: contact for contact in directory.getContacts()}
+    network_index = {}
+    contacts_by_email = {"demo@example.org": directory.getContacts()}
+    biobanks_by_normalized_name = {}
+    biobanks_by_alias = {}
+    biobanks_by_signature = {}
+    resolved = module.resolve_row(
+        __import__("pandas").Series(
+            {
+                "Name of Institution": "Demo",
+                "BiobankID in the Directory (if available)": "",
+                "Country": "Spain",
+                "E-Mail address": "demo@example.org",
+            }
+        ),
+        0,
+        directory,
+        biobank_index,
+        collection_index,
+        network_index,
+        contacts_by_email,
+        {},
+        {},
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        {},
+    )
+    assert resolved["resolution_status"] == "manual_review"
+    assert "bbmri-eric:ID:ES_MISSING" in resolved["resolution_explanation"]
+    assert resolved["matched_contact_ids"] == ["bbmri-eric:contactID:ES_demo"]
+
+
+def test_resolve_row_supports_explicit_network_id():
+    module = load_module()
+    directory = DirectoryStub()
+    biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
+    collection_index = {collection["id"]: collection for collection in directory.getCollections()}
+    contact_index = {contact["id"]: contact for contact in directory.getContacts()}
+    network_index = {"bbmri-eric:networkID:DE_DKTK": {"id": "bbmri-eric:networkID:DE_DKTK", "name": "DKTK"}}
+    contacts_by_email = {directory.getContacts()[0]["email"]: directory.getContacts()}
+    biobank_ids_by_contact, collection_ids_by_contact = module.build_contact_usage_indexes(biobank_index, collection_index)
+    biobanks_by_normalized_name = {}
+    biobanks_by_alias = {}
+    biobanks_by_signature = {}
+    for biobank in directory.getBiobanks():
+        biobanks_by_normalized_name.setdefault(module.normalize_text(biobank.get("name")), []).append(biobank)
+        for alias in module.institution_aliases(biobank.get("name")).union(module.biobank_id_aliases(biobank.get("id"))):
+            biobanks_by_alias.setdefault(alias, []).append(biobank)
+        biobanks_by_signature.setdefault(module.normalized_institution_signature(biobank.get("name")), []).append(biobank)
+    resolved = module.resolve_row(
+        __import__("pandas").Series(
+            {
+                "Name of Institution": "German Cancer Consortium",
+                "BiobankID in the Directory (if available)": "bbmri-eric:networkID:DE_DKTK",
+                "Country": "Germany",
+                "E-Mail address": "",
+            }
+        ),
+        0,
+        directory,
+        biobank_index,
+        collection_index,
+        network_index,
+        contacts_by_email,
+        biobank_ids_by_contact,
+        collection_ids_by_contact,
+        biobanks_by_normalized_name,
+        biobanks_by_alias,
+        biobanks_by_signature,
+        {},
+    )
+    assert resolved["resolution_status"] == "resolved_by_network_id"
+    assert resolved["matched_network_ids"] == ["bbmri-eric:networkID:DE_DKTK"]
 
 
 def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_breakable_emails():
@@ -975,6 +1164,8 @@ def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_
     assert r"(NL) BIOBANK \texorpdfstring{\nolinkurl{NL_AUMCBB}}{NL_AUMCBB}" in tex
     assert r"\nolinkurl{contact.person@example.org}" in tex
     assert r"Missing in Directory=SERUM; Extra in Directory=SALIVA." in tex
+    assert "These findings have a plausible survey-to-Directory relation" in tex
+    assert "These findings cover survey respondents or identifiers that could not be mapped confidently" in tex
     assert r"\textbf{Directory field(s):} COLLECTION.materials\\" in tex
     assert r"\textbf{Comparison method:} Map structured survey sample-type answers" in tex
 

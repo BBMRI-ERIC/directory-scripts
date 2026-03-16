@@ -124,8 +124,9 @@ FINDING_TYPE_METADATA = {
     "row_resolution": {
         "directory_fields": ["BIOBANK.id", "BIOBANK.name", "BIOBANK.country", "COLLECTION.id"],
         "comparison_description": (
-            "Resolve the survey row conservatively: explicit biobank ID first, explicit collection IDs second, "
-            "then institution-name matching (certain or approximate). Approximate name matches remain analysis-only."
+            "Resolve the survey row conservatively: explicit network/biobank ID first, explicit collection IDs second, "
+            "then exact respondent-email contact matching, then institution-name matching (certain or approximate). "
+            "Approximate name matches remain analysis-only."
         ),
     },
     "geo.country": {
@@ -438,6 +439,17 @@ STATUS_COLORS = {
     "not_comparable": "soBlue",
 }
 
+STATUS_SECTION_INTROS = {
+    "manual_review": (
+        "These findings have a plausible survey-to-Directory relation, but the available evidence is not strong "
+        "enough for an automatic yes/no consistency judgement. They require human review before any update is considered."
+    ),
+    "missing_from_directory": (
+        "These findings cover survey respondents or identifiers that could not be mapped confidently to a current "
+        "Directory entity. They may represent truly missing entities, unresolved aliases, or snapshot inconsistencies."
+    ),
+}
+
 
 def latex_label(value: Any) -> str:
     text = "" if value is None else str(value)
@@ -711,6 +723,13 @@ def normalize_biobank_id(value: str) -> str:
     return biobank_id
 
 
+def normalize_network_id(value: str) -> str:
+    network_id = cell_text(value)
+    if network_id.startswith("bbmri-eric:networkID:"):
+        return network_id
+    return ""
+
+
 def institution_aliases(value: Any) -> set[str]:
     raw_text = cell_text(value)
     normalized = normalize_text(raw_text)
@@ -753,6 +772,30 @@ def match_biobank_alias_candidates(
                 continue
             candidates_by_id[candidate["id"]] = candidate
     return [candidates_by_id[biobank_id] for biobank_id in sorted(candidates_by_id)]
+
+
+def build_contact_usage_indexes(
+    biobank_index: dict[str, dict[str, Any]],
+    collection_index: dict[str, dict[str, Any]],
+) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    biobank_ids_by_contact: dict[str, set[str]] = defaultdict(set)
+    collection_ids_by_contact: dict[str, set[str]] = defaultdict(set)
+    for biobank in biobank_index.values():
+        contact_value = biobank.get("contact")
+        if not contact_value:
+            continue
+        contact_id = contact_value["id"] if isinstance(contact_value, dict) else str(contact_value)
+        biobank_ids_by_contact[contact_id].add(biobank["id"])
+    for collection in collection_index.values():
+        contact_value = collection.get("contact")
+        if not contact_value:
+            continue
+        contact_id = contact_value["id"] if isinstance(contact_value, dict) else str(contact_value)
+        collection_ids_by_contact[contact_id].add(collection["id"])
+    return (
+        {contact_id: set(ids) for contact_id, ids in biobank_ids_by_contact.items()},
+        {contact_id: set(ids) for contact_id, ids in collection_ids_by_contact.items()},
+    )
 
 
 def extract_email_domain(value: Any) -> str:
@@ -853,6 +896,10 @@ def resolve_row(
     directory: Directory,
     biobank_index: dict[str, dict[str, Any]],
     collection_index: dict[str, dict[str, Any]],
+    network_index: dict[str, dict[str, Any]],
+    contacts_by_email: dict[str, list[dict[str, Any]]],
+    biobank_ids_by_contact: dict[str, set[str]],
+    collection_ids_by_contact: dict[str, set[str]],
     biobanks_by_normalized_name: dict[str, list[dict[str, Any]]],
     biobanks_by_alias: dict[str, list[dict[str, Any]]],
     biobanks_by_signature: dict[tuple[str, ...], list[dict[str, Any]]],
@@ -861,6 +908,7 @@ def resolve_row(
     survey_row = row_index + 5
     raw_biobank_id = cell_text(get_row_value(row, "BiobankID in the Directory (if available)"))
     biobank_id = normalize_biobank_id(raw_biobank_id)
+    network_id = normalize_network_id(raw_biobank_id)
     collection_ids = [
         normalized_collection_id
         for normalized_collection_id in (
@@ -881,6 +929,7 @@ def resolve_row(
     survey_aliases = institution_aliases(institution_name)
     survey_aliases.update(biobank_id_aliases(raw_biobank_id))
     country = normalize_country(row.get("Country"))
+    survey_email = cell_text(row.get("E-Mail address")).lower()
     survey_email_domain = extract_email_domain(row.get("E-Mail address"))
     result = {
         "survey_row": survey_row,
@@ -891,10 +940,21 @@ def resolve_row(
         "resolution_reliability": "low",
         "resolution_explanation": "",
         "matched_biobank_ids": [],
+        "matched_network_ids": [],
         "matched_collection_ids": [],
         "matched_contact_ids": [],
     }
     explicit_biobank_resolution_note = ""
+
+    if network_id:
+        network = network_index.get(network_id)
+        if network is not None:
+            result["matched_network_ids"] = [network_id]
+            result["resolution_status"] = "resolved_by_network_id"
+            result["resolution_reliability"] = "high"
+            result["resolution_explanation"] = f"Resolved via explicit network ID {network_id}."
+            return result
+        explicit_biobank_resolution_note = f"Survey network ID {raw_biobank_id} does not exist in schema {directory.getSchema()}."
 
     if biobank_id:
         if ":collection:" in biobank_id and biobank_id not in collection_ids:
@@ -902,7 +962,7 @@ def resolve_row(
             biobank_id = ""
         biobank = biobank_index.get(biobank_id) if biobank_id else None
         if biobank is None:
-            if raw_biobank_id:
+            if raw_biobank_id and not explicit_biobank_resolution_note:
                 explicit_biobank_resolution_note = (
                     f"Survey biobank ID {raw_biobank_id} does not exist in schema {directory.getSchema()}."
                 )
@@ -956,6 +1016,80 @@ def resolve_row(
             result["resolution_reliability"] = "high"
             result["resolution_explanation"] = "Resolved via explicit collection IDs."
             return result
+
+    if survey_email:
+        exact_contact_matches = contacts_by_email.get(survey_email, [])
+        if exact_contact_matches:
+            resolved_biobank_ids: set[str] = set()
+            resolved_collection_ids: set[str] = set()
+            dangling_biobank_ids: set[str] = set()
+            result["matched_contact_ids"] = sorted(contact["id"] for contact in exact_contact_matches)
+            for contact in exact_contact_matches:
+                contact_id = contact["id"]
+                for linked_biobank in contact.get("biobanks", []) or []:
+                    linked_biobank_id = linked_biobank["id"] if isinstance(linked_biobank, dict) else str(linked_biobank)
+                    if linked_biobank_id in biobank_index:
+                        resolved_biobank_ids.add(linked_biobank_id)
+                    else:
+                        dangling_biobank_ids.add(linked_biobank_id)
+                for linked_collection in contact.get("collections", []) or []:
+                    linked_collection_id = linked_collection["id"] if isinstance(linked_collection, dict) else str(linked_collection)
+                    if linked_collection_id in collection_index:
+                        resolved_collection_ids.add(linked_collection_id)
+                resolved_biobank_ids.update(biobank_ids_by_contact.get(contact_id, set()))
+                resolved_collection_ids.update(collection_ids_by_contact.get(contact_id, set()))
+            for collection_id in resolved_collection_ids:
+                collection = collection_index.get(collection_id)
+                if collection and collection.get("biobank"):
+                    collection_biobank = collection["biobank"]
+                    resolved_biobank_ids.add(
+                        collection_biobank["id"] if isinstance(collection_biobank, dict) else str(collection_biobank)
+                    )
+            if len(resolved_biobank_ids) == 1:
+                biobank_id_from_contact = next(iter(resolved_biobank_ids))
+                result["matched_biobank_ids"] = [biobank_id_from_contact]
+                result["matched_collection_ids"] = (
+                    sorted(resolved_collection_ids)
+                    if resolved_collection_ids
+                    else get_collections_ids_from_biobank(directory, biobank_id_from_contact)
+                )
+                result["resolution_status"] = "resolved_by_contact_email"
+                result["resolution_reliability"] = "high"
+                result["resolution_explanation"] = (
+                    f"Resolved by exact respondent email match to Directory contact(s) for {biobank_id_from_contact}."
+                )
+                if explicit_biobank_resolution_note:
+                    result["resolution_explanation"] = (
+                        explicit_biobank_resolution_note + " " + result["resolution_explanation"]
+                    )
+                return result
+            if dangling_biobank_ids and not resolved_biobank_ids:
+                result["resolution_status"] = "manual_review"
+                result["resolution_reliability"] = "medium"
+                result["resolution_explanation"] = (
+                    "Respondent email matches Directory contact(s), but those contacts reference biobank IDs "
+                    "that are not present in the current schema snapshot: "
+                    + ", ".join(sorted(dangling_biobank_ids))
+                    + "."
+                )
+                if explicit_biobank_resolution_note:
+                    result["resolution_explanation"] = (
+                        explicit_biobank_resolution_note + " " + result["resolution_explanation"]
+                    )
+                return result
+            if len(resolved_biobank_ids) > 1:
+                result["matched_biobank_ids"] = sorted(resolved_biobank_ids)
+                result["matched_collection_ids"] = sorted(resolved_collection_ids)
+                result["resolution_status"] = "ambiguous"
+                result["resolution_reliability"] = "medium"
+                result["resolution_explanation"] = (
+                    "Respondent email matches Directory contact(s) linked to multiple biobanks; human review is required."
+                )
+                if explicit_biobank_resolution_note:
+                    result["resolution_explanation"] = (
+                        explicit_biobank_resolution_note + " " + result["resolution_explanation"]
+                    )
+                return result
 
     exact_name_candidates = list(biobanks_by_normalized_name.get(normalized_institution, []))
     if country:
@@ -1063,7 +1197,7 @@ def resolve_row(
         return result
 
     result["resolution_status"] = "missing_from_directory"
-    result["resolution_explanation"] = "No exact-ID or institution-name-based match was found in the Directory."
+    result["resolution_explanation"] = "No exact-ID, contact-email, or institution-name-based match was found in the Directory."
     if explicit_biobank_resolution_note:
         result["resolution_explanation"] = explicit_biobank_resolution_note + " " + result["resolution_explanation"]
     return result
@@ -1177,6 +1311,13 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
     collection_index = {collection["id"]: collection for collection in directory.getCollections()}
     contact_index = {contact["id"]: contact for contact in directory.getContacts()}
+    network_index = {network["id"]: network for network in directory.getNetworks()}
+    contacts_by_email: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for contact in contact_index.values():
+        email = cell_text(contact.get("email")).lower()
+        if email:
+            contacts_by_email[email].append(contact)
+    biobank_ids_by_contact, collection_ids_by_contact = build_contact_usage_indexes(biobank_index, collection_index)
     biobanks_by_normalized_name: dict[str, list[dict[str, Any]]] = defaultdict(list)
     biobanks_by_alias: dict[str, list[dict[str, Any]]] = defaultdict(list)
     biobanks_by_signature: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
@@ -1202,20 +1343,31 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
             directory,
             biobank_index,
             collection_index,
+            network_index,
+            contacts_by_email,
+            biobank_ids_by_contact,
+            collection_ids_by_contact,
             biobanks_by_normalized_name,
             biobanks_by_alias,
             biobanks_by_signature,
             collection_contact_domain_counts,
         )
         row_resolutions.append(resolution)
-        if resolution["resolution_status"] in {"missing_from_directory", "ambiguous"}:
+        if resolution["resolution_status"] in {"missing_from_directory", "ambiguous", "manual_review"}:
             survey_country = normalize_country(row.get("Country"))
+            entity_type = "NETWORK" if resolution.get("matched_network_ids") else "BIOBANK"
+            entity_id = (
+                (resolution.get("matched_network_ids") or [None])[0]
+                or resolution["biobank_id_from_survey"]
+                or resolution["institution_name"]
+                or f"row-{resolution['survey_row']}"
+            )
             findings.append(
                 make_finding(
                     row_resolution=resolution,
                     mapping_id="row_resolution",
-                    entity_type="BIOBANK",
-                    entity_id=(resolution["biobank_id_from_survey"] or resolution["institution_name"] or f"row-{resolution['survey_row']}"),
+                    entity_type=entity_type,
+                    entity_id=entity_id,
                     status=resolution["resolution_status"],
                     survey_value={
                         "institution_name": resolution["institution_name"],
@@ -1223,7 +1375,11 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
                         "collection_ids": resolution["collection_ids_from_survey"],
                         "country": survey_country,
                     },
-                    directory_value={"matched_biobank_ids": resolution["matched_biobank_ids"]},
+                    directory_value={
+                        "matched_biobank_ids": resolution["matched_biobank_ids"],
+                        "matched_network_ids": resolution.get("matched_network_ids", []),
+                        "matched_contact_ids": resolution.get("matched_contact_ids", []),
+                    },
                     relation_type="entity_resolution",
                     reliability=resolution["resolution_reliability"],
                     why_relevant="The survey row must be mapped to a Directory scope before any consistency analysis is meaningful.",
@@ -1237,6 +1393,9 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
                     strategic_objectives=[],
                 )
             )
+            continue
+
+        if resolution["resolution_status"] == "resolved_by_network_id":
             continue
 
         if len(resolution.get("matched_biobank_ids", [])) == 1:
@@ -1912,6 +2071,9 @@ def render_tex(report: dict[str, Any]) -> str:
         lines.append(r"\section{Findings by Status}")
     for status in sorted(grouped):
         lines.append(r"\subsection{" + colored_status_text(status) + "}")
+        intro = STATUS_SECTION_INTROS.get(str(status))
+        if intro:
+            lines.append(escape_latex_with_inline_breaks(intro))
         lines.append(r"\begin{longtable}{L{1.5cm}L{3.2cm}L{3.2cm}L{6.5cm}}")
         lines.append(r"\toprule Row & Mapping & Entity & Explanation \\ \midrule")
         for finding in grouped[status]:
