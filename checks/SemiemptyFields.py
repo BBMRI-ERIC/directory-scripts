@@ -57,7 +57,7 @@ CHECK_DOCS = {'SE:BBDescMissing': {'entity': 'BIOBANK',
                                                       'summary': 'Missing name for '
                                                                  "collection ('name' "
                                                                  'attribute is empty '
-                                                                 'for the biobank)'},
+                                                                 'for the collection)'},
  'SE:BBDescShort': {'entity': 'BIOBANK',
                                                   'fields': ['description'],
                                                   'severity': 'WARNING',
@@ -119,7 +119,7 @@ class SemiemptyFields(IPlugin):
 			elif 'description' in collection and descriptionTooShort(collection['description']):
 				warnings.append(DataCheckWarning(make_check_id(self, "CollDescShort"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Suspiciously short description for collection ('description' attribute {collection['description']} has less than {str(minDescWords)} words)"))
 			if not 'name' in collection or re.search(r'^\s*$', collection['name']) or re.search(r'^\s*N/?A\s*$', collection['name']):
-				warnings.append(DataCheckWarning(make_check_id(self, "CollNameMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Missing name for collection ('name' attribute is empty for the biobank)"))
+				warnings.append(DataCheckWarning(make_check_id(self, "CollNameMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Missing name for collection ('name' attribute is empty for the collection)"))
 
 
 		return warnings
