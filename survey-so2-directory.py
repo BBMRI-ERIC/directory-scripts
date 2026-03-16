@@ -440,27 +440,55 @@ STATUS_COLORS = {
 }
 
 STATUS_SECTION_INTROS = {
+    "consistent": (
+        "These findings indicate that the survey answer is reflected consistently in the mapped Directory entity under the current comparison rule."
+    ),
+    "inconsistent": (
+        "These findings indicate a concrete mismatch between the survey answer and the mapped Directory metadata under the applied comparison rule."
+    ),
+    "missing_in_directory": (
+        "These findings are linked to a concrete Directory entity, but the corresponding survey-reported metadata or "
+        "capability is not reflected in the current Directory record."
+    ),
     "manual_review": (
-        "These findings have a plausible survey-to-Directory relation, but the available evidence is not strong "
-        "enough for an automatic yes/no consistency judgement. They require human review before any update is considered."
+        "These findings have a plausible survey-to-Directory relation, but the evidence is not strong enough for an "
+        "automatic consistency judgement."
     ),
     "missing_from_directory": (
         "These findings cover survey respondents or identifiers that could not be mapped confidently to a current "
-        "Directory entity. They may represent truly missing entities, unresolved aliases, or snapshot inconsistencies."
+        "Directory entity."
+    ),
+    "ambiguous": (
+        "These findings indicate that the available survey and Directory evidence supports more than one plausible interpretation or mapping."
+    ),
+    "ambiguous_resolution": (
+        "These findings indicate that the survey row could not be resolved to a single confident Directory target because multiple plausible matches remain."
+    ),
+    "unresolved_row": (
+        "These findings indicate that the survey row could not be evaluated meaningfully because no sufficiently reliable mapping or comparison basis was established."
+    ),
+    "not_comparable": (
+        "These findings indicate that the survey answer and the current Directory metadata are related in topic, but not directly comparable under the implemented rules."
     ),
 }
 
 STATUS_DISPLAY_ORDER = [
     "consistent",
     "inconsistent",
+    "missing_in_directory",
     "manual_review",
     "missing_from_directory",
-    "missing_in_directory",
     "ambiguous",
     "ambiguous_resolution",
     "unresolved_row",
     "not_comparable",
 ]
+
+STABLE_STATUS_SECTIONS = {
+    "missing_in_directory",
+    "manual_review",
+    "missing_from_directory",
+}
 
 
 def ordered_statuses(statuses: list[str]) -> list[str]:
@@ -574,9 +602,17 @@ def finding_link(mapping_id: str) -> str:
     return rf"\hyperref[{label}]{{{escape_latex_breakable_identifier(mapping_id)} {escape_latex('(appendix)')}}}"
 
 
+STATUS_DISPLAY_LABELS = {
+    "missing_in_directory": "Survey Data Missing from the Directory",
+    "manual_review": "Data Requiring Manual Review",
+    "missing_from_directory": "Entities Not Mapped to the Directory",
+}
+
+
 def colored_status_text(status: str) -> str:
     color = STATUS_COLORS.get(status, "black")
-    return rf"\textcolor{{{color}}}{{{escape_latex(status.replace('_', ' ').title())}}}"
+    label = STATUS_DISPLAY_LABELS.get(status, status.replace('_', ' ').title())
+    return rf"\textcolor{{{color}}}{{{escape_latex(label)}}}"
 
 
 def format_finding_result(finding: dict[str, Any], *, concise_consistent: bool) -> str:
@@ -2084,16 +2120,23 @@ def render_tex(report: dict[str, Any]) -> str:
                     lines.append(r"\end{itemize}")
             else:
                 lines.append("No biobank-level grouping is available because this objective currently has no mapped findings.")
-    if grouped:
+    statuses_to_render = ordered_statuses(
+        list(set(grouped.keys()) | STABLE_STATUS_SECTIONS)
+    ) if grouped else []
+    if statuses_to_render:
         lines.append(r"\section{Findings by Status}")
-    for status in ordered_statuses(list(grouped)):
+    for status in statuses_to_render:
         lines.append(r"\subsection{" + colored_status_text(status) + "}")
         intro = STATUS_SECTION_INTROS.get(str(status))
         if intro:
             lines.append(escape_latex_with_inline_breaks(intro))
+        status_findings = grouped.get(status, [])
+        if not status_findings:
+            lines.append("No findings with this status in the current report.")
+            continue
         lines.append(r"\begin{longtable}{L{1.5cm}L{3.2cm}L{3.2cm}L{6.5cm}}")
         lines.append(r"\toprule Row & Mapping & Entity & Explanation \\ \midrule")
-        for finding in grouped[status]:
+        for finding in status_findings:
             entity_label = display_entity_label(finding)
             lines.append(
                 f"{escape_latex(finding['survey_row'])} & "

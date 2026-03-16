@@ -376,6 +376,21 @@ def test_survey_so2_render_tex_escapes_special_characters():
         "summary": {"survey_rows": 1, "resolved_rows": 1, "missing_rows": 0, "ambiguous_rows": 0, "proposed_update_findings": 0},
         "findings": [
             {
+                "status": "missing_in_directory",
+                "survey_row": 5,
+                "mapping_id": "imaging.wsi_presence",
+                "entity_type": "BIOBANK",
+                "entity_id": "bbmri-eric:ID:CZ_demo",
+                "explanation": "Missing in directory.",
+                "why_relevant": "z",
+                "relation_type": "derived_presence",
+                "reliability": "medium",
+                "survey_fields": [],
+                "survey_value": "yes",
+                "directory_value": "no",
+                "proposed_update": None,
+            },
+            {
                 "status": "manual_review",
                 "survey_row": 6,
                 "mapping_id": "geo.country",
@@ -1125,6 +1140,21 @@ def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_
                 "proposed_update": None,
             },
             {
+                "status": "missing_in_directory",
+                "survey_row": 6,
+                "mapping_id": "imaging.wsi_presence",
+                "entity_type": "BIOBANK",
+                "entity_id": "bbmri-eric:ID:CZ_demo",
+                "explanation": "Survey-reported WSI availability is not reflected by generic imaging metadata or text.",
+                "why_relevant": "Imaging comparison.",
+                "relation_type": "derived_presence",
+                "reliability": "medium",
+                "survey_fields": ["Radiology / WSI"],
+                "survey_value": {"answer": "Yes"},
+                "directory_value": {"has_image_support": False, "has_wsi_hint": False},
+                "proposed_update": None,
+            },
+            {
                 "status": "manual_review",
                 "survey_row": 6,
                 "mapping_id": "contact.email",
@@ -1164,13 +1194,18 @@ def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_
     assert r"(NL) BIOBANK \texorpdfstring{\nolinkurl{NL_AUMCBB}}{NL_AUMCBB}" in tex
     assert r"\nolinkurl{contact.person@example.org}" in tex
     assert r"Missing in Directory=SERUM; Extra in Directory=SALIVA." in tex
+    assert "These findings are linked to a concrete Directory entity" in tex
     assert "These findings have a plausible survey-to-Directory relation" in tex
     assert "These findings cover survey respondents or identifiers that could not be mapped confidently" in tex
+    assert "These findings indicate a concrete mismatch between the survey answer and the mapped Directory metadata" in tex
+    assert r"\subsection{\textcolor{soRed}{Survey Data Missing from the Directory}}" in tex
+    assert r"\subsection{\textcolor{soOrange}{Data Requiring Manual Review}}" in tex
+    assert r"\subsection{\textcolor{soOrange}{Entities Not Mapped to the Directory}}" in tex
     assert r"\textbf{Directory field(s):} COLLECTION.materials\\" in tex
     assert r"\textbf{Comparison method:} Map structured survey sample-type answers" in tex
 
 
-def test_findings_by_status_orders_manual_review_before_missing_from_directory():
+def test_findings_by_status_orders_missing_in_directory_manual_review_and_missing_from_directory():
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1193,6 +1228,21 @@ def test_findings_by_status_orders_manual_review_before_missing_from_directory()
                 "proposed_update": None,
             },
             {
+                "status": "missing_in_directory",
+                "survey_row": 5,
+                "mapping_id": "imaging.wsi_presence",
+                "entity_type": "BIOBANK",
+                "entity_id": "bbmri-eric:ID:CZ_demo",
+                "explanation": "Missing in directory.",
+                "why_relevant": "z",
+                "relation_type": "derived_presence",
+                "reliability": "medium",
+                "survey_fields": [],
+                "survey_value": "yes",
+                "directory_value": "no",
+                "proposed_update": None,
+            },
+            {
                 "status": "manual_review",
                 "survey_row": 6,
                 "mapping_id": "contact.email",
@@ -1210,8 +1260,86 @@ def test_findings_by_status_orders_manual_review_before_missing_from_directory()
         ],
     }
     tex = module.render_tex(report)
-    assert tex.index(r"\subsection{\textcolor{soOrange}{Manual Review}}") < tex.index(
-        r"\subsection{\textcolor{soOrange}{Missing From Directory}}"
+    assert tex.index(r"\subsection{\textcolor{soRed}{Survey Data Missing from the Directory}}") < tex.index(
+        r"\subsection{\textcolor{soOrange}{Data Requiring Manual Review}}"
+    )
+    assert tex.index(r"\subsection{\textcolor{soOrange}{Data Requiring Manual Review}}") < tex.index(
+        r"\subsection{\textcolor{soOrange}{Entities Not Mapped to the Directory}}"
+    )
+
+
+def test_findings_by_status_adds_intro_for_ambiguous_section():
+    module = load_module()
+    report = {
+        "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
+        "summary": {"survey_rows": 1, "resolved_rows": 0, "missing_rows": 0, "ambiguous_rows": 1, "proposed_update_findings": 0},
+        "row_resolutions": [],
+        "findings": [
+            {
+                "status": "ambiguous",
+                "survey_row": 1,
+                "mapping_id": "row_resolution",
+                "entity_type": "BIOBANK",
+                "entity_id": "Demo",
+                "explanation": "Ambiguous.",
+                "why_relevant": "x",
+                "relation_type": "entity_resolution",
+                "reliability": "low",
+                "survey_fields": [],
+                "survey_value": {"institution_name": "Demo"},
+                "directory_value": {"matched_biobank_ids": ["A", "B"]},
+                "proposed_update": None,
+            },
+        ],
+    }
+    tex = module.render_tex(report)
+    assert "These findings indicate that the available survey and Directory evidence supports more than one plausible interpretation or mapping." in tex
+
+
+def test_findings_by_status_keeps_stable_sections_when_one_status_has_no_findings():
+    module = load_module()
+    report = {
+        "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
+        "summary": {"survey_rows": 2, "resolved_rows": 0, "missing_rows": 1, "ambiguous_rows": 0, "proposed_update_findings": 0},
+        "row_resolutions": [],
+        "findings": [
+            {
+                "status": "manual_review",
+                "survey_row": 6,
+                "mapping_id": "contact.email",
+                "entity_type": "CONTACT",
+                "entity_id": "bbmri-eric:contactID:CZ_demo_1",
+                "explanation": "Manual review.",
+                "why_relevant": "y",
+                "relation_type": "exact_field",
+                "reliability": "high",
+                "survey_fields": [],
+                "survey_value": "a",
+                "directory_value": "b",
+                "proposed_update": None,
+            },
+            {
+                "status": "missing_from_directory",
+                "survey_row": 7,
+                "mapping_id": "row_resolution",
+                "entity_type": "BIOBANK",
+                "entity_id": "NL_AUMCBB",
+                "explanation": "Missing.",
+                "why_relevant": "x",
+                "relation_type": "entity_resolution",
+                "reliability": "low",
+                "survey_fields": [],
+                "survey_value": {"country": "NL"},
+                "directory_value": {"matched_biobank_ids": []},
+                "proposed_update": None,
+            },
+        ],
+    }
+    tex = module.render_tex(report)
+    assert r"\subsection{\textcolor{soRed}{Survey Data Missing from the Directory}}" in tex
+    assert "No findings with this status in the current report." in tex
+    assert tex.index(r"\subsection{\textcolor{soRed}{Survey Data Missing from the Directory}}") < tex.index(
+        r"\subsection{\textcolor{soOrange}{Data Requiring Manual Review}}"
     )
 
 
