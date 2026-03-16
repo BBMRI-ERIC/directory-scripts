@@ -220,15 +220,13 @@ class COVID(IPlugin):
 			covid_control = False
 
 			# TODO: Raise a warning here if needed
-			try:
+			if 'diagnosis_available' in collection:
 				for d in collection['diagnosis_available']:
 					#if re.search('-', d['id']): # EMX2 collection['diagnosis_available'] has name but not id (this applies to all times we call d in this loop)
 					if re.search('-', d['name']):
 							diag_ranges.append(d['name'])
 					else:
 							diags.append(d['name'])
-			except KeyError:
-					continue
 
 			for d in diags+diag_ranges:
 				# ICD-10
@@ -335,7 +333,7 @@ class COVID(IPlugin):
 					]))
 				if not 'DNA' in materials and not 'PATHOGEN' in materials and not 'PERIPHERAL_BLOOD_CELLS' in materials and not 'PLASMA' in materials and not 'RNA' in materials and not 'SALIVA' in materials and not 'SERUM' in materials and not 'WHOLE_BLOOD' in materials and not 'FECES' in materials and not 'BUFFY_COAT' in materials and not 'NASAL_SWAB' in materials and not 'THROAT_SWAB' in materials:
 					warnings.append(DataCheckWarning(make_check_id(self, "MaterialsSuspect"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Supect material types: existing COVID-19 collection does not have any of the common material types: DNA, PATHOGEN, PERIPHERAL_BLOOD_CELLS, PLASMA, RNA, SALIVA, SERUM, WHOLE_BLOOD, FECES, BUFFY_COAT, NASAL_SWAB, THROAT_SWAB"))
-				if 'NASAL_SWAB' in materials or 'THROAT_SWAB' in materials or 'FECES' in materials and not ('BSL2' in biobank_covid or 'BSL3' in biobank_covid):
+				if ('NASAL_SWAB' in materials or 'THROAT_SWAB' in materials or 'FECES' in materials) and not ('BSL2' in biobank_covid or 'BSL3' in biobank_covid):
 					warnings.append(DataCheckWarning(make_check_id(self, "BslFlagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Suspect situation: collection contains infectious material (nasal/throat swabs, faeces) while the parent biobank does not indicate BSL2 nor BSL3 available"))
 				if not covid_diag:
 					warnings.append(DataCheckWarning(make_check_id(self, "CovidDiagMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "COVID19 collection misses COVID-19 diagnosis filled in", fix_proposals=[
@@ -368,6 +366,9 @@ class COVID(IPlugin):
 
 		for biobank in dir.getBiobanks():
 			biobank_covid = []
+			if 'covid19biobank' in biobank:
+				for c in biobank['covid19biobank']:
+					biobank_covid.append(c['id'])
 			biobank_capabilities = []
 			if 'capabilities' in biobank:
 				for c in biobank['capabilities']:

@@ -102,11 +102,12 @@ for collection in dir.getCollections():
     covid_prospective = False
     non_covid = False
 
-    for d in collection['diagnosis_available']:
-        if re.search('-', d['id']):
-            diag_ranges.append(d['id'])
-        else:
-            diags.append(d['id'])
+    if 'diagnosis_available' in collection:
+        for d in collection['diagnosis_available']:
+            if re.search('-', d['id']):
+                diag_ranges.append(d['id'])
+            else:
+                diags.append(d['id'])
 
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))

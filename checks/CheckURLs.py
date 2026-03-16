@@ -1,6 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
 from typing import List
+import copy
 import re
 import urllib
 import pprint
@@ -28,7 +29,7 @@ def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWar
 	global cache
 
 	if(URL in cache):
-		(warnings, logString) = cache[URL]
+		(warnings, logString) = copy.deepcopy(cache[URL])
 	else:
 		if(not re.search('^(http|https):', URL, re.IGNORECASE)):
 			URLErrorWarning.message += ' (' + URL + ') does not start with http or https'

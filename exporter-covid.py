@@ -251,7 +251,7 @@ if not args.nostdout:
     print("- total number of samples advertised in COVID-only collections including OoM estimates: %d"%(covidOnlyCollectionSamplesIncOoM))
     print("- total number of samples advertised in COVID-relevant collections including OoM estimates: %d"%(covidCollectionSamplesIncOoM))
 
-for df in (pd_covidExistingDiagnosed,pd_covidProspective,pd_covidOther):
+for df in (pd_covidExistingDiagnosed,pd_covidExistingControls,pd_covidProspective,pd_covidOther):
     pddfutils.tidyCollectionDf(df)
 
 covidOnlyCollectionIDs = [c['id'] for c in covidOnlyExistingDiagnosed]
