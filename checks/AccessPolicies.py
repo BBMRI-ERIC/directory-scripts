@@ -342,9 +342,9 @@ class AccessPolicies(IPlugin):
 
 			for attributes,negative_DUO_term in [(['collaboration_commercial'], 'DUO:0000018')]:
 				if any((x in collection and collection[x] == True) for x in attributes) and negative_DUO_term in DUOs:
-					warnings.append(DataCheckWarning(make_check_id(self, "CollDuoConflict"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"At least one of {attributes} specified on collection level but conflicting '{DUO_term}' is specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term)}"))
+					warnings.append(DataCheckWarning(make_check_id(self, "CollDuoConflict"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"At least one of {attributes} specified on collection level but conflicting '{negative_DUO_term}' is specified in data_use attribute. DUO documentation available at {DUOs_to_url(negative_DUO_term)}"))
 				elif any((x not in collection and x in biobank and biobank[x] == True) for x in attributes) and negative_DUO_term in DUOs:
-					warnings.append(DataCheckWarning(make_check_id(self, "BBAttrDuoConflict"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"At least one of {attributes} specified on biobank level and not overridden on collection but conflicting '{DUO_term}' is specified in data_use attribute. DUO documentation available at {DUOs_to_url(DUO_term)}"))
+					warnings.append(DataCheckWarning(make_check_id(self, "BBAttrDuoConflict"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"At least one of {attributes} specified on biobank level and not overridden on collection but conflicting '{negative_DUO_term}' is specified in data_use attribute. DUO documentation available at {DUOs_to_url(negative_DUO_term)}"))
 
 			# DUO term DUO:0000007 is potentially relevant for DISEASE_SPECIFIC collections
 			DUO_term_disease_specific = 'DUO:0000007'
