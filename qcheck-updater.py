@@ -39,11 +39,15 @@ DEFAULT_USERNAME = os.getenv("DIRECTORYUSERNAME")
 DEFAULT_PASSWORD = os.getenv("DIRECTORYPASSWORD")
 DEFAULT_TOKEN = os.getenv("DIRECTORYTOKEN")
 
-MULTI_VALUE_FIELDS = {"data_use", "type", "diagnosis_available", "materials", "sex"}
+MULTI_VALUE_FIELDS = {"data_use", "type", "diagnosis_available", "materials", "sex", "network"}
 INTEGER_FIELDS = {"age_low", "age_high", "size", "number_of_donors"}
-SUPPORTED_ENTITY_TYPES = {"COLLECTION"}
+SUPPORTED_ENTITY_TYPES = {"COLLECTION", "BIOBANK"}
 FACT_ROW_DELETE_FIELD = "facts"
 FACT_ROW_DELETE_MODE = "delete_rows"
+ENTITY_TABLES = {
+    "BIOBANK": "Biobanks",
+    "COLLECTION": "Collections",
+}
 
 EXIT_OK = 0
 EXIT_RUNTIME_ERROR = 1
@@ -296,7 +300,7 @@ def _entity_ids_for_root(directory: Directory, root_id: str) -> set[str]:
         return descendants | {collection["id"]}
     biobank = directory.getBiobankById(root_id, raise_on_missing=True)
     graph = directory.getGraphBiobankCollectionsFromBiobank(biobank["id"])
-    return set(graph.nodes())
+    return set(graph.nodes()) | {biobank["id"]}
 
 
 def _filter_updates(args: argparse.Namespace, payload: dict, directory: Directory | None) -> list[EntityFixProposal]:
@@ -653,15 +657,26 @@ def _review_updates_interactively(
     return approved_updates
 
 
-def _fetch_target_rows(session: DirectorySession, schema: str, entity_ids: list[str]) -> tuple[pd.DataFrame, dict[str, dict]]:
+def _fetch_target_rows(
+    session: DirectorySession,
+    schema: str,
+    *,
+    entity_type: str,
+    entity_ids: list[str],
+) -> tuple[pd.DataFrame, dict[str, dict]]:
     if not entity_ids:
         return pd.DataFrame(), {}
-    table_df = session.get(table="Collections", schema=schema, as_df=True)
+    table_name = ENTITY_TABLES.get(entity_type)
+    if not table_name:
+        raise InputError(f"Unsupported entity type {entity_type!r} for row fetching.")
+    table_df = session.get(table=table_name, schema=schema, as_df=True)
     rows = {}
     for entity_id in entity_ids:
         row_df = table_df[table_df["id"].astype(str) == entity_id]
         if row_df.empty:
-            raise InputError(f"Collection {entity_id!r} does not exist in schema {schema!r}; no update was applied.")
+            raise InputError(
+                f"{entity_type.title()} {entity_id!r} does not exist in schema {schema!r}; no update was applied."
+            )
         rows[entity_id] = row_df.iloc[0].to_dict()
     return table_df, rows
 
@@ -727,7 +742,7 @@ def _apply_update_to_row(row: dict, update: EntityFixProposal) -> dict:
         return updated
     if update.mode in {"set", "replace", "enable_flag", "disable_flag"}:
         value = update.proposed_value
-        updated[update.field] = "" if value is None else str(value)
+        updated[update.field] = "" if value is None else value
         return updated
     raise InputError(f"Unsupported scalar update mode {update.mode!r} for field {update.field!r}.")
 
@@ -768,7 +783,7 @@ def run_updater(args: argparse.Namespace) -> int:
     if unsupported:
         unsupported_ids = ", ".join(sorted({f"{update.entity_type}:{update.entity_id}" for update in unsupported}))
         raise InputError(
-            "The current updater implementation supports collection-targeted updates only. Unsupported selected updates: "
+            "The current updater implementation supports biobank-targeted and collection-targeted updates only. Unsupported selected updates: "
             + unsupported_ids
         )
 
@@ -794,10 +809,24 @@ def run_updater(args: argparse.Namespace) -> int:
             for update in merged_updates
             if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD
         ]
-        collection_updates = [update for update in merged_updates if update not in fact_row_updates]
+        non_fact_updates = [update for update in merged_updates if update not in fact_row_updates]
+        biobank_updates = [update for update in non_fact_updates if update.entity_type == "BIOBANK"]
+        collection_updates = [update for update in non_fact_updates if update.entity_type == "COLLECTION"]
 
+        biobank_entity_ids = sorted({update.entity_id for update in biobank_updates})
+        biobanks_df, live_biobank_rows = _fetch_target_rows(
+            session,
+            args.schema,
+            entity_type="BIOBANK",
+            entity_ids=biobank_entity_ids,
+        )
         collection_entity_ids = sorted({update.entity_id for update in collection_updates})
-        table_df, live_rows = _fetch_target_rows(session, args.schema, collection_entity_ids)
+        collections_df, live_collection_rows = _fetch_target_rows(
+            session,
+            args.schema,
+            entity_type="COLLECTION",
+            entity_ids=collection_entity_ids,
+        )
 
         fact_collection_ids = sorted({update.entity_id for update in fact_row_updates})
         collection_facts_df, live_fact_ids_by_collection = _fetch_collection_fact_ids(
@@ -812,10 +841,12 @@ def run_updater(args: argparse.Namespace) -> int:
                     update.field,
                     live_fact_ids_by_collection.get(update.entity_id, []),
                 )
-            row = live_rows.get(update.entity_id)
+            row = live_collection_rows.get(update.entity_id)
+            if row is None:
+                row = live_biobank_rows.get(update.entity_id)
             if row is None:
                 raise InputError(
-                    f"Collection {update.entity_id!r} does not exist in schema {args.schema!r}; no update was applied."
+                    f"{update.entity_type.title()} {update.entity_id!r} does not exist in schema {args.schema!r}; no update was applied."
                 )
             return _normalize_live_row_value(row, update.field)
 
@@ -887,7 +918,9 @@ def run_updater(args: argparse.Namespace) -> int:
             return EXIT_OK
 
         changed_collection_ids = set()
-        changed_rows_by_id: dict[str, dict] = {}
+        changed_biobank_ids = set()
+        changed_collection_rows_by_id: dict[str, dict] = {}
+        changed_biobank_rows_by_id: dict[str, dict] = {}
         fact_rows_to_delete: set[str] = set()
         for update in updated_rows:
             if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
@@ -896,26 +929,45 @@ def run_updater(args: argparse.Namespace) -> int:
                     if fact_id in live_ids:
                         fact_rows_to_delete.add(fact_id)
                 continue
-            current_row = live_rows[update.entity_id]
+            if update.entity_type == "BIOBANK":
+                current_row = live_biobank_rows[update.entity_id]
+            else:
+                current_row = live_collection_rows[update.entity_id]
             next_row = _apply_update_to_row(current_row, update)
             if next_row == current_row:
                 continue
-            live_rows[update.entity_id] = next_row
-            changed_collection_ids.add(update.entity_id)
-            changed_rows_by_id[update.entity_id] = next_row
+            if update.entity_type == "BIOBANK":
+                live_biobank_rows[update.entity_id] = next_row
+                changed_biobank_ids.add(update.entity_id)
+                changed_biobank_rows_by_id[update.entity_id] = next_row
+            else:
+                live_collection_rows[update.entity_id] = next_row
+                changed_collection_ids.add(update.entity_id)
+                changed_collection_rows_by_id[update.entity_id] = next_row
 
-        if not changed_collection_ids and not fact_rows_to_delete:
+        if not changed_biobank_ids and not changed_collection_ids and not fact_rows_to_delete:
             logging.info("All approved updates were no-ops against the live data. Nothing was written.")
             return EXIT_OK
+
+        if changed_biobank_ids:
+            changed_biobank_rows = pd.DataFrame(
+                [
+                    {column: changed_biobank_rows_by_id[row_id].get(column) for column in biobanks_df.columns}
+                    for row_id in biobanks_df["id"].astype(str)
+                    if row_id in changed_biobank_ids
+                ],
+                columns=biobanks_df.columns,
+            )
+            session.save_table(table="Biobanks", schema=args.schema, data=changed_biobank_rows)
 
         if changed_collection_ids:
             changed_rows = pd.DataFrame(
                 [
-                    {column: changed_rows_by_id[row_id].get(column) for column in table_df.columns}
-                    for row_id in table_df["id"].astype(str)
+                    {column: changed_collection_rows_by_id[row_id].get(column) for column in collections_df.columns}
+                    for row_id in collections_df["id"].astype(str)
                     if row_id in changed_collection_ids
                 ],
-                columns=table_df.columns,
+                columns=collections_df.columns,
             )
             session.save_table(table="Collections", schema=args.schema, data=changed_rows)
 
@@ -927,8 +979,9 @@ def run_updater(args: argparse.Namespace) -> int:
             session.delete_records(table="CollectionFacts", schema=args.schema, data=delete_df)
 
         logging.info(
-            "Applied %d update(s): %d collection change(s), %d fact row deletion(s), in schema %s.",
+            "Applied %d update(s): %d biobank change(s), %d collection change(s), %d fact row deletion(s), in schema %s.",
             len(updated_rows),
+            len(changed_biobank_ids),
             len(changed_collection_ids),
             len(fact_rows_to_delete),
             args.schema,

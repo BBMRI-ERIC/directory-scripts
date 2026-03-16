@@ -1,0 +1,657 @@
+{
+  "survey": {
+    "file": "Content_Export_SO2_2025_20260313.xlsx",
+    "sheet": "Content",
+    "header_row": 4,
+    "alias": "SO2_2025",
+    "purpose": "Map SO2 Datafication survey responses to comparable BBMRI Directory entities/fields for analysis and possible update-plan generation."
+  },
+  "mapping_version": 1,
+  "generated_on": "2026-03-13",
+  "notes": [
+    "The survey is mostly institution/biobank-level, while the Directory stores both biobank-level and collection-level metadata. Mappings therefore mix exact field comparisons with aggregate/coverage comparisons.",
+    "BiobankID is the primary anchor. CollectionID list is a scope restriction below the mapped biobank, not a separate row-level primary anchor in the current data export.",
+    "Only mappings marked update_support='current_qcheck' are intended to be safely transformable into qcheck-updater plans without extending qcheck-updater itself.",
+    "Institution-level matching should explicitly distinguish exact-ID matches, certain institution-name matches, approximate institution-name matches, and respondents that are entirely missing from the Directory."
+  ],
+  "entity_resolution": [
+    {
+      "resolution_id": "anchor.biobank_id",
+      "survey_field": "BiobankID in the Directory (if available)",
+      "directory_target": {
+        "entity": "BIOBANK",
+        "field": "id"
+      },
+      "relation_type": "exact_identifier",
+      "reliability": "high",
+      "why_relevant": "This is the strongest row-to-Directory anchor and should drive matching whenever present.",
+      "normalization": [
+        "trim whitespace",
+        "preserve case",
+        "exact string match"
+      ],
+      "required_for_updates": true
+    },
+    {
+      "resolution_id": "anchor.collection_ids",
+      "survey_field": "List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)",
+      "directory_target": {
+        "entity": "COLLECTION",
+        "field": "id"
+      },
+      "relation_type": "exact_identifier_list",
+      "reliability": "high",
+      "why_relevant": "When present, the listed collections define the survey scope within the mapped biobank.",
+      "normalization": [
+        "split on ';'",
+        "trim whitespace",
+        "drop empty items",
+        "exact string match"
+      ],
+      "required_for_updates": false
+    },
+    {
+      "resolution_id": "fallback.contact_email",
+      "survey_field": "E-Mail address",
+      "directory_target": {
+        "entity": "CONTACT",
+        "field": "email"
+      },
+      "relation_type": "probable_unique_key",
+      "reliability": "medium",
+      "why_relevant": "Useful only as a fallback for analysis when no explicit Directory IDs are provided; not safe enough for automated updates by itself.",
+      "normalization": [
+        "lowercase",
+        "trim whitespace"
+      ],
+      "required_for_updates": false
+    },
+    {
+      "resolution_id": "anchor.institution_name_certain",
+      "survey_field": "Name of Institution",
+      "directory_target": {
+        "entity": "BIOBANK",
+        "field": "name"
+      },
+      "relation_type": "institution_name_certain_match",
+      "reliability": "medium",
+      "why_relevant": "When the normalized institution name matches one Directory biobank unambiguously, the row can be treated as certainly mapped for analysis. This should still be recorded as institution-name-based rather than ID-based resolution.",
+      "normalization": [
+        "casefold",
+        "collapse whitespace",
+        "strip punctuation",
+        "normalize common university/medical-center abbreviations where curated in the mapping JSON"
+      ],
+      "required_for_updates": false
+    },
+    {
+      "resolution_id": "anchor.institution_name_approximate",
+      "survey_field": "Name of Institution",
+      "directory_target": {
+        "entity": "BIOBANK",
+        "field": "name"
+      },
+      "relation_type": "institution_name_approximate_match",
+      "reliability": "low",
+      "why_relevant": "When no exact institution-name match exists, the tool may still propose approximate candidates for human review. These matches are analysis-only and must never drive automatic updates.",
+      "normalization": [
+        "casefold",
+        "collapse whitespace",
+        "strip punctuation"
+      ],
+      "required_for_updates": false
+    }
+  ],
+  "field_mappings": [
+    {
+      "mapping_id": "contact.full_name",
+      "survey_field": "Name",
+      "directory_targets": [
+        {
+          "entity": "CONTACT",
+          "field": "full_name"
+        }
+      ],
+      "relation_type": "exact_or_normalized_text",
+      "reliability": "medium",
+      "why_relevant": "Survey respondent identity can be compared with the linked Directory contact when the row is anchored to a specific biobank/collection contact.",
+      "comparison_mode": "normalized_text",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "contact.role",
+      "survey_field": "Role",
+      "directory_targets": [
+        {
+          "entity": "CONTACT",
+          "field": "role"
+        }
+      ],
+      "relation_type": "normalized_text",
+      "reliability": "low",
+      "why_relevant": "Potential contact-role consistency signal, but free-text role labels differ widely and should stay advisory only.",
+      "comparison_mode": "normalized_text_contains",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "contact.email",
+      "survey_field": "E-Mail address",
+      "directory_targets": [
+        {
+          "entity": "CONTACT",
+          "field": "email"
+        }
+      ],
+      "relation_type": "exact_field",
+      "reliability": "high",
+      "why_relevant": "Email is the most reliable contact-level comparison when a row resolves to one Directory contact.",
+      "comparison_mode": "casefold_exact",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "biobank.name",
+      "survey_field": "Name of Institution",
+      "directory_targets": [
+        {
+          "entity": "BIOBANK",
+          "field": "name"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "biobank_label"
+        }
+      ],
+      "relation_type": "normalized_text",
+      "reliability": "medium",
+      "why_relevant": "Institution/biobank naming is one of the main consistency checks for whether the survey row is anchored to the right Directory biobank.",
+      "comparison_mode": "normalized_text",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "geo.country",
+      "survey_field": "Country",
+      "directory_targets": [
+        {
+          "entity": "BIOBANK",
+          "field": "country"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "country"
+        }
+      ],
+      "relation_type": "exact_field",
+      "reliability": "high",
+      "why_relevant": "Country is directly comparable and can also detect obvious row-to-biobank mismatches.",
+      "comparison_mode": "normalized_country",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "promotion.partnership_interest",
+      "survey_fields": [
+        "Are you interested in promoting your biobank resources to new partners?",
+        "Are you interested in promoting your biobank resources to new research or industry partners?"
+      ],
+      "directory_targets": [
+        {
+          "entity": "BIOBANK",
+          "field": "collaboration_non_for_profit"
+        },
+        {
+          "entity": "BIOBANK",
+          "field": "collaboration_commercial"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "collaboration_non_for_profit"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "collaboration_commercial"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "commercial_use"
+        }
+      ],
+      "relation_type": "derived_policy_mapping",
+      "reliability": "low",
+      "why_relevant": "The survey captures willingness to promote resources to academic and/or industrial partners, which is directionally related to Directory collaboration/commercial access flags but not semantically identical.",
+      "comparison_mode": "derived_boolean_profile",
+      "update_support": "plausible_only"
+    },
+    {
+      "mapping_id": "sample_types.materials",
+      "survey_fields": [
+        "Which types of samples do you manage?",
+        "Sample types"
+      ],
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "materials"
+        }
+      ],
+      "relation_type": "controlled_vocabulary_mapping",
+      "reliability": "medium",
+      "why_relevant": "Survey sample-type selections are the clearest structured source for comparing Directory collection materials; free-text refinements can add coverage notes.",
+      "comparison_mode": "set_overlap_with_manual_value_map",
+      "update_support": "current_qcheck",
+      "value_map_id": "sample_types_to_materials"
+    },
+    {
+      "mapping_id": "biobank_size.samples",
+      "survey_field": "What is the approximate size of your biobank (number of samples aliquots)?",
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "size"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "order_of_magnitude"
+        }
+      ],
+      "relation_type": "aggregate_numeric_comparison",
+      "reliability": "medium",
+      "why_relevant": "The survey gives a biobank-level approximate sample count, while the Directory holds collection-level exact sizes or order-of-magnitude buckets. The tool should compare aggregates and coverage, not single fields.",
+      "comparison_mode": "aggregate_sum_and_bucket_compare",
+      "update_support": "plausible_only"
+    },
+    {
+      "mapping_id": "directory_representativity",
+      "survey_fields": [
+        "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)",
+        "Why are the collections not representative?"
+      ],
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "materials"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "size"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "order_of_magnitude"
+        }
+      ],
+      "relation_type": "survey_assertion_vs_directory_coverage",
+      "reliability": "medium",
+      "why_relevant": "This survey answer is an explicit self-assessment of whether current Directory content is representative. It should drive dedicated findings comparing survey claims with observed material/count coverage.",
+      "comparison_mode": "assertion_vs_aggregate_coverage",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "imaging.wsi_presence",
+      "survey_fields": [
+        "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?",
+        "You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):"
+      ],
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "type"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "data_categories"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "image_dataset_type"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "description"
+        }
+      ],
+      "relation_type": "derived_presence_and_text_support",
+      "reliability": "medium",
+      "why_relevant": "A positive survey answer indicates image-bearing collections should likely advertise IMAGE / IMAGING_DATA and related imaging metadata in the Directory. There is no WSI-specific structured field in the current Directory model, so WSI consistency must be inferred from generic imaging fields and unstructured descriptions only.",
+      "comparison_mode": "generic_imaging_presence_plus_text_review",
+      "update_support": "current_qcheck"
+    },
+    {
+      "mapping_id": "imaging.radiology_presence",
+      "survey_fields": [
+        "Does your biobank provide access to radiology datasets?",
+        "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):"
+      ],
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "type"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "data_categories"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "imaging_modality"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "description"
+        }
+      ],
+      "relation_type": "derived_presence_and_text_support",
+      "reliability": "medium",
+      "why_relevant": "A positive survey answer suggests at least one mapped collection should expose IMAGE / IMAGING_DATA and likely an imaging modality.",
+      "comparison_mode": "presence_plus_text_review",
+      "update_support": "current_qcheck"
+    },
+    {
+      "mapping_id": "imaging.other_presence",
+      "survey_fields": [
+        "Does your biobank provide access to other imaging datasets?",
+        "You can provide more information about other available imaging data here (e.g., focus of the collections, more details on modalities):"
+      ],
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "type"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "data_categories"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "description"
+        }
+      ],
+      "relation_type": "derived_presence_and_text_support",
+      "reliability": "low",
+      "why_relevant": "The survey distinguishes other imaging at a biobank level, but the Directory may only expose it through collection descriptions unless dedicated imaging fields are present.",
+      "comparison_mode": "presence_plus_text_review",
+      "update_support": "plausible_only"
+    },
+    {
+      "mapping_id": "research_field.free_text",
+      "survey_fields": [
+        "What field of research does your biobank or biomolecular resource support? (Select all that apply)",
+        "Research field"
+      ],
+      "directory_targets": [
+        {
+          "entity": "BIOBANK",
+          "field": "description"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "description"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "keywords"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "type"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "data_categories"
+        }
+      ],
+      "relation_type": "topic_overlap",
+      "reliability": "low",
+      "why_relevant": "Research-field answers may expose missing or contradictory thematic descriptors, but the Directory has no direct structured research-field field.",
+      "comparison_mode": "manual_or_ai_text_review",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "returned_data.policy",
+      "survey_fields": [
+        "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?",
+        "Please describe your policy or workflow for returned data provide a link:"
+      ],
+      "directory_targets": [
+        {
+          "entity": "COLLECTION",
+          "field": "access_description"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "access_uri"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "license"
+        }
+      ],
+      "relation_type": "conceptual_policy_overlap",
+      "reliability": "low",
+      "why_relevant": "Returned-data workflows are related to collection governance, but the current Directory access fields are broader and not specific to returned-data handling.",
+      "comparison_mode": "manual_review_only",
+      "update_support": "none"
+    },
+    {
+      "mapping_id": "network.membership",
+      "survey_field": "Biobank network",
+      "directory_targets": [
+        {
+          "entity": "BIOBANK",
+          "field": "network"
+        },
+        {
+          "entity": "COLLECTION",
+          "field": "network"
+        }
+      ],
+      "relation_type": "normalized_membership_list",
+      "reliability": "medium",
+      "why_relevant": "If filled, survey network membership can be compared with Directory network links, but vocabulary normalization will likely require human curation.",
+      "comparison_mode": "normalized_list_overlap",
+      "update_support": "none"
+    }
+  ],
+  "value_maps": {
+    "sample_types_to_materials": {
+      "Whole Blood": [
+        "WHOLE_BLOOD"
+      ],
+      "Blood derivatives": [
+        "PLASMA",
+        "SERUM",
+        "BUFFY_COAT"
+      ],
+      "DNA/RNA": [
+        "DNA",
+        "RNA"
+      ],
+      "PBMC": [
+        "PERIPHERAL_BLOOD_CELLS"
+      ],
+      "FFPE Tissue": [
+        "TISSUE_PARAFFIN_EMBEDDED"
+      ],
+      "Fresh Frozen Tissue": [
+        "TISSUE_FROZEN"
+      ],
+      "Urine": [
+        "URINE"
+      ],
+      "Faeces": [
+        "FECES"
+      ],
+      "Saliva": [
+        "SALIVA"
+      ],
+      "CSF": [
+        "OTHER"
+      ],
+      "Liquor": [
+        "OTHER"
+      ],
+      "Bone marrow": [
+        "OTHER"
+      ],
+      "Swabs": [
+        "NASAL_SWAB",
+        "THROAT_SWAB",
+        "OTHER"
+      ],
+      "Fibroblast": [
+        "CELL_LINES",
+        "OTHER"
+      ],
+      "Linfocites": [
+        "PERIPHERAL_BLOOD_CELLS",
+        "OTHER"
+      ],
+      "Hair": [
+        "OTHER"
+      ],
+      "Nails": [
+        "OTHER"
+      ],
+      "Sputum": [
+        "OTHER"
+      ],
+      "Postmortem brain tissue": [
+        "OTHER"
+      ],
+      "Bacteria, fungi": [
+        "PATHOGEN",
+        "OTHER"
+      ],
+      "Other (please specify)": [
+        "OTHER"
+      ]
+    },
+    "survey_yes_no_to_imaging_expectation": {
+      "No": {
+        "expect_image_support": false
+      },
+      "In planning / preparation": {
+        "expect_image_support": false,
+        "note": "Planning signal only; do not treat absence from Directory as inconsistency."
+      },
+      "Yes \u2014 access to internally generated WSI data collections": {
+        "expect_image_support": true,
+        "preferred_modalities": [
+          "SM"
+        ]
+      },
+      "Yes \u2014 access to WSI data collections received via partners / consortia": {
+        "expect_image_support": true,
+        "preferred_modalities": [
+          "SM"
+        ],
+        "note": "May be represented in shared or consortium collections rather than in the local biobank only."
+      },
+      "Yes \u2014 access to internally generated radiology data collections (e.g., directly connected to a PACS system)": {
+        "expect_image_support": true
+      },
+      "Yes \u2014 access to radiology data collections received via partners / consortia": {
+        "expect_image_support": true,
+        "note": "May be represented indirectly through consortial collections."
+      },
+      "Other human imaging data": {
+        "expect_image_support": true
+      },
+      "Animal imaging data": {
+        "expect_image_support": true
+      },
+      "Other imaging data": {
+        "expect_image_support": true
+      }
+    }
+  },
+  "unmapped_survey_fields": [
+    "How many years of experience do you have in the field?",
+    "What type of institution do you work for? (Select all that apply)",
+    "Type of Institution",
+    "Is this the institution hosting a BBMRI-ERIC National or Organisational Node?",
+    "Does the organization where the Biobank is located as a service unit have dedicated personnel for biobank activities?",
+    "Please indicate which of the following activities are carried out by the dedicated biobank personnel. (Select all that apply)",
+    "Activities",
+    "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:",
+    "Standards",
+    "If you support HL7 FHIR, does your repository support the national or international exchange of data in HL7 FHIR? (Select all that apply)",
+    "What type of information system is used to run the biobank? (Select all that apply)",
+    "If there is a dedicated IT system, provide us with the product name, vendor name, and indicate if any of these products is open source.",
+    "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)",
+    "National health registries (please separate with ';' if more than 1)",
+    "International registries (please separate with ';' if more than 1)",
+    "Other data sources (please separate with ';' if more than 1)",
+    "Do you have an IT infrastructure for the repository and if yes, how is it provided and managed? (Select all that apply - e.g. you can have infrastructure provided by your institution, but you have to pay per use still)",
+    "IT infrastructure",
+    "What type of data storage systems does your repository have? (Select all that apply)",
+    "Capacity of large-scale storage for research data",
+    "Capacity of large-scale storage for healthcare data",
+    "Capacity of S3 storage",
+    "Type of storage system",
+    "Can the repository allocate computational and data storage resources to implement additional BBMRI services? (Select all that apply)",
+    "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)",
+    "Next-gen sequencing technology/vendor",
+    "Radiology imaging technology/vendor",
+    "Pathology imaging technology/vendor",
+    "Proteomics technology/vendor",
+    "Metabolomics technology/vendor",
+    "Technologies",
+    "Are you contributing or depositing data to some bigger national or international databases? (Select all that apply)",
+    "Database",
+    "Are you connected to or providing data to international or major national initiatives? (Select all that apply)",
+    "Initiative",
+    "What is the origin of the samples stored at your biobank? (Select all that apply)",
+    "Origin of samples",
+    "Are sample-related data collected in an automated way (e.g., directly from lab instruments or lab systems, without manual input)? Examples include timestamps, temperatures, processing steps, or QC metrics automatically captured by lab devices or software.",
+    "Describe the reasons for not collecting (e.g. devices do not provide the information or integration is technically difficult).",
+    "Do you track the full chain of custody of each sample and associated data (from collection to analysis for research)? (Select all that apply) This includes documenting the departments, organizations, and individuals (e.g. using coded identifiers) involved at each step, along with time points, locations, and processing or transfer events.",
+    "Are sample-related data linked to donor data in your system or on the level of your organisation?",
+    "Does your system automatically track changes made to traceability or provenance-related data (e.g. processing, handling, storage, transfers)? This refers to audit trails or version logs typically managed by a BIMS or database system",
+    "How would you rate your repository\u2019s technical readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. By \u201cdigital traceability,\u201d we mean the structured, automated, and system-supported capture and linkage of associated data (e.g. preanalytical, clinical, research-derived), enabling traceability of a sample across its full lifecycle, from collection through processing, storage, use, and data generation. This includes the use of dedicated software (e.g. BIMS/LIMS), digital metadata standards, audit trails, and secure linkage to clinical data or research data.",
+    "If you require guidance or support to implement advanced digital traceability, please briefly describe what kind (e.g., technical, legal, funding, training):",
+    "Does your QMS track processing, handling, storage, transfers of biological material and generated data?",
+    "How would you rate your biobank\u2019s Quality Management System (QMS) readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. This refers to the extent to which your QMS includes procedures, documentation, responsibilities, and controls that enable structured, auditable, and reproducible management of associated data across the sample lifecycle.",
+    "If you require guidance or support to strengthen your QMS alignment with digital traceability, please briefly describe what kind (e.g. SOP development, audits, training, templates, funding):",
+    "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)",
+    "What types of legal barriers have you faced?: Licensing restrictions",
+    "What types of legal barriers have you faced?: Lack of clarity on data ownership",
+    "What types of legal barriers have you faced?: Cross-border data sharing restrictions",
+    "If there are other legal barriers, please specify:",
+    "What organizational barriers have you encountered? (Select all that apply): Lack of data sharing agreements",
+    "What organizational barriers have you encountered? (Select all that apply): Bureaucratic delays",
+    "What organizational barriers have you encountered? (Select all that apply): Lack of contact points or unclear responsibilities",
+    "What organizational barriers have you encountered? (Select all that apply): Institutional reluctance to share data",
+    "If there are other organisational barriers, please specify:",
+    "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Local",
+    "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: National",
+    "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Europewide",
+    "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Outside Europe",
+    "Which of the following semantic issues have you experienced? (Select all that apply)",
+    "Other semantic issues",
+    "What technical challenges have you faced? (Select all that apply)",
+    "Other technical challenges",
+    "What tools do you currently use to collect/edit health data? (e.g. hospital information systems, REDCap, MS-EXCEL, SPSS etc.) Please specify:",
+    "Do you know about the BBMRI-ERIC Federated Platform?",
+    "Please specify from where:",
+    "Do you currently have sufficient IT personnel (e.g., ~0.2 FTE of a data expert or DevOps specialist) to support integration with the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more necessities)",
+    "Does your organisation have the necessary infrastructure to host and maintain a local component of the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more technical details)",
+    "Do you understand the potential advantages of being part of the BBMRI-ERIC Federated Platform?",
+    "Have data been previously returned to you?",
+    "Please, describe the data you have received as returned data already.",
+    "Have you linked the returned data with the samples from which they were derived?",
+    "How do you expect to be notified about the existence of data to be returned?",
+    "Do you store returned data? (Select all that apply)",
+    "Biobank-level strategy",
+    "Institutional strategy",
+    "Network strategy",
+    "How do you store data?",
+    "How much disk space do you currently require storing returned data overall (for all returned data altogether)?",
+    "Do you monitor the quality of the returned data?",
+    "How do you monitor the quality of the returned data?",
+    "What do you see as the main hurdles in hosting returned data?",
+    "Other hurdles",
+    "We may wish to follow up with some participants to learn more about specific practices or challenges. Would you or a colleague be open to a short follow-up interview to share your experience in more detail? If yes, please provide name and email address (optional):",
+    "If you have any additional comments, suggestions, or questions related to the survey topics, please feel free to leave them here:",
+    "Creation date",
+    "Last update"
+  ]
+}

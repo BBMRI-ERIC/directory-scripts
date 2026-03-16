@@ -239,6 +239,25 @@ python3 directory-stats.py -c DE,FR -A EXT -T CASE_CONTROL,POPULATION -N
 python3 directory-stats.py --only-withdrawn -N
 ```
 - **AI review workflow** - use the Codex skill `run-ai-checks` explicitly when you need full AI-model review of live Directory data. That workflow refreshes `ai-check-cache/` only for genuinely AI-only findings; deterministic regex/heuristic text checks already run in the normal QC pipeline via `TextConsistency`. Current AI-reviewed domains include access-governance metadata gaps, participant clinical-profile gaps, data-category gaps, and material-metadata gaps. After refreshing AI-reviewed findings, use `python3 data-check.py -N -r` to validate that the full QC path stays free of stale-cache warnings, and use `python3 data-check.py -r | rg 'AI:Curated'` to inspect the emitted cache-backed warnings themselves.  
+- **survey-so2-directory.py** - compares the SO2 Datafication survey export with Directory content using an editable survey-to-Directory mapping JSON, produces machine-readable findings, renders a standalone XeLaTeX/PDF report, and can export a qcheck-updater-compatible update plan for supported biobank/collection updates. Mapping resolution is intentionally conservative: survey rows resolve by explicit biobank ID or collection ID when available, otherwise by certain or approximate institution-name matching, or are reported as missing/ambiguous. WSI answers are analyzed only through generic imaging fields and unstructured text because the current Directory model has no dedicated WSI field. Examples:  
+```bash
+python3 survey-so2-directory.py analyze -i Content_Export_SO2_2025_20260313.xlsx -m survey-mappings/so2_2025_directory_mapping.json --objectives-mapping-file survey-mappings/so2_2025_question_to_strategic_objectives.json -o so2-findings.json --output-tex so2-report.tex --output-pdf so2-report.pdf
+
+python3 survey-so2-directory.py render-report -i so2-findings.json --output-tex so2-report.tex --output-pdf so2-report.pdf
+
+python3 survey-so2-directory.py export-update-plan -i so2-findings.json -o so2-updates.json --min-confidence almost_certain
+```
+- The survey workflow uses two editable JSON inputs:
+  - `survey-mappings/so2_2025_directory_mapping.json` for survey-to-Directory field mapping
+  - `survey-mappings/so2_2025_question_to_strategic_objectives.json` for mapping survey questions to SO2 strategic objectives from `BBMRI_Work_Programme_presentation_March_2026_SO2.pptx`
+- The PDF report now contains:
+  - a clickable table of contents on the title page followed by `\clearpage`
+  - the status-oriented findings sections
+  - a biobank-oriented summary section
+  - a strategic-objective summary section
+  - a per-strategic-objective / per-biobank subsection
+  - one appendix entry per finding type, with clickable links from the report tables/summaries
+- The main report body keeps consistent findings terse and puts repeated methodological detail into the appendix. Inconsistent/manual-review findings keep compact concrete `Survey=...; Directory=...` values to make conflicts readable without repeating long methodology text on every row.
 - **geocoding_2022.py** - generates geoJSON output from Directory data and config.  
 ```bash
 python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson
@@ -480,7 +499,7 @@ Key behavior:
   - `FT` for fact-sheet-derived diagnosis/material/sex/age/count fixes from `FactTables`
   - `TXT` for deterministic narrative-to-structure fixes from `TextConsistency`
 - semantic detail still lives in `update_id`, for example `access.duo.disease_specific_research` or `diagnoses.add.covid_acute_u07_1`
-- `qcheck-updater.py` applies collection metadata updates and can also apply fact-row deletion fixes (for example `FT:KAnonViolation`) by deleting specific `CollectionFacts` rows from the target staging area
+- `qcheck-updater.py` applies both biobank metadata updates (`Biobanks`) and collection metadata updates (`Collections`), and can also apply fact-row deletion fixes (for example `FT:KAnonViolation`) by deleting specific `CollectionFacts` rows from the target staging area
 - ontology-backed fixes carry human-readable explanations in the update plan so the reviewer can see what a term such as `DUO:...` means before approving the change
 - DUO identifiers are normalized internally, so `DUO_0000007` and `DUO:0000007` are treated as the same term during checks and update application
 - append-mode review shows both the final target value and the incremental value being added, to avoid giving the impression that a multi-value field would be replaced

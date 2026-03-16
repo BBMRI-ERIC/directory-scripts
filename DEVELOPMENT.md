@@ -304,7 +304,7 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 - Interactive review must accept `y` to apply, `n` to skip, and `i` to ignore as false positive; the ignore path writes canonical coupled suppressions for the update's source check IDs into `warning-suppressions.json` and then continues with the next update.
 - Interactive maintenance CLIs should treat Ctrl+C as a normal user abort: catch `KeyboardInterrupt` in `main()`, log a short interruption message naming the script/action, and return the script's abort/runtime exit code instead of dumping a traceback.
 - The updater is intentionally a consumer of exported QC evidence, not a second implementation of the QC logic.
-- The current updater apply path supports collection-scoped fixes: collection metadata updates in `Collections` and explicit row deletions in `CollectionFacts` (for example k-anonymity cleanup). Keep biobank/contact/network fixes out of the apply path until there is explicit support for them.
+- The current updater apply path supports both biobank-scoped and collection-scoped fixes: biobank metadata updates in `Biobanks`, collection metadata updates in `Collections`, and explicit row deletions in `CollectionFacts` (for example k-anonymity cleanup). Contact/network fixes are still out of scope until there is explicit support for them.
 - Current default QC baseline for fact-row donor k-anonymity is `k=10` (`FT:KAnonViolation`) for public aggregated data; any lower/waived threshold should be an explicitly documented exception (for example pre-anonymized source data).
 - `--list` is the non-writing inspection mode and should use the same canonical multi-value formatting as interactive review so order-only differences are not presented as live mismatches.
 - Checksums are advisory integrity markers: warn on mismatch, but keep an override path so deliberate user edits remain possible.
@@ -316,6 +316,29 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 - Ontology-backed fixes such as DUO terms must carry explanations validated against the official ontology source during development; do not improvise ontology descriptions at runtime.
 - DUO terms must be normalized across `DUO_0000000` and `DUO:0000000` forms before comparison and duplicate detection.
 - This workflow only makes sense when the staging area is the authoritative editable source. If a node imports/synchronizes data from another primary system, fix that primary source instead.
+
+### SO2 survey analysis tool
+
+- `survey-so2-directory.py` is a one-off survey-analysis CLI that still follows the repository's shared infrastructure rules:
+  - use `directory.py` for Directory access/cache/auth instead of ad hoc API calls
+  - keep the survey-to-Directory mapping in editable JSON (`survey-mappings/so2_2025_directory_mapping.json`) so humans can correct Codex-produced assumptions
+  - keep the survey-question to strategic-objective mapping in editable JSON (`survey-mappings/so2_2025_question_to_strategic_objectives.json`) so the report can aggregate findings by BBMRI SO2 objective without baking those assumptions into code
+  - generate a machine-readable findings JSON first; treat TeX/PDF rendering as a second step that can render an edited findings JSON without re-reading the survey workbook
+  - generate XeLaTeX builds in a temporary working directory and write only the designated `.tex` / `.pdf` outputs into the repository or user-selected paths
+  - prefer `latexmk -pdfxe` for PDF builds when available; fall back to direct `xelatex` only when `latexmk` is unavailable
+- Resolution logic for survey respondents is intentionally conservative:
+  - exact via biobank ID or collection ID when the survey provides them
+  - certain via institution-name match when the name maps uniquely
+  - approximate via institution-name similarity when there is no exact ID anchor
+  - unresolved/missing when the respondent does not map cleanly into the Directory
+- Do not invert the workflow by reporting every Directory biobank missing from the survey; only analyze survey respondents and their matched/missing Directory scope.
+- WSI can currently only be analyzed through generic imaging signals (`type=IMAGE`, `data_categories=IMAGING_DATA`, imaging metadata, and free text). Do not invent a fake WSI-specific structured field until the Directory schema grows one.
+- Survey-derived update plans may target both `BIOBANK` and `COLLECTION` entities; keep update generation conservative and avoid auto-writing free-text rewrites.
+- Keep the findings JSON self-contained for later rendering: it should carry any derived strategic-objective tags needed for the PDF so `render-report` can work from the JSON alone.
+- Keep repeated methodology text out of the main report body:
+  - the main report should use short issue summaries plus compact concrete values for non-consistent findings
+  - one canonical description per finding type belongs in the appendix, with clickable links from the summary/status tables
+  - `Mapping` and `Entity` cells should remain breakable enough for PDF readability (`.` / `_` for mapping IDs; `-` / `:` / `_` / `.` for entity identifiers)
 
 ### Current fix-producing module labels
 

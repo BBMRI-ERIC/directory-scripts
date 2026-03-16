@@ -1,0 +1,860 @@
+{
+  "source": {
+    "pptx": "BBMRI_Work_Programme_presentation_March_2026_SO2.pptx",
+    "generated_on": "2026-03-13",
+    "note": "Proposed mapping from SO2 survey questions to BBMRI Work Programme SO2 strategic objectives. One survey question may map to multiple strategic objectives. Empty mappings are intentionally omitted."
+  },
+  "strategic_objectives": {
+    "SO2.1": {
+      "title": "Datafication at source",
+      "description": "Assess datafication readiness at biobanks and develop practical concepts, curricula, and training for datafication at source."
+    },
+    "SO2.2": {
+      "title": "Traceability and quality management",
+      "description": "Enable reproducible research through good data traceability, provenance, and quality-management readiness."
+    },
+    "SO2.3": {
+      "title": "Interoperable connectivity with medical data ecosystems",
+      "description": "Ensure interoperable connectivity with local, national, and international medical data ecosystems, cohorts, EHDS, EOSC, and related dataspaces."
+    },
+    "SO2.4": {
+      "title": "Expand the Federated Platform",
+      "description": "Identify onboarding gaps and expand the Federated Platform, including discovery services, local components, and supporting capabilities."
+    },
+    "SO2.5": {
+      "title": "On-demand accessible data generation",
+      "description": "Enable on-demand easily accessible data generation to advance biobanking, with specific attention to WSI, digital pathology, synthetic data, and privacy-aware secondary use."
+    },
+    "SO2.6": {
+      "title": "Capacities to host result data",
+      "description": "Increase capacities to host returned/result data, including storage, workflows, quality monitoring, and operating models."
+    }
+  },
+  "question_mappings": [
+    {
+      "survey_field": "Does the organization where the Biobank is located as a service unit have dedicated personnel for biobank activities?",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Organizational capacity for datafication at source depends on dedicated biobank personnel.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Please indicate which of the following activities are carried out by the dedicated biobank personnel. (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Dedicated operational activities indicate current datafication capabilities and scope at source.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Activities",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Free-text activity details expand the datafication-at-source capability picture.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3"
+      ],
+      "rationale": "Terminology/ontology and common-model skills are core to local datafication and interoperability with wider ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Standards",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3"
+      ],
+      "rationale": "Named standards and ontologies support both source datafication and interoperability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "If you support HL7 FHIR, does your repository support the national or international exchange of data in HL7 FHIR? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "FHIR exchange directly addresses interoperable connectivity with health-data ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What type of information system is used to run the biobank? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.4"
+      ],
+      "rationale": "Core repository systems determine local datafication maturity and readiness to integrate with the Federated Platform.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "If there is a dedicated IT system, provide us with the product name, vendor name, and indicate if any of these products is open source.",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.4"
+      ],
+      "rationale": "Product/vendor specifics matter for local datafication feasibility and platform onboarding paths.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3"
+      ],
+      "rationale": "System connectivity reflects both local datafication and interoperability with external ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "National health registries (please separate with \";\" if more than 1)",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Registry integrations are a direct interoperability / ecosystem-connectivity signal.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "International registries (please separate with \";\" if more than 1)",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "International registry connectivity directly supports international data-ecosystem integration.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Other data sources (please separate with \";\" if more than 1)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3"
+      ],
+      "rationale": "Additional connected data sources reflect local datafication and interoperability breadth.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Do you have an IT infrastructure for the repository and if yes, how is it provided and managed? (Select all that apply - e.g. you can have infrastructure provided by your institution, but you have to pay per use still)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.4",
+        "SO2.6"
+      ],
+      "rationale": "Infrastructure provision underpins source datafication, federated-platform deployment, and result-data hosting.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "IT infrastructure",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.4",
+        "SO2.6"
+      ],
+      "rationale": "Infrastructure details refine readiness for datafication, platform onboarding, and hosting.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What type of data storage systems does your repository have? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.6"
+      ],
+      "rationale": "Storage architecture is relevant for operational datafication and for hosting returned/result data.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Capacity of large-scale storage for research data",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Research-data storage capacity is directly relevant to hosting returned/result data.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Capacity of large-scale storage for healthcare data",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Healthcare-data storage capacity informs hosting models and constraints for result data.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Capacity of S3 storage",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Object-storage capacity is especially relevant for scalable hosting of returned/result datasets.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Type of storage system",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Storage-system type informs feasible return-data hosting models.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Can the repository allocate computational and data storage resources to implement additional BBMRI services? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.4",
+        "SO2.6"
+      ],
+      "rationale": "Capacity to allocate resources is relevant to platform services and to hosting returned/result data.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.3",
+        "SO2.5"
+      ],
+      "rationale": "Direct access to omics/imaging technologies informs both connectivity to data ecosystems and data-generation capabilities.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Next-gen sequencing technology/vendor",
+      "strategic_objectives": [
+        "SO2.5"
+      ],
+      "rationale": "Sequencing technology access indicates on-demand data-generation capacity.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Radiology imaging technology/vendor",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Radiology imaging access is relevant both for generating imaging-linked data and for ecosystem interoperability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Pathology imaging technology/vendor",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Pathology imaging access, especially WSI, is central to SO2.5 and also relevant for interoperable imaging ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Proteomics technology/vendor",
+      "strategic_objectives": [
+        "SO2.5"
+      ],
+      "rationale": "Proteomics platforms indicate data-generation capability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Metabolomics technology/vendor",
+      "strategic_objectives": [
+        "SO2.5"
+      ],
+      "rationale": "Metabolomics platforms indicate data-generation capability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Technologies",
+      "strategic_objectives": [
+        "SO2.5"
+      ],
+      "rationale": "Free-text technologies complement the direct data-generation capability assessment.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Are you contributing or depositing data to some bigger national or international databases? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Data deposition into major databases is a direct connectivity indicator.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Database",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Named databases clarify ecosystem connectivity scope.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Are you connected to or providing data to international or major national initiatives? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Participation in large initiatives reflects interoperability and may also align with platform onboarding/discovery exposure.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Initiative",
+      "strategic_objectives": [
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Named initiatives help characterize interoperability and platform-facing integration contexts.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What is the origin of the samples stored at your biobank? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Sample-origin structure contributes to understanding source datafication and collection modeling needs.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Origin of samples",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Free-text details on sample origin expand the datafication-at-source context.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.4"
+      ],
+      "rationale": "Directory representativeness is relevant to datafication quality and to discovery-platform completeness.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Why are the collections not representative?",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.4"
+      ],
+      "rationale": "Reasons for non-representativeness inform datafication gaps and Federated Platform onboarding shortcomings.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Which types of samples do you manage?",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Managed sample types are a core source-datafication characteristic and align with Directory collection metadata.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Sample types",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Additional sample-type details refine the source-datafication picture.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What is the approximate size of your biobank (number of samples aliquots)?",
+      "strategic_objectives": [
+        "SO2.1"
+      ],
+      "rationale": "Approximate size contributes to readiness landscape and representativeness checks for datafication at source.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Are sample-related data collected in an automated way (e.g., directly from lab instruments or lab systems, without manual input)? Examples include timestamps, temperatures, processing steps, or QC metrics automatically captured by lab devices or software.",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.2"
+      ],
+      "rationale": "Automation of sample-related data capture is central both to source datafication and to traceability/provenance readiness.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Describe the reasons for not collecting (e.g. devices do not provide the information or integration is technically difficult).",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.2"
+      ],
+      "rationale": "Reasons for missing automated capture directly describe blockers for datafication and traceability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Do you track the full chain of custody of each sample and associated data (from collection to analysis for research)? (Select all that apply) This includes documenting the departments, organizations, and individuals (e.g. using coded identifiers) involved at each step, along with time points, locations, and processing or transfer events.",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "Full chain-of-custody tracking is a direct traceability/provenance question.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Are sample-related data linked to donor data in your system or on the level of your organisation?",
+      "strategic_objectives": [
+        "SO2.2",
+        "SO2.3"
+      ],
+      "rationale": "Linkage between sample and donor data supports traceability and broader ecosystem integration.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Does your system automatically track changes made to traceability or provenance-related data (e.g. processing, handling, storage, transfers)? This refers to audit trails or version logs typically managed by a BIMS or database system",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "Audit trails and provenance-change tracking are direct traceability/QM signals.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How would you rate your repository’s technical readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. By “digital traceability,” we mean the structured, automated, and system-supported capture and linkage of associated data (e.g. preanalytical, clinical, research-derived), enabling traceability of a sample across its full lifecycle, from collection through processing, storage, use, and data generation. This includes the use of dedicated software (e.g. BIMS/LIMS), digital metadata standards, audit trails, and secure linkage to clinical data or research data.",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "This is the central technical-readiness question for traceability and provenance.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "If you require guidance or support to implement advanced digital traceability, please briefly describe what kind (e.g., technical, legal, funding, training):",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "Support needs map directly to the next-step planning for traceability and provenance work.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Does your QMS track processing, handling, storage, transfers of biological material and generated data?",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "QMS coverage of handling and generated data is part of the SO2.2 quality-management objective.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How would you rate your biobank’s Quality Management System (QMS) readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. This refers to the extent to which your QMS includes procedures, documentation, responsibilities, and controls that enable structured, auditable, and reproducible management of associated data across the sample lifecycle.",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "This is the core QMS-readiness question for SO2.2.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "If you require guidance or support to strengthen your QMS alignment with digital traceability, please briefly describe what kind (e.g. SOP development, audits, training, templates, funding):",
+      "strategic_objectives": [
+        "SO2.2"
+      ],
+      "rationale": "QMS support needs directly inform SO2.2 priorities.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)",
+      "strategic_objectives": [
+        "SO2.2",
+        "SO2.3"
+      ],
+      "rationale": "Legal barriers affect both traceability/provenance work and interoperable data sharing across ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What types of legal barriers have you faced?: Licensing restrictions",
+      "strategic_objectives": [
+        "SO2.2",
+        "SO2.3"
+      ],
+      "rationale": "Licensing barriers affect provenance governance and data-ecosystem interoperability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What types of legal barriers have you faced?: Lack of clarity on data ownership",
+      "strategic_objectives": [
+        "SO2.2",
+        "SO2.3"
+      ],
+      "rationale": "Ownership uncertainty constrains both traceability governance and interoperable exchange.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What types of legal barriers have you faced?: Cross-border data sharing restrictions",
+      "strategic_objectives": [
+        "SO2.2",
+        "SO2.3"
+      ],
+      "rationale": "Cross-border restrictions are explicitly relevant to interoperable connectivity and also appear in SO2.2 barrier analysis.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "If there are other legal barriers, please specify:",
+      "strategic_objectives": [
+        "SO2.2",
+        "SO2.3"
+      ],
+      "rationale": "Other legal barriers can affect both traceability/provenance implementation and data-ecosystem connectivity.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What organizational barriers have you encountered? (Select all that apply): Lack of data sharing agreements",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Data-sharing agreements are directly relevant to ecosystem connectivity.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "What organizational barriers have you encountered? (Select all that apply): Bureaucratic delays",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Bureaucratic delays constrain ecosystem connectivity and exchange processes.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What organizational barriers have you encountered? (Select all that apply): Lack of contact points or unclear responsibilities",
+      "strategic_objectives": [
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Unclear responsibilities affect both ecosystem connectivity and onboarding into shared BBMRI platforms.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What organizational barriers have you encountered? (Select all that apply): Institutional reluctance to share data",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Institutional reluctance directly affects connectivity with data ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "If there are other organisational barriers, please specify:",
+      "strategic_objectives": [
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Additional organizational barriers may affect ecosystem connectivity and platform participation.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Local",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Collaboration quality for data sharing is directly relevant to ecosystem connectivity.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: National",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Collaboration quality for data sharing is directly relevant to ecosystem connectivity.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Europewide",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Europe-wide collaboration is directly tied to interoperable connectivity.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Outside Europe",
+      "strategic_objectives": [
+        "SO2.3"
+      ],
+      "rationale": "Global collaboration in data sharing is directly tied to interoperable connectivity.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Which of the following semantic issues have you experienced? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Semantic issues affect datafication, interoperability, and discovery-platform harmonization.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Other semantic issues",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Other semantic issues affect datafication, interoperability, and platform harmonization.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What technical challenges have you faced? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Technical challenges span local datafication, interoperability, and Federated Platform onboarding.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Other technical challenges",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3",
+        "SO2.4"
+      ],
+      "rationale": "Additional technical challenges span local datafication, interoperability, and platform onboarding.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What tools do you currently use to collect/edit health data? (e.g. hospital information systems, REDCap, MS-EXCEL, SPSS etc.) Please specify:",
+      "strategic_objectives": [
+        "SO2.1",
+        "SO2.3"
+      ],
+      "rationale": "Health-data tooling characterizes local datafication practices and interoperability opportunities.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Do you know about the BBMRI-ERIC Federated Platform?",
+      "strategic_objectives": [
+        "SO2.4"
+      ],
+      "rationale": "Awareness of the Federated Platform is directly tied to SO2.4.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Please specify from where:",
+      "strategic_objectives": [
+        "SO2.4"
+      ],
+      "rationale": "Platform-awareness source helps understand onboarding channels for SO2.4.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Are you interested in promoting your biobank resources to new research or industry partners?",
+      "strategic_objectives": [
+        "SO2.4",
+        "SO2.3"
+      ],
+      "rationale": "Promotion to external partners aligns with discovery/federated-platform visibility and wider ecosystem connectivity.",
+      "confidence": "low"
+    },
+    {
+      "survey_field": "Are you interested in promoting your biobank resources to new partners?",
+      "strategic_objectives": [
+        "SO2.4",
+        "SO2.3"
+      ],
+      "rationale": "Promotion to external partners aligns with discovery/federated-platform visibility and wider ecosystem connectivity.",
+      "confidence": "low"
+    },
+    {
+      "survey_field": "Do you currently have sufficient IT personnel (e.g., ~0.2 FTE of a data expert or DevOps specialist) to support integration with the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more necessities)",
+      "strategic_objectives": [
+        "SO2.4"
+      ],
+      "rationale": "Staff capacity for FP integration is directly in scope for SO2.4.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Does your organisation have the necessary infrastructure to host and maintain a local component of the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more technical details)",
+      "strategic_objectives": [
+        "SO2.4"
+      ],
+      "rationale": "Local FP hosting capability is directly in scope for SO2.4.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Do you understand the potential advantages of being part of the BBMRI-ERIC Federated Platform?",
+      "strategic_objectives": [
+        "SO2.4"
+      ],
+      "rationale": "Understanding the value of the FP is directly related to SO2.4 adoption.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "WSI access is central to SO2.5 and also relevant to interoperability with wider imaging ecosystems.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Digital pathology details refine WSI-related data-generation and imaging-interoperability analysis.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Does your biobank provide access to radiology datasets?",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Radiology data access informs both data-generation scope and interoperable connectivity with imaging ecosystems.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Radiology imaging details refine the same analysis.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Does your biobank provide access to other imaging datasets?",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Other imaging datasets extend data-generation and imaging-connectivity scope.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "You can provide more information about other available imaging data here (e.g., focus of the collections, more details on modalities):",
+      "strategic_objectives": [
+        "SO2.5",
+        "SO2.3"
+      ],
+      "rationale": "Other imaging details refine the same analysis.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Have data been previously returned to you?",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Returned-data experience is directly in scope for SO2.6.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Please, describe the data you have received as returned data already.",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Returned-data descriptions refine SO2.6 hosting and workflow analysis.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Have you linked the returned data with the samples from which they were derived?",
+      "strategic_objectives": [
+        "SO2.6",
+        "SO2.2"
+      ],
+      "rationale": "Linking returned data to samples is central to return-data hosting and also relevant to traceability.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Return-data policies and workflows are directly in scope for SO2.6.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Please describe your policy or workflow for returned data provide a link:",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Details on return-data workflow are directly in scope for SO2.6.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How do you expect to be notified about the existence of data to be returned?",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Notification expectations are part of return-data operating workflows.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Do you store returned data? (Select all that apply)",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Storage of returned data is the core hosting question of SO2.6.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Biobank network",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Storage/responsibility at network level is part of hosting model analysis.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Biobank-level strategy",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Biobank-level return-data strategy is part of hosting model analysis.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Institutional strategy",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Institution-level return-data strategy is part of hosting model analysis.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "Network strategy",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Network-level return-data strategy is part of hosting model analysis.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "How do you store data?",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Actual storage mode is directly relevant to result-data hosting.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "How much disk space do you currently require storing returned data overall (for all returned data altogether)?",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Return-data storage demand is directly relevant to SO2.6 capacity planning.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Do you monitor the quality of the returned data?",
+      "strategic_objectives": [
+        "SO2.6",
+        "SO2.2"
+      ],
+      "rationale": "Quality monitoring of returned data is primarily SO2.6 but also intersects with QM concerns.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "How do you monitor the quality of the returned data?",
+      "strategic_objectives": [
+        "SO2.6",
+        "SO2.2"
+      ],
+      "rationale": "Methods for quality monitoring returned data intersect hosting and QM workflows.",
+      "confidence": "medium"
+    },
+    {
+      "survey_field": "What do you see as the main hurdles in hosting returned data?",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Main hurdles in hosting returned data are directly in scope for SO2.6.",
+      "confidence": "high"
+    },
+    {
+      "survey_field": "Other hurdles",
+      "strategic_objectives": [
+        "SO2.6"
+      ],
+      "rationale": "Additional hurdles refine SO2.6 hosting analysis.",
+      "confidence": "medium"
+    }
+  ]
+}
