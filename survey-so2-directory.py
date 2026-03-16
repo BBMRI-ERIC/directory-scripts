@@ -450,6 +450,23 @@ STATUS_SECTION_INTROS = {
     ),
 }
 
+STATUS_DISPLAY_ORDER = [
+    "consistent",
+    "inconsistent",
+    "manual_review",
+    "missing_from_directory",
+    "missing_in_directory",
+    "ambiguous",
+    "ambiguous_resolution",
+    "unresolved_row",
+    "not_comparable",
+]
+
+
+def ordered_statuses(statuses: list[str]) -> list[str]:
+    order = {status: index for index, status in enumerate(STATUS_DISPLAY_ORDER)}
+    return sorted(statuses, key=lambda status: (order.get(status, len(order)), status))
+
 
 def latex_label(value: Any) -> str:
     text = "" if value is None else str(value)
@@ -2069,7 +2086,7 @@ def render_tex(report: dict[str, Any]) -> str:
                 lines.append("No biobank-level grouping is available because this objective currently has no mapped findings.")
     if grouped:
         lines.append(r"\section{Findings by Status}")
-    for status in sorted(grouped):
+    for status in ordered_statuses(list(grouped)):
         lines.append(r"\subsection{" + colored_status_text(status) + "}")
         intro = STATUS_SECTION_INTROS.get(str(status))
         if intro:

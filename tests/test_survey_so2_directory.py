@@ -1170,6 +1170,51 @@ def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_
     assert r"\textbf{Comparison method:} Map structured survey sample-type answers" in tex
 
 
+def test_findings_by_status_orders_manual_review_before_missing_from_directory():
+    module = load_module()
+    report = {
+        "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
+        "summary": {"survey_rows": 2, "resolved_rows": 0, "missing_rows": 1, "ambiguous_rows": 0, "proposed_update_findings": 0},
+        "row_resolutions": [],
+        "findings": [
+            {
+                "status": "missing_from_directory",
+                "survey_row": 7,
+                "mapping_id": "row_resolution",
+                "entity_type": "BIOBANK",
+                "entity_id": "NL_AUMCBB",
+                "explanation": "Missing.",
+                "why_relevant": "x",
+                "relation_type": "entity_resolution",
+                "reliability": "low",
+                "survey_fields": [],
+                "survey_value": {"country": "NL"},
+                "directory_value": {"matched_biobank_ids": []},
+                "proposed_update": None,
+            },
+            {
+                "status": "manual_review",
+                "survey_row": 6,
+                "mapping_id": "contact.email",
+                "entity_type": "CONTACT",
+                "entity_id": "bbmri-eric:contactID:CZ_demo_1",
+                "explanation": "Manual review.",
+                "why_relevant": "y",
+                "relation_type": "exact_field",
+                "reliability": "high",
+                "survey_fields": [],
+                "survey_value": "a",
+                "directory_value": "b",
+                "proposed_update": None,
+            },
+        ],
+    }
+    tex = module.render_tex(report)
+    assert tex.index(r"\subsection{\textcolor{soOrange}{Manual Review}}") < tex.index(
+        r"\subsection{\textcolor{soOrange}{Missing From Directory}}"
+    )
+
+
 def test_summarize_collection_scope_uses_all_collections_and_all_except():
     module = load_module()
 
