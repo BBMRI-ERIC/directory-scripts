@@ -220,15 +220,13 @@ class COVID(IPlugin):
 			covid_control = False
 
 			# TODO: Raise a warning here if needed
-			try:
+			if 'diagnosis_available' in collection:
 				for d in collection['diagnosis_available']:
 					#if re.search('-', d['id']): # EMX2 collection['diagnosis_available'] has name but not id (this applies to all times we call d in this loop)
 					if re.search('-', d['name']):
 							diag_ranges.append(d['name'])
 					else:
 							diags.append(d['name'])
-			except KeyError:
-					continue
 
 			for d in diags+diag_ranges:
 				# ICD-10
