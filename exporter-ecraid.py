@@ -60,39 +60,16 @@ for collection in dir.getCollections():
     biobankId = dir.getCollectionBiobankId(collection['id'])
     biobank = dir.getBiobankById(biobankId)
 
-    biobank_capabilities = []
-    if 'capabilities' in biobank:
-        for c in biobank['capabilities']:
-            biobank_capabilities.append(c['id'])
-    biobank_covid = []
-    if 'covid19biobank' in biobank:
-        for c in biobank['covid19biobank']:
-            biobank_covid.append(c['id'])
-    biobank_networks = []
-    if 'network' in biobank:
-        for n in biobank['network']:
-            biobank_networks.append(n['id'])
-    collection_networks = []
-    if 'network' in collection:
-        for n in collection['network']:
-            collection_networks.append(n['id'])
+    biobank_capabilities = Directory.getListOfEntityAttributeIds(biobank, 'capabilities')
+    biobank_covid = Directory.getListOfEntityAttributeIds(biobank, 'covid19biobank')
+    biobank_networks = Directory.getListOfEntityAttributeIds(biobank, 'network')
+    collection_networks = Directory.getListOfEntityAttributeIds(collection, 'network')
 
-    OoM = collection['order_of_magnitude']['id']
+    OoM = Directory.getEntityAttributeId(collection.get('order_of_magnitude'))
 
-    materials = []
-    if 'materials' in collection:
-        for m in collection['materials']:
-            materials.append(m['id'])
-    
-    data_categories = []
-    if 'data_categories' in collection:
-        for c in collection['data_categories']:
-            data_categories.append(c['id'])
-
-    types = []
-    if 'type' in collection:
-        for t in collection['type']:
-            types.append(t['id'])
+    materials = Directory.getListOfEntityAttributeIds(collection, 'materials')
+    data_categories = Directory.getListOfEntityAttributeIds(collection, 'data_categories')
+    types = Directory.getListOfEntityAttributeIds(collection, 'type')
     log.debug("Types: " + str(types))
     
     diags = []
@@ -103,11 +80,11 @@ for collection in dir.getCollections():
     non_covid = False
 
     if 'diagnosis_available' in collection:
-        for d in collection['diagnosis_available']:
-            if re.search('-', d['id']):
-                diag_ranges.append(d['id'])
+        for d in Directory.getListOfEntityAttributeIds(collection, 'diagnosis_available'):
+            if re.search('-', str(d)):
+                diag_ranges.append(d)
             else:
-                diags.append(d['id'])
+                diags.append(d)
 
     if diag_ranges:
         log.warning("There are diagnosis ranges provided for collection " + collection['id'] + ": " + str(diag_ranges))
@@ -120,13 +97,16 @@ for collection in dir.getCollections():
         ecraidPathogenCollections.append(collection)
         ecraidRelevantBiobankIds.add(biobankId)
 
-pd_ecraidBSLCollections = pd.DataFrame(ecraidBSLCollections)
-pd_ecraidPathogenCollections = pd.DataFrame(ecraidPathogenCollections)
+collection_columns = list(dir.getCollections()[0].keys()) if dir.getCollections() else []
+biobank_columns = list(dir.getBiobanks()[0].keys()) if dir.getBiobanks() else []
+
+pd_ecraidBSLCollections = pd.DataFrame(ecraidBSLCollections, columns=collection_columns)
+pd_ecraidPathogenCollections = pd.DataFrame(ecraidPathogenCollections, columns=collection_columns)
 
 ecraidRelevantBiobanks = []
 for b in ecraidRelevantBiobankIds:
     ecraidRelevantBiobanks.append(dir.getBiobankById(b))
-pd_ecraidRelevantBiobanks = pd.DataFrame(ecraidRelevantBiobanks)
+pd_ecraidRelevantBiobanks = pd.DataFrame(ecraidRelevantBiobanks, columns=biobank_columns)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
     print(headerStr + " - " + str(len(collectionList)) + " collections")
