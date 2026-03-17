@@ -378,9 +378,9 @@ class COVID(IPlugin):
 				for n in biobank['network']:
 					biobank_networks.append(n['id'])
 
-			if covidNetworkName in biobank_networks and not 'covid19' in biobank_capabilities:
+			if covidNetworkName in biobank_networks and not 'covid19' in biobank_covid:
 				warnings.append(DataCheckWarning(make_check_id(self, "BBNetNeedsAttr"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank is part of " + covidNetworkName + " but does not have covid19 among covid19biobank attributes"))
-			if 'covid19' in biobank_capabilities and not covidNetworkName in biobank_networks:
+			if 'covid19' in biobank_covid and not covidNetworkName in biobank_networks:
 				warnings.append(DataCheckWarning(make_check_id(self, "BBAttrNeedsNet"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has covid19 among covid19biobank attributes but is not part of " + covidNetworkName))
 
 			# This is a simple check if the biobank has other services than just the attribute of being a covid19 biobank
@@ -392,7 +392,7 @@ class COVID(IPlugin):
 			if 'covid19' in biobank_capabilities and not (biobank['id'] in biobankHasCovidCollection or biobank['id'] in biobankHasCovidControls or other_covid_services):
 				warnings.append(DataCheckWarning(make_check_id(self, "CapNeedsContent"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.ERROR, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has covid19 among capabilities but has no relevant services nor any collection of COVID-19 samples nor any collection of COVID-19 controls"))
 	
-			if 'ProspectiveCollections' in biobank_capabilities and not biobank['id'] in biobankHasCovidProspectiveCollection:
+			if 'ProspectiveCollections' in biobank_covid and not biobank['id'] in biobankHasCovidProspectiveCollection:
 				warnings.append(DataCheckWarning(make_check_id(self, "BBProsAttrNoColl"), "", dir.getBiobankNN(biobank['id']), DataCheckWarningLevel.WARNING, biobank['id'], DataCheckEntityType.BIOBANK, str(biobank['withdrawn']), "Biobank has ProspectiveCollections among covid19biobank attributes but has no prospective collection defined (collection ID matching '" + covidProspectiveCollectionIdPattern + "' regex pattern)"))
 
 			if biobank['id'] in biobankHasCovidProspectiveCollection and not 'ProspectiveCollections' in biobank_covid:

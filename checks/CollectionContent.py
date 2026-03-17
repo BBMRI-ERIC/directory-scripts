@@ -295,7 +295,7 @@ class CollectionContent(IPlugin):
 				warnings.append(DataCheckWarning(make_check_id(self, "TypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Collection type not provided"))
 
 			if 'size' in collection and isinstance(collection['size'], int) and OoM:
-				if OoM > 1 and collection['size'] < 10**OoM or collection['size'] > 10**(OoM+1):
+				if OoM > 1 and (collection['size'] < 10**OoM or collection['size'] > 10**(OoM+1)):
 					warnings.append(DataCheckWarning(make_check_id(self, "SizeOoMMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Size of the collection does not match its order of magnitude: size = " + str(collection['size']) + ", order of magnitude is %d (size between %d and %d)"%(OoM, 10**OoM, 10**(OoM+1))))
 
 			if OoM and OoM > 4:
@@ -398,7 +398,7 @@ class CollectionContent(IPlugin):
 			age_unit = None
 			age_units = []
 			if 'age_unit' in collection:
-				age_units = [collection['age_unit']]
+				age_units = collection['age_unit']
 				if len(age_units) > 1:
 					warnings.append(DataCheckWarning(make_check_id(self, "AgeUnitAmbiguous"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Ambiguous speification of age_unit - only one value is permitted. Provided values %s"%(age_units)))
 				elif len(age_units) == 1:
