@@ -398,7 +398,7 @@ class CollectionContent(IPlugin):
 			age_unit = None
 			age_units = []
 			if 'age_unit' in collection:
-				age_units = [collection['age_unit']]
+				age_units = collection['age_unit']
 				if len(age_units) > 1:
 					warnings.append(DataCheckWarning(make_check_id(self, "AgeUnitAmbiguous"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Ambiguous speification of age_unit - only one value is permitted. Provided values %s"%(age_units)))
 				elif len(age_units) == 1:
