@@ -6,6 +6,12 @@ from builtins import str, isinstance, len, set, int
 from typing import List
 import pandas as pd
 
+
+def _sort_by_existing_columns(df: pd.DataFrame, columns: list):
+    sort_columns = [column for column in columns if column in df]
+    if sort_columns:
+        df.sort_values(by=sort_columns, ascending=True, inplace=True)
+
 def extractContactDetails (df : pd.DataFrame):
     assert isinstance(df, pd.DataFrame)
     if 'contact' in df:
@@ -42,7 +48,7 @@ def tidyCollectionDf (df : pd.DataFrame):
         if col in df:
             df[col] = df[col].map(lambda x: ",".join([x['id']]) if isinstance(x, dict) else x)
     extractContactDetails(df)
-    df.sort_values(by=['country','id'],ascending=True,inplace=True)
+    _sort_by_existing_columns(df, ['country', 'id'])
 
 def tidyBiobankDf (df : pd.DataFrame):
     assert isinstance(df, pd.DataFrame)
@@ -58,5 +64,5 @@ def tidyBiobankDf (df : pd.DataFrame):
         if col in df:
             df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) if isinstance(x, list) else x)
     assert isinstance(df, pd.DataFrame)
-    df.sort_values(by=['country','id'],ascending=True,inplace=True)
+    _sort_by_existing_columns(df, ['country', 'id'])
             

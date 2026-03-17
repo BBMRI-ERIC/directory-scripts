@@ -21,6 +21,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - `directory.py`
   - single shared abstraction for Directory / Molgenis access
   - owns shared data retrieval, schema handling, withdrawal scoping, and graph helpers
+  - owns shared quality-information access too: new code should prefer `getBiobankQualityInfo(...)`, `getCollectionQualityInfo(...)`, `getBiobankQualityInfoWide(...)`, `getCollectionQualityInfoWide(...)`, and `getQualityStandardsOntology(...)` over ad hoc DataFrame filtering/pivoting in exporters
 - `directory_session_compat.py`
   - compatibility wrapper for write-capable Molgenis sessions
   - provides the repository-local `DirectorySession` context-manager surface on top of `molgenis_emx2_pyclient.Client`
@@ -332,6 +333,7 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
   - approximate via institution-name similarity when there is no exact ID anchor; fuzzy matching should be accent-insensitive and robust to small typos
   - unresolved/missing when the respondent does not map cleanly into the Directory
 - `directory.py` should stay cache-first for read workflows: when a complete schema snapshot is already cached, reuse it without forcing a live API session; if live refresh fails, fall back to the cached snapshot when it is complete and otherwise raise a clear runtime error.
+- The same cache-first rule applies to quality metadata: `directory.py` should backfill missing optional `QualityInfoBiobanks` / `QualityInfoCollections` tables into an otherwise-complete schema cache when live access is available, and `QualityStandards` ontology caching must be keyed by Directory base URL.
 - Do not invert the workflow by reporting every Directory biobank missing from the survey; only analyze survey respondents and their matched/missing Directory scope.
 - WSI can currently only be analyzed through generic imaging signals (`type=IMAGE`, `data_categories=IMAGING_DATA`, imaging metadata, and free text). Do not invent a fake WSI-specific structured field until the Directory schema grows one.
 - Survey-derived update plans may target both `BIOBANK` and `COLLECTION` entities; keep update generation conservative and avoid auto-writing free-text rewrites.

@@ -20,7 +20,6 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
-from molgenis_emx2_pyclient import Client
 from xlsxutils import write_xlsx_tables
 
 cachesList = ['directory']
@@ -58,43 +57,6 @@ configure_logging(args)
 ### Initialize variables
 qual_label = {}
 
-### Functions
-def reshape_quality_table(df, entity, assess_level, qualityStandardsOntology):
-    """
-    Adapt format of the quality table.
-
-    Parameters:
-        df: Input df with columns ['id', entity, 'quality_standard', assess_level]
-        entity: Header of the second column of the dataframe
-        assess_level: Name of the assess_level column
-        qualityStandardsOntology: Ontology table from Directory
-
-    Returns:
-        df: Reshaped df with one row per entity
-    """
-    # Pivot table
-    pivoted_df = df.pivot(index=['id', entity],
-                          columns='quality_standard',
-                          values=assess_level).reset_index()
-
-    # Remove ID colum
-    pivoted_df = pivoted_df.drop(columns='id')
-
-    # Remove axis name from columns
-    pivoted_df.columns.name = None
-
-    # Merge rows with the same entity
-    final_df = pivoted_df.groupby(entity, as_index=False).first()
-
-    # Reorder columns
-    final_df = final_df[[entity] + sorted(col for col in final_df.columns if col != entity)]
-
-    # Replace name by the label in Quality Standards Ontology:
-    mapping = dict(zip(qualityStandardsOntology["name"], qualityStandardsOntology["label"])) # Create mapping dict
-    final_df = final_df.rename(columns=mapping)
-
-    return final_df
-
 def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfCombinedQual : pd.DataFrame, combQualLabel : str):
     write_xlsx_tables(
         filename,
@@ -117,55 +79,27 @@ def replacebyQMvalues(df, include_headers=False):
 
     return df
 
-
-def _normalize_quality_value(value):
-    if isinstance(value, dict):
-        return value.get("id", "")
-    return value if value is not None else ""
-
-
-def _filter_quality_table(df, column_name, allowed_ids):
-    if df.empty or column_name not in df.columns:
-        return df.copy()
-    mask = df[column_name].apply(_normalize_quality_value).isin(allowed_ids)
-    return df.loc[mask].copy()
-
 #### Main
-
-# Get ontology info from Directory
-directoryURL = "https://directory.bbmri-eric.eu"
-log.info('Retrieving directory content from ' + directoryURL)
-session = Client(directoryURL, schema='DirectoryOntologies')
-
-qualityStandardsOntology = session.get(table = 'QualityStandards', as_df= True)
 
 # Get data
 dir = Directory(**build_directory_kwargs(args, pp=pp))
+qualityStandardsOntology = dir.getQualityStandardsOntology(
+    purge_cache="directory" in args.purgeCaches
+)
 
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-selected_biobank_ids = {biobank["id"] for biobank in dir.getBiobanks()}
-selected_collection_ids = {collection["id"] for collection in dir.getCollections()}
-withdrawn_biobank_ids = {
-    biobank_id for biobank_id in selected_biobank_ids if dir.isBiobankWithdrawn(biobank_id)
-}
 withdrawn_collection_ids = {
-    collection_id
-    for collection_id in selected_collection_ids
-    if dir.isCollectionWithdrawn(collection_id)
+    collection["id"]
+    for collection in dir.getCollections()
+    if dir.isCollectionWithdrawn(collection["id"])
 }
 
 ### Get combined quality info
 
 for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
-    biobankId = dir.getCollectionBiobankId(collection['id'])
-    biobank = dir.getBiobankById(biobankId)
-    
-    if 'contact' in collection:
-        collection['contact'] = dir.getContact(collection['contact']['id'])
-
     if 'combined_quality' in collection:
         qual_label[collection['id']] = collection['combined_quality']
 
@@ -186,14 +120,16 @@ combinedQualitydf = pd.DataFrame(rows, columns=columns)
 
 ### Get quality info
 
-qualBBdf = dir.getQualBB()
-qualColldf = dir.getQualColl()
-
-qualBBdf = _filter_quality_table(qualBBdf, 'biobank', selected_biobank_ids)
-qualColldf = _filter_quality_table(qualColldf, 'collection', selected_collection_ids)
-
-qualBBfinaldf = reshape_quality_table(qualBBdf, 'biobank', 'assess_level_bio', qualityStandardsOntology)
-qualCollfinaldf = reshape_quality_table(qualColldf, 'collection', 'assess_level_col', qualityStandardsOntology)
+qualBBfinaldf = dir.getBiobankQualityInfoWide(
+    scope="configured",
+    use_ontology_labels=True,
+    quality_standards_ontology=qualityStandardsOntology,
+)
+qualCollfinaldf = dir.getCollectionQualityInfoWide(
+    scope="configured",
+    use_ontology_labels=True,
+    quality_standards_ontology=qualityStandardsOntology,
+)
 
 # Replace values by those indicated by QM:
 qualBBfinaldf = replacebyQMvalues(qualBBfinaldf)
@@ -203,17 +139,15 @@ combinedQualitydf = replacebyQMvalues(combinedQualitydf, include_headers=True)
 outputExcelBiobanksCollections(args.outputXLSX[0], qualBBfinaldf, "Biobanks", qualCollfinaldf, "Collections", combinedQualitydf, "CombinedQuality")
 
 if args.outputXLSXwithdrawn is not None:
-    qualBBwithdrawndf = _filter_quality_table(
-        dir.getQualBB(), 'biobank', withdrawn_biobank_ids
+    qualBBwithdrawnfinaldf = dir.getBiobankQualityInfoWide(
+        scope="withdrawn",
+        use_ontology_labels=True,
+        quality_standards_ontology=qualityStandardsOntology,
     )
-    qualCollwithdrawndf = _filter_quality_table(
-        dir.getQualColl(), 'collection', withdrawn_collection_ids
-    )
-    qualBBwithdrawnfinaldf = reshape_quality_table(
-        qualBBwithdrawndf, 'biobank', 'assess_level_bio', qualityStandardsOntology
-    )
-    qualCollwithdrawnfinaldf = reshape_quality_table(
-        qualCollwithdrawndf, 'collection', 'assess_level_col', qualityStandardsOntology
+    qualCollwithdrawnfinaldf = dir.getCollectionQualityInfoWide(
+        scope="withdrawn",
+        use_ontology_labels=True,
+        quality_standards_ontology=qualityStandardsOntology,
     )
     qualBBwithdrawnfinaldf = replacebyQMvalues(qualBBwithdrawnfinaldf)
     qualCollwithdrawnfinaldf = replacebyQMvalues(qualCollwithdrawnfinaldf)

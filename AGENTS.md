@@ -108,6 +108,7 @@
 - For CLI help consistency, keep standard options first and in stable order: `-h`, `-v`, `-d`, then Directory auth/target options, then tool-specific options.
 - When using shared auth helpers that already reserve `-t/--token`, do not reuse `-t` for unrelated tool-specific options in the same CLI; prefer another short option and keep `README.md` examples aligned.
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
+- New code should treat `getQualColl()` / `getQualBB()` as legacy raw-table compatibility accessors only. Prefer the scope-aware `directory.py` quality API (`getCollectionQualityInfo(...)`, `getBiobankQualityInfo(...)`, `getCollectionQualityInfoWide(...)`, `getBiobankQualityInfoWide(...)`, `getQualityStandardsOntology(...)`) so withdrawn filtering, ontology labeling, offline cache reuse, and alternate Directory targets stay consistent across exporters and helper tools.
 - XLSX schema note (`exporter-negotiator-orphans.py`):
   - `nn_summary` includes “Number of biobanks without collections” (count of active biobanks with `total_collections == 0`), positioned with other biobank-related columns.
   - `biobanks_summary` includes `total_collections` and now includes active biobanks even if they have 0 collections.

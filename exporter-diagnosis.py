@@ -50,7 +50,7 @@ dir = Directory(**build_directory_kwargs(args, pp=pp))
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-orphacodes = OrphaCodes(args.orphacodesfile[0])
+orphacodes = OrphaCodes(args.orphacodesfile[0] if args.orphacodesfile is not None else None)
 
 cancerExistingDiagnosed = []
 cancerOnlyExistingDiagnosed = []

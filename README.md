@@ -211,6 +211,8 @@ python3 exporter-pediatric.py -X pediatric.xlsx
 ```
 python3 exporter-quality-label.py
 ```
+  - Reuses `directory.py` cache-first loading for both Directory data and the `QualityStandards` ontology, so offline reruns work when those caches are already populated.
+  - Supports the shared withdrawn-scope flags; `--output-xlsx-withdrawn` writes the withdrawn subset separately and requires `-w` or `--only-withdrawn`.
 
 ## Additional helper scripts
 
@@ -251,6 +253,7 @@ python3 survey-so2-directory.py export-update-plan -i so2-findings.json -o so2-u
   - `survey-mappings/so2_2025_directory_mapping.json` for survey-to-Directory field mapping
   - `survey-mappings/so2_2025_question_to_strategic_objectives.json` for mapping survey questions to SO2 strategic objectives from `BBMRI_Work_Programme_presentation_March_2026_SO2.pptx`
 - Tools that read through `directory.py` now reuse a complete schema cache offline when available; if the live Directory is unreachable and no complete cached snapshot exists, they fail with a clear user-facing error instead of a low-level network traceback.
+- Quality-aware tools also cache `DirectoryOntologies/QualityStandards` per Directory base URL and backfill missing `QualityInfoBiobanks` / `QualityInfoCollections` rows into otherwise-complete schema caches when the live Directory is reachable.
 - The PDF report now contains:
   - a clickable table of contents on the title page followed by `\clearpage`
   - the status-oriented findings sections

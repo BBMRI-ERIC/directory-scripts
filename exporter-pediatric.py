@@ -62,7 +62,7 @@ log.info(
     get_oom_upper_bound_coefficient(),
 )
 
-orphacodes = OrphaCodes(args.orphacodesfile[0])
+orphacodes = OrphaCodes(args.orphacodesfile[0] if args.orphacodesfile is not None else None)
 
 pediatricExistingDiagnosed = []
 pediatricOnlyExistingDiagnosed = []

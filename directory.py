@@ -15,6 +15,55 @@ from nncontacts import NNContacts
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
 
+
+def get_directory_ontology_table(
+    table_name: str,
+    *,
+    directory_url: Optional[str] = None,
+    purge_cache: bool = False,
+) -> pd.DataFrame:
+    """Return a cached DirectoryOntologies table, refreshing it live when needed.
+
+    Cache entries are keyed by both table name and Directory base URL so
+    alternate Directory instances do not accidentally reuse ontology rows from
+    the default public service.
+    """
+    base_url = directory_url or "https://directory.bbmri-eric.eu"
+    cache_dir = "data-check-cache/directory-DirectoryOntologies"
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+    cache = Cache(cache_dir)
+    cache_key = f"table:{base_url}:{table_name}"
+
+    try:
+        if purge_cache and cache_key in cache:
+            del cache[cache_key]
+
+        cached_value = cache.get(cache_key)
+        if isinstance(cached_value, pd.DataFrame):
+            log.info("Using cached DirectoryOntologies/%s table.", table_name)
+            return cached_value
+
+        log.info("Retrieving DirectoryOntologies/%s from %s", table_name, base_url)
+        with Client(base_url, schema="DirectoryOntologies") as session:
+            table_df = session.get(table=table_name, as_df=True)
+        cache[cache_key] = table_df
+        return table_df
+    except Exception as exc:
+        cached_value = cache.get(cache_key)
+        if isinstance(cached_value, pd.DataFrame):
+            log.warning(
+                "Unable to refresh DirectoryOntologies/%s; reusing cached copy instead: %s",
+                table_name,
+                exc,
+            )
+            return cached_value
+        raise RuntimeError(
+            f"Unable to load DirectoryOntologies table {table_name!r} and no cached copy is available."
+        ) from exc
+    finally:
+        cache.close()
+
 class Directory:
     """Access, cache, and graph-model BBMRI Directory data for downstream checks."""
 
@@ -74,6 +123,14 @@ class Directory:
             client_kwargs["token"] = token
         if self._has_complete_cached_snapshot(cache):
             self._load_cached_snapshot(cache, schema)
+            self._refresh_missing_optional_quality_tables(
+                cache=cache,
+                schema=schema,
+                client_kwargs=client_kwargs,
+                username=username,
+                password=password,
+                token=token,
+            )
         else:
             try:
                 with Client(self.__directoryURL, **client_kwargs) as session:
@@ -277,6 +334,19 @@ class Directory:
                 return cached_value
         return pd.DataFrame()
 
+    @staticmethod
+    def _get_missing_optional_quality_cache_keys(cache: Cache) -> list[tuple[str, str]]:
+        """Return missing optional quality cache keys and their live table names."""
+        quality_tables = [
+            ("quality_info_biobanks", "QualityInfoBiobanks"),
+            ("quality_info_collections", "QualityInfoCollections"),
+        ]
+        return [
+            (cache_key, table_name)
+            for cache_key, table_name in quality_tables
+            if cache_key not in cache
+        ]
+
     def _load_cached_snapshot(self, cache: Cache, schema: str) -> None:
         """Populate Directory tables from an existing cache snapshot without using the live API."""
         log.info("Using cached directory snapshot for schema %s.", schema)
@@ -306,6 +376,48 @@ class Directory:
             log.info(f'   ... retrieved {len(self.services)} services from cache')
         else:
             log.info('   ... cached snapshot has no services table; using empty list')
+
+    def _refresh_missing_optional_quality_tables(
+        self,
+        cache: Cache,
+        schema: str,
+        client_kwargs: dict[str, Any],
+        username: Optional[str],
+        password: Optional[str],
+        token: Optional[str],
+    ) -> None:
+        """Backfill missing optional quality tables without refetching the full snapshot."""
+        missing_quality_tables = self._get_missing_optional_quality_cache_keys(cache)
+        if not missing_quality_tables:
+            return
+
+        log.info(
+            "Cached snapshot for schema %s is missing optional quality tables; attempting live backfill.",
+            schema,
+        )
+        try:
+            with Client(self.__directoryURL, **client_kwargs) as session:
+                if username is not None and password is not None:
+                    log.info("Logging in to MOLGENIS with a user account.")
+                    log.debug('username: ' + username)
+                    log.debug('password: ' + password)
+                    session.signin(username, password)
+                elif token is None:
+                    log.warning("Continuing without authorization.")
+                session.set_schema(schema)
+                for cache_key, table_name in missing_quality_tables:
+                    quality_df = self._load_quality_table(session, table_name, schema)
+                    cache[cache_key] = quality_df
+                    if cache_key == "quality_info_biobanks":
+                        self.qualBBtable = quality_df
+                    elif cache_key == "quality_info_collections":
+                        self.qualColltable = quality_df
+        except Exception as exc:
+            log.warning(
+                "Unable to backfill optional quality tables for schema %s; continuing with cached snapshot: %s",
+                schema,
+                exc,
+            )
 
     def _load_live_snapshot(self, session: Client, cache: Cache, schema: str, debug: bool) -> None:
         """Populate Directory tables from the live API and cache the retrieved snapshot."""
@@ -424,6 +536,10 @@ class Directory:
         """Return the configured Directory schema/staging-area name."""
         return self.__package
 
+    def getDirectoryUrl(self) -> str:
+        """Return the configured Directory base URL."""
+        return self.__directoryURL
+
     @staticmethod
     def _is_explicitly_withdrawn(entity: Optional[dict[str, Any]]) -> bool:
         """Return whether an entity is explicitly marked as withdrawn."""
@@ -465,14 +581,199 @@ class Directory:
             biobank for biobank in self.biobanks
             if self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobank['id']))
         ]
-    
+
+    @staticmethod
+    def _normalize_quality_entity_reference(value: Any) -> str:
+        """Return a comparable entity identifier from a quality-table reference cell."""
+        if isinstance(value, dict):
+            value = value.get("id", "")
+        return str(value) if value is not None else ""
+
+    @staticmethod
+    def _filter_quality_table_by_entity_ids(
+        df: pd.DataFrame,
+        entity_column: str,
+        allowed_ids: set[str],
+    ) -> pd.DataFrame:
+        """Return only the quality rows whose entity reference matches ``allowed_ids``."""
+        if df.empty or entity_column not in df.columns:
+            return df.copy()
+        mask = df[entity_column].apply(Directory._normalize_quality_entity_reference).isin(allowed_ids)
+        return df.loc[mask].copy()
+
+    @staticmethod
+    def _reshape_quality_table(
+        df: pd.DataFrame,
+        entity_column: str,
+        assess_level_column: str,
+    ) -> pd.DataFrame:
+        """Return one wide quality row per entity from the raw quality rows."""
+        required_columns = {"id", entity_column, "quality_standard", assess_level_column}
+        missing_columns = sorted(required_columns.difference(df.columns))
+        if df.empty or missing_columns:
+            return pd.DataFrame(columns=[entity_column])
+
+        pivoted_df = df.pivot(
+            index=["id", entity_column],
+            columns="quality_standard",
+            values=assess_level_column,
+        ).reset_index()
+        pivoted_df = pivoted_df.drop(columns="id")
+        pivoted_df.columns.name = None
+        final_df = pivoted_df.groupby(entity_column, as_index=False).first()
+        return final_df[[entity_column] + sorted(col for col in final_df.columns if col != entity_column)]
+
+    @staticmethod
+    def _rename_quality_standard_columns(
+        df: pd.DataFrame,
+        quality_standards_ontology: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Rename quality-standard code columns to ontology labels when available."""
+        if df.empty:
+            return df.copy()
+        if quality_standards_ontology.empty or not {"name", "label"}.issubset(quality_standards_ontology.columns):
+            return df.copy()
+        renamed_df = df.copy()
+        mapping = {
+            row["name"]: row["label"]
+            for _, row in quality_standards_ontology.iterrows()
+            if row.get("name") not in (None, "") and row.get("label") not in (None, "")
+        }
+        return renamed_df.rename(columns=mapping)
+
+    def _resolve_quality_scope(self, scope: str) -> str:
+        """Validate and normalize a quality-table scope selector."""
+        allowed_scopes = {"configured", "active", "withdrawn", "all"}
+        if scope not in allowed_scopes:
+            raise ValueError(
+                f"Unsupported quality scope {scope!r}; expected one of {sorted(allowed_scopes)}."
+            )
+        return scope
+
+    def _get_quality_allowed_entity_ids(self, entity_type: str, scope: str) -> Optional[set[str]]:
+        """Return the entity ids visible under a given quality-table scope."""
+        scope = self._resolve_quality_scope(scope)
+        if scope == "all":
+            return None
+
+        if entity_type == "biobank":
+            entities = self.biobanks
+            configured_entities = self.getBiobanks()
+            is_withdrawn = self.isBiobankWithdrawn
+        elif entity_type == "collection":
+            entities = self.collections
+            configured_entities = self.getCollections()
+            is_withdrawn = self.isCollectionWithdrawn
+        else:
+            raise ValueError(f"Unsupported quality entity type {entity_type!r}.")
+
+        if scope == "configured":
+            return {entity["id"] for entity in configured_entities}
+
+        include_withdrawn = scope == "withdrawn"
+        return {entity["id"] for entity in entities if is_withdrawn(entity["id"]) is include_withdrawn}
+
+    def getQualityStandardsOntology(self, purge_cache: bool = False) -> pd.DataFrame:
+        """Return the cached QualityStandards ontology table for this Directory target."""
+        return get_directory_ontology_table(
+            "QualityStandards",
+            directory_url=self.__directoryURL,
+            purge_cache=purge_cache,
+        )
+
+    def getBiobankQualityInfo(self, scope: str = "configured") -> pd.DataFrame:
+        """Return biobank quality-info rows filtered by the requested scope.
+
+        Args:
+            scope: One of ``configured``, ``active``, ``withdrawn``, or ``all``.
+                ``configured`` follows this ``Directory`` instance's withdrawn
+                flags, while the explicit scopes ignore those constructor flags.
+        """
+        allowed_ids = self._get_quality_allowed_entity_ids("biobank", scope)
+        raw_df = self.qualBBtable.copy()
+        if allowed_ids is None:
+            return raw_df
+        return self._filter_quality_table_by_entity_ids(raw_df, "biobank", allowed_ids)
+
+    def getCollectionQualityInfo(self, scope: str = "configured") -> pd.DataFrame:
+        """Return collection quality-info rows filtered by the requested scope.
+
+        Args:
+            scope: One of ``configured``, ``active``, ``withdrawn``, or ``all``.
+                ``configured`` follows this ``Directory`` instance's withdrawn
+                flags, while the explicit scopes ignore those constructor flags.
+        """
+        allowed_ids = self._get_quality_allowed_entity_ids("collection", scope)
+        raw_df = self.qualColltable.copy()
+        if allowed_ids is None:
+            return raw_df
+        return self._filter_quality_table_by_entity_ids(raw_df, "collection", allowed_ids)
+
+    def getBiobankQualityInfoWide(
+        self,
+        scope: str = "configured",
+        *,
+        use_ontology_labels: bool = False,
+        purge_ontology_cache: bool = False,
+        quality_standards_ontology: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
+        """Return one wide quality-information row per biobank."""
+        quality_df = self._reshape_quality_table(
+            self.getBiobankQualityInfo(scope=scope),
+            "biobank",
+            "assess_level_bio",
+        )
+        if use_ontology_labels:
+            if quality_standards_ontology is None:
+                quality_standards_ontology = self.getQualityStandardsOntology(
+                    purge_cache=purge_ontology_cache
+                )
+            quality_df = self._rename_quality_standard_columns(
+                quality_df,
+                quality_standards_ontology,
+            )
+        return quality_df
+
+    def getCollectionQualityInfoWide(
+        self,
+        scope: str = "configured",
+        *,
+        use_ontology_labels: bool = False,
+        purge_ontology_cache: bool = False,
+        quality_standards_ontology: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
+        """Return one wide quality-information row per collection."""
+        quality_df = self._reshape_quality_table(
+            self.getCollectionQualityInfo(scope=scope),
+            "collection",
+            "assess_level_col",
+        )
+        if use_ontology_labels:
+            if quality_standards_ontology is None:
+                quality_standards_ontology = self.getQualityStandardsOntology(
+                    purge_cache=purge_ontology_cache
+                )
+            quality_df = self._rename_quality_standard_columns(
+                quality_df,
+                quality_standards_ontology,
+            )
+        return quality_df
+
     def getQualBB(self):
-        """Return the biobank quality-info table."""
-        return self.qualBBtable
-    
+        """Return the raw cached biobank quality-info table without scope filtering.
+
+        Prefer ``getBiobankQualityInfo(...)`` or
+        ``getBiobankQualityInfoWide(...)`` in new code.
+        """
+        return self.qualBBtable.copy()
+
     def getQualColl(self):
-        """Return the collection quality-info table."""
-        return self.qualColltable
+        """Return the raw cached collection quality-info table without scope filtering.
+
+        Prefer ``getCollectionQualityInfo(...)`` or
+        ``getCollectionQualityInfoWide(...)`` in new code.
+        """
+        return self.qualColltable.copy()
 
     def getBiobankById(self, biobankId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
         """Return a biobank by id.
@@ -735,9 +1036,49 @@ class Directory:
         return ""
 
     @staticmethod
+    def getEntityAttributeId(value: Any):
+        """Return the canonical identifier-like value of an entity attribute.
+
+        Args:
+            value: Attribute payload as returned by the Directory. This may be
+                a plain scalar, a dict with ``id``/``name``, or an empty value.
+
+        Returns:
+            The ``id`` value when present, otherwise ``name`` when present,
+            otherwise the scalar value itself. Empty/NaN values return ``None``.
+        """
+        if value is None:
+            return None
+        if isinstance(value, float) and pd.isna(value):
+            return None
+        if isinstance(value, dict):
+            if value.get('id') not in (None, ''):
+                return value['id']
+            if value.get('name') not in (None, ''):
+                return value['name']
+            return None
+        return value
+
+    @staticmethod
     def getListOfEntityAttributeIds(entity, key: str):
-        """Return list of `id` values from an entity attribute list."""
-        return [ element['id'] for element in entity[key] ] if key in entity else []
+        """Return normalized identifier-like values from an entity attribute list.
+
+        The Directory now exposes some ontology-backed attributes as plain
+        strings instead of ``{"id": ...}`` dicts, while some fields still use
+        dicts and diagnoses may expose only ``name``. This helper normalizes the
+        mixed representations into a single flat list.
+        """
+        if key not in entity:
+            return []
+        values = entity[key]
+        if not isinstance(values, list):
+            values = [values]
+        normalized = []
+        for value in values:
+            normalized_value = Directory.getEntityAttributeId(value)
+            if normalized_value not in (None, ''):
+                normalized.append(normalized_value)
+        return normalized
 
     @staticmethod
     def getListOfEntityAttributes(entity, key: str):

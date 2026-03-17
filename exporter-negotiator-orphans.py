@@ -39,23 +39,6 @@ def parse_email_list(raw_value):
             emails.append(item)
     return set(emails)
 
-def _normalize_quality_value(value):
-    if isinstance(value, dict):
-        return value.get('id', '')
-    return value if value is not None else ''
-
-
-def _extract_quality_values(value):
-    values = []
-    if value is None:
-        return values
-    if isinstance(value, list):
-        for item in value:
-            values.append(_normalize_quality_value(item))
-    else:
-        values.append(_normalize_quality_value(value))
-    return values
-
 
 def get_staging_area_from_id(collection_id):
     if not collection_id:
@@ -114,23 +97,23 @@ dir = Directory(**build_directory_kwargs(args, pp=pp))
 log.info('Total biobanks: ' + str(dir.getBiobanksCount()))
 log.info('Total collections: ' + str(dir.getCollectionsCount()))
 
-qual_col_df = dir.getQualColl()
+qual_col_df = dir.getCollectionQualityInfo(scope="configured")
 collection_quality_ids = set()
 if isinstance(qual_col_df, pd.DataFrame) and not qual_col_df.empty:
     if 'assess_level_col' in qual_col_df.columns and 'collection' in qual_col_df.columns:
         for _, row in qual_col_df.iterrows():
-            if _normalize_quality_value(row.get('assess_level_col')) in QUALITY_LABELS:
-                collection_id = _normalize_quality_value(row.get('collection'))
+            if Directory.getEntityAttributeId(row.get('assess_level_col')) in QUALITY_LABELS:
+                collection_id = Directory.getEntityAttributeId(row.get('collection'))
                 if collection_id:
                     collection_quality_ids.add(collection_id)
 
 biobank_quality_ids = set()
-qual_bb_df = dir.getQualBB()
+qual_bb_df = dir.getBiobankQualityInfo(scope="configured")
 if isinstance(qual_bb_df, pd.DataFrame) and not qual_bb_df.empty:
     if 'assess_level_bio' in qual_bb_df.columns and 'biobank' in qual_bb_df.columns:
         for _, row in qual_bb_df.iterrows():
-            if _normalize_quality_value(row.get('assess_level_bio')) in QUALITY_LABELS:
-                biobank_id = _normalize_quality_value(row.get('biobank'))
+            if Directory.getEntityAttributeId(row.get('assess_level_bio')) in QUALITY_LABELS:
+                biobank_id = Directory.getEntityAttributeId(row.get('biobank'))
                 if biobank_id:
                     biobank_quality_ids.add(biobank_id)
 
