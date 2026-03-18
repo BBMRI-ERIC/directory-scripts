@@ -69,18 +69,21 @@ class OrphaCodes:
 
     def orphaToIcd10(self, code : str) -> List[MappingWithType]:
         if code not in self.__orpha_to_icd10_code_map:
-            return None
+            return []
         return self.__orpha_to_icd10_code_map[code]
 
     def icd10ToOrpha(self, code : str) -> List[MappingWithType]:
         if code not in self.__icd10_to_orpha_code_map:
-            return None
+            return []
         return self.__icd10_to_orpha_code_map[code]
 
     def orphaToNamesList(self, code : str) -> List[str]:
         if code not in self.__orpha_to_name_map:
-            return None
+            return []
         return self.__orpha_to_name_map[code]
 
     def orphaToNamesString(self, code : str) -> str:
-        return ", ".join(self.orphaToNamesList(code))
+        names = self.orphaToNamesList(code)
+        if not names:
+            return code
+        return ", ".join(names)
