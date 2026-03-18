@@ -331,7 +331,7 @@ class CollectionContent(IPlugin):
 				if dir.issetOrphaCodesMapper():
 					for d in diags_icd10:
 						orpha = orphacodes.icd10ToOrpha(d)
-						if orpha is not None and len(orpha) > 0:
+						if orpha:
 							orphalist = ["%(code)s(%(name)s)/%(mapping_type)s" % {'code' : c['code'], 'name' : orphacodes.orphaToNamesString(c['code']), 'mapping_type' : c['mapping_type']} for c in orpha]
 							warnings.append(DataCheckWarning(make_check_id(self, "RDOrphaSuggest"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Consider adding following ORPHA code(s) to the RD collection - based on mapping ICD-10 code %s to ORPHA codes: %s"%(d, ",".join(orphalist))))
 

@@ -56,7 +56,7 @@ def add_orphacodes(directory_file, orphanet_file, output_file):
             diagnosis = cell_value.split(',')
             for d in diagnosis[:]:
                 orpha_codes = orphacodes.icd10ToOrpha(d.split(':')[-1])
-                if orpha_codes is not None:
+                if orpha_codes:
                     for code in orpha_codes:
                         # considering NTBT because OrphaCodes register the mapping as inverse from the Orphacode
                         if code['mapping_type'] in ('NTBT', 'E'):
