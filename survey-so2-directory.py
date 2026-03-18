@@ -31,6 +31,7 @@ from cli_common import (
 from directory import Directory
 from duo_terms import normalize_duo_term_ids
 from fix_proposals import EntityFixProposal, compute_checksum
+from oomutils import estimate_count_from_oom_or_none
 
 
 DEFAULT_MAPPING_FILE = Path("survey-mappings/so2_2025_directory_mapping.json")
@@ -120,6 +121,74 @@ INLINE_BREAK_PATTERN = re.compile(
 )
 WHOLE_IDENTIFIER_PATTERN = re.compile(r"^(?:\([A-Z]{2}\)\s+)?(?:BIOBANK|COLLECTION|CONTACT|NETWORK)\s+bbmri-eric:[A-Za-z0-9:._-]+$|^bbmri-eric:[A-Za-z0-9:._-]+$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$|^[A-Z]{2}_[A-Za-z0-9._-]+$")
 
+
+TECHNOLOGY_DIRECT_ACCESS_FIELD = "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
+TECHNOLOGY_MODALITIES = [
+    {
+        "id": "sequencing",
+        "label": "NGS",
+        "choice": "Next-gen sequencing (if yes, specify technology/vendor)",
+        "detail_field": "Next-gen sequencing technology/vendor",
+    },
+    {
+        "id": "genotyping_panels",
+        "label": "Genotyping / panels",
+        "choice": None,
+        "detail_field": "Technologies",
+    },
+    {
+        "id": "radiology",
+        "label": "Radiology imaging",
+        "choice": "Radiology imaging (if yes, specify technology/vendor)",
+        "detail_field": "Radiology imaging technology/vendor",
+    },
+    {
+        "id": "pathology",
+        "label": "Pathology imaging",
+        "choice": "Pathology imaging (if yes, specify technology/vendor)",
+        "detail_field": "Pathology imaging technology/vendor",
+    },
+    {
+        "id": "proteomics",
+        "label": "Proteomics",
+        "choice": "Proteomics (if yes, specify technology/vendor)",
+        "detail_field": "Proteomics technology/vendor",
+    },
+    {
+        "id": "metabolomics",
+        "label": "Metabolomics",
+        "choice": "Metabolomics (if yes, specify technology/vendor)",
+        "detail_field": "Metabolomics technology/vendor",
+    },
+    {
+        "id": "other_technology",
+        "label": "Other technology",
+        "choice": "Other (please specify):",
+        "detail_field": "Technologies",
+    },
+]
+TECHNOLOGY_NEGATIVE_PREFIXES = (
+    "no",
+    "none",
+    "not ",
+    "without ",
+    "i dont know",
+    "no access",
+    "no direct access",
+    "not applicable",
+    "n a",
+)
+RADIOLOGY_PRESENCE_FIELD = "Does your biobank provide access to radiology datasets?"
+PATHOLOGY_PRESENCE_FIELD = (
+    "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? "
+    "E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology "
+    "across multiple organs from non-diseased donors?"
+)
+QUESTION_DRIVEN_MODALITIES = {
+    "radiology": RADIOLOGY_PRESENCE_FIELD,
+    "pathology": PATHOLOGY_PRESENCE_FIELD,
+}
+
 FINDING_TYPE_METADATA = {
     "row_resolution": {
         "directory_fields": ["BIOBANK.id", "BIOBANK.name", "BIOBANK.country", "COLLECTION.id"],
@@ -166,6 +235,14 @@ FINDING_TYPE_METADATA = {
             "mapped collections; emit collection-level update proposals only when the survey row maps to exactly one collection."
         ),
     },
+    "biobank_size.samples": {
+        "directory_fields": ["COLLECTION.size", "COLLECTION.order_of_magnitude"],
+        "comparison_description": (
+            "Compare the survey's approximate sample-size bucket with the mapped collection scope. "
+            "Use a scope-local sum of top-level explicit collection sizes, with order-of-magnitude fallback only when an "
+            "explicit size is absent for a top-level collection in the mapped scope."
+        ),
+    },
     "imaging.wsi_presence": {
         "directory_fields": [
             "COLLECTION.type",
@@ -177,6 +254,19 @@ FINDING_TYPE_METADATA = {
         "comparison_description": (
             "The Directory has no dedicated WSI field. Compare the survey WSI answer against generic imaging support "
             "signals plus unstructured text hints only."
+        ),
+    },
+    "imaging.radiology_presence": {
+        "directory_fields": [
+            "COLLECTION.type",
+            "COLLECTION.data_categories",
+            "COLLECTION.imaging_modality",
+            "COLLECTION.description",
+        ],
+        "comparison_description": (
+            "Compare the survey radiology answer against generic imaging support plus radiology-specific modality/text hints. "
+            "When the survey scope maps to exactly one collection and no imaging metadata exists, only the generic IMAGE / "
+            "IMAGING_DATA fields are proposed automatically."
         ),
     },
 }
@@ -207,12 +297,26 @@ def build_cli() -> argparse.ArgumentParser:
     analyze.add_argument("-o", "--output-json", required=True, help="Write findings JSON to this path.")
     analyze.add_argument("--output-tex", help="Optional path for the rendered TeX report.")
     analyze.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
+    analyze.add_argument(
+        "--output-tech-upset-prefix",
+        help=(
+            "Optional output prefix; writes a technology-modality CSV matrix plus an R script "
+            "that renders UpSet and deviation plots to PDF/PNG."
+        ),
+    )
 
     render = subparsers.add_parser("render-report", help="Render TeX/PDF from an existing findings JSON file.")
     add_logging_arguments(render)
     render.add_argument("-i", "--input-json", required=True, help="Findings JSON produced by analyze.")
-    render.add_argument("--output-tex", required=True, help="Write rendered TeX to this path.")
+    render.add_argument("--output-tex", help="Optional path for the rendered TeX report; defaults next to the input JSON when rendering PDF.")
     render.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
+    render.add_argument(
+        "--output-tech-upset-prefix",
+        help=(
+            "Optional output prefix; writes a technology-modality CSV matrix plus an R script "
+            "that renders UpSet and deviation plots to PDF/PNG."
+        ),
+    )
 
     export = subparsers.add_parser("export-update-plan", help="Export qcheck-updater-compatible JSON from findings.")
     add_logging_arguments(export)
@@ -370,6 +474,392 @@ def parse_material_value(value: Any) -> list[str]:
     else:
         items = [part.strip() for part in str(value).split(",")]
     return [str(item).strip() for item in items if str(item).strip()]
+
+
+def parse_sample_size_bucket(value: Any) -> str:
+    text = cell_text(value)
+    if not text:
+        return ""
+    normalized = re.sub(r"\s+", " ", text.replace("–", "-").replace("—", "-")).strip()
+    aliases = {
+        "<500 aliquots": "< 500 aliquots",
+        "< 500": "< 500 aliquots",
+        "500-1000 aliquots": "500 - 1000 aliquots",
+        "1000-10,000 aliquots": "1000 - 10,000 aliquots",
+        "10,000-100,000 aliquots": "10,000 - 100,000 aliquots",
+        ">100,000 aliquots": "> 100,000 aliquots",
+        "> 100000 aliquots": "> 100,000 aliquots",
+    }
+    return aliases.get(normalized, normalized)
+
+
+
+def classify_sample_size_bucket(count: int | None) -> str:
+    if count is None:
+        return ""
+    if count < 500:
+        return "< 500 aliquots"
+    if count <= 1000:
+        return "500 - 1000 aliquots"
+    if count <= 10000:
+        return "1000 - 10,000 aliquots"
+    if count <= 100000:
+        return "10,000 - 100,000 aliquots"
+    return "> 100,000 aliquots"
+
+
+def is_negative_technology_detail(value: Any) -> bool:
+    normalized = normalize_text(value)
+    if not normalized:
+        return False
+    normalized_unquoted = normalized.replace('"', '')
+    if any(
+        candidate == prefix or candidate.startswith(prefix + " ")
+        for candidate in (normalized, normalized_unquoted)
+        for prefix in TECHNOLOGY_NEGATIVE_PREFIXES
+    ):
+        return True
+    return any(
+        phrase in normalized_unquoted
+        for phrase in (
+            "the answer is no",
+            "no direct access",
+            "no direct connection",
+            "no direct data access",
+            "no other direct technology connections",
+        )
+    )
+
+
+def is_genotyping_panel_detail(value: Any) -> bool:
+    normalized = normalize_text(value)
+    if not normalized or is_negative_technology_detail(value):
+        return False
+    return any(keyword in normalized for keyword in ("genotyp", "gwas", "array", "panel"))
+
+
+def classify_modality_question_answer(value: Any) -> str:
+    text = cell_text(value)
+    if not text:
+        return ""
+    if text.startswith("Yes"):
+        return "yes"
+    if text.startswith("No"):
+        return "no"
+    if text.startswith("In planning"):
+        return "planned"
+    return normalize_text(text) or "other"
+
+
+def build_technology_modality_row(row: pd.Series, row_resolution: dict[str, Any]) -> dict[str, Any]:
+    selected_choices = split_semicolon_values(get_row_value(row, TECHNOLOGY_DIRECT_ACCESS_FIELD))
+    selected_set = set(selected_choices)
+    row_payload = {
+        "survey_row": int(row_resolution["survey_row"]),
+        "institution_name": cell_text(row.get("Name of Institution")),
+        "resolution_status": str(row_resolution.get("resolution_status", "")),
+        "matched_biobank_ids": ";".join(row_resolution.get("matched_biobank_ids", [])),
+        "matched_collection_ids": ";".join(row_resolution.get("matched_collection_ids", [])),
+        "direct_access_raw": cell_text(get_row_value(row, TECHNOLOGY_DIRECT_ACCESS_FIELD)),
+        "selected_choices": ";".join(selected_choices),
+        "unknown_selected": int("I don’t know" in selected_set or "I don't know" in selected_set),
+    }
+    has_any_modality = False
+    has_any_detail = False
+    inconsistencies: list[str] = []
+    for modality in TECHNOLOGY_MODALITIES:
+        detail_text = cell_text(get_row_value(row, modality["detail_field"]))
+        selected = bool(modality["choice"] and modality["choice"] in selected_set)
+        inferred_from_detail = bool(
+            detail_text
+            and modality["id"] not in {"other_technology", "genotyping_panels"}
+            and not is_negative_technology_detail(detail_text)
+        )
+        if modality["id"] == "genotyping_panels":
+            field_present = bool(
+                "Other (please specify):" in selected_set
+                and detail_text
+                and is_genotyping_panel_detail(detail_text)
+            )
+        elif modality["id"] == "other_technology":
+            # The survey required at least one checkbox, so "Other" alone is not positive evidence.
+            field_present = bool(
+                selected
+                and detail_text
+                and not is_negative_technology_detail(detail_text)
+                and not is_genotyping_panel_detail(detail_text)
+            )
+        else:
+            field_present = bool(selected or inferred_from_detail)
+        question_field = QUESTION_DRIVEN_MODALITIES.get(modality["id"])
+        question_answer = cell_text(get_row_value(row, question_field)) if question_field else ""
+        question_state = classify_modality_question_answer(question_answer) if question_field else ""
+
+        question_present = bool(question_state == "yes")
+        if question_field and question_state in {"yes", "no", "planned"}:
+            combined_present = question_present
+        else:
+            combined_present = field_present
+        inconsistent = bool(question_state in {"yes", "no"} and field_present != question_present)
+        row_payload[modality["id"]] = int(combined_present)
+        row_payload[f"{modality['id']}_detail"] = detail_text
+        row_payload[f"{modality['id']}_selected"] = int(selected)
+        row_payload[f"{modality['id']}_detail_present"] = int(bool(detail_text))
+        row_payload[f"{modality['id']}_field_present"] = int(field_present)
+        row_payload[f"{modality['id']}_question_answer"] = question_answer
+        row_payload[f"{modality['id']}_question_state"] = question_state
+        row_payload[f"{modality['id']}_question_present"] = int(question_present)
+        row_payload[f"{modality['id']}_inconsistent"] = int(inconsistent)
+        if inconsistent:
+            inconsistencies.append(modality["id"])
+        has_any_modality = has_any_modality or combined_present
+        has_any_detail = has_any_detail or bool(detail_text)
+    row_payload["has_any_modality"] = int(has_any_modality)
+    row_payload["has_any_detail"] = int(has_any_detail)
+    row_payload["inconsistency_modalities"] = ";".join(inconsistencies)
+    return row_payload
+
+
+def build_technology_modalities_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    inconsistencies = []
+    for row in rows:
+        for modality in ("radiology", "pathology"):
+            if int(row.get(f"{modality}_inconsistent", 0)) != 1:
+                continue
+            inconsistencies.append(
+                {
+                    "survey_row": int(row.get("survey_row", 0)),
+                    "institution_name": str(row.get("institution_name", "")),
+                    "modality": modality,
+                    "field_present": bool(int(row.get(f"{modality}_field_present", 0))),
+                    "field_value": str(row.get("direct_access_raw", "")),
+                    "question_answer": str(row.get(f"{modality}_question_answer", "")),
+                    "question_state": str(row.get(f"{modality}_question_state", "")),
+                }
+            )
+    inconsistencies.sort(key=lambda item: (item["survey_row"], item["modality"], item["institution_name"]))
+    summary = {
+        "rows_considered": len(rows),
+        "rows_with_any_modality": sum(int(row.get("has_any_modality", 0)) for row in rows),
+        "rows_with_any_detail": sum(int(row.get("has_any_detail", 0)) for row in rows),
+        "rows_with_unknown_selected": sum(int(row.get("unknown_selected", 0)) for row in rows),
+        "modality_counts": {
+            modality["id"]: sum(int(row.get(modality["id"], 0)) for row in rows)
+            for modality in TECHNOLOGY_MODALITIES
+        },
+        "field_only_counts": {
+            modality["id"]: sum(int(row.get(f"{modality['id']}_field_present", 0)) for row in rows)
+            for modality in TECHNOLOGY_MODALITIES
+        },
+        "detail_counts": {
+            modality["id"]: sum(int(row.get(f"{modality['id']}_detail_present", 0)) for row in rows)
+            for modality in TECHNOLOGY_MODALITIES
+        },
+        "question_yes_counts": {
+            modality: sum(int(row.get(f"{modality}_question_present", 0)) for row in rows)
+            for modality in QUESTION_DRIVEN_MODALITIES
+        },
+        "inconsistency_counts": {
+            modality: sum(int(row.get(f"{modality}_inconsistent", 0)) for row in rows)
+            for modality in QUESTION_DRIVEN_MODALITIES
+        },
+        "inconsistencies": inconsistencies,
+    }
+    return {
+        "question_field": TECHNOLOGY_DIRECT_ACCESS_FIELD,
+        "question_driven_modalities": dict(QUESTION_DRIVEN_MODALITIES),
+        "modalities": [dict(modality) for modality in TECHNOLOGY_MODALITIES],
+        "rows": rows,
+        "summary": summary,
+    }
+
+
+def escape_r_string(value: str) -> str:
+    return value.replace(chr(92), chr(92) * 2).replace('"', chr(92) + '"')
+
+
+def build_technology_upset_r_script(
+    payload: dict[str, Any],
+    *,
+    csv_filename: str,
+    upset_pdf_filename: str,
+    upset_png_filename: str,
+    deviation_pdf_filename: str,
+    deviation_png_filename: str,
+) -> str:
+    modality_ids = [modality["id"] for modality in payload.get("modalities", [])]
+    modality_labels = {modality["id"]: modality["label"] for modality in payload.get("modalities", [])}
+    modality_ids_r = ", ".join(f'"{escape_r_string(modality_id)}"' for modality_id in modality_ids)
+    modality_labels_r = ",\n  ".join(
+        f'{modality_id} = "{escape_r_string(modality_labels[modality_id])}"'
+        for modality_id in modality_ids
+    )
+    return f'''#!/usr/bin/env Rscript
+# Auto-generated by survey-so2-directory.py
+
+required_packages <- c("readr", "dplyr", "ggplot2", "ComplexUpset", "forcats")
+missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing_packages) > 0) {{
+  stop(paste("Install required R packages before running this script:", paste(missing_packages, collapse = ", ")))
+}}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ComplexUpset)
+library(forcats)
+
+get_script_dir <- function() {{
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {{
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[[1]]))))
+  }}
+  return(getwd())
+}}
+
+script_dir <- get_script_dir()
+data_path <- file.path(script_dir, "{escape_r_string(csv_filename)}")
+upset_pdf_path <- file.path(script_dir, "{escape_r_string(upset_pdf_filename)}")
+upset_png_path <- file.path(script_dir, "{escape_r_string(upset_png_filename)}")
+deviation_pdf_path <- file.path(script_dir, "{escape_r_string(deviation_pdf_filename)}")
+deviation_png_path <- file.path(script_dir, "{escape_r_string(deviation_png_filename)}")
+
+modality_columns <- c({modality_ids_r})
+modality_labels <- c(
+  {modality_labels_r}
+)
+
+data <- readr::read_csv(data_path, show_col_types = FALSE)
+missing_columns <- setdiff(modality_columns, names(data))
+if (length(missing_columns) > 0) {{
+  stop(paste("Missing expected modality columns in CSV:", paste(missing_columns, collapse = ", ")))
+}}
+
+for (column_name in modality_columns) {{
+  data[[column_name]] <- as.logical(data[[column_name]])
+}}
+if ("has_any_modality" %in% names(data)) {{
+  data$has_any_modality <- as.logical(data$has_any_modality)
+}} else {{
+  data$has_any_modality <- apply(data[modality_columns], 1, any)
+}}
+
+plot_data <- dplyr::filter(data, .data$has_any_modality)
+if (nrow(plot_data) == 0) {{
+  stop("No survey rows advertise any technology modality; nothing to plot.")
+}}
+
+pretty_data <- plot_data
+for (column_name in modality_columns) {{
+  pretty_data[[modality_labels[[column_name]]]] <- pretty_data[[column_name]]
+}}
+pretty_columns <- unname(modality_labels)
+max_set_count <- max(vapply(pretty_columns, function(column_name) sum(pretty_data[[column_name]]), numeric(1)))
+upset_plot <- ComplexUpset::upset(
+  pretty_data,
+  pretty_columns,
+  min_size = 1,
+  width_ratio = 0.2,
+  set_sizes=(
+    upset_set_size()
+    + ggplot2::geom_text(ggplot2::aes(label=after_stat(count)), hjust=1.1, stat='count')
+    + ggplot2::expand_limits(y = max_set_count * 1.15)
+  )
+) +
+  ggplot2::labs(
+    title = "SO2 Survey Data-Generating Technology Modalities",
+    subtitle = paste0(nrow(plot_data), " survey rows with at least one modality (technology field for NGS/proteomics/metabolomics, Genotyping/panels from positive Other free text, Other only for remaining positive free-text details; dedicated radiology and WSI questions for radiology/pathology; ", nrow(data), " analyzed rows)")
+  ) +
+  ggplot2::coord_cartesian(clip = "off") +
+  ggplot2::theme(plot.margin = ggplot2::margin(5.5, 5.5, 5.5, 28))
+
+ggplot2::ggsave(upset_pdf_path, upset_plot, width = 11, height = 7)
+ggplot2::ggsave(upset_png_path, upset_plot, width = 11, height = 7, dpi = 220)
+
+intersection_key <- apply(plot_data[modality_columns], 1, function(flags) {{
+  active <- unname(modality_labels)[as.logical(flags)]
+  if (length(active) == 0) {{
+    return("<none>")
+  }}
+  paste(active, collapse = " + ")
+}})
+observed <- as.data.frame(table(intersection_key), stringsAsFactors = FALSE)
+observed <- observed[observed$Freq > 0, , drop = FALSE]
+colnames(observed) <- c("intersection", "observed")
+marginal_probabilities <- vapply(modality_columns, function(column_name) mean(plot_data[[column_name]]), numeric(1))
+expected_count <- function(intersection_label) {{
+  active_labels <- strsplit(intersection_label, " + ", fixed = TRUE)[[1]]
+  active_columns <- names(modality_labels)[match(active_labels, unname(modality_labels))]
+  probabilities <- vapply(
+    modality_columns,
+    function(column_name) if (column_name %in% active_columns) marginal_probabilities[[column_name]] else (1 - marginal_probabilities[[column_name]]),
+    numeric(1)
+  )
+  nrow(plot_data) * prod(probabilities)
+}}
+observed$expected <- vapply(observed$intersection, expected_count, numeric(1))
+observed$deviation <- observed$observed - observed$expected
+
+deviation_plot <- ggplot2::ggplot(
+  observed,
+  ggplot2::aes(x = forcats::fct_reorder(.data$intersection, .data$deviation), y = .data$deviation, fill = .data$deviation >= 0)
+) +
+  ggplot2::geom_col() +
+  ggplot2::geom_hline(yintercept = 0, color = "grey40") +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_manual(values = c("TRUE" = "#1F6F3F", "FALSE" = "#9E2A2B"), guide = "none") +
+  ggplot2::labs(
+    title = "Observed Intersection Deviation From Independence",
+    subtitle = "Positive bars mean more survey rows than expected under independent modality selection.",
+    x = "Intersection",
+    y = "Observed - expected survey rows"
+  ) +
+  ggplot2::theme_minimal(base_size = 11)
+
+ggplot2::ggsave(deviation_pdf_path, deviation_plot, width = 10, height = 7)
+ggplot2::ggsave(deviation_png_path, deviation_plot, width = 10, height = 7, dpi = 220)
+'''
+
+
+
+
+def write_technology_upset_artifacts(report: dict[str, Any], output_prefix: str | Path) -> dict[str, str]:
+    payload = report.get("technology_modalities")
+    if not isinstance(payload, dict) or not isinstance(payload.get("rows"), list):
+        raise InputError("Report JSON does not contain technology modality data for UpSet export.")
+    base_path = Path(output_prefix)
+    if base_path.suffix:
+        base_path = base_path.with_suffix("")
+    csv_path = Path(str(base_path) + "-technology-upset.csv")
+    r_path = Path(str(base_path) + "-technology-upset.R")
+    upset_pdf_path = Path(str(base_path) + "-technology-upset.pdf")
+    upset_png_path = Path(str(base_path) + "-technology-upset.png")
+    deviation_pdf_path = Path(str(base_path) + "-technology-upset-deviation.pdf")
+    deviation_png_path = Path(str(base_path) + "-technology-upset-deviation.png")
+    rows = payload.get("rows", [])
+    if not rows:
+        raise InputError("Report JSON contains no technology modality rows for UpSet export.")
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
+    r_path.write_text(
+        build_technology_upset_r_script(
+            payload,
+            csv_filename=csv_path.name,
+            upset_pdf_filename=upset_pdf_path.name,
+            upset_png_filename=upset_png_path.name,
+            deviation_pdf_filename=deviation_pdf_path.name,
+            deviation_png_filename=deviation_png_path.name,
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "csv": str(csv_path),
+        "r": str(r_path),
+        "upset_pdf": str(upset_pdf_path),
+        "upset_png": str(upset_png_path),
+        "deviation_pdf": str(deviation_pdf_path),
+        "deviation_png": str(deviation_png_path),
+    }
 
 
 def escape_latex(value: Any) -> str:
@@ -572,6 +1062,24 @@ def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
         else:
             directory_text = serialize_report_value(directory_value)
         return survey_text, directory_text
+    if mapping_id == "biobank_size.samples":
+        if isinstance(survey_value, dict):
+            survey_text = (
+                f"bucket={serialize_report_value(survey_value.get('bucket'))}, "
+                f"raw_answer={serialize_report_value(survey_value.get('raw_answer'))}"
+            )
+        else:
+            survey_text = serialize_report_value(survey_value)
+        if isinstance(directory_value, dict):
+            directory_text = (
+                f"explicit_total={serialize_report_value(directory_value.get('explicit_total'))}, "
+                f"estimated_total={serialize_report_value(directory_value.get('estimated_total'))}, "
+                f"bucket={serialize_report_value(directory_value.get('bucket'))}, "
+                f"estimate_used={serialize_report_value(directory_value.get('estimate_used'))}"
+            )
+        else:
+            directory_text = serialize_report_value(directory_value)
+        return survey_text, directory_text
     if mapping_id == "imaging.wsi_presence":
         if isinstance(survey_value, dict):
             survey_text = f"answer={serialize_report_value(survey_value.get('answer'))}"
@@ -581,6 +1089,19 @@ def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
             directory_text = (
                 f"has_image_support={serialize_report_value(directory_value.get('has_image_support'))}, "
                 f"has_wsi_hint={serialize_report_value(directory_value.get('has_wsi_hint'))}"
+            )
+        else:
+            directory_text = serialize_report_value(directory_value)
+        return survey_text, directory_text
+    if mapping_id == "imaging.radiology_presence":
+        if isinstance(survey_value, dict):
+            survey_text = f"answer={serialize_report_value(survey_value.get('answer'))}"
+        else:
+            survey_text = serialize_report_value(survey_value)
+        if isinstance(directory_value, dict):
+            directory_text = (
+                f"has_image_support={serialize_report_value(directory_value.get('has_image_support'))}, "
+                f"has_radiology_hint={serialize_report_value(directory_value.get('has_radiology_hint'))}"
             )
         else:
             directory_text = serialize_report_value(directory_value)
@@ -718,13 +1239,61 @@ def summarize_collection_scope(
 def aggregate_scope(scope: dict[str, Any], collection_index: dict[str, dict[str, Any]]) -> dict[str, Any]:
     collections = [collection_index.get(collection_id) for collection_id in scope["collection_ids"]]
     collections = [collection for collection in collections if collection]
+    scope_collection_ids = {collection["id"] for collection in collections}
+    top_level_scope_collections = []
+    for collection in collections:
+        parent = collection.get("parent_collection")
+        parent_id = parent.get("id") if isinstance(parent, dict) else None
+        if parent_id and parent_id in scope_collection_ids:
+            continue
+        top_level_scope_collections.append(collection)
     materials = sorted({item for collection in collections for item in parse_material_value(collection.get("materials")) if item != "NAV"})
     types = sorted({item for collection in collections for item in parse_material_value(collection.get("type"))})
     data_categories = sorted({item for collection in collections for item in parse_material_value(collection.get("data_categories")) if item != "NAV"})
     imaging_modalities = sorted({item for collection in collections for item in parse_material_value(collection.get("imaging_modality"))})
     image_dataset_types = sorted({item for collection in collections for item in parse_material_value(collection.get("image_dataset_type"))})
     descriptions = [str(collection.get("description") or "") for collection in collections]
-    exact_sizes = [int(collection["size"]) for collection in collections if collection.get("size") not in (None, "")]
+    explicit_total = 0
+    explicit_collection_count = 0
+    estimated_total = 0
+    estimate_used = False
+    for collection in top_level_scope_collections:
+        size_value = collection.get("size")
+        if size_value not in (None, ""):
+            explicit_total += int(size_value)
+            estimated_total += int(size_value)
+            explicit_collection_count += 1
+            continue
+        estimate = estimate_count_from_oom_or_none(
+            collection.get("order_of_magnitude"),
+            collection_id=collection.get("id", ""),
+            field_name="order_of_magnitude",
+        )
+        if estimate is not None:
+            estimated_total += estimate
+            estimate_used = True
+    normalized_descriptions = [normalize_text(description) for description in descriptions]
+    radiology_modality_codes = {"MR", "CT", "US", "PT", "PX", "XA", "DX", "MG", "RG", "BMD"}
+    radiology_text_hints = (
+        "radiology",
+        "mri",
+        "mr ",
+        "magnetic resonance",
+        "ct",
+        "computed tomography",
+        "ultrasound",
+        "pet",
+        "pacs",
+        "dicom",
+        "x ray",
+        "xray",
+        "mammograph",
+        "dexa",
+    )
+    has_radiology_hint = bool(
+        radiology_modality_codes.intersection(imaging_modalities)
+        or any(hint in description for description in normalized_descriptions for hint in radiology_text_hints)
+    )
     return {
         "collections": collections,
         "materials": materials,
@@ -740,14 +1309,17 @@ def aggregate_scope(scope: dict[str, Any], collection_index: dict[str, dict[str,
         ),
         "has_wsi_hint": bool(
             any(
-                hint in normalize_text(description)
-                for description in descriptions
+                hint in description
+                for description in normalized_descriptions
                 for hint in ("whole slide", "wsi", "histopath", "digital pathology", "slide microscopy")
             )
             or "SM" in imaging_modalities
         ),
-        "size_sum": sum(exact_sizes) if exact_sizes else None,
-        "size_known_collection_count": len(exact_sizes),
+        "has_radiology_hint": has_radiology_hint,
+        "size_sum": explicit_total if explicit_collection_count else None,
+        "size_total_estimated": estimated_total if explicit_collection_count or estimate_used else None,
+        "size_estimate_used": estimate_used,
+        "size_known_collection_count": explicit_collection_count,
         "collection_count": len(collections),
     }
 
@@ -1383,6 +1955,7 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
 
     row_resolutions = []
     findings = []
+    technology_rows = []
     for row_index, row in survey.iterrows():
         if all(
             value is None or (isinstance(value, float) and pd.isna(value)) or str(value).strip() == ""
@@ -1406,6 +1979,7 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
             collection_contact_domain_counts,
         )
         row_resolutions.append(resolution)
+        technology_rows.append(build_technology_modality_row(row, resolution))
         if resolution["resolution_status"] in {"missing_from_directory", "ambiguous", "manual_review"}:
             survey_country = normalize_country(row.get("Country"))
             entity_type = "NETWORK" if resolution.get("matched_network_ids") else "BIOBANK"
@@ -1746,6 +2320,154 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
                 )
             )
 
+        survey_size_answer = str(row.get("What is the approximate size of your biobank (number of samples aliquots)?") or "").strip()
+        survey_size_bucket = parse_sample_size_bucket(survey_size_answer)
+        if survey_size_bucket:
+            directory_size_bucket = classify_sample_size_bucket(aggregate["size_total_estimated"])
+            if aggregate["size_total_estimated"] is None:
+                size_status = "missing_in_directory"
+                size_explanation = "Survey sample-size bucket cannot be compared because the mapped Directory scope has no sample counts or order-of-magnitude values."
+            elif aggregate["size_estimate_used"]:
+                size_status = "manual_review"
+                size_explanation = (
+                    "Survey sample-size bucket can only be compared against an OoM-backed Directory estimate."
+                    if survey_size_bucket == directory_size_bucket
+                    else "Survey sample-size bucket differs from the OoM-backed Directory estimate."
+                )
+            else:
+                size_status = "consistent" if survey_size_bucket == directory_size_bucket else "inconsistent"
+                size_explanation = (
+                    "Survey sample-size bucket matches the explicit Directory sample total for the mapped scope."
+                    if survey_size_bucket == directory_size_bucket
+                    else "Survey sample-size bucket differs from the explicit Directory sample total for the mapped scope."
+                )
+            findings.append(
+                make_finding(
+                    row_resolution=resolution,
+                    mapping_id="biobank_size.samples",
+                    entity_type="BIOBANK" if len(scope["collection_ids"]) != 1 else "COLLECTION",
+                    entity_id=biobank_id if len(scope["collection_ids"]) != 1 else scope["collection_ids"][0],
+                    status=size_status,
+                    survey_value={"raw_answer": survey_size_answer, "bucket": survey_size_bucket},
+                    directory_value={
+                        "explicit_total": aggregate["size_sum"],
+                        "estimated_total": aggregate["size_total_estimated"],
+                        "bucket": directory_size_bucket,
+                        "estimate_used": aggregate["size_estimate_used"],
+                    },
+                    relation_type="aggregate_numeric_comparison",
+                    reliability="medium",
+                    why_relevant="The survey gives a biobank-level approximate sample-count bucket, while the Directory stores collection-level explicit sizes or order-of-magnitude values.",
+                    explanation=size_explanation,
+                    survey_fields=["What is the approximate size of your biobank (number of samples aliquots)?"],
+                    strategic_objectives=objectives_for_fields(question_objectives, ["What is the approximate size of your biobank (number of samples aliquots)?"]),
+                )
+            )
+
+        radiology_answer = str(row.get("Does your biobank provide access to radiology datasets?") or "").strip()
+        radiology_info = str(row.get("You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):") or "").strip()
+        if radiology_answer:
+            wants_radiology = radiology_answer.startswith("Yes")
+            planning_radiology = "planning" in normalize_text(radiology_answer)
+            status = "manual_review"
+            explanation = "Survey radiology answer needs manual review against the mapped Directory imaging metadata."
+            proposed_update = None
+            export_update_plan = False
+            if planning_radiology:
+                status = "not_comparable"
+                explanation = "Survey says radiology access is only planned, so it is not directly comparable with current Directory metadata."
+            elif wants_radiology:
+                if aggregate["has_radiology_hint"]:
+                    status = "consistent"
+                    explanation = "Survey-reported radiology availability is reflected by radiology-specific imaging metadata or text."
+                elif aggregate["has_image_support"]:
+                    status = "manual_review"
+                    explanation = "Survey-reported radiology availability is reflected only by generic imaging metadata, without radiology-specific hints."
+                else:
+                    status = "missing_in_directory"
+                    explanation = "Survey-reported radiology availability is not reflected by generic imaging metadata or radiology-specific hints."
+                    if len(scope["collection_ids"]) == 1:
+                        collection_id = scope["collection_ids"][0]
+                        collection = collection_index.get(collection_id)
+                        current_types = parse_material_value(collection.get("type"))
+                        current_categories = parse_material_value(collection.get("data_categories"))
+                        if "IMAGE" not in current_types:
+                            proposed_update = build_update(
+                                mapping_id="survey_so2.collection.image_type_from_radiology",
+                                module="SO2",
+                                entity_type="COLLECTION",
+                                entity_id=collection_id,
+                                field="type",
+                                mode="append",
+                                confidence="uncertain",
+                                current_value=collection.get("type"),
+                                proposed_value=["IMAGE"],
+                                explanation="Add IMAGE collection type because the SO2 survey reports radiology availability for the mapped collection scope.",
+                                rationale="The survey provides only generic radiology presence, so the safest structured update is the generic IMAGE type, and only when the survey row maps to exactly one collection.",
+                                source_check_id="SO2:RadiologyPresence",
+                            )
+                            export_update_plan = True
+                        elif "IMAGING_DATA" not in current_categories:
+                            proposed_update = build_update(
+                                mapping_id="survey_so2.collection.imaging_data_from_radiology",
+                                module="SO2",
+                                entity_type="COLLECTION",
+                                entity_id=collection_id,
+                                field="data_categories",
+                                mode="append",
+                                confidence="uncertain",
+                                current_value=collection.get("data_categories"),
+                                proposed_value=["IMAGING_DATA"],
+                                explanation="Add IMAGING_DATA to the collection because the SO2 survey reports radiology availability for the mapped collection scope.",
+                                rationale="The survey does not specify a reliable structured modality update, so only the generic imaging data category is proposed automatically.",
+                                source_check_id="SO2:RadiologyPresence",
+                            )
+                            export_update_plan = True
+            else:
+                if aggregate["has_radiology_hint"]:
+                    status = "inconsistent"
+                    explanation = "Survey says no radiology access, but the mapped Directory scope contains radiology-specific imaging metadata or text."
+                elif aggregate["has_image_support"]:
+                    status = "manual_review"
+                    explanation = "Survey says no radiology access, but the mapped Directory scope contains generic imaging metadata that may reflect non-radiology imaging."
+                else:
+                    status = "consistent"
+                    explanation = "Survey says no radiology access and the mapped Directory scope shows no radiology-specific imaging hints."
+            findings.append(
+                make_finding(
+                    row_resolution=resolution,
+                    mapping_id="imaging.radiology_presence",
+                    entity_type="BIOBANK" if len(scope["collection_ids"]) != 1 else "COLLECTION",
+                    entity_id=biobank_id if len(scope["collection_ids"]) != 1 else scope["collection_ids"][0],
+                    status=status,
+                    survey_value={"answer": radiology_answer, "details": radiology_info},
+                    directory_value={
+                        "has_image_support": aggregate["has_image_support"],
+                        "has_radiology_hint": aggregate["has_radiology_hint"],
+                        "types": aggregate["types"],
+                        "data_categories": aggregate["data_categories"],
+                        "imaging_modalities": aggregate["imaging_modalities"],
+                    },
+                    relation_type="derived_presence_and_text_support",
+                    reliability="medium",
+                    why_relevant="Radiology availability can be compared through generic imaging fields plus radiology-specific modality and description hints in the Directory.",
+                    explanation=explanation,
+                    survey_fields=[
+                        "Does your biobank provide access to radiology datasets?",
+                        "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+                    ],
+                    strategic_objectives=objectives_for_fields(
+                        question_objectives,
+                        [
+                            "Does your biobank provide access to radiology datasets?",
+                            "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+                        ],
+                    ),
+                    proposed_update=proposed_update,
+                    export_update_plan=export_update_plan,
+                )
+            )
+
         wsi_answer = str(row.get("Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?") or "").strip()
         wsi_info = str(row.get("You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):") or "").strip()
         if wsi_answer:
@@ -1851,6 +2573,7 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
         "strategic_objectives": objectives_mapping.get("strategic_objectives", {}),
         "row_resolutions": row_resolutions,
         "findings": findings,
+        "technology_modalities": build_technology_modalities_payload(technology_rows),
         "summary": summary,
     }
 
@@ -1950,6 +2673,18 @@ def render_entity_label_latex(label: str) -> str:
     return escape_latex(prefix) + escape_latex_breakable_entity(entity_id)
 
 
+
+TECHNOLOGY_MODALITY_LABELS = {modality["id"]: modality["label"] for modality in TECHNOLOGY_MODALITIES}
+
+
+def summarize_technology_counts(counts: dict[str, Any]) -> str:
+    return ", ".join(
+        f"{TECHNOLOGY_MODALITY_LABELS[modality['id']]}={int(counts.get(modality['id'], 0))}"
+        for modality in TECHNOLOGY_MODALITIES
+    )
+
+
+
 def render_tex(report: dict[str, Any]) -> str:
     summary = report.get("summary", {})
     findings = report.get("findings", [])
@@ -1958,6 +2693,7 @@ def render_tex(report: dict[str, Any]) -> str:
         grouped[finding["status"]].append(finding)
     biobank_summary = build_biobank_summary(report)
     objective_summary = build_objective_summary(report)
+    technology_payload = report.get("technology_modalities") if isinstance(report.get("technology_modalities"), dict) else None
     appendix_entries = build_appendix_entries(report)
     lines = [
         r"\documentclass[11pt,a4paper]{article}",
@@ -1992,6 +2728,67 @@ def render_tex(report: dict[str, Any]) -> str:
         rf"\item Findings with proposed updates: {summary.get('proposed_update_findings', 0)}",
         r"\end{itemize}",
     ]
+    if technology_payload is not None:
+        technology_summary = technology_payload.get("summary", {})
+        lines.append(r"\subsection{Technology Modalities}")
+        lines.append(
+            escape_latex_with_inline_breaks(
+                "The technology UpSet graph defaults to the direct technology field for NGS, proteomics, and metabolomics. Genotyping/panels are inferred from positive free-text details under the Other checkbox, while Other itself is counted only for the remaining positive free-text details; radiology and pathology/WSI come from their dedicated survey questions."
+            )
+        )
+        lines.append(r"\begin{itemize}")
+        lines.append(r"\item " + escape_latex(f"Rows included in technology graph: {technology_summary.get('rows_considered', 0)}"))
+        lines.append(r"\item " + escape_latex(f"Rows with at least one modality: {technology_summary.get('rows_with_any_modality', 0)}"))
+        lines.append(r"\item " + escape_latex("Combined modality counts: " + summarize_technology_counts(technology_summary.get("modality_counts", {}))))
+        lines.append(r"\item " + escape_latex("Direct technology-field counts: " + summarize_technology_counts(technology_summary.get("field_only_counts", {}))))
+        question_yes_counts = technology_summary.get("question_yes_counts", {})
+        lines.append(
+            r"\item "
+            + escape_latex(
+                "Dedicated question yes-counts: "
+                + ", ".join(
+                    [
+                        f"Radiology={int(question_yes_counts.get('radiology', 0))}",
+                        f"Pathology/WSI={int(question_yes_counts.get('pathology', 0))}",
+                    ]
+                )
+            )
+        )
+        inconsistency_counts = technology_summary.get("inconsistency_counts", {})
+        lines.append(
+            r"\item "
+            + escape_latex(
+                "Field/question mismatches: "
+                + ", ".join(
+                    [
+                        f"Radiology={int(inconsistency_counts.get('radiology', 0))}",
+                        f"Pathology/WSI={int(inconsistency_counts.get('pathology', 0))}",
+                    ]
+                )
+            )
+        )
+        lines.append(r"\item " + escape_latex(f"Rows selecting 'I don't know' in the technology field: {technology_summary.get('rows_with_unknown_selected', 0)}"))
+        lines.append(r"\end{itemize}")
+        inconsistencies = technology_summary.get("inconsistencies", [])
+        if inconsistencies:
+            lines.append(r"\subsubsection*{Technology Source Inconsistencies}")
+            lines.append(
+                escape_latex_with_inline_breaks(
+                    "These rows disagree between the direct technology multichoice field and the dedicated radiology or WSI/pathology question. The UpSet graph follows the dedicated question for radiology/pathology, but the disagreement is listed here for review."
+                )
+            )
+            lines.append(r"\begin{longtable}{L{0.9cm}L{3.7cm}L{1.8cm}L{4.4cm}L{4.7cm}}")
+            lines.append(r"\toprule Row & Institution & Modality & Technology field & Dedicated question \\ \midrule")
+            for item in inconsistencies:
+                lines.append(
+                    f"{escape_latex(item['survey_row'])} & "
+                    f"{escape_latex_with_inline_breaks(item.get('institution_name', ''))} & "
+                    f"{escape_latex(TECHNOLOGY_MODALITY_LABELS.get(item.get('modality', ''), str(item.get('modality', ''))))} & "
+                    f"{escape_latex_with_inline_breaks(item.get('field_value', ''))} & "
+                    f"{escape_latex_with_inline_breaks(item.get('question_answer', ''))} "
+                    + "\\\\"
+                )
+            lines.append(r"\end{longtable}")
     if biobank_summary:
         lines.append(r"\section{Biobank-Oriented Summary}")
         lines.append(
@@ -2266,6 +3063,8 @@ def export_update_plan_from_report(report: dict[str, Any], output_json: str | Pa
 def run_analyze(args: argparse.Namespace) -> int:
     report = analyze_survey(args)
     write_json(args.output_json, report)
+    if getattr(args, "output_tech_upset_prefix", None):
+        write_technology_upset_artifacts(report, args.output_tech_upset_prefix)
     if args.output_tex or args.output_pdf:
         tex_path = args.output_tex or (str(Path(args.output_json).with_suffix(".tex")))
         render_pdf(render_tex(report), tex_path, args.output_pdf)
@@ -2274,7 +3073,13 @@ def run_analyze(args: argparse.Namespace) -> int:
 
 def run_render(args: argparse.Namespace) -> int:
     report = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
-    render_pdf(render_tex(report), args.output_tex, args.output_pdf)
+    if getattr(args, "output_tech_upset_prefix", None):
+        write_technology_upset_artifacts(report, args.output_tech_upset_prefix)
+    if args.output_tex or args.output_pdf:
+        tex_path = args.output_tex or str(Path(args.input_json).with_suffix(".tex"))
+        render_pdf(render_tex(report), tex_path, args.output_pdf)
+    elif not getattr(args, "output_tech_upset_prefix", None):
+        raise InputError("render-report requires at least one of --output-tex, --output-pdf, or --output-tech-upset-prefix.")
     return EXIT_OK
 
 

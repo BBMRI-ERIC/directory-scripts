@@ -321,6 +321,7 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 ### SO2 survey analysis tool
 
 - `survey-so2-directory.py` is a one-off survey-analysis CLI that still follows the repository's shared infrastructure rules:
+- Technology-modality UpSet exports treat the required `Other` survey checkbox as non-positive unless `Technologies` free text says something concrete; the current graph uses direct-field NGS/proteomics/metabolomics, dedicated radiology/pathology questions, a separate `Genotyping / panels` bucket inferred from positive `Technologies` text, and `Other technology` only for the remaining positive `Technologies` details.
   - use `directory.py` for Directory access/cache/auth instead of ad hoc API calls
   - keep the survey-to-Directory mapping in editable JSON (`survey-mappings/so2_2025_directory_mapping.json`) so humans can correct Codex-produced assumptions
   - keep the survey-question to strategic-objective mapping in editable JSON (`survey-mappings/so2_2025_question_to_strategic_objectives.json`) so the report can aggregate findings by BBMRI SO2 objective without baking those assumptions into code

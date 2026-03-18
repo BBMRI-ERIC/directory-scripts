@@ -95,6 +95,40 @@ def write_survey(tmp_path: Path) -> Path:
     return path
 
 
+def write_survey_row(tmp_path: Path, updates: dict[str, object] | None = None, *, filename: str = "survey.xlsx") -> Path:
+    row = {
+        "Name": "Test Person",
+        "Role": "Manager",
+        "E-Mail address": "contact@example.org",
+        "Name of Institution": "Demo Biobank",
+        "BiobankID in the Directory (if available)": "bbmri-eric:ID:CZ_demo",
+        "List of CollectionID in the Directory (if you only represent a part of a biobank; please use ';' as separator in case of more than 1 ID)": "bbmri-eric:ID:CZ_demo:collection:col1",
+        "Country": "Czech Republic",
+        "Are you interested in promoting your biobank resources to new partners?": "",
+        "Are you interested in promoting your biobank resources to new research or industry partners?": "",
+        "Which types of samples do you manage?": "",
+        "Sample types": "",
+        "What is the approximate size of your biobank (number of samples aliquots)?": "",
+        "Does your biobank provide access to radiology datasets?": "",
+        "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):": "",
+        "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?": "",
+        "You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):": "",
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": "",
+        "Next-gen sequencing technology/vendor": "",
+        "Radiology imaging technology/vendor": "",
+        "Pathology imaging technology/vendor": "",
+        "Proteomics technology/vendor": "",
+        "Metabolomics technology/vendor": "",
+        "Technologies": "",
+    }
+    if updates:
+        row.update(updates)
+    path = tmp_path / filename
+    with __import__("pandas").ExcelWriter(path) as writer:
+        __import__("pandas").DataFrame([row]).to_excel(writer, sheet_name="Content", index=False, startrow=3)
+    return path
+
+
 class DirectoryStub:
     def __init__(self, *args, **kwargs):
         self.schema = kwargs.get("schema", "ERIC")
@@ -266,6 +300,278 @@ def test_survey_so2_analyze_generates_findings_and_proposed_updates(tmp_path, mo
     assert duo_finding["proposed_update"]["field"] == "data_use"
     assert duo_finding["proposed_update"]["proposed_value"] == ["DUO:0000018"]
     assert any(finding["strategic_objectives"] for finding in payload["findings"])
+
+
+def test_survey_so2_analyze_radiology_presence_and_explicit_size_bucket(tmp_path, monkeypatch):
+    module = load_module()
+    mapping_path = write_mapping(tmp_path)
+    objectives_mapping_path = write_objectives_mapping(tmp_path)
+    survey_path = write_survey_row(
+        tmp_path,
+        {
+            "What is the approximate size of your biobank (number of samples aliquots)?": "1000 - 10,000 aliquots",
+            "Does your biobank provide access to radiology datasets?": "Yes — access to internally generated radiology data collections (e.g., directly connected to a PACS system)",
+        },
+        filename="radiology-size.xlsx",
+    )
+    output_json = tmp_path / "radiology-size-report.json"
+
+    class DirectoryExplicitSizeStub(DirectoryStub):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._collection["size"] = 1500
+
+    monkeypatch.setattr(module, "Directory", DirectoryExplicitSizeStub)
+
+    args = Namespace(
+        survey_file=str(survey_path),
+        mapping_file=str(mapping_path),
+        objectives_mapping_file=str(objectives_mapping_path),
+        output_json=str(output_json),
+        output_tex=None,
+        output_pdf=None,
+        verbose=False,
+        debug=False,
+        username=None,
+        password=None,
+        token=None,
+        schema="ERIC",
+        directory_target=None,
+    )
+
+    result = module.run_analyze(args)
+
+    assert result == module.EXIT_OK
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    size_finding = next(finding for finding in payload["findings"] if finding["mapping_id"] == "biobank_size.samples")
+    assert size_finding["status"] == "consistent"
+    assert size_finding["directory_value"]["explicit_total"] == 1500
+    assert size_finding["directory_value"]["bucket"] == "1000 - 10,000 aliquots"
+    radiology_finding = next(finding for finding in payload["findings"] if finding["mapping_id"] == "imaging.radiology_presence")
+    assert radiology_finding["status"] == "missing_in_directory"
+    assert radiology_finding["proposed_update"]["field"] == "type"
+    assert radiology_finding["proposed_update"]["proposed_value"] == ["IMAGE"]
+
+
+
+
+def test_survey_so2_analyze_outputs_technology_upset_artifacts(tmp_path, monkeypatch):
+    module = load_module()
+    mapping_path = write_mapping(tmp_path)
+    objectives_mapping_path = write_objectives_mapping(tmp_path)
+    survey_path = write_survey_row(
+        tmp_path,
+        {
+            "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": (
+                "Next-gen sequencing (if yes, specify technology/vendor); "
+                "Proteomics (if yes, specify technology/vendor); "
+                "Other (please specify):"
+            ),
+            "Radiology imaging technology/vendor": "Siemens SOMATOM",
+            "Technologies": "Mass cytometry",
+        },
+        filename="technology-upset.xlsx",
+    )
+    output_json = tmp_path / "technology-upset-report.json"
+    upset_prefix = tmp_path / "so2-modalities"
+
+    monkeypatch.setattr(module, "Directory", DirectoryStub)
+
+    args = Namespace(
+        survey_file=str(survey_path),
+        mapping_file=str(mapping_path),
+        objectives_mapping_file=str(objectives_mapping_path),
+        output_json=str(output_json),
+        output_tex=None,
+        output_pdf=None,
+        output_tech_upset_prefix=str(upset_prefix),
+        verbose=False,
+        debug=False,
+        username=None,
+        password=None,
+        token=None,
+        schema="ERIC",
+        directory_target=None,
+    )
+
+    result = module.run_analyze(args)
+
+    assert result == module.EXIT_OK
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    technology_payload = payload["technology_modalities"]
+    assert technology_payload["summary"]["modality_counts"]["sequencing"] == 1
+    assert technology_payload["summary"]["modality_counts"]["genotyping_panels"] == 0
+    assert technology_payload["summary"]["modality_counts"]["radiology"] == 1
+    assert technology_payload["summary"]["modality_counts"]["proteomics"] == 1
+    assert technology_payload["summary"]["modality_counts"]["other_technology"] == 1
+    row = technology_payload["rows"][0]
+    assert row["sequencing"] == 1
+    assert row["genotyping_panels"] == 0
+    assert row["radiology"] == 1
+    assert row["proteomics"] == 1
+    assert row["other_technology"] == 1
+    assert row["metabolomics"] == 0
+
+    csv_path = tmp_path / "so2-modalities-technology-upset.csv"
+    r_path = tmp_path / "so2-modalities-technology-upset.R"
+    assert csv_path.exists()
+    assert r_path.exists()
+    df = __import__("pandas").read_csv(csv_path)
+    assert {"sequencing", "radiology", "proteomics", "other_technology", "has_any_modality"}.issubset(df.columns)
+    assert int(df.loc[0, "sequencing"]) == 1
+    assert int(df.loc[0, "radiology"]) == 1
+    assert int(df.loc[0, "proteomics"]) == 1
+    assert int(df.loc[0, "other_technology"]) == 1
+    script_text = r_path.read_text(encoding="utf-8")
+    assert "ComplexUpset::upset" in script_text
+    assert "Observed Intersection Deviation From Independence" in script_text
+    assert "so2-modalities-technology-upset.pdf" in script_text
+    assert "so2-modalities-technology-upset-deviation.png" in script_text
+
+
+def test_technology_genotyping_panels_is_split_from_other_positive_detail(tmp_path, monkeypatch):
+    module = load_module()
+    mapping_path = write_mapping(tmp_path)
+    objectives_mapping_path = write_objectives_mapping(tmp_path)
+    survey_path = write_survey_row(
+        tmp_path,
+        {
+            "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": "Other (please specify):",
+            "Technologies": "GWAS array",
+        },
+        filename="technology-genotyping-panels.xlsx",
+    )
+    output_json = tmp_path / "technology-genotyping-panels-report.json"
+
+    monkeypatch.setattr(module, "Directory", DirectoryStub)
+
+    args = Namespace(
+        survey_file=str(survey_path),
+        mapping_file=str(mapping_path),
+        objectives_mapping_file=str(objectives_mapping_path),
+        output_json=str(output_json),
+        output_tex=None,
+        output_pdf=None,
+        output_tech_upset_prefix=None,
+        verbose=False,
+        debug=False,
+        username=None,
+        password=None,
+        token=None,
+        schema="ERIC",
+        directory_target=None,
+    )
+
+    result = module.run_analyze(args)
+
+    assert result == module.EXIT_OK
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    technology_payload = payload["technology_modalities"]
+    assert technology_payload["summary"]["modality_counts"]["genotyping_panels"] == 1
+    assert technology_payload["summary"]["field_only_counts"]["genotyping_panels"] == 1
+    assert technology_payload["summary"]["modality_counts"]["other_technology"] == 0
+    row = technology_payload["rows"][0]
+    assert row["genotyping_panels"] == 1
+    assert row["genotyping_panels_field_present"] == 1
+    assert row["other_technology"] == 0
+    assert row["other_technology_field_present"] == 0
+    assert row["has_any_modality"] == 1
+
+
+def test_technology_other_checkbox_requires_positive_detail(tmp_path, monkeypatch):
+    module = load_module()
+    mapping_path = write_mapping(tmp_path)
+    objectives_mapping_path = write_objectives_mapping(tmp_path)
+    survey_path = write_survey_row(
+        tmp_path,
+        {
+            "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": "Other (please specify):",
+            "Technologies": "The answer is \"No\"",
+        },
+        filename="technology-other-negative.xlsx",
+    )
+    output_json = tmp_path / "technology-other-negative-report.json"
+
+    monkeypatch.setattr(module, "Directory", DirectoryStub)
+
+    args = Namespace(
+        survey_file=str(survey_path),
+        mapping_file=str(mapping_path),
+        objectives_mapping_file=str(objectives_mapping_path),
+        output_json=str(output_json),
+        output_tex=None,
+        output_pdf=None,
+        output_tech_upset_prefix=None,
+        verbose=False,
+        debug=False,
+        username=None,
+        password=None,
+        token=None,
+        schema="ERIC",
+        directory_target=None,
+    )
+
+    result = module.run_analyze(args)
+
+    assert result == module.EXIT_OK
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    technology_payload = payload["technology_modalities"]
+    assert technology_payload["summary"]["modality_counts"]["other_technology"] == 0
+    assert technology_payload["summary"]["field_only_counts"]["other_technology"] == 0
+    row = technology_payload["rows"][0]
+    assert row["other_technology_selected"] == 1
+    assert row["other_technology_detail_present"] == 1
+    assert row["other_technology_field_present"] == 0
+    assert row["other_technology"] == 0
+    assert row["has_any_modality"] == 0
+
+
+def test_survey_so2_analyze_sample_size_uses_oom_fallback_as_manual_review(tmp_path, monkeypatch):
+    module = load_module()
+    mapping_path = write_mapping(tmp_path)
+    objectives_mapping_path = write_objectives_mapping(tmp_path)
+    survey_path = write_survey_row(
+        tmp_path,
+        {
+            "What is the approximate size of your biobank (number of samples aliquots)?": "1000 - 10,000 aliquots",
+        },
+        filename="size-oom.xlsx",
+    )
+    output_json = tmp_path / "size-oom-report.json"
+
+    class DirectoryOomSizeStub(DirectoryStub):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._collection["order_of_magnitude"] = 3
+
+    monkeypatch.setattr(module, "Directory", DirectoryOomSizeStub)
+
+    args = Namespace(
+        survey_file=str(survey_path),
+        mapping_file=str(mapping_path),
+        objectives_mapping_file=str(objectives_mapping_path),
+        output_json=str(output_json),
+        output_tex=None,
+        output_pdf=None,
+        verbose=False,
+        debug=False,
+        username=None,
+        password=None,
+        token=None,
+        schema="ERIC",
+        directory_target=None,
+    )
+
+    result = module.run_analyze(args)
+
+    assert result == module.EXIT_OK
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    size_finding = next(finding for finding in payload["findings"] if finding["mapping_id"] == "biobank_size.samples")
+    assert size_finding["status"] == "manual_review"
+    assert size_finding["directory_value"]["explicit_total"] is None
+    assert size_finding["directory_value"]["estimated_total"] == 1000
+    assert size_finding["directory_value"]["bucket"] == "500 - 1000 aliquots"
+    assert size_finding["directory_value"]["estimate_used"] is True
 
 
 def test_survey_so2_export_update_plan_keeps_biobank_and_collection_updates(tmp_path):
@@ -1350,3 +1656,104 @@ def test_summarize_collection_scope_uses_all_collections_and_all_except():
     assert module.summarize_collection_scope(["c1", "c3"], ["c1", "c2", "c3"]) == "c1, c3"
     assert module.summarize_collection_scope(["c1", "c3", "c4", "c5"], ["c1", "c2", "c3", "c4", "c5", "c6"]) == "All except c2, c6"
     assert module.summarize_collection_scope(["c1"], ["c1", "c2", "c3", "c4", "c5", "c6"]) == "c1"
+
+
+
+def test_technology_modalities_combine_question_sources_and_render_inconsistencies(tmp_path):
+    module = load_module()
+    survey_row = __import__("pandas").Series(
+        {
+            "Name of Institution": "Demo Biobank",
+            "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": "I don’t know",
+            "Does your biobank provide access to radiology datasets?": "Yes — access to internally generated radiology data collections (e.g., directly connected to a PACS system)",
+            "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?": "Yes — access to internally generated WSI data collections",
+        }
+    )
+    row_resolution = {
+        "survey_row": 1,
+        "resolution_status": "missing_from_directory",
+        "matched_biobank_ids": [],
+        "matched_collection_ids": [],
+    }
+    technology_row = module.build_technology_modality_row(survey_row, row_resolution)
+    payload = module.build_technology_modalities_payload([technology_row])
+
+    assert technology_row["radiology"] == 1
+    assert technology_row["pathology"] == 1
+    assert technology_row["radiology_field_present"] == 0
+    assert technology_row["pathology_field_present"] == 0
+    assert technology_row["radiology_question_present"] == 1
+    assert technology_row["pathology_question_present"] == 1
+    assert technology_row["radiology_inconsistent"] == 1
+    assert technology_row["pathology_inconsistent"] == 1
+    assert payload["summary"]["modality_counts"]["radiology"] == 1
+    assert payload["summary"]["modality_counts"]["pathology"] == 1
+    assert payload["summary"]["field_only_counts"]["radiology"] == 0
+    assert payload["summary"]["field_only_counts"]["pathology"] == 0
+    assert payload["summary"]["question_yes_counts"]["radiology"] == 1
+    assert payload["summary"]["question_yes_counts"]["pathology"] == 1
+    assert payload["summary"]["inconsistency_counts"]["radiology"] == 1
+    assert payload["summary"]["inconsistency_counts"]["pathology"] == 1
+
+    report = {
+        "report_metadata": {"generated_at": "2026-03-18T00:00:00+00:00"},
+        "summary": {
+            "survey_rows": 1,
+            "resolved_rows": 0,
+            "missing_rows": 1,
+            "ambiguous_rows": 0,
+            "proposed_update_findings": 0,
+        },
+        "findings": [],
+        "row_resolutions": [row_resolution],
+        "strategic_objectives": {},
+        "technology_modalities": payload,
+    }
+    tex = module.render_tex(report)
+    assert "Technology Modalities" in tex
+    assert "Field/question mismatches: Radiology=1, Pathology/WSI=1" in tex
+    assert "Technology Source Inconsistencies" in tex
+
+def test_survey_so2_render_report_can_write_only_technology_upset_artifacts(tmp_path):
+    module = load_module()
+    survey_row = __import__("pandas").Series(
+        {
+            "Name of Institution": "Demo Biobank",
+            "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": "Next-gen sequencing (if yes, specify technology/vendor)",
+            "Next-gen sequencing technology/vendor": "Illumina",
+        }
+    )
+    row_resolution = {
+        "survey_row": 1,
+        "resolution_status": "resolved_by_biobank_id",
+        "matched_biobank_ids": ["bbmri-eric:ID:CZ_demo"],
+        "matched_collection_ids": ["bbmri-eric:ID:CZ_demo:collection:col1"],
+    }
+    technology_rows = [module.build_technology_modality_row(survey_row, row_resolution)]
+    report = {
+        "report_metadata": {"generated_at": "2026-03-18T00:00:00+00:00"},
+        "summary": {},
+        "findings": [],
+        "row_resolutions": [],
+        "strategic_objectives": {},
+        "technology_modalities": module.build_technology_modalities_payload(technology_rows),
+    }
+    input_json = tmp_path / "report.json"
+    input_json.write_text(json.dumps(report), encoding="utf-8")
+    upset_prefix = tmp_path / "render-only"
+
+    args = Namespace(
+        input_json=str(input_json),
+        output_tex=None,
+        output_pdf=None,
+        output_tech_upset_prefix=str(upset_prefix),
+        verbose=False,
+        debug=False,
+    )
+
+    result = module.run_render(args)
+
+    assert result == module.EXIT_OK
+    assert (tmp_path / "render-only-technology-upset.csv").exists()
+    assert (tmp_path / "render-only-technology-upset.R").exists()
+
