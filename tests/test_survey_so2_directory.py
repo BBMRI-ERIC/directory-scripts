@@ -417,7 +417,8 @@ def test_survey_so2_analyze_outputs_technology_upset_artifacts(tmp_path, monkeyp
     assert csv_path.exists()
     assert r_path.exists()
     df = __import__("pandas").read_csv(csv_path)
-    assert {"sequencing", "radiology", "proteomics", "other_technology", "has_any_modality"}.issubset(df.columns)
+    assert {"country", "sequencing", "radiology", "proteomics", "other_technology", "has_any_modality"}.issubset(df.columns)
+    assert df.loc[0, "country"] == "CZ"
     assert int(df.loc[0, "sequencing"]) == 1
     assert int(df.loc[0, "radiology"]) == 1
     assert int(df.loc[0, "proteomics"]) == 1
@@ -427,6 +428,15 @@ def test_survey_so2_analyze_outputs_technology_upset_artifacts(tmp_path, monkeyp
     assert "Observed Intersection Deviation From Independence" in script_text
     assert "so2-modalities-technology-upset.pdf" in script_text
     assert "so2-modalities-technology-upset-deviation.png" in script_text
+    assert "SO2 Survey Respondent-by-Modality Matrix" in script_text
+    assert "so2-modalities-technology-matrix.pdf" in script_text
+    assert "so2-modalities-technology-matrix.png" in script_text
+    assert "tidyr::pivot_longer" in script_text
+    assert 'paste0(" (", plot_data$country, ")"' in script_text
+    assert 'plot.background = ggplot2::element_rect(fill = "white", colour = NA)' in script_text
+    assert 'dplyr::arrange(.data$country, dplyr::desc(.data$modality_count), .data$institution_name, .data$survey_row)' in script_text
+    assert 'respondent_label = factor(.data$respondent_label, levels = rev(respondent_levels))' in script_text
+    assert "Rows are grouped by country, then sorted by the number of advertised modalities, highest first." in script_text
 
 
 def test_technology_genotyping_panels_is_split_from_other_positive_detail(tmp_path, monkeypatch):
@@ -1659,6 +1669,56 @@ def test_summarize_collection_scope_uses_all_collections_and_all_except():
 
 
 
+def test_survey_so2_render_tex_includes_so21_technology_matrix():
+    module = load_module()
+    technology_rows = [
+        {
+            "survey_row": 7,
+            "institution_name": "Gamma Biobank",
+            "matched_biobank_ids": "bbmri-eric:ID:CZ_gamma",
+            "matched_collection_ids": "",
+            "resolution_status": "resolved_by_biobank_id",
+            "sequencing": 1,
+            "genotyping_panels": 0,
+            "radiology": 1,
+            "pathology": 1,
+            "proteomics": 0,
+            "metabolomics": 0,
+            "other_technology": 0,
+            "has_any_modality": 1,
+        },
+        {
+            "survey_row": 8,
+            "institution_name": "Alpha Biobank",
+            "matched_biobank_ids": "bbmri-eric:ID:CZ_alpha",
+            "matched_collection_ids": "",
+            "resolution_status": "resolved_by_biobank_id",
+            "sequencing": 1,
+            "genotyping_panels": 0,
+            "radiology": 0,
+            "pathology": 0,
+            "proteomics": 0,
+            "metabolomics": 0,
+            "other_technology": 0,
+            "has_any_modality": 1,
+        },
+    ]
+    report = {
+        "report_metadata": {"generated_at": "2026-03-19T00:00:00+00:00"},
+        "summary": {"survey_rows": 2, "resolved_rows": 2, "missing_rows": 0, "ambiguous_rows": 0, "proposed_update_findings": 0},
+        "findings": [],
+        "row_resolutions": [],
+        "strategic_objectives": {"SO2.1": {"title": "Datafication at source", "description": "x"}},
+        "technology_modalities": module.build_technology_modalities_payload(technology_rows),
+    }
+    tex = module.render_tex(report)
+    assert "Technology Modality Matrix" in tex
+    assert "Gamma Biobank" in tex
+    assert "Alpha Biobank" in tex
+    assert tex.index("Gamma Biobank") < tex.index("Alpha Biobank")
+    assert "NGS & G/P & Rad & Path & Prot & Met & Other & N" in tex
+
+
 def test_technology_modalities_combine_question_sources_and_render_inconsistencies(tmp_path):
     module = load_module()
     survey_row = __import__("pandas").Series(
@@ -1756,4 +1816,3 @@ def test_survey_so2_render_report_can_write_only_technology_upset_artifacts(tmp_
     assert result == module.EXIT_OK
     assert (tmp_path / "render-only-technology-upset.csv").exists()
     assert (tmp_path / "render-only-technology-upset.R").exists()
-
