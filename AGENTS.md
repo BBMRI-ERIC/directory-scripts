@@ -10,7 +10,7 @@
 - `python3 data-check.py` runs the default validation suite.
 - `python3 data-check.py --purge-all-caches -X results.xlsx` clears all caches and writes an XLSX report.
 - `python3 data-check.py -v --purge-cache directory -N -X results.xlsx` verbose run, directory cache only, XLSX only.
-- `python3 data-check.py -O en_product1.xml` enables ORPHA-to-ICD checks (requires the XML file).
+- `python3 data-check.py -O en_product1.xml` enables ORPHA-to-ICD checks and conservative ORPHA/ICD diagnosis crosswalk fix proposals in `checks/CollectionContent.py` (requires the XML file).
 - `./full-text-search.py 'term'` performs Whoosh-based directory search; see `README.md` for examples.
 - `python3 -m py_compile <changed-python-files>` performs a fast syntax check for touched Python files.
 - `pytest -q` runs the unit test suite; use `pytest -q tests/test_directory.py` for focused `directory.py` checks.
@@ -37,6 +37,7 @@
 - Keep exporters thin: CLI + orchestration only; move reusable logic into helper modules.
 - Keep all the logic of BBMRI-ERIC Directory and Molgenis access confined into the directory.py module and enrich this as needed to have it universally reusable
 - Group related logic by concern (mappings in `orphacodes.py`/`icd10codeshelper.py`, warnings in `warningscontainer.py`/`customwarnings.py`, dataframe shaping in `pddfutils.py`).
+- ORPHA/ICD diagnosis crosswalk fixes in `checks/CollectionContent.py` must stay conservative: for ICD->ORPHA on non-`RD` collections, suggest ORPHA only for exact (`E`) mappings; broader-to-narrower directions must remain warning-only, and concrete crosswalk fixes should suppress duplicate legacy informational warnings such as `CC:RDOrphaSuggest` / `CC:OrphaIcdSuggest` for the same source diagnosis.
 - `warningscontainer.py` XLSX export must handle real Python booleans for withdrawn flags (and blank values) without forcing them through `write_string(...)`; QC exports may now carry boolean withdrawn state directly.
 - Share common parsing/formatting (e.g., email parsing, ID/NN extraction) through utilities rather than reimplementing in multiple scripts.
 - Keep domain-specific analytics in dedicated exporter scripts; if reused by multiple exporters, extract to a module with a clear API.

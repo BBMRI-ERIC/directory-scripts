@@ -30,6 +30,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
   - owns actual QC logic that emits `DataCheckWarning(...)`
   - keep the easy-to-disable `INFO` plugin `checks/ContactReuse.py` separate from the warning-level probabilistic plugin `checks/ContactAssignments.py`
 - helper modules such as `nncontacts.py`, `warningscontainer.py`, `warning_suppressions.py`, `orphacodes.py`, `oomutils.py`, `text_consistency.py`, `fact_descriptor_sync.py`
+- `checks/CollectionContent.py` now owns conservative ORPHA/ICD diagnosis crosswalk completion too when an `OrphaCodes` mapper is loaded: keep exact mappings highest-confidence, allow narrower-to-broader crosswalk fixes only in the accepted direction, and suppress duplicate legacy informational warnings when a newer concrete append fix already covers the same source diagnosis.
 - `warningscontainer.py` should write XLSX cells by actual value type; withdrawn flags may be real booleans in warning/entity listings and must not be forced through string-only worksheet APIs.
   - own reusable logic that can be consumed by multiple scripts or plugins
 

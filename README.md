@@ -31,7 +31,7 @@ If you run into GraphQL errors when retrieving data from the Directory, upgrade 
 pip3 install --upgrade certifi
 ```
 - The `ContactFields` plugin uses `validate_email` for remote MX/reachability validation. It is now listed in `requirements.txt`; re-run `pip3 install -r requirements.txt` after Python upgrades so the plugin-side dependencies are restored in the new interpreter environment.
-- If you want support for checking mappings of ORPHA codes to ICD-10 codes for RD biobanks, you need to get en_product1.xml from
+- If you want support for checking mappings of ORPHA codes to ICD-10 codes for RD biobanks, and for conservative ORPHA/ICD diagnosis crosswalk fix proposals in `CollectionContent`, you need to get en_product1.xml from
   http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html
 
 - If you have Python 3.12 or higher, for the time being (December, 2024) you need a patched version of yapsy module to deal with instability in the Python - some stable components being removed from the Python core. Here is a quick howto:
