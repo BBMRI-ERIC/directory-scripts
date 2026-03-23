@@ -29,7 +29,7 @@ Run this workflow before creating a commit in this repository.
 - Check/update docstrings for changed reusable modules, public functions, and classes.
 - Check unit-test coverage for the changed behavior.
 - Add regression tests for fixed bugs and changed workflows.
-- Run `python3 -m py_compile` on touched Python files.
+- Run `python3 -m py_compile` on touched Python files only; do not include non-Python docs such as `README.md` in that command.
 - Run targeted `pytest -q` subsets first.
 - Run broader tests when the risk justifies it.
 - Do not commit until the relevant unit tests pass.
@@ -51,7 +51,7 @@ Run this workflow before creating a commit in this repository.
 - Include source, tests, docs, AGENTS, skill files, and manual files needed for the new behavior.
 - Exclude local artifacts such as XLSX outputs, caches, generated temporary files, editor backups, and ad hoc review outputs unless the user explicitly wants them committed.
 - Be careful with renames so required runtime files are not accidentally left untracked.
-- Verify that all files required for correct runtime operation of the updated tooling are tracked and staged as needed; do not leave newly introduced runtime/source files untracked just because the current diff happens to exercise them locally.
+- Verify that all files required for correct runtime operation of the updated tooling are tracked and staged as needed; this includes newly introduced helper/runtime modules, not only the top-level CLI files that import them.
 
 8. Commit after validations pass.
 - Once the required validations succeed, create the commit at the end of the workflow.

@@ -12,6 +12,7 @@ Apply this workflow as a required gate before push, and as the default process f
 - Inspect changed files and classify risk.
 - Prioritize reusable modules first (`directory.py`, shared helpers), then script-level changes.
 - Detect whether `checks/` was changed; if yes, enable the checks-specific validation in Step 6.
+- When the same parsing, normalization, or serialization logic appears in more than one CLI, treat that as shared-helper risk and review whether it should move into a reusable module before commit.
 
 ## Step 2: Enforce assertive programming
 
