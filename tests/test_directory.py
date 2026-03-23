@@ -83,7 +83,22 @@ def _make_directory_stub():
         {"id": "bbmri-eric:networkID:EXT_demo:net1", "country": {"id": "US"}},
     ]
     directory.facts = [{"id": "fact1", "collection": {"id": "col1"}}]
-    directory.services = [{"id": "svc1", "biobank": {"id": "bb1"}}]
+    directory.services = [
+        {"id": "svc1", "biobank": {"id": "bb1"}},
+        {
+            "id": "bbmri-eric:serviceID:EXT_demo:svc2",
+            "biobank": {"id": "bbmri-eric:ID:EXT_demo"},
+        },
+    ]
+    directory.studies = [
+        {"id": "study1", "collections": [{"id": "col1"}]},
+        {"id": "study2", "collections": [{"id": "col1"}, {"id": "col2"}]},
+        {
+            "id": "study3",
+            "collections": [{"id": "col1"}, {"id": "bbmri-eric:ID:EXT_demo:collection:col5"}],
+        },
+        {"id": "study4", "collections": [{"id": "col3"}]},
+    ]
     directory.qualBBtable = pd.DataFrame(
         [
             {
@@ -136,8 +151,42 @@ def _make_directory_stub():
         },
     }
     directory.collectionFactMap = {"col1": [{"id": "fact1"}]}
-    directory.serviceHashmap = {"svc1": {"id": "svc1", "biobank": {"id": "bb1"}}}
-    directory.biobankServiceMap = {"bb1": [{"id": "svc1", "biobank": {"id": "bb1"}}]}
+    directory.serviceHashmap = {
+        "svc1": {"id": "svc1", "biobank": {"id": "bb1"}},
+        "bbmri-eric:serviceID:EXT_demo:svc2": {
+            "id": "bbmri-eric:serviceID:EXT_demo:svc2",
+            "biobank": {"id": "bbmri-eric:ID:EXT_demo"},
+        },
+    }
+    directory.biobankServiceMap = {
+        "bb1": [{"id": "svc1", "biobank": {"id": "bb1"}}],
+        "bbmri-eric:ID:EXT_demo": [
+            {
+                "id": "bbmri-eric:serviceID:EXT_demo:svc2",
+                "biobank": {"id": "bbmri-eric:ID:EXT_demo"},
+            }
+        ],
+    }
+    directory.studyHashmap = {
+        "study1": {"id": "study1", "collections": [{"id": "col1"}]},
+        "study2": {"id": "study2", "collections": [{"id": "col1"}, {"id": "col2"}]},
+        "study3": {
+            "id": "study3",
+            "collections": [{"id": "col1"}, {"id": "bbmri-eric:ID:EXT_demo:collection:col5"}],
+        },
+        "study4": {"id": "study4", "collections": [{"id": "col3"}]},
+    }
+    directory.collectionStudyMap = {
+        "col1": [directory.studyHashmap["study1"], directory.studyHashmap["study2"], directory.studyHashmap["study3"]],
+        "col2": [directory.studyHashmap["study2"]],
+        "bbmri-eric:ID:EXT_demo:collection:col5": [directory.studyHashmap["study3"]],
+        "col3": [directory.studyHashmap["study4"]],
+    }
+    directory.biobankStudyMap = {
+        "bb1": [directory.studyHashmap["study1"], directory.studyHashmap["study2"], directory.studyHashmap["study3"]],
+        "bbmri-eric:ID:EXT_demo": [directory.studyHashmap["study3"]],
+        "bb2": [directory.studyHashmap["study4"]],
+    }
 
     directory.directoryGraph = nx.DiGraph()
     directory.directoryGraph.add_node("bb1", data=directory.biobanks[0])
@@ -155,6 +204,79 @@ def _make_directory_stub():
         "bbmri-eric:ID:EXT_demo",
         "bbmri-eric:ID:EXT_demo:collection:col5",
     )
+    directory.directoryServicesGraph = nx.DiGraph()
+    directory.directoryServicesGraph.add_node("bb1", data=directory.biobanks[0])
+    directory.directoryServicesGraph.add_node("bb2", data=directory.biobanks[1])
+    directory.directoryServicesGraph.add_node("bbmri-eric:ID:EXT_demo", data=directory.biobanks[2])
+    for service in directory.services:
+        directory.directoryServicesGraph.add_node(service["id"], data=service)
+    directory.directoryServicesGraph.add_edge("bb1", "svc1")
+    directory.directoryServicesGraph.add_edge("svc1", "bb1")
+    directory.directoryServicesGraph.add_edge(
+        "bbmri-eric:ID:EXT_demo",
+        "bbmri-eric:serviceID:EXT_demo:svc2",
+    )
+    directory.directoryServicesGraph.add_edge(
+        "bbmri-eric:serviceID:EXT_demo:svc2",
+        "bbmri-eric:ID:EXT_demo",
+    )
+    directory.directoryServicesDAG = nx.DiGraph()
+    directory.directoryServicesDAG.add_edge("bb1", "svc1")
+    directory.directoryServicesDAG.add_edge(
+        "bbmri-eric:ID:EXT_demo",
+        "bbmri-eric:serviceID:EXT_demo:svc2",
+    )
+    directory.directoryStudiesGraph = nx.DiGraph()
+    directory.directoryStudiesGraph.add_node("bb1", data=directory.biobanks[0])
+    directory.directoryStudiesGraph.add_node("bb2", data=directory.biobanks[1])
+    directory.directoryStudiesGraph.add_node("bbmri-eric:ID:EXT_demo", data=directory.biobanks[2])
+    for collection in directory.collections:
+        directory.directoryStudiesGraph.add_node(collection["id"], data=collection)
+    for study in directory.studies:
+        directory.directoryStudiesGraph.add_node(study["id"], data=study)
+    directory.directoryStudiesGraph.add_edge("bb1", "col1")
+    directory.directoryStudiesGraph.add_edge("col1", "bb1")
+    directory.directoryStudiesGraph.add_edge("col1", "col2")
+    directory.directoryStudiesGraph.add_edge("col2", "col1")
+    directory.directoryStudiesGraph.add_edge("bb2", "col3")
+    directory.directoryStudiesGraph.add_edge("col3", "bb2")
+    directory.directoryStudiesGraph.add_edge("col3", "col4")
+    directory.directoryStudiesGraph.add_edge("col4", "col3")
+    directory.directoryStudiesGraph.add_edge(
+        "bbmri-eric:ID:EXT_demo",
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+    )
+    directory.directoryStudiesGraph.add_edge(
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+        "bbmri-eric:ID:EXT_demo",
+    )
+    directory.directoryStudiesGraph.add_edge("col1", "study1")
+    directory.directoryStudiesGraph.add_edge("study1", "col1")
+    directory.directoryStudiesGraph.add_edge("col1", "study2")
+    directory.directoryStudiesGraph.add_edge("study2", "col1")
+    directory.directoryStudiesGraph.add_edge("col2", "study2")
+    directory.directoryStudiesGraph.add_edge("study2", "col2")
+    directory.directoryStudiesGraph.add_edge("col1", "study3")
+    directory.directoryStudiesGraph.add_edge("study3", "col1")
+    directory.directoryStudiesGraph.add_edge("bbmri-eric:ID:EXT_demo:collection:col5", "study3")
+    directory.directoryStudiesGraph.add_edge("study3", "bbmri-eric:ID:EXT_demo:collection:col5")
+    directory.directoryStudiesGraph.add_edge("col3", "study4")
+    directory.directoryStudiesGraph.add_edge("study4", "col3")
+    directory.directoryStudiesDAG = nx.DiGraph()
+    directory.directoryStudiesDAG.add_edge("bb1", "col1")
+    directory.directoryStudiesDAG.add_edge("col1", "col2")
+    directory.directoryStudiesDAG.add_edge("bb2", "col3")
+    directory.directoryStudiesDAG.add_edge("col3", "col4")
+    directory.directoryStudiesDAG.add_edge(
+        "bbmri-eric:ID:EXT_demo",
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+    )
+    directory.directoryStudiesDAG.add_edge("col1", "study1")
+    directory.directoryStudiesDAG.add_edge("col1", "study2")
+    directory.directoryStudiesDAG.add_edge("col2", "study2")
+    directory.directoryStudiesDAG.add_edge("col1", "study3")
+    directory.directoryStudiesDAG.add_edge("bbmri-eric:ID:EXT_demo:collection:col5", "study3")
+    directory.directoryStudiesDAG.add_edge("col3", "study4")
 
     directory.contactGraph = nx.DiGraph()
     directory.networkGraph = nx.DiGraph()
@@ -237,6 +359,52 @@ def test_get_biobank_services_returns_services_for_biobank():
     assert directory.getBiobankServices("bb1") == [{"id": "svc1", "biobank": {"id": "bb1"}}]
 
 
+def test_service_helpers_resolve_parent_biobank_contact_and_scope():
+    directory = _make_directory_stub()
+    assert directory.getServiceBiobankId("svc1") == "bb1"
+    assert directory.getServiceContact("svc1") == {"id": "ct1", "country": "CZ"}
+    assert directory.getServiceNN("bbmri-eric:serviceID:EXT_demo:svc2") == "EXT"
+    assert directory.getServiceCountry("bbmri-eric:serviceID:EXT_demo:svc2") == "US"
+
+
+def test_study_helpers_resolve_collections_biobanks_and_contacts():
+    directory = _make_directory_stub()
+
+    assert [study["id"] for study in directory.getStudies()] == ["study1", "study2", "study3", "study4"]
+    assert [study["id"] for study in directory.getCollectionStudies("col1")] == ["study1", "study2", "study3"]
+    assert [study["id"] for study in directory.getBiobankStudies("bb1")] == ["study1", "study2", "study3"]
+    assert directory.getStudyCollectionIds("study2") == ["col1", "col2"]
+    assert directory.getStudyBiobankIds("study2") == ["bb1"]
+    assert directory.getStudyBiobankId("study2") == "bb1"
+    assert directory.getStudyContact("study2") == {"id": "ct1", "country": "CZ"}
+    assert [contact["id"] for contact in directory.getStudyContacts("study3")] == [
+        "ct1",
+        "bbmri-eric:contactID:EXT_demo:main",
+    ]
+    assert directory.getStudyContact("study3") is None
+
+
+def test_service_and_study_graph_helpers_return_expected_subgraphs():
+    directory = _make_directory_stub()
+
+    assert set(directory.getGraphBiobankServicesFromBiobank("bb1").nodes()) == {"bb1", "svc1"}
+    assert set(directory.getGraphBiobankStudiesFromBiobank("bb1").nodes()) == {
+        "bb1",
+        "col1",
+        "col2",
+        "study1",
+        "study2",
+        "study3",
+    }
+    assert set(directory.getGraphBiobankStudiesFromStudy("study3").nodes()) == {
+        "bb1",
+        "col1",
+        "study3",
+        "bbmri-eric:ID:EXT_demo",
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+    }
+
+
 def test_get_entity_attribute_id_normalizes_dict_name_and_scalar_values():
     assert Directory.getEntityAttributeId({"id": "X1", "name": "Name"}) == "X1"
     assert Directory.getEntityAttributeId({"name": "Only Name"}) == "Only Name"
@@ -275,6 +443,9 @@ def test_directory_filters_withdrawn_entities_when_requested():
     assert directory.getBiobankById("bb2") is None
     assert directory.getCollectionById("col3") is None
     assert directory.getCollectionById("col4") is None
+    assert [service["id"] for service in directory.getServices()] == ["svc1", "bbmri-eric:serviceID:EXT_demo:svc2"]
+    assert [study["id"] for study in directory.getStudies()] == ["study1", "study2", "study3"]
+    assert directory.getStudyById("study4") is None
 
 
 def test_is_collection_withdrawn_inherits_from_parent_biobank_and_collection():
@@ -432,6 +603,7 @@ def test_directory_uses_complete_cache_without_live_client(monkeypatch, tmp_path
         cache["networks"] = []
         cache["facts"] = []
         cache["services"] = []
+        cache["studies"] = []
         cache["quality_info_biobanks"] = pd.DataFrame()
         cache["quality_info_collections"] = pd.DataFrame()
 
@@ -450,6 +622,7 @@ def test_directory_uses_complete_cache_without_live_client(monkeypatch, tmp_path
     assert directory.networks == []
     assert directory.facts == []
     assert directory.services == []
+    assert directory.studies == []
 
 
 def test_directory_backfills_missing_quality_tables_for_complete_cache(monkeypatch, tmp_path):
@@ -464,6 +637,7 @@ def test_directory_backfills_missing_quality_tables_for_complete_cache(monkeypat
         cache["networks"] = []
         cache["facts"] = []
         cache["services"] = []
+        cache["studies"] = []
 
     calls = []
     quality_biobanks = pd.DataFrame(
@@ -504,6 +678,7 @@ def test_directory_backfills_missing_quality_tables_for_complete_cache(monkeypat
 
     assert directory.biobanks == [{"id": "bb1"}]
     assert directory.collections == [{"id": "col1", "biobank": {"id": "bb1"}}]
+    assert directory.studies == []
     assert directory.getQualBB().equals(quality_biobanks)
     assert directory.getQualColl().equals(quality_collections)
     assert ("get", "QualityInfoBiobanks", True) in calls
@@ -594,6 +769,7 @@ def test_directory_can_return_only_withdrawn_entities():
     assert [biobank["id"] for biobank in directory.getBiobanks()] == ["bb2"]
     assert [collection["id"] for collection in directory.getCollections()] == ["col3", "col4"]
     assert [service["id"] for service in directory.getServices()] == []
+    assert [study["id"] for study in directory.getStudies()] == ["study4"]
 
 
 def test_directory_nn_methods_prefer_staging_area_over_country():

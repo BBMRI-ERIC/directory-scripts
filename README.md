@@ -159,7 +159,7 @@ OoM-based count estimation is centralized in `oomutils.py`. By default all expor
 
 ## Exporters
 
-- **exporter-all.py** - exports biobanks/collections with aggregate counts and optional filters. By default it works on active content only. Use `-w/--include-withdrawn` to include withdrawn content in the main output, `--only-withdrawn` to run only on withdrawn content, and `--output-xlsx-withdrawn` to write the withdrawn subset separately (requires `-w` or `--only-withdrawn`).  
+- **exporter-all.py** - exports biobanks, collections, services, studies, contacts, and networks with aggregate collection sample/donor counts and optional filters. By default it works on active content only. Standard output lists collections, services, studies, contacts, and networks in the selected scope, while the XLSX output writes separate sheets for biobanks, collections, services, studies, contacts, and networks. Use `-w/--include-withdrawn` to include withdrawn content in the main output, `--only-withdrawn` to run only on withdrawn content, `--include-withdrawn-sheets-in-output` to append withdrawn sheets into the main workbook (requires `-X` and `-w`), and `--output-xlsx-withdrawn` to write the withdrawn subset separately (requires `-w` or `--only-withdrawn`).  
 ```
 python3 exporter-all.py -X all.xlsx
 ```

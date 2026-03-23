@@ -48,6 +48,12 @@ add_no_stdout_argument(parser)
 add_directory_schema_argument(parser, default="ERIC")
 add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
+parser.add_argument(
+    '--include-withdrawn-sheets-in-output',
+    dest='includeWithdrawnSheetsInOutput',
+    action='store_true',
+    help='append withdrawn-entity sheets to the main XLSX output (requires -X and -w/--include-withdrawn)',
+)
 parser.add_argument('-FCT', '--filter-collection-type', '--filter-coll-type', dest='filterCollType', nargs='+', action='extend',
                     help='filter by the collection types in the data model, each of them between quotes ("") and separated by a space. E.g.: -FCT "CASE_CONTROL" "LONGITUDINAL" "DISEASE_SPECIFIC"') # TODO: Till now it uses the terms from the data model, different from the ones displayed in Directory
 parser.add_argument('-FMT', '--filter-material-type', dest='filterMatType', nargs='+', action='extend',
@@ -65,6 +71,10 @@ if args.outputXLSXwithdrawn is not None and not (
     parser.error(
         "--output-xlsx-withdrawn requires --include-withdrawn or --only-withdrawn."
     )
+if args.includeWithdrawnSheetsInOutput and args.outputXLSX is None:
+    parser.error("--include-withdrawn-sheets-in-output requires -X/--output-XLSX.")
+if args.includeWithdrawnSheetsInOutput and not args.include_withdrawn:
+    parser.error("--include-withdrawn-sheets-in-output requires -w/--include-withdrawn.")
 
 configure_logging(args)
 
@@ -72,6 +82,14 @@ configure_logging(args)
 ### Initialize variables
 allCollections = []
 withdrawnCollections = []
+allServices = []
+withdrawnServices = []
+allStudies = []
+withdrawnStudies = []
+allContacts = []
+withdrawnContacts = []
+allNetworks = []
+withdrawnNetworks = []
 allBiobanks = set()
 withdrawnBiobanks = set()
 allCollectionSamplesExplicit = 0
@@ -166,13 +184,177 @@ def printCollectionStdout(collectionList: List):
         log.info("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " + biobankId + " - " + biobank['name'])
     log.info("\n\n")
 
-def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str):
+def analyseServices():
+    for service in dir.getServices():
+        biobankId = dir.getServiceBiobankId(service['id'])
+        biobank = dir.getBiobankById(biobankId)
+        if biobank is None:
+            continue
+        allServices.append(service)
+        allBiobanks.add(biobankId)
+        if dir.isBiobankWithdrawn(biobankId):
+            withdrawnServices.append(service)
+            withdrawnBiobanks.add(biobankId)
+        if 'directoryURL' not in service:
+            service['directoryURL'] = 'https://directory.bbmri-eric.eu/ERIC/directory/#/service/' + service['id']
+
+
+def _study_has_withdrawn_collection(study: dict) -> bool:
+    for collection_id in dir.getStudyCollectionIds(study['id']):
+        if dir.isCollectionWithdrawn(collection_id):
+            return True
+    return False
+
+
+def analyseStudies():
+    for study in dir.getStudies():
+        studyBiobankIds = dir.getStudyBiobankIds(study['id'])
+        for biobankId in studyBiobankIds:
+            allBiobanks.add(biobankId)
+            if dir.isBiobankWithdrawn(biobankId):
+                withdrawnBiobanks.add(biobankId)
+        allStudies.append(study)
+        if _study_has_withdrawn_collection(study):
+            withdrawnStudies.append(study)
+        if 'directoryURL' not in study:
+            study['directoryURL'] = 'https://directory.bbmri-eric.eu/ERIC/directory/#/study/' + study['id']
+
+
+def _collect_reference_ids(value):
+    if isinstance(value, dict):
+        reference_id = value.get('id')
+        return [reference_id] if reference_id else []
+    if isinstance(value, list):
+        return [
+            element.get('id')
+            for element in value
+            if isinstance(element, dict) and element.get('id')
+        ]
+    return []
+
+
+def _collect_scope_contact_ids(biobank_ids, collections, networks):
+    contact_ids = set()
+    for biobank_id in biobank_ids:
+        biobank = dir.getBiobankById(biobank_id)
+        if biobank is None:
+            continue
+        contact_ids.update(_collect_reference_ids(biobank.get('contact')))
+        contact_ids.update(_collect_reference_ids(biobank.get('contacts')))
+    for collection in collections:
+        contact_ids.update(_collect_reference_ids(collection.get('contact')))
+        contact_ids.update(_collect_reference_ids(collection.get('contacts')))
+    for network in networks:
+        contact_ids.update(_collect_reference_ids(network.get('contact')))
+        contact_ids.update(_collect_reference_ids(network.get('contacts')))
+    return contact_ids
+
+
+def _collect_scope_network_ids(biobank_ids, collections):
+    network_ids = set()
+    for biobank_id in biobank_ids:
+        biobank = dir.getBiobankById(biobank_id)
+        if biobank is None:
+            continue
+        network_ids.update(_collect_reference_ids(biobank.get('network')))
+        network_ids.update(_collect_reference_ids(biobank.get('networks')))
+    for collection in collections:
+        network_ids.update(_collect_reference_ids(collection.get('network')))
+        network_ids.update(_collect_reference_ids(collection.get('networks')))
+    return network_ids
+
+
+def analyseNetworks():
+    selected_network_ids = _collect_scope_network_ids(allBiobanks, allCollections)
+    selected_withdrawn_network_ids = _collect_scope_network_ids(withdrawnBiobanks, withdrawnCollections)
+    network_by_id = {network['id']: network for network in dir.getNetworks()}
+    for network_id in sorted(selected_network_ids):
+        network = network_by_id.get(network_id)
+        if network is None:
+            continue
+        allNetworks.append(network)
+    for network_id in sorted(selected_withdrawn_network_ids):
+        network = network_by_id.get(network_id)
+        if network is None:
+            continue
+        withdrawnNetworks.append(network)
+
+
+def analyseContacts():
+    selected_contact_ids = _collect_scope_contact_ids(allBiobanks, allCollections, allNetworks)
+    selected_withdrawn_contact_ids = _collect_scope_contact_ids(withdrawnBiobanks, withdrawnCollections, withdrawnNetworks)
+    for contact_id in sorted(selected_contact_ids):
+        allContacts.append(dir.getContact(contact_id))
+    for contact_id in sorted(selected_withdrawn_contact_ids):
+        withdrawnContacts.append(dir.getContact(contact_id))
+
+
+def printServiceStdout(serviceList: List):
+    for service in serviceList:
+        biobankId = dir.getServiceBiobankId(service['id'])
+        biobank = dir.getBiobankById(biobankId)
+        serviceName = service.get('name', '')
+        biobankName = biobank.get('name', '') if biobank is not None else ''
+        log.info("   Service: " + service['id'] + " - " + serviceName + ". Parent biobank: " + biobankId + " - " + biobankName)
+    log.info("\n\n")
+
+
+def printStudyStdout(studyList: List):
+    for study in studyList:
+        studyTitle = study.get('title', '')
+        studyBiobankIds = dir.getStudyBiobankIds(study['id'])
+        if len(studyBiobankIds) == 1:
+            biobankId = studyBiobankIds[0]
+            biobank = dir.getBiobankById(biobankId)
+            biobankName = biobank.get('name', '') if biobank is not None else ''
+            log.info("   Study: " + study['id'] + " - " + studyTitle + ". Parent biobank: " + biobankId + " - " + biobankName)
+        else:
+            log.info("   Study: " + study['id'] + " - " + studyTitle + ". Parent biobanks: " + ",".join(studyBiobankIds))
+    log.info("\n\n")
+
+def printContactStdout(contactList: List):
+    for contact in contactList:
+        contactName = " ".join([value for value in [contact.get('first_name'), contact.get('last_name')] if value])
+        label = contactName if contactName else contact.get('email', '')
+        log.info("   Contact: " + contact['id'] + " - " + label)
+    log.info("\n\n")
+
+
+def printNetworkStdout(networkList: List):
+    for network in networkList:
+        log.info("   Network: " + network['id'] + " - " + network.get('name', ''))
+    log.info("\n\n")
+
+
+def outputExcelDirectoryEntities(
+    filename : str,
+    dfBiobanks : pd.DataFrame,
+    biobanksLabel : str,
+    dfCollections : pd.DataFrame,
+    collectionsLabel : str,
+    dfServices : pd.DataFrame,
+    servicesLabel : str,
+    dfStudies : pd.DataFrame,
+    studiesLabel : str,
+    dfContacts : pd.DataFrame,
+    contactsLabel : str,
+    dfNetworks : pd.DataFrame,
+    networksLabel : str,
+    extraSheets = None,
+):
+    sheet_specs = [
+        (dfBiobanks, biobanksLabel),
+        (dfCollections, collectionsLabel),
+        (dfServices, servicesLabel),
+        (dfStudies, studiesLabel),
+        (dfContacts, contactsLabel),
+        (dfNetworks, networksLabel),
+    ]
+    if extraSheets:
+        sheet_specs.extend(extraSheets)
     write_xlsx_tables(
         filename,
-        [
-            (dfBiobanks, biobanksLabel),
-            (dfCollections, collectionsLabel),
-        ],
+        sheet_specs,
     )
 
 ### Main
@@ -211,17 +393,38 @@ else:
     allCollections, withdrawnCollections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM, allBiobanks = analyseCollections(targetColls, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM)
     allBiobanks = analyseBBs()
 
+analyseServices()
+analyseStudies()
+analyseNetworks()
+analyseContacts()
+
 pd_allCollections = pd.DataFrame(allCollections)
 pd_withdrawnCollections = pd.DataFrame(withdrawnCollections)
+pd_allServices = pd.DataFrame(allServices)
+pd_withdrawnServices = pd.DataFrame(withdrawnServices)
+pd_allStudies = pd.DataFrame(allStudies)
+pd_withdrawnStudies = pd.DataFrame(withdrawnStudies)
+pd_allContacts = pd.DataFrame(allContacts)
+pd_withdrawnContacts = pd.DataFrame(withdrawnContacts)
+pd_allNetworks = pd.DataFrame(allNetworks)
+pd_withdrawnNetworks = pd.DataFrame(withdrawnNetworks)
 pd_allBiobanks = pd.DataFrame([dir.getBiobankById(biobankId) for biobankId in allBiobanks])
 pd_withdrawnBiobanks = pd.DataFrame([dir.getBiobankById(biobankId) for biobankId in withdrawnBiobanks])
 
 if not args.nostdout:
     printCollectionStdout(allCollections)
+    printServiceStdout(allServices)
+    printStudyStdout(allStudies)
+    printContactStdout(allContacts)
+    printNetworkStdout(allNetworks)
     print("Totals:")
     print("- total of biobanks in selected scope: %d" % (len(allBiobanks)))
     print("- total of withdrawn biobanks in selected scope: %d" % (len(withdrawnBiobanks)))
     print("- total of collections with existing samples in selected scope: %d" % (len(allCollections)))
+    print("- total of services in selected scope: %d" % (len(allServices)))
+    print("- total of studies in selected scope: %d" % (len(allStudies)))
+    print("- total of contacts in selected scope: %d" % (len(allContacts)))
+    print("- total of networks in selected scope: %d" % (len(allNetworks)))
     print("- total of countries: %d" % ( len(allCountries)))
     print("Estimated totals:")
     print("- total of samples/donors advertised explicitly in all-relevant collections: %d / %d" % (
@@ -235,9 +438,62 @@ for df in (pd_allCollections, pd_withdrawnCollections):
 for df in (pd_allBiobanks, pd_withdrawnBiobanks):
     if not df.empty:
         pddfutils.tidyBiobankDf(df)
+for df in (pd_allServices, pd_withdrawnServices):
+    if not df.empty:
+        pddfutils.tidyServiceDf(df)
+for df in (pd_allStudies, pd_withdrawnStudies):
+    if not df.empty:
+        pddfutils.tidyStudyDf(df)
+for df in (pd_allContacts, pd_withdrawnContacts):
+    if not df.empty:
+        pddfutils.tidyContactDf(df)
+for df in (pd_allNetworks, pd_withdrawnNetworks):
+    if not df.empty:
+        pddfutils.tidyNetworkDf(df)
 
 if args.outputXLSX is not None:
-    outputExcelBiobanksCollections(args.outputXLSX[0], pd_allBiobanks, "Biobanks", pd_allCollections, "Collections")
+    extra_sheets = []
+    if args.includeWithdrawnSheetsInOutput:
+        extra_sheets.extend(
+            [
+                (pd_withdrawnBiobanks, "Withdrawn biobanks"),
+                (pd_withdrawnCollections, "Withdrawn collections"),
+                (pd_withdrawnServices, "Withdrawn services"),
+                (pd_withdrawnStudies, "Withdrawn studies"),
+                (pd_withdrawnContacts, "Withdrawn contacts"),
+                (pd_withdrawnNetworks, "Withdrawn networks"),
+            ]
+        )
+    outputExcelDirectoryEntities(
+        args.outputXLSX[0],
+        pd_allBiobanks,
+        "Biobanks",
+        pd_allCollections,
+        "Collections",
+        pd_allServices,
+        "Services",
+        pd_allStudies,
+        "Studies",
+        pd_allContacts,
+        "Contacts",
+        pd_allNetworks,
+        "Networks",
+        extra_sheets,
+    )
 
 if args.outputXLSXwithdrawn is not None:
-    outputExcelBiobanksCollections(args.outputXLSXwithdrawn[0], pd_withdrawnBiobanks, "Withdrawn biobanks", pd_withdrawnCollections, "Withdrawn collections")
+    outputExcelDirectoryEntities(
+        args.outputXLSXwithdrawn[0],
+        pd_withdrawnBiobanks,
+        "Withdrawn biobanks",
+        pd_withdrawnCollections,
+        "Withdrawn collections",
+        pd_withdrawnServices,
+        "Withdrawn services",
+        pd_withdrawnStudies,
+        "Withdrawn studies",
+        pd_withdrawnContacts,
+        "Withdrawn contacts",
+        pd_withdrawnNetworks,
+        "Withdrawn networks",
+    )

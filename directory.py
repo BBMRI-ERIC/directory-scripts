@@ -164,6 +164,12 @@ class Directory:
         self.directoryGraph = nx.DiGraph()
         # DAG containing only biobanks and collections
         self.directoryCollectionsDAG = nx.DiGraph()
+        # Graph/DAG containing only biobanks and services
+        self.directoryServicesGraph = nx.DiGraph()
+        self.directoryServicesDAG = nx.DiGraph()
+        # Graph/DAG containing biobanks, collections, and studies
+        self.directoryStudiesGraph = nx.DiGraph()
+        self.directoryStudiesDAG = nx.DiGraph()
         # Weighted graph linking contacts to biobanks/collections/networks
         self.contactGraph = nx.DiGraph()
         # Graph linking networks to biobanks/collections
@@ -182,6 +188,10 @@ class Directory:
                 raise Exception('DirectoryStructure', 'Conflicting ID found in directoryGraph: ' + b['id'])
             self.directoryGraph.add_node(b['id'], data=b)
             self.directoryCollectionsDAG.add_node(b['id'], data=b)
+            self.directoryServicesGraph.add_node(b['id'], data=b)
+            self.directoryServicesDAG.add_node(b['id'], data=b)
+            self.directoryStudiesGraph.add_node(b['id'], data=b)
+            self.directoryStudiesDAG.add_node(b['id'], data=b)
             if self.contactGraph.has_node(b['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + b['id'])
             self.contactGraph.add_node(b['id'], data=b)
@@ -194,12 +204,26 @@ class Directory:
                 raise Exception('DirectoryStructure', 'Conflicting ID found: ' + c['id'])
             self.directoryGraph.add_node(c['id'], data=c)
             self.directoryCollectionsDAG.add_node(c['id'], data=c)
+            self.directoryStudiesGraph.add_node(c['id'], data=c)
+            self.directoryStudiesDAG.add_node(c['id'], data=c)
             if self.contactGraph.has_node(c['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in contactGraph: ' + c['id'])
             self.contactGraph.add_node(c['id'], data=c)
             if self.networkGraph.has_node(c['id']):
                 raise Exception('DirectoryStructure', 'Conflicting ID found in networkGraph: ' + c['id'])
             self.networkGraph.add_node(c['id'], data=c)
+        for service in self.services:
+            log.debug(f'Processing service {service["id"]} into the graph')
+            if self.directoryServicesGraph.has_node(service['id']):
+                raise Exception('DirectoryStructure', 'Conflicting ID found in directoryServicesGraph: ' + service['id'])
+            self.directoryServicesGraph.add_node(service['id'], data=service)
+            self.directoryServicesDAG.add_node(service['id'], data=service)
+        for study in self.studies:
+            log.debug(f'Processing study {study["id"]} into the graph')
+            if self.directoryStudiesGraph.has_node(study['id']):
+                raise Exception('DirectoryStructure', 'Conflicting ID found in directoryStudiesGraph: ' + study['id'])
+            self.directoryStudiesGraph.add_node(study['id'], data=study)
+            self.directoryStudiesDAG.add_node(study['id'], data=study)
         for n in self.networks:
             log.debug(f'Processing network {n["id"]} into the graph')
             if self.contactGraph.has_node(n['id']):
@@ -223,6 +247,23 @@ class Directory:
             biobank = service.get('biobank')
             if biobank and 'id' in biobank:
                 self.biobankServiceMap.setdefault(biobank['id'], []).append(service)
+        self.studyHashmap = {}
+        self.collectionStudyMap = {}
+        self.biobankStudyMap = {}
+        for study in self.studies:
+            self.studyHashmap[study['id']] = study
+            for collection_ref in study.get('collections', []):
+                collection_id = collection_ref.get('id')
+                if not collection_id:
+                    continue
+                self.collectionStudyMap.setdefault(collection_id, []).append(study)
+                collection = next((c for c in self.collections if c['id'] == collection_id), None)
+                if collection is None:
+                    continue
+                biobank_id = collection['biobank']['id']
+                existing_studies = self.biobankStudyMap.setdefault(biobank_id, [])
+                if study not in existing_studies:
+                    existing_studies.append(study)
 
         # check forward pointers from biobanks
         for b in self.biobanks:
@@ -242,20 +283,48 @@ class Directory:
             if 'parent_collection' in c:
                 # some child collection
                 self.directoryGraph.add_edge(c['id'], c['parent_collection']['id'])
+                self.directoryStudiesGraph.add_edge(c['id'], c['parent_collection']['id'])
+                self.directoryStudiesGraph.add_edge(c['parent_collection']['id'], c['id'])
+                self.directoryStudiesDAG.add_edge(c['parent_collection']['id'], c['id'])
             else:
                 # some of root collections of a biobank
                 # we add both edges as we can't extract this information from the biobank level (it contains pointers to all the child collections)
                 self.directoryGraph.add_edge(c['id'], c['biobank']['id'])
                 self.directoryGraph.add_edge(c['biobank']['id'], c['id'])
                 self.directoryCollectionsDAG.add_edge(c['biobank']['id'], c['id'])
+                self.directoryStudiesGraph.add_edge(c['id'], c['biobank']['id'])
+                self.directoryStudiesGraph.add_edge(c['biobank']['id'], c['id'])
+                self.directoryStudiesDAG.add_edge(c['biobank']['id'], c['id'])
             # some of root collections of a biobank
             for sb in c.get('sub_collections', []):
                 self.directoryGraph.add_edge(c['id'], sb['id'])
                 self.directoryCollectionsDAG.add_edge(c['id'], sb['id'])
+                self.directoryStudiesGraph.add_edge(c['id'], sb['id'])
+                self.directoryStudiesGraph.add_edge(sb['id'], c['id'])
+                self.directoryStudiesDAG.add_edge(c['id'], sb['id'])
             if 'contact' in c:
                 self.contactGraph.add_edge(c['id'],c['contact']['id'])
             for n in c.get('networks', []):
                 self.networkGraph.add_edge(c['id'], n['id'])
+        for service in self.services:
+            biobank = service.get('biobank')
+            if biobank is None or 'id' not in biobank:
+                continue
+            if not self.directoryServicesGraph.has_node(biobank['id']):
+                raise Exception('DirectoryStructure', 'Service refers non-existent biobank ID: ' + biobank['id'])
+            self.directoryServicesGraph.add_edge(service['id'], biobank['id'])
+            self.directoryServicesGraph.add_edge(biobank['id'], service['id'])
+            self.directoryServicesDAG.add_edge(biobank['id'], service['id'])
+        for study in self.studies:
+            for collection_ref in study.get('collections', []):
+                collection_id = collection_ref.get('id')
+                if not collection_id:
+                    continue
+                if not self.directoryStudiesGraph.has_node(collection_id):
+                    raise Exception('DirectoryStructure', 'Study refers non-existent collection ID: ' + collection_id)
+                self.directoryStudiesGraph.add_edge(study['id'], collection_id)
+                self.directoryStudiesGraph.add_edge(collection_id, study['id'])
+                self.directoryStudiesDAG.add_edge(collection_id, study['id'])
 
         # processing network edges
         for n in self.networks:
@@ -290,6 +359,14 @@ class Directory:
                 #raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
                 log.warning('DirectoryStructure - contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
                 self.contactGraph.add_edge(e[1],e[0])
+        for e in self.directoryServicesGraph.edges():
+            if not self.directoryServicesGraph.has_edge(e[1],e[0]):
+                log.warning('DirectoryStructure - directoryServicesGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                self.directoryServicesGraph.add_edge(e[1], e[0])
+        for e in self.directoryStudiesGraph.edges():
+            if not self.directoryStudiesGraph.has_edge(e[1],e[0]):
+                log.warning('DirectoryStructure - directoryStudiesGraph: Missing edge: ' + e[1] + ' to ' + e[0])
+                self.directoryStudiesGraph.add_edge(e[1], e[0])
         for e in self.networkGraph.edges():
             if not self.networkGraph.has_edge(e[1],e[0]):
                 #raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
@@ -299,12 +376,20 @@ class Directory:
         # now make graphs immutable
         nx.freeze(self.directoryGraph)
         nx.freeze(self.directoryCollectionsDAG)
+        nx.freeze(self.directoryServicesGraph)
+        nx.freeze(self.directoryServicesDAG)
+        nx.freeze(self.directoryStudiesGraph)
+        nx.freeze(self.directoryStudiesDAG)
         nx.freeze(self.contactGraph)
         nx.freeze(self.networkGraph)
 
         # we check that DAG is indeed DAG :-)
         if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
             raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
+        if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryServicesDAG):
+            raise Exception('DirectoryStructure', 'Service DAG is not DAG')
+        if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryStudiesDAG):
+            raise Exception('DirectoryStructure', 'Study DAG is not DAG')
 
         log.info('Directory structure initialized')
         self.__orphacodesmapper = None
@@ -376,6 +461,12 @@ class Directory:
             log.info(f'   ... retrieved {len(self.services)} services from cache')
         else:
             log.info('   ... cached snapshot has no services table; using empty list')
+        log.info('   ... retrieving studies')
+        self.studies = cache['studies'] if 'studies' in cache else []
+        if 'studies' in cache:
+            log.info(f'   ... retrieved {len(self.studies)} studies from cache')
+        else:
+            log.info('   ... cached snapshot has no studies table; using empty list')
 
     def _refresh_missing_optional_quality_tables(
         self,
@@ -494,6 +585,20 @@ class Directory:
             except Exception as exc:
                 log.warning('Unable to retrieve services: %s', exc)
                 self.services = []
+        log.info('   ... retrieving studies')
+        if 'studies' in cache:
+            self.studies = cache['studies']
+            log.info(f'   ... retrieved {len(self.studies)} studies from cache')
+        else:
+            try:
+                start_time = time.perf_counter()
+                self.studies = session.get_graphql("Studies")
+                cache['studies'] = self.studies
+                end_time = time.perf_counter()
+                log.info(f'   ... retrieved {len(self.studies)} studies in ' + "%0.3f" % (end_time-start_time) + 's')
+            except Exception as exc:
+                log.warning('Unable to retrieve studies: %s', exc)
+                self.studies = []
 
     def prepare_ai_cache_checksum_state(self):
         """Capture pristine entities for AI-cache checksum validation.
@@ -775,6 +880,31 @@ class Directory:
         """
         return self.qualColltable.copy()
 
+    def _get_loaded_biobank_by_id(self, biobankID: str) -> Optional[dict[str, Any]]:
+        """Return a loaded biobank regardless of withdrawn scope, or None when absent."""
+        if self.directoryGraph.has_node(biobankID):
+            biobank = self.directoryGraph.nodes[biobankID]['data']
+            if 'country' in biobank or 'contact' in biobank:
+                return biobank
+        return None
+
+    def _get_loaded_collection_by_id(self, collectionID: str) -> Optional[dict[str, Any]]:
+        """Return a loaded collection regardless of withdrawn scope, or None when absent."""
+        if self.directoryGraph.has_node(collectionID):
+            collection = self.directoryGraph.nodes[collectionID]['data']
+            if 'biobank' in collection:
+                return collection
+        return None
+
+    def _get_visible_collection_by_id(self, collectionID: str) -> Optional[dict[str, Any]]:
+        """Return a collection visible under the current withdrawn scope, or None."""
+        collection = self._get_loaded_collection_by_id(collectionID)
+        if collection is None:
+            return None
+        if not self._matches_withdrawn_scope(self.isCollectionWithdrawn(collectionID)):
+            return None
+        return collection
+
     def getBiobankById(self, biobankId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
         """Return a biobank by id.
 
@@ -1002,17 +1132,189 @@ class Directory:
     def getServiceById(self, serviceID: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
         """Return a service by id."""
         if serviceID in self.serviceHashmap:
-            return self.serviceHashmap[serviceID]
+            service = self.serviceHashmap[serviceID]
+            if self._matches_withdrawn_scope(self.isBiobankWithdrawn(service['biobank']['id'])):
+                return service
         if raise_on_missing:
             raise KeyError(f"Service {serviceID!r} not found in loaded directory snapshot.")
         log.warning("Service %r not found in loaded directory snapshot.", serviceID)
         return None
+
+    def getServicesCount(self):
+        """Return the number of loaded services."""
+        return len(self.getServices())
 
     def getBiobankServices(self, biobankID: str):
         """Return services belonging to a biobank id."""
         if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobankID)):
             return []
         return self.biobankServiceMap.get(biobankID, [])
+
+    def getServiceBiobankId(self, serviceID: str):
+        """Return the parent biobank id of the given service id."""
+        service = self.directoryServicesGraph.nodes[serviceID]['data']
+        return service['biobank']['id']
+
+    def getServiceBiobank(self, serviceID: str) -> Optional[dict[str, Any]]:
+        """Return the parent biobank of a service id."""
+        return self.getBiobankById(self.getServiceBiobankId(serviceID))
+
+    def getServiceContact(self, serviceID: str):
+        """Return primary contact record for a service id via its parent biobank."""
+        return self.getBiobankContact(self.getServiceBiobankId(serviceID))
+
+    def getServiceNN(self, serviceID: str):
+        """Return the node/staging-area code for a service id."""
+        staging_area = NNContacts.extract_staging_area(serviceID)
+        if staging_area:
+            return staging_area
+        return self.getBiobankNN(self.getServiceBiobankId(serviceID))
+
+    def getServiceCountry(self, serviceID: str):
+        """Return the reported country code for a service id."""
+        return self.getBiobankCountry(self.getServiceBiobankId(serviceID))
+
+    def getGraphBiobankServicesFromBiobank(self, biobankID: str):
+        """Return subgraph containing a biobank and its services."""
+        return self.directoryServicesDAG.subgraph(
+            nx.algorithms.dag.descendants(self.directoryServicesDAG, biobankID).union({biobankID})
+        )
+
+    def getStudies(self):
+        """Return all loaded studies with at least one visible associated collection."""
+        visible_studies = []
+        for study in self.studies:
+            for collection_ref in study.get('collections', []):
+                collection_id = collection_ref.get('id')
+                if collection_id is None:
+                    continue
+                collection = self._get_visible_collection_by_id(collection_id)
+                if collection is not None:
+                    visible_studies.append(study)
+                    break
+        return visible_studies
+
+    def getStudyById(self, studyID: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
+        """Return a study by id when it has at least one visible associated collection."""
+        if studyID in self.studyHashmap:
+            study = self.studyHashmap[studyID]
+            if any(
+                self._get_visible_collection_by_id(collection_ref.get('id')) is not None
+                for collection_ref in study.get('collections', [])
+                if collection_ref.get('id') is not None
+            ):
+                return study
+        if raise_on_missing:
+            raise KeyError(f"Study {studyID!r} not found in loaded directory snapshot.")
+        log.warning("Study %r not found in loaded directory snapshot.", studyID)
+        return None
+
+    def getStudiesCount(self):
+        """Return the number of loaded studies."""
+        return len(self.getStudies())
+
+    def getCollectionStudies(self, collectionID: str):
+        """Return studies associated with a collection id."""
+        if self._get_visible_collection_by_id(collectionID) is None:
+            return []
+        visible_studies = []
+        for study in self.collectionStudyMap.get(collectionID, []):
+            if self.getStudyById(study['id']) is not None:
+                visible_studies.append(study)
+        return visible_studies
+
+    def getBiobankStudies(self, biobankID: str):
+        """Return studies associated with collections of a biobank id."""
+        if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobankID)):
+            return []
+        visible_studies = []
+        for study in self.biobankStudyMap.get(biobankID, []):
+            if self.getStudyById(study['id']) is not None:
+                visible_studies.append(study)
+        return visible_studies
+
+    def getStudyCollectionIds(self, studyID: str):
+        """Return visible collection ids associated with a study id."""
+        study = self.getStudyById(studyID, raise_on_missing=True)
+        collection_ids = []
+        for collection_ref in study.get('collections', []):
+            collection_id = collection_ref.get('id')
+            if collection_id is None:
+                continue
+            if self._get_visible_collection_by_id(collection_id) is not None:
+                collection_ids.append(collection_id)
+        return collection_ids
+
+    def getStudyCollections(self, studyID: str):
+        """Return visible collections associated with a study id."""
+        return [
+            self._get_visible_collection_by_id(collection_id)
+            for collection_id in self.getStudyCollectionIds(studyID)
+        ]
+
+    def getStudyBiobankIds(self, studyID: str):
+        """Return visible parent biobank ids associated with a study id."""
+        biobank_ids = []
+        for collection in self.getStudyCollections(studyID):
+            if collection is None:
+                continue
+            biobank_id = collection['biobank']['id']
+            if biobank_id not in biobank_ids:
+                biobank_ids.append(biobank_id)
+        return biobank_ids
+
+    def getStudyBiobanks(self, studyID: str):
+        """Return visible parent biobanks associated with a study id."""
+        return [
+            self.getBiobankById(biobank_id)
+            for biobank_id in self.getStudyBiobankIds(studyID)
+        ]
+
+    def getStudyBiobankId(self, studyID: str) -> Optional[str]:
+        """Return the single visible parent biobank id of a study, or None when ambiguous."""
+        biobank_ids = self.getStudyBiobankIds(studyID)
+        if len(biobank_ids) == 1:
+            return biobank_ids[0]
+        return None
+
+    def getStudyContacts(self, studyID: str):
+        """Return unique contacts associated with the visible collections of a study."""
+        contacts = []
+        seen_contact_ids = set()
+        for collection in self.getStudyCollections(studyID):
+            if collection is None:
+                continue
+            contact = None
+            if 'contact' in collection and collection['contact'].get('id') in self.contactHashmap:
+                contact = self.contactHashmap[collection['contact']['id']]
+            elif 'biobank' in collection:
+                biobank = self.getBiobankById(collection['biobank']['id'])
+                if biobank is not None and 'contact' in biobank:
+                    contact = self.contactHashmap.get(biobank['contact']['id'])
+            if contact is None or contact['id'] in seen_contact_ids:
+                continue
+            contacts.append(contact)
+            seen_contact_ids.add(contact['id'])
+        return contacts
+
+    def getStudyContact(self, studyID: str) -> Optional[dict[str, Any]]:
+        """Return the single unique study contact, or None when ambiguous."""
+        contacts = self.getStudyContacts(studyID)
+        if len(contacts) == 1:
+            return contacts[0]
+        return None
+
+    def getGraphBiobankStudiesFromBiobank(self, biobankID: str):
+        """Return subgraph containing a biobank, descendant collections, and linked studies."""
+        return self.directoryStudiesDAG.subgraph(
+            nx.algorithms.dag.descendants(self.directoryStudiesDAG, biobankID).union({biobankID})
+        )
+
+    def getGraphBiobankStudiesFromStudy(self, studyID: str):
+        """Return subgraph containing a study, its associated collections, and ancestor biobanks."""
+        return self.directoryStudiesDAG.subgraph(
+            nx.algorithms.dag.ancestors(self.directoryStudiesDAG, studyID).union({studyID})
+        )
 
     def getNetworkNN(self, networkID: str):
         """Return the node/staging-area code for a network id."""

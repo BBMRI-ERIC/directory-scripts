@@ -19,6 +19,7 @@ class SharedDirectoryStub:
             "name": "Biobank 1",
             "country": "CZ",
             "contact": {"id": "ct1"},
+            "network": [{"id": "net1"}],
             "withdrawn": False,
         },
         {
@@ -26,6 +27,7 @@ class SharedDirectoryStub:
             "name": "Biobank 2",
             "country": "DE",
             "contact": {"id": "ct2"},
+            "network": [{"id": "net2"}],
             "withdrawn": False,
         },
         {
@@ -33,6 +35,7 @@ class SharedDirectoryStub:
             "name": "Biobank 3",
             "country": "NL",
             "contact": {"id": "ct3"},
+            "network": [{"id": "net3"}],
             "withdrawn": True,
         },
     ]
@@ -43,6 +46,7 @@ class SharedDirectoryStub:
             "biobank": {"id": "bbmri-eric:ID:CZ_BB1"},
             "country": "CZ",
             "contact": {"id": "ct1"},
+            "networks": [{"id": "net1"}],
             "type": ["DISEASE_SPECIFIC"],
             "materials": ["SERUM"],
             "order_of_magnitude": 2,
@@ -58,6 +62,7 @@ class SharedDirectoryStub:
             "biobank": {"id": "bbmri-eric:ID:CZ_BB1"},
             "country": "CZ",
             "contact": {"id": "ct1"},
+            "networks": [{"id": "net1"}],
             "type": ["CASE_CONTROL"],
             "materials": ["DNA"],
             "parent_collection": {"id": "col1"},
@@ -73,6 +78,7 @@ class SharedDirectoryStub:
             "biobank": {"id": "bbmri-eric:ID:EXT_BB2"},
             "country": "DE",
             "contact": {"id": "ct2"},
+            "networks": [{"id": "net2"}],
             "type": ["POPULATION"],
             "materials": ["PLASMA"],
             "order_of_magnitude": 3,
@@ -86,6 +92,7 @@ class SharedDirectoryStub:
             "biobank": {"id": "bbmri-eric:ID:EXT_BB2"},
             "country": "DE",
             "contact": {"id": "ct2"},
+            "networks": [{"id": "net2"}],
             "type": ["LONGITUDINAL"],
             "materials": ["SERUM"],
             "order_of_magnitude": 1,
@@ -98,6 +105,7 @@ class SharedDirectoryStub:
             "biobank": {"id": "bbmri-eric:ID:NL_BB3"},
             "country": "NL",
             "contact": {"id": "ct3"},
+            "networks": [{"id": "net3"}],
             "type": ["CASE_CONTROL"],
             "materials": ["SERUM"],
             "order_of_magnitude": 2,
@@ -112,6 +120,11 @@ class SharedDirectoryStub:
         {"id": "ct1", "email": "ct1@example.org", "country": "CZ"},
         {"id": "ct2", "email": "ct2@example.org", "country": "DE"},
         {"id": "ct3", "email": "ct3@example.org", "country": "NL"},
+    ]
+    BASE_NETWORKS = [
+        {"id": "net1", "name": "Network 1", "country": {"id": "CZ"}, "contact": {"id": "ct1"}},
+        {"id": "net2", "name": "Network 2", "country": {"id": "DE"}, "contact": {"id": "ct2"}},
+        {"id": "net3", "name": "Network 3", "country": {"id": "NL"}, "contact": {"id": "ct3"}},
     ]
     BASE_FACTS = {
         "col1": [
@@ -174,6 +187,23 @@ class SharedDirectoryStub:
         {"id": "svc1", "biobank": {"id": "bbmri-eric:ID:CZ_BB1"}, "serviceTypes": ["SEQUENCING"]},
         {"id": "svc2", "biobank": {"id": "bbmri-eric:ID:NL_BB3"}, "serviceTypes": ["BIOANALYTICAL_SERVICES"]},
     ]
+    BASE_STUDIES = [
+        {
+            "id": "study1",
+            "title": "Study 1",
+            "collections": [{"id": "col1"}],
+        },
+        {
+            "id": "study2",
+            "title": "Study 2",
+            "collections": [{"id": "col1"}, {"id": "col3"}],
+        },
+        {
+            "id": "study3",
+            "title": "Study 3",
+            "collections": [{"id": "col5"}],
+        },
+    ]
 
     def __init__(self, *args, **kwargs):
         self.include_withdrawn_entities = kwargs.get("include_withdrawn_entities", False) or kwargs.get("only_withdrawn_entities", False)
@@ -181,7 +211,9 @@ class SharedDirectoryStub:
         self.biobanks = copy.deepcopy(self.BASE_BIOBANKS)
         self.collections = copy.deepcopy(self.BASE_COLLECTIONS)
         self.contacts = copy.deepcopy(self.BASE_CONTACTS)
+        self.networks = copy.deepcopy(self.BASE_NETWORKS)
         self.services = copy.deepcopy(self.BASE_SERVICES)
+        self.studies = copy.deepcopy(self.BASE_STUDIES)
         self.collectionFactMap = copy.deepcopy(self.BASE_FACTS)
         self.contactHashmap = {contact["id"]: contact for contact in self.contacts}
 
@@ -262,6 +294,12 @@ class SharedDirectoryStub:
     def getContact(self, contact_id):
         return self.contactHashmap[contact_id]
 
+    def getContacts(self):
+        return self.contacts
+
+    def getNetworks(self):
+        return self.networks
+
     def getServices(self):
         return [
             service
@@ -270,6 +308,40 @@ class SharedDirectoryStub:
                 self.isBiobankWithdrawn(service["biobank"]["id"])
             )
         ]
+
+    def getServiceBiobankId(self, service_id):
+        return next(
+            service["biobank"]["id"]
+            for service in self.services
+            if service["id"] == service_id
+        )
+
+    def getStudies(self):
+        visible_studies = []
+        for study in self.studies:
+            for collection_ref in study.get("collections", []):
+                collection = self.getCollectionById(collection_ref["id"])
+                if collection is not None:
+                    visible_studies.append(study)
+                    break
+        return visible_studies
+
+    def getStudyCollectionIds(self, study_id):
+        study = next(study for study in self.studies if study["id"] == study_id)
+        collection_ids = []
+        for collection_ref in study.get("collections", []):
+            collection_id = collection_ref["id"]
+            if self.getCollectionById(collection_id) is not None:
+                collection_ids.append(collection_id)
+        return collection_ids
+
+    def getStudyBiobankIds(self, study_id):
+        biobank_ids = []
+        for collection_id in self.getStudyCollectionIds(study_id):
+            biobank_id = self.getCollectionBiobankId(collection_id)
+            if biobank_id not in biobank_ids:
+                biobank_ids.append(biobank_id)
+        return biobank_ids
 
     def isTopLevelCollection(self, collection_id):
         return "parent_collection" not in self.getCollectionById(collection_id)
@@ -323,6 +395,52 @@ def test_directory_stats_matches_exporter_all_active_totals(monkeypatch):
     assert summary["donors_explicit"] == exporter_globals["allCollectionDonorsExplicit"]
     assert summary["samples_total"] == exporter_globals["allCollectionSamplesIncOoM"]
     assert summary["donors_total"] == exporter_globals["allCollectionDonorsIncOoM"]
+
+
+def test_exporter_all_collects_services_and_studies_in_active_scope(monkeypatch):
+    exporter_globals, _, _ = _run_script(
+        monkeypatch,
+        "exporter-all.py",
+        ["-N"],
+    )
+
+    assert [service["id"] for service in exporter_globals["allServices"]] == ["svc1"]
+    assert [study["id"] for study in exporter_globals["allStudies"]] == ["study1", "study2"]
+    assert [contact["id"] for contact in exporter_globals["allContacts"]] == ["ct1", "ct2"]
+    assert [network["id"] for network in exporter_globals["allNetworks"]] == ["net1", "net2"]
+
+
+def test_exporter_all_can_append_withdrawn_sheets_to_main_workbook(monkeypatch, tmp_path):
+    workbook = tmp_path / "all.xlsx"
+    _run_script(
+        monkeypatch,
+        "exporter-all.py",
+        [
+            "-N",
+            "-w",
+            "-X",
+            str(workbook),
+            "--include-withdrawn-sheets-in-output",
+        ],
+    )
+
+    import pandas as pd
+
+    sheet_names = pd.ExcelFile(workbook).sheet_names
+    assert sheet_names == [
+        "Biobanks",
+        "Collections",
+        "Services",
+        "Studies",
+        "Contacts",
+        "Networks",
+        "Withdrawn biobanks",
+        "Withdrawn collections",
+        "Withdrawn services",
+        "Withdrawn studies",
+        "Withdrawn contacts",
+        "Withdrawn networks",
+    ]
 
 
 def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):

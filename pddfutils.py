@@ -65,4 +65,76 @@ def tidyBiobankDf (df : pd.DataFrame):
             df[col] = df[col].map(lambda x: ",".join([e['id'] for e in x]) if isinstance(x, list) else x)
     assert isinstance(df, pd.DataFrame)
     _sort_by_existing_columns(df, ['country', 'id'])
+
+def tidyServiceDf (df : pd.DataFrame):
+    assert isinstance(df, pd.DataFrame)
+    if 'biobank' in df:
+        df['biobank'] = df['biobank'].map(
+            lambda x: x.get('name') or x.get('id', '') if isinstance(x, dict) else x
+        )
+    linearizeStructures(df, [('national_node', 'id')])
+    if 'serviceTypes' in df:
+        df['serviceTypes'] = df['serviceTypes'].map(
+            lambda x: ",".join(
+                [
+                    e.get('id') or e.get('name', '')
+                    for e in x
+                    if isinstance(e, dict)
+                ]
+            ) if isinstance(x, list) else x
+        )
+    _sort_by_existing_columns(df, ['id'])
+
+def tidyStudyDf (df : pd.DataFrame):
+    assert isinstance(df, pd.DataFrame)
+    linearizeStructures(df, [('national_node', 'id')])
+    for col in ('sex',):
+        if col in df:
+            df[col] = df[col].map(lambda x: ",".join([e for e in x]) if isinstance(x, list) else x)
+    for col in ('collections', 'also_known'):
+        if col in df:
+            df[col] = df[col].map(
+                lambda x: ",".join(
+                    [
+                        e.get('id', '')
+                        for e in x
+                        if isinstance(e, dict)
+                    ]
+                ) if isinstance(x, list) else x
+            )
+    _sort_by_existing_columns(df, ['id'])
+
+def tidyContactDf (df : pd.DataFrame):
+    assert isinstance(df, pd.DataFrame)
+    for col in ('country',):
+        if col in df:
+            df[col] = df[col].map(lambda x: x.get('id', '') if isinstance(x, dict) else x)
+    for col in ('biobanks', 'collections', 'networks'):
+        if col in df:
+            df[col] = df[col].map(
+                lambda x: ",".join(
+                    [
+                        e.get('id', '')
+                        for e in x
+                        if isinstance(e, dict)
+                    ]
+                ) if isinstance(x, list) else x
+            )
+    _sort_by_existing_columns(df, ['country', 'id'])
+
+def tidyNetworkDf (df : pd.DataFrame):
+    assert isinstance(df, pd.DataFrame)
+    linearizeStructures(df, [('country', 'id'), ('contact', 'id')])
+    for col in ('contacts', 'biobanks', 'collections'):
+        if col in df:
+            df[col] = df[col].map(
+                lambda x: ",".join(
+                    [
+                        e.get('id', '')
+                        for e in x
+                        if isinstance(e, dict)
+                    ]
+                ) if isinstance(x, list) else x
+            )
+    _sort_by_existing_columns(df, ['country', 'id'])
             

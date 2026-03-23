@@ -21,6 +21,7 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
 - `directory.py`
   - single shared abstraction for Directory / Molgenis access
   - owns shared data retrieval, schema handling, withdrawal scoping, and graph helpers
+  - Services and Studies are first-class cached/traversable entities there too: keep biobank<->service traversal and biobank->collection->study traversal logic in `directory.py` instead of reconstructing parentage ad hoc in exporters
   - owns shared quality-information access too: new code should prefer `getBiobankQualityInfo(...)`, `getCollectionQualityInfo(...)`, `getBiobankQualityInfoWide(...)`, `getCollectionQualityInfoWide(...)`, and `getQualityStandardsOntology(...)` over ad hoc DataFrame filtering/pivoting in exporters
 - `directory_session_compat.py`
   - compatibility wrapper for write-capable Molgenis sessions
@@ -197,6 +198,7 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 - Prefer `snake_case` names and small reusable helpers.
 - Keep exporters thin: CLI + orchestration only.
 - Keep shared Directory logic in `directory.py`.
+- `exporter-all.py` is the broad entity dump: when its sheet layout changes, keep the workbook tabs and stdout sections aligned across biobanks, collections, services, studies, contacts, and networks, and keep any withdrawn-in-main-workbook option additive rather than replacing the existing separate-workbook path.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.
 - Keep CLI help output consistent across scripts: standard options first (`-h`, `-v`, `-d`, then Directory target/auth options), then tool-specific options.
 - Keep short options globally consistent inside one CLI: do not reuse `-t` for tool-specific meanings in scripts that already expose `-t/--token` via shared auth helpers.
