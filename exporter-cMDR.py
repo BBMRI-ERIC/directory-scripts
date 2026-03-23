@@ -78,14 +78,20 @@ def _reorder_columns(df: pd.DataFrame, preferred_columns: list[str]) -> pd.DataF
 
 
 def _build_country_summary(
+    biobank_rows: list[dict],
     collection_rows: list[dict],
     study_rows: list[dict],
 ) -> list[dict[str, int | str]]:
     country_codes = sorted(
         {
             row.get('country', '')
-            for row in collection_rows
+            for row in biobank_rows
         }.union(
+            {
+                row.get('country', '')
+                for row in collection_rows
+            }
+        ).union(
             {
                 item
                 for row in study_rows
@@ -99,6 +105,7 @@ def _build_country_summary(
         summary_rows.append(
             {
                 'country': country_code,
+                'biobanks': sum(1 for row in biobank_rows if row.get('country', '') == country_code),
                 'collections': sum(1 for row in collection_rows if row.get('country', '') == country_code),
                 'studies': sum(
                     1
@@ -142,8 +149,23 @@ def _get_study_coordinates(study_id: str) -> tuple[list[float] | None, str, str]
     return None, '', ''
 
 
+cmdrBiobanks = []
 cmdrCollections = []
 cmdrStudies = []
+
+for biobank in dir.getBiobanks():
+    linked_studies = dir.getBiobankStudies(biobank['id'])
+    if not linked_studies:
+        continue
+    biobank_row = dict(biobank)
+    biobank_row['country'] = dir.getBiobankCountry(biobank['id'])
+    biobank_row['study_count'] = len(linked_studies)
+    biobank_row['studies'] = [{'id': study['id']} for study in linked_studies]
+    biobank_row['study_titles'] = ",".join(
+        study.get('title', '') for study in linked_studies if study.get('title')
+    )
+    biobank_row['directoryURL'] = buildDirectoryEntityURL('biobank', biobank['id'])
+    cmdrBiobanks.append(biobank_row)
 
 for collection in dir.getCollections():
     linked_studies = dir.getCollectionStudies(collection['id'])
@@ -166,22 +188,43 @@ for study in dir.getStudies():
     study_row = dict(study)
     study_row['country'] = ",".join(dir.getStudyCountries(study['id']))
     study_row['collection_count'] = len(collection_ids)
+    biobank_ids = dir.getStudyBiobankIds(study['id'])
+    study_row['biobank_count'] = len(biobank_ids)
     study_row['collections'] = [{'id': collection_id} for collection_id in collection_ids]
+    study_row['biobanks'] = [{'id': biobank_id} for biobank_id in biobank_ids]
     study_row['directoryURL'] = buildDirectoryEntityURL('study', study['id'])
     for index, collection_id in enumerate(collection_ids, start=1):
         study_row[f'collection_{index}'] = collection_id
         study_row[f'collection_{index}_directoryURL'] = buildDirectoryEntityURL('collection', collection_id)
+    for index, biobank_id in enumerate(biobank_ids, start=1):
+        study_row[f'biobank_{index}'] = biobank_id
+        study_row[f'biobank_{index}_directoryURL'] = buildDirectoryEntityURL('biobank', biobank_id)
     cmdrStudies.append(study_row)
 
+cmdrBiobanks = _sort_rows(cmdrBiobanks)
 cmdrCollections = _sort_rows(cmdrCollections)
 cmdrStudies = _sort_rows(cmdrStudies)
-countrySummary = _build_country_summary(cmdrCollections, cmdrStudies)
+countrySummary = _build_country_summary(cmdrBiobanks, cmdrCollections, cmdrStudies)
+studyBiobankColumnCount = max(
+    (row.get('biobank_count', 0) for row in cmdrStudies),
+    default=0,
+)
 studyCollectionColumnCount = max(
     (row.get('collection_count', 0) for row in cmdrStudies),
     default=0,
 )
 
 if not args.nostdout:
+    print("Biobanks linked to one or more studies")
+    _grouped_stdout(
+        cmdrBiobanks,
+        "Biobanks",
+        lambda row: (
+            f"{row['id']} - {row.get('name', '')} "
+            f"[studies: {','.join(study['id'] for study in dir.getBiobankStudies(row['id']))}]"
+        ),
+    )
+    print("")
     print("Collections linked to one or more studies")
     _grouped_stdout(
         cmdrCollections,
@@ -206,18 +249,27 @@ if not args.nostdout:
     for row in countrySummary:
         label = row['country'] if row['country'] else "(no country)"
         print(
-            f"- {label}: collections linked to studies = {row['collections']}, "
+            f"- {label}: biobanks linked to studies = {row['biobanks']}, "
+            f"collections linked to studies = {row['collections']}, "
             f"studies linked to collections = {row['studies']}"
         )
     print("")
     print("Totals:")
+    print(f"- biobanks linked to studies: {len(cmdrBiobanks)}")
     print(f"- collections linked to studies: {len(cmdrCollections)}")
     print(f"- studies linked to collections: {len(cmdrStudies)}")
 
 if args.outputXLSX is not None:
+    pd_biobanks = pd.DataFrame(cmdrBiobanks)
     pd_collections = pd.DataFrame(cmdrCollections)
     pd_studies = pd.DataFrame(cmdrStudies)
 
+    if not pd_biobanks.empty:
+        pddfutils.tidyBiobankDf(pd_biobanks)
+        pd_biobanks = _reorder_columns(
+            pd_biobanks,
+            ['country', 'id', 'name', 'study_count', 'studies', 'study_titles', 'directoryURL'],
+        )
     if not pd_collections.empty:
         pddfutils.tidyCollectionDf(pd_collections)
         pd_collections = _reorder_columns(
@@ -230,10 +282,16 @@ if args.outputXLSX is not None:
             'country',
             'id',
             'title',
+            'biobank_count',
             'collection_count',
+            'biobanks',
             'collections',
             'directoryURL',
         ]
+        for index in range(1, studyBiobankColumnCount + 1):
+            preferred_study_columns.extend(
+                [f'biobank_{index}', f'biobank_{index}_directoryURL']
+            )
         for index in range(1, studyCollectionColumnCount + 1):
             preferred_study_columns.extend(
                 [f'collection_{index}', f'collection_{index}_directoryURL']
@@ -242,6 +300,11 @@ if args.outputXLSX is not None:
 
     study_hyperlink_columns = [('id', 'directoryURL')]
     hidden_columns = ['directoryURL']
+    for index in range(1, studyBiobankColumnCount + 1):
+        display_column = f'biobank_{index}'
+        url_column = f'biobank_{index}_directoryURL'
+        study_hyperlink_columns.append((display_column, url_column))
+        hidden_columns.append(url_column)
     for index in range(1, studyCollectionColumnCount + 1):
         display_column = f'collection_{index}'
         url_column = f'collection_{index}_directoryURL'
@@ -251,6 +314,15 @@ if args.outputXLSX is not None:
     write_xlsx_tables(
         args.outputXLSX[0],
         [
+            (
+                pd_biobanks,
+                'Biobanks',
+                False,
+                {
+                    'hyperlink_columns': [('id', 'directoryURL')],
+                    'hide_columns': ['directoryURL'],
+                },
+            ),
             (
                 pd_collections,
                 'Collections',

@@ -280,6 +280,9 @@ class SharedDirectoryStub:
             raise KeyError(biobank_id)
         return None
 
+    def getBiobankCountry(self, biobank_id):
+        return self.getBiobankById(biobank_id)["country"]
+
     def getCollections(self):
         return [
             collection
@@ -397,6 +400,13 @@ class SharedDirectoryStub:
             if biobank_id not in biobank_ids:
                 biobank_ids.append(biobank_id)
         return biobank_ids
+
+    def getBiobankStudies(self, biobank_id):
+        return [
+            study
+            for study in self.getStudies()
+            if biobank_id in self.getStudyBiobankIds(study["id"])
+        ]
 
     def getStudyCountries(self, study_id):
         return sorted(
@@ -536,13 +546,17 @@ def test_exporter_all_writes_clickable_id_hyperlinks(monkeypatch, tmp_path):
     assert network_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/network/net1","net1")'
 
 
-def test_exporter_cmdr_lists_only_study_linked_collections_and_studies(monkeypatch):
+def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):
     exporter_globals, stdout, _ = _run_script(
         monkeypatch,
         "exporter-cMDR.py",
         [],
     )
 
+    assert [biobank["id"] for biobank in exporter_globals["cmdrBiobanks"]] == [
+        "bbmri-eric:ID:CZ_BB1",
+        "bbmri-eric:ID:EXT_BB2",
+    ]
     assert [collection["id"] for collection in exporter_globals["cmdrCollections"]] == [
         "col1",
         "col3",
@@ -552,12 +566,14 @@ def test_exporter_cmdr_lists_only_study_linked_collections_and_studies(monkeypat
         "study2",
     ]
     assert "CZ" in stdout
+    assert "bbmri-eric:ID:CZ_BB1 - Biobank 1 [studies: study1,study2]" in stdout
     assert "col1 - Collection 1 [studies: study1,study2]" in stdout
     assert "DE" in stdout
+    assert "bbmri-eric:ID:EXT_BB2 - Biobank 2 [studies: study2]" in stdout
     assert "study2 - Study 2 [collections: col1,col3]" in stdout
     assert "Per-country summary:" in stdout
-    assert "- CZ: collections linked to studies = 1, studies linked to collections = 2" in stdout
-    assert "- DE: collections linked to studies = 1, studies linked to collections = 1" in stdout
+    assert "- CZ: biobanks linked to studies = 1, collections linked to studies = 1, studies linked to collections = 2" in stdout
+    assert "- DE: biobanks linked to studies = 1, collections linked to studies = 1, studies linked to collections = 1" in stdout
     assert "- CZ,DE:" not in stdout
 
 
@@ -576,16 +592,21 @@ def test_exporter_cmdr_writes_sorted_hyperlinked_workbook(monkeypatch, tmp_path)
     from openpyxl import load_workbook
 
     wb = load_workbook(workbook)
-    assert wb.sheetnames == ["Collections", "Studies"]
+    assert wb.sheetnames == ["Biobanks", "Collections", "Studies"]
+    assert wb["Biobanks"]["A2"].value == "CZ"
+    assert wb["Biobanks"]["B2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:CZ_BB1","bbmri-eric:ID:CZ_BB1")'
+    assert wb["Biobanks"]["B3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:EXT_BB2","bbmri-eric:ID:EXT_BB2")'
     assert wb["Collections"]["A2"].value == "CZ"
     assert wb["Collections"]["B2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
     assert wb["Collections"]["B3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col3","col3")'
     assert wb["Studies"]["A2"].value == "CZ"
     assert wb["Studies"]["B2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/study/study1","study1")'
-    assert wb["Studies"]["G2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
+    assert wb["Studies"]["I2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:CZ_BB1","bbmri-eric:ID:CZ_BB1")'
+    assert wb["Studies"]["M2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
     assert wb["Studies"]["A3"].value == "CZ,DE"
-    assert wb["Studies"]["G3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
-    assert wb["Studies"]["I3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col3","col3")'
+    assert wb["Studies"]["I3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:CZ_BB1","bbmri-eric:ID:CZ_BB1")'
+    assert wb["Studies"]["K3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:EXT_BB2","bbmri-eric:ID:EXT_BB2")'
+    assert wb["Studies"]["M3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
 
 
 def test_exporter_cmdr_writes_geojson_with_entity_and_biobank_fallback(monkeypatch, tmp_path):
