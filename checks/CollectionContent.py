@@ -38,14 +38,6 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                'summary': 'Missing age_unit for '
                                                           'provided age range: '
                                                           "{collection.get('age_low')}-{collection.get('age_high')}"},
- 'CC:AgeUnitAmbiguous': {'entity': 'COLLECTION',
-                                                       'fields': ['age_unit'],
-                                                       'severity': 'ERROR',
-                                                       'summary': 'Ambiguous '
-                                                                  'speification of '
-                                                                  'age_unit - only one '
-                                                                  'value is permitted. '
-                                                                  'Provided values %s'},
  'CC:TypeMissing': {'entity': 'COLLECTION',
                                               'fields': ['type'],
                                               'severity': 'ERROR',
@@ -587,15 +579,11 @@ class CollectionContent(IPlugin):
 					)
 				]))
 
+			# age_unit is ONTOLOGY (single scalar), not ONTOLOGY_ARRAY
 			age_unit = None
-			age_units = []
-			if 'age_unit' in collection:
-				age_units = collection['age_unit']
-				if len(age_units) > 1:
-					warnings.append(DataCheckWarning(make_check_id(self, "AgeUnitAmbiguous"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Ambiguous speification of age_unit - only one value is permitted. Provided values %s"%(age_units)))
-				elif len(age_units) == 1:
-					age_unit = age_units[0]
-			if ('age_high' in collection or 'age_low' in collection) and ('age_low' not in collection or len(age_units) < 1):
+			if 'age_unit' in collection and collection['age_unit']:
+				age_unit = collection['age_unit']
+			if ('age_high' in collection or 'age_low' in collection) and ('age_low' not in collection or age_unit is None):
 				warnings.append(DataCheckWarning(make_check_id(self, "AgeUnitMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Missing age_unit for provided age range: {collection.get('age_low')}-{collection.get('age_high')}"))
 
 			age_min_limit = -1
