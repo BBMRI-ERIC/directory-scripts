@@ -18,6 +18,7 @@ CLI_SCRIPTS = [
     "COVID19DataPortal_XMLFromBBMRIDirectory.py",
     "exporter-all.py",
     "exporter-bbmri-cohorts.py",
+    "exporter-cMDR.py",
     "exporter-cohorts.py",
     "exporter-country.py",
     "exporter-covid.py",

@@ -16,7 +16,8 @@ def write_xlsx_tables(filename: str, sheets) -> None:
             `(dataframe, sheet_name, index)`, or
             `(dataframe, sheet_name, index, options)` tuples.
             Supported options currently include
-            `hyperlink_columns=[(display_column, url_column), ...]`.
+            `hyperlink_columns=[(display_column, url_column), ...]` and
+            `hide_columns=[column_name, ...]`.
 
     Raises:
         ValueError: If any sheet specification has an unsupported shape.
@@ -64,3 +65,12 @@ def write_xlsx_tables(filename: str, sheets) -> None:
                             hyperlink_format,
                             str(display_value),
                         )
+            hidden_columns = options.get("hide_columns", [])
+            if hidden_columns:
+                worksheet = writer.sheets[sheet_name]
+                column_offset = 1 if index else 0
+                for column_name in hidden_columns:
+                    if column_name not in dataframe.columns:
+                        continue
+                    column_index = dataframe.columns.get_loc(column_name) + column_offset
+                    worksheet.set_column(column_index, column_index, None, None, {"hidden": True})

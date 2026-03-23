@@ -167,6 +167,11 @@ python3 exporter-all.py -X all.xlsx
 ```
 python3 exporter-bbmri-cohorts.py -X bbmri_cohorts_stats.xlsx -XWE bbmri_cohorts_warnings.xlsx
 ```
+- **exporter-cMDR.py** - exports only collections linked to one or more studies and studies linked to one or more collections. Standard output is grouped by country and sorted by country/id; the XLSX output writes `Collections` and `Studies` sheets with clickable entity ids and per-study linked collection ids. `-G/--output-geojson` writes linked collections/studies as GeoJSON point features, using entity coordinates when present and otherwise falling back to parent biobank coordinates.  
+```
+python3 exporter-cMDR.py -X cMDR.xlsx
+python3 exporter-cMDR.py -G cMDR-map.geojson
+```
 - **exporter-cohorts.py** - lists COHORT/POPULATION_BASED collections and summaries per country/biobank.  
 ```
 python3 exporter-cohorts.py -X cohorts.xlsx

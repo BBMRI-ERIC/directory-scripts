@@ -87,7 +87,7 @@ def tidyServiceDf (df : pd.DataFrame):
 
 def tidyStudyDf (df : pd.DataFrame):
     assert isinstance(df, pd.DataFrame)
-    linearizeStructures(df, [('national_node', 'id')])
+    linearizeStructures(df, [('national_node', 'id'), ('country', '')])
     for col in ('sex',):
         if col in df:
             df[col] = df[col].map(lambda x: ",".join([e for e in x]) if isinstance(x, list) else x)
@@ -102,7 +102,7 @@ def tidyStudyDf (df : pd.DataFrame):
                     ]
                 ) if isinstance(x, list) else x
             )
-    _sort_by_existing_columns(df, ['id'])
+    _sort_by_existing_columns(df, ['country', 'id'])
 
 def tidyContactDf (df : pd.DataFrame):
     assert isinstance(df, pd.DataFrame)

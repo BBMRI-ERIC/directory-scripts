@@ -1,5 +1,6 @@
 import copy
 import io
+import json
 import runpy
 import sys
 import types
@@ -20,6 +21,8 @@ class SharedDirectoryStub:
             "country": "CZ",
             "contact": {"id": "ct1"},
             "network": [{"id": "net1"}],
+            "longitude": "14.42076",
+            "latitude": "50.08804",
             "withdrawn": False,
         },
         {
@@ -28,6 +31,8 @@ class SharedDirectoryStub:
             "country": "DE",
             "contact": {"id": "ct2"},
             "network": [{"id": "net2"}],
+            "longitude": "13.4050",
+            "latitude": "52.5200",
             "withdrawn": False,
         },
         {
@@ -55,6 +60,9 @@ class SharedDirectoryStub:
             "number_of_donors": 10,
             "withdrawn": False,
             "facts": [{"id": "f1"}],
+            "studies": [{"id": "study1"}, {"id": "study2"}],
+            "longitude": "14.5000",
+            "latitude": "50.1000",
         },
         {
             "id": "col2",
@@ -85,6 +93,7 @@ class SharedDirectoryStub:
             "order_of_magnitude_donors": 2,
             "withdrawn": False,
             "facts": [{"id": "f3"}],
+            "studies": [{"id": "study2"}],
         },
         {
             "id": "col4",
@@ -114,6 +123,7 @@ class SharedDirectoryStub:
             "number_of_donors": 8,
             "withdrawn": False,
             "facts": [{"id": "f5"}],
+            "studies": [{"id": "study3"}],
         },
     ]
     BASE_CONTACTS = [
@@ -191,17 +201,16 @@ class SharedDirectoryStub:
         {
             "id": "study1",
             "title": "Study 1",
-            "collections": [{"id": "col1"}],
+            "longitude": "14.6000",
+            "latitude": "50.2000",
         },
         {
             "id": "study2",
             "title": "Study 2",
-            "collections": [{"id": "col1"}, {"id": "col3"}],
         },
         {
             "id": "study3",
             "title": "Study 3",
-            "collections": [{"id": "col5"}],
         },
     ]
 
@@ -299,6 +308,28 @@ class SharedDirectoryStub:
     def getCollectionFacts(self, collection_id):
         return self.collectionFactMap.get(collection_id, [])
 
+    def getCollectionCountry(self, collection_id):
+        collection = self.getCollectionById(collection_id)
+        return collection["country"]
+
+    def getCollectionStudies(self, collection_id):
+        collection = self.getCollectionById(collection_id)
+        if collection is None:
+            return []
+        study_ids = {
+            study_ref["id"]
+            for study_ref in collection.get("studies", [])
+            if isinstance(study_ref, dict) and study_ref.get("id")
+        }
+        return [
+            study
+            for study in self.getStudies()
+            if study["id"] in study_ids
+        ]
+
+    def getCollectionStudyIds(self, collection_id):
+        return [study["id"] for study in self.getCollectionStudies(collection_id)]
+
     def getContact(self, contact_id):
         return self.contactHashmap[contact_id]
 
@@ -325,22 +356,38 @@ class SharedDirectoryStub:
         )
 
     def getStudies(self):
-        visible_studies = []
-        for study in self.studies:
-            for collection_ref in study.get("collections", []):
-                collection = self.getCollectionById(collection_ref["id"])
-                if collection is not None:
-                    visible_studies.append(study)
-                    break
-        return visible_studies
+        visible_study_ids = []
+        for collection in self.getCollections():
+            for study_ref in collection.get("studies", []):
+                if not isinstance(study_ref, dict):
+                    continue
+                study_id = study_ref.get("id")
+                if study_id and study_id not in visible_study_ids:
+                    visible_study_ids.append(study_id)
+        return [
+            study
+            for study in self.studies
+            if study["id"] in visible_study_ids
+        ]
+
+    def getStudyById(self, study_id, raise_on_missing=False):
+        for study in self.getStudies():
+            if study["id"] == study_id:
+                return study
+        if raise_on_missing:
+            raise KeyError(study_id)
+        return None
 
     def getStudyCollectionIds(self, study_id):
-        study = next(study for study in self.studies if study["id"] == study_id)
         collection_ids = []
-        for collection_ref in study.get("collections", []):
-            collection_id = collection_ref["id"]
-            if self.getCollectionById(collection_id) is not None:
-                collection_ids.append(collection_id)
+        for collection in self.getCollections():
+            study_ids = {
+                study_ref["id"]
+                for study_ref in collection.get("studies", [])
+                if isinstance(study_ref, dict) and study_ref.get("id")
+            }
+            if study_id in study_ids:
+                collection_ids.append(collection["id"])
         return collection_ids
 
     def getStudyBiobankIds(self, study_id):
@@ -350,6 +397,14 @@ class SharedDirectoryStub:
             if biobank_id not in biobank_ids:
                 biobank_ids.append(biobank_id)
         return biobank_ids
+
+    def getStudyCountries(self, study_id):
+        return sorted(
+            {
+                self.getCollectionCountry(collection_id)
+                for collection_id in self.getStudyCollectionIds(study_id)
+            }
+        )
 
     def isTopLevelCollection(self, collection_id):
         return "parent_collection" not in self.getCollectionById(collection_id)
@@ -479,6 +534,95 @@ def test_exporter_all_writes_clickable_id_hyperlinks(monkeypatch, tmp_path):
     assert study_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/study/study1","study1")'
     assert contact_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/person/ct1","ct1")'
     assert network_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/network/net1","net1")'
+
+
+def test_exporter_cmdr_lists_only_study_linked_collections_and_studies(monkeypatch):
+    exporter_globals, stdout, _ = _run_script(
+        monkeypatch,
+        "exporter-cMDR.py",
+        [],
+    )
+
+    assert [collection["id"] for collection in exporter_globals["cmdrCollections"]] == [
+        "col1",
+        "col3",
+    ]
+    assert [study["id"] for study in exporter_globals["cmdrStudies"]] == [
+        "study1",
+        "study2",
+    ]
+    assert "CZ" in stdout
+    assert "col1 - Collection 1 [studies: study1,study2]" in stdout
+    assert "DE" in stdout
+    assert "study2 - Study 2 [collections: col1,col3]" in stdout
+    assert "Per-country summary:" in stdout
+    assert "- CZ: collections linked to studies = 1, studies linked to collections = 2" in stdout
+    assert "- DE: collections linked to studies = 1, studies linked to collections = 1" in stdout
+    assert "- CZ,DE:" not in stdout
+
+
+def test_exporter_cmdr_writes_sorted_hyperlinked_workbook(monkeypatch, tmp_path):
+    workbook = tmp_path / "cmdr.xlsx"
+    _run_script(
+        monkeypatch,
+        "exporter-cMDR.py",
+        [
+            "-N",
+            "-X",
+            str(workbook),
+        ],
+    )
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(workbook)
+    assert wb.sheetnames == ["Collections", "Studies"]
+    assert wb["Collections"]["A2"].value == "CZ"
+    assert wb["Collections"]["B2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
+    assert wb["Collections"]["B3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col3","col3")'
+    assert wb["Studies"]["A2"].value == "CZ"
+    assert wb["Studies"]["B2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/study/study1","study1")'
+    assert wb["Studies"]["G2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
+    assert wb["Studies"]["A3"].value == "CZ,DE"
+    assert wb["Studies"]["G3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
+    assert wb["Studies"]["I3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col3","col3")'
+
+
+def test_exporter_cmdr_writes_geojson_with_entity_and_biobank_fallback(monkeypatch, tmp_path):
+    output_file = tmp_path / "cmdr.geojson"
+    _run_script(
+        monkeypatch,
+        "exporter-cMDR.py",
+        [
+            "-N",
+            "-G",
+            str(output_file),
+        ],
+    )
+
+    payload = json.loads(output_file.read_text(encoding="utf-8"))
+    assert payload["type"] == "FeatureCollection"
+    by_key = {
+        (feature["properties"]["entity_type"], feature["properties"]["id"]): feature
+        for feature in payload["features"]
+    }
+
+    collection_feature = by_key[("collection", "col1")]
+    assert collection_feature["geometry"]["coordinates"] == [14.5, 50.1]
+    assert collection_feature["properties"]["coordinate_source"] == "collection"
+
+    collection_feature_fallback = by_key[("collection", "col3")]
+    assert collection_feature_fallback["geometry"]["coordinates"] == [13.405, 52.52]
+    assert collection_feature_fallback["properties"]["coordinate_source"] == "biobank"
+
+    study_feature = by_key[("study", "study1")]
+    assert study_feature["geometry"]["coordinates"] == [14.6, 50.2]
+    assert study_feature["properties"]["coordinate_source"] == "study"
+
+    study_feature_fallback = by_key[("study", "study2")]
+    assert study_feature_fallback["geometry"]["coordinates"] == [14.5, 50.1]
+    assert study_feature_fallback["properties"]["coordinate_source"] == "collection"
+    assert study_feature_fallback["properties"]["coordinate_source_id"] == "col1"
 
 
 def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):

@@ -22,7 +22,11 @@ For user-facing usage, installation, and tool examples, see [README.md](README.m
   - single shared abstraction for Directory / Molgenis access
   - owns shared data retrieval, schema handling, withdrawal scoping, and graph helpers
   - Services and Studies are first-class cached/traversable entities there too: keep biobank<->service traversal and biobank->collection->study traversal logic in `directory.py` instead of reconstructing parentage ad hoc in exporters
+  - for study linkage, treat `Collections.studies` as the authoritative relationship source; use `getCollectionStudies(...)`, `getCollectionStudyIds(...)`, `getStudyCollectionIds(...)`, and `getStudyCountries(...)` rather than reconstructing study membership from stale or partial `Studies.collections` payloads in scripts
   - owns shared quality-information access too: new code should prefer `getBiobankQualityInfo(...)`, `getCollectionQualityInfo(...)`, `getBiobankQualityInfoWide(...)`, `getCollectionQualityInfoWide(...)`, and `getQualityStandardsOntology(...)` over ad hoc DataFrame filtering/pivoting in exporters
+- `geojsonutils.py`
+  - shared coordinate parsing and GeoJSON feature-writing helpers
+  - reuse it from exporters/tools that expose mapped entities instead of duplicating DMS/DMM/decimal coordinate normalization or ad hoc GeoJSON serialization
 - `directory_session_compat.py`
   - compatibility wrapper for write-capable Molgenis sessions
   - provides the repository-local `DirectorySession` context-manager surface on top of `molgenis_emx2_pyclient.Client`

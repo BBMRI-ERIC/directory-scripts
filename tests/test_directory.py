@@ -41,6 +41,7 @@ def _make_directory_stub():
             "contact": {"id": "ct1"},
             "size": 10,
             "withdrawn": False,
+            "studies": [{"id": "study1"}, {"id": "study2"}, {"id": "study3"}],
         },
         {
             "id": "col2",
@@ -49,6 +50,7 @@ def _make_directory_stub():
             "size": 5,
             "parent_collection": {"id": "col1"},
             "withdrawn": False,
+            "studies": [{"id": "study2"}],
         },
         {
             "id": "col3",
@@ -56,6 +58,7 @@ def _make_directory_stub():
             "contact": {"id": "ct1"},
             "size": 7,
             "withdrawn": False,
+            "studies": [{"id": "study4"}],
         },
         {
             "id": "col4",
@@ -72,6 +75,7 @@ def _make_directory_stub():
             "country": "US",
             "size": 3,
             "withdrawn": False,
+            "studies": [{"id": "study3"}],
         },
     ]
     directory.contacts = [
@@ -181,6 +185,12 @@ def _make_directory_stub():
         "col2": [directory.studyHashmap["study2"]],
         "bbmri-eric:ID:EXT_demo:collection:col5": [directory.studyHashmap["study3"]],
         "col3": [directory.studyHashmap["study4"]],
+    }
+    directory.studyCollectionIdMap = {
+        "study1": ["col1"],
+        "study2": ["col1", "col2"],
+        "study3": ["col1", "bbmri-eric:ID:EXT_demo:collection:col5"],
+        "study4": ["col3"],
     }
     directory.biobankStudyMap = {
         "bb1": [directory.studyHashmap["study1"], directory.studyHashmap["study2"], directory.studyHashmap["study3"]],
@@ -372,8 +382,11 @@ def test_study_helpers_resolve_collections_biobanks_and_contacts():
 
     assert [study["id"] for study in directory.getStudies()] == ["study1", "study2", "study3", "study4"]
     assert [study["id"] for study in directory.getCollectionStudies("col1")] == ["study1", "study2", "study3"]
+    assert directory.getCollectionStudyIds("col1") == ["study1", "study2", "study3"]
     assert [study["id"] for study in directory.getBiobankStudies("bb1")] == ["study1", "study2", "study3"]
+    assert directory.getBiobankStudyIds("bb1") == ["study1", "study2", "study3"]
     assert directory.getStudyCollectionIds("study2") == ["col1", "col2"]
+    assert directory.getStudyCountries("study3") == ["CZ", "US"]
     assert directory.getStudyBiobankIds("study2") == ["bb1"]
     assert directory.getStudyBiobankId("study2") == "bb1"
     assert directory.getStudyContact("study2") == {"id": "ct1", "country": "CZ"}

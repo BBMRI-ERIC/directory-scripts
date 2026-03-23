@@ -249,18 +249,28 @@ class Directory:
                 self.biobankServiceMap.setdefault(biobank['id'], []).append(service)
         self.studyHashmap = {}
         self.collectionStudyMap = {}
+        self.studyCollectionIdMap = {}
         self.biobankStudyMap = {}
         for study in self.studies:
             self.studyHashmap[study['id']] = study
-            for collection_ref in study.get('collections', []):
-                collection_id = collection_ref.get('id')
-                if not collection_id:
+        for collection in self.collections:
+            collection_id = collection['id']
+            biobank_id = collection['biobank']['id']
+            seen_study_ids = set()
+            for study_id in self.getListOfEntityAttributeIds(collection, 'studies'):
+                if not study_id or study_id in seen_study_ids:
+                    continue
+                seen_study_ids.add(study_id)
+                study = self.studyHashmap.get(study_id)
+                if study is None:
+                    log.warning(
+                        "Collection %r refers non-existent study ID %r in studies field.",
+                        collection_id,
+                        study_id,
+                    )
                     continue
                 self.collectionStudyMap.setdefault(collection_id, []).append(study)
-                collection = next((c for c in self.collections if c['id'] == collection_id), None)
-                if collection is None:
-                    continue
-                biobank_id = collection['biobank']['id']
+                self.studyCollectionIdMap.setdefault(study_id, []).append(collection_id)
                 existing_studies = self.biobankStudyMap.setdefault(biobank_id, [])
                 if study not in existing_studies:
                     existing_studies.append(study)
@@ -315,16 +325,13 @@ class Directory:
             self.directoryServicesGraph.add_edge(service['id'], biobank['id'])
             self.directoryServicesGraph.add_edge(biobank['id'], service['id'])
             self.directoryServicesDAG.add_edge(biobank['id'], service['id'])
-        for study in self.studies:
-            for collection_ref in study.get('collections', []):
-                collection_id = collection_ref.get('id')
-                if not collection_id:
-                    continue
+        for study_id, collection_ids in self.studyCollectionIdMap.items():
+            for collection_id in collection_ids:
                 if not self.directoryStudiesGraph.has_node(collection_id):
                     raise Exception('DirectoryStructure', 'Study refers non-existent collection ID: ' + collection_id)
-                self.directoryStudiesGraph.add_edge(study['id'], collection_id)
-                self.directoryStudiesGraph.add_edge(collection_id, study['id'])
-                self.directoryStudiesDAG.add_edge(collection_id, study['id'])
+                self.directoryStudiesGraph.add_edge(study_id, collection_id)
+                self.directoryStudiesGraph.add_edge(collection_id, study_id)
+                self.directoryStudiesDAG.add_edge(collection_id, study_id)
 
         # processing network edges
         for n in self.networks:
@@ -1184,10 +1191,7 @@ class Directory:
         """Return all loaded studies with at least one visible associated collection."""
         visible_studies = []
         for study in self.studies:
-            for collection_ref in study.get('collections', []):
-                collection_id = collection_ref.get('id')
-                if collection_id is None:
-                    continue
+            for collection_id in self.studyCollectionIdMap.get(study['id'], []):
                 collection = self._get_visible_collection_by_id(collection_id)
                 if collection is not None:
                     visible_studies.append(study)
@@ -1199,9 +1203,8 @@ class Directory:
         if studyID in self.studyHashmap:
             study = self.studyHashmap[studyID]
             if any(
-                self._get_visible_collection_by_id(collection_ref.get('id')) is not None
-                for collection_ref in study.get('collections', [])
-                if collection_ref.get('id') is not None
+                self._get_visible_collection_by_id(collection_id) is not None
+                for collection_id in self.studyCollectionIdMap.get(studyID, [])
             ):
                 return study
         if raise_on_missing:
@@ -1223,6 +1226,10 @@ class Directory:
                 visible_studies.append(study)
         return visible_studies
 
+    def getCollectionStudyIds(self, collectionID: str):
+        """Return study ids associated with a collection id."""
+        return [study['id'] for study in self.getCollectionStudies(collectionID)]
+
     def getBiobankStudies(self, biobankID: str):
         """Return studies associated with collections of a biobank id."""
         if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobankID)):
@@ -1233,14 +1240,15 @@ class Directory:
                 visible_studies.append(study)
         return visible_studies
 
+    def getBiobankStudyIds(self, biobankID: str):
+        """Return study ids associated with collections of a biobank id."""
+        return [study['id'] for study in self.getBiobankStudies(biobankID)]
+
     def getStudyCollectionIds(self, studyID: str):
         """Return visible collection ids associated with a study id."""
-        study = self.getStudyById(studyID, raise_on_missing=True)
+        self.getStudyById(studyID, raise_on_missing=True)
         collection_ids = []
-        for collection_ref in study.get('collections', []):
-            collection_id = collection_ref.get('id')
-            if collection_id is None:
-                continue
+        for collection_id in self.studyCollectionIdMap.get(studyID, []):
             if self._get_visible_collection_by_id(collection_id) is not None:
                 collection_ids.append(collection_id)
         return collection_ids
@@ -1262,6 +1270,15 @@ class Directory:
             if biobank_id not in biobank_ids:
                 biobank_ids.append(biobank_id)
         return biobank_ids
+
+    def getStudyCountries(self, studyID: str):
+        """Return sorted visible collection countries associated with a study id."""
+        return sorted(
+            {
+                self.getCollectionCountry(collection_id)
+                for collection_id in self.getStudyCollectionIds(studyID)
+            }
+        )
 
     def getStudyBiobanks(self, studyID: str):
         """Return visible parent biobanks associated with a study id."""
