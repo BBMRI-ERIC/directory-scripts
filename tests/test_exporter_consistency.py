@@ -208,6 +208,8 @@ class SharedDirectoryStub:
     def __init__(self, *args, **kwargs):
         self.include_withdrawn_entities = kwargs.get("include_withdrawn_entities", False) or kwargs.get("only_withdrawn_entities", False)
         self.only_withdrawn_entities = kwargs.get("only_withdrawn_entities", False)
+        self._schema = kwargs.get("schema", "ERIC")
+        self._directory_url = kwargs.get("directory_url", "https://directory.example.test")
         self.biobanks = copy.deepcopy(self.BASE_BIOBANKS)
         self.collections = copy.deepcopy(self.BASE_COLLECTIONS)
         self.contacts = copy.deepcopy(self.BASE_CONTACTS)
@@ -223,6 +225,12 @@ class SharedDirectoryStub:
         if self.include_withdrawn_entities:
             return True
         return not is_withdrawn
+
+    def getSchema(self):
+        return self._schema
+
+    def getDirectoryUrl(self):
+        return self._directory_url
 
     def isBiobankWithdrawn(self, biobank_id):
         biobank = next(
@@ -441,6 +449,36 @@ def test_exporter_all_can_append_withdrawn_sheets_to_main_workbook(monkeypatch, 
         "Withdrawn contacts",
         "Withdrawn networks",
     ]
+
+
+def test_exporter_all_writes_clickable_id_hyperlinks(monkeypatch, tmp_path):
+    workbook = tmp_path / "links.xlsx"
+    _run_script(
+        monkeypatch,
+        "exporter-all.py",
+        [
+            "-N",
+            "-X",
+            str(workbook),
+        ],
+    )
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(workbook)
+    biobank_formula = wb["Biobanks"]["B2"].value
+    collection_formula = wb["Collections"]["B2"].value
+    service_formula = wb["Services"]["B2"].value
+    study_formula = wb["Studies"]["B2"].value
+    contact_formula = wb["Contacts"]["B2"].value
+    network_formula = wb["Networks"]["B2"].value
+
+    assert biobank_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:CZ_BB1","bbmri-eric:ID:CZ_BB1")'
+    assert collection_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/collection/col1","col1")'
+    assert service_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/service/svc1","svc1")'
+    assert study_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/study/study1","study1")'
+    assert contact_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/person/ct1","ct1")'
+    assert network_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/network/net1","net1")'
 
 
 def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):

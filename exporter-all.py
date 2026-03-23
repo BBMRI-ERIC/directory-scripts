@@ -101,6 +101,11 @@ allCountries = set()
 targetColls = []
 
 ### Functions
+def buildDirectoryEntityURL(entity_route: str, entity_id: str) -> str:
+    base_url = dir.getDirectoryUrl().rstrip('/')
+    return f"{base_url}/{dir.getSchema()}/directory/#/{entity_route}/{entity_id}"
+
+
 def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM):
     for collection in collections:
         log.debug("Analyzing collection " + collection['id'])
@@ -156,7 +161,7 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
 
         # Print also the Directory URL:
         if not 'directoryURL' in collection:
-            collection['directoryURL'] = 'https://directory.bbmri-eric.eu/ERIC/directory/#/collection/' + collection['id']
+            collection['directoryURL'] = buildDirectoryEntityURL('collection', collection['id'])
 
     return allCollections, withdrawnCollections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM, allBiobanks
 
@@ -165,6 +170,8 @@ def analyseBBs():
         biobankId = biobank['id']
         if 'contact' in biobank:
             biobank['contact'] = dir.getContact(biobank['contact']['id'])
+        if 'directoryURL' not in biobank:
+            biobank['directoryURL'] = buildDirectoryEntityURL('biobank', biobankId)
         log.debug("Analyzing biobank " + biobankId)
         if biobankId in allBiobanks:
             continue
@@ -196,7 +203,7 @@ def analyseServices():
             withdrawnServices.append(service)
             withdrawnBiobanks.add(biobankId)
         if 'directoryURL' not in service:
-            service['directoryURL'] = 'https://directory.bbmri-eric.eu/ERIC/directory/#/service/' + service['id']
+            service['directoryURL'] = buildDirectoryEntityURL('service', service['id'])
 
 
 def _study_has_withdrawn_collection(study: dict) -> bool:
@@ -217,7 +224,7 @@ def analyseStudies():
         if _study_has_withdrawn_collection(study):
             withdrawnStudies.append(study)
         if 'directoryURL' not in study:
-            study['directoryURL'] = 'https://directory.bbmri-eric.eu/ERIC/directory/#/study/' + study['id']
+            study['directoryURL'] = buildDirectoryEntityURL('study', study['id'])
 
 
 def _collect_reference_ids(value):
@@ -272,11 +279,15 @@ def analyseNetworks():
         network = network_by_id.get(network_id)
         if network is None:
             continue
+        if 'directoryURL' not in network:
+            network['directoryURL'] = buildDirectoryEntityURL('network', network['id'])
         allNetworks.append(network)
     for network_id in sorted(selected_withdrawn_network_ids):
         network = network_by_id.get(network_id)
         if network is None:
             continue
+        if 'directoryURL' not in network:
+            network['directoryURL'] = buildDirectoryEntityURL('network', network['id'])
         withdrawnNetworks.append(network)
 
 
@@ -284,9 +295,15 @@ def analyseContacts():
     selected_contact_ids = _collect_scope_contact_ids(allBiobanks, allCollections, allNetworks)
     selected_withdrawn_contact_ids = _collect_scope_contact_ids(withdrawnBiobanks, withdrawnCollections, withdrawnNetworks)
     for contact_id in sorted(selected_contact_ids):
-        allContacts.append(dir.getContact(contact_id))
+        contact = dir.getContact(contact_id)
+        if 'directoryURL' not in contact:
+            contact['directoryURL'] = buildDirectoryEntityURL('person', contact['id'])
+        allContacts.append(contact)
     for contact_id in sorted(selected_withdrawn_contact_ids):
-        withdrawnContacts.append(dir.getContact(contact_id))
+        contact = dir.getContact(contact_id)
+        if 'directoryURL' not in contact:
+            contact['directoryURL'] = buildDirectoryEntityURL('person', contact['id'])
+        withdrawnContacts.append(contact)
 
 
 def printServiceStdout(serviceList: List):
@@ -343,12 +360,12 @@ def outputExcelDirectoryEntities(
     extraSheets = None,
 ):
     sheet_specs = [
-        (dfBiobanks, biobanksLabel),
-        (dfCollections, collectionsLabel),
-        (dfServices, servicesLabel),
-        (dfStudies, studiesLabel),
-        (dfContacts, contactsLabel),
-        (dfNetworks, networksLabel),
+        (dfBiobanks, biobanksLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
+        (dfCollections, collectionsLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
+        (dfServices, servicesLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
+        (dfStudies, studiesLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
+        (dfContacts, contactsLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
+        (dfNetworks, networksLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
     ]
     if extraSheets:
         sheet_specs.extend(extraSheets)
@@ -456,12 +473,12 @@ if args.outputXLSX is not None:
     if args.includeWithdrawnSheetsInOutput:
         extra_sheets.extend(
             [
-                (pd_withdrawnBiobanks, "Withdrawn biobanks"),
-                (pd_withdrawnCollections, "Withdrawn collections"),
-                (pd_withdrawnServices, "Withdrawn services"),
-                (pd_withdrawnStudies, "Withdrawn studies"),
-                (pd_withdrawnContacts, "Withdrawn contacts"),
-                (pd_withdrawnNetworks, "Withdrawn networks"),
+                (pd_withdrawnBiobanks, "Withdrawn biobanks", True, {"hyperlink_columns": [("id", "directoryURL")]}),
+                (pd_withdrawnCollections, "Withdrawn collections", True, {"hyperlink_columns": [("id", "directoryURL")]}),
+                (pd_withdrawnServices, "Withdrawn services", True, {"hyperlink_columns": [("id", "directoryURL")]}),
+                (pd_withdrawnStudies, "Withdrawn studies", True, {"hyperlink_columns": [("id", "directoryURL")]}),
+                (pd_withdrawnContacts, "Withdrawn contacts", True, {"hyperlink_columns": [("id", "directoryURL")]}),
+                (pd_withdrawnNetworks, "Withdrawn networks", True, {"hyperlink_columns": [("id", "directoryURL")]}),
             ]
         )
     outputExcelDirectoryEntities(
