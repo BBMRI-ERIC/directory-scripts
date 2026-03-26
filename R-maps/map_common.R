@@ -1,0 +1,670 @@
+bbmri_script_dir <- function() {
+  if (exists("script_dir", inherits = TRUE)) {
+    return(get("script_dir", inherits = TRUE))
+  }
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) == 0) {
+    return(normalizePath(".", winslash = "/", mustWork = TRUE))
+  }
+  normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE)
+}
+
+bbmri_enable_local_r_lib <- function() {
+  local_lib <- file.path(bbmri_script_dir(), "r-lib")
+  if (!dir.exists(local_lib)) {
+    return(invisible(FALSE))
+  }
+  .libPaths(c(normalizePath(local_lib, winslash = "/", mustWork = TRUE), .libPaths()))
+  invisible(TRUE)
+}
+
+bbmri_enable_local_r_lib()
+
+bbmri_require_packages <- function(packages) {
+  missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
+  if (length(missing) > 0) {
+    stop(
+      "Missing R packages: ",
+      paste(missing, collapse = ", "),
+      ". Install them before running the map scripts.",
+      call. = FALSE
+    )
+  }
+}
+
+bbmri_parse_args <- function(defaults) {
+  args <- defaults
+  trailing <- commandArgs(trailingOnly = TRUE)
+  if (length(trailing) == 0) {
+    return(args)
+  }
+
+  for (arg in trailing) {
+    if (!startsWith(arg, "--")) {
+      stop("Unsupported argument format: ", arg, call. = FALSE)
+    }
+    parts <- strsplit(sub("^--", "", arg), "=", fixed = TRUE)[[1]]
+    key <- gsub("-", "_", parts[[1]], fixed = TRUE)
+    value <- if (length(parts) > 1) parts[[2]] else TRUE
+    args[[key]] <- value
+  }
+
+  args
+}
+
+bbmri_read_sf <- function(path, label) {
+  if (!file.exists(path)) {
+    stop(label, " not found: ", path, call. = FALSE)
+  }
+  sf::st_read(path, quiet = TRUE)
+}
+
+bbmri_read_optional_sf <- function(path) {
+  if (is.null(path) || is.na(path) || identical(path, "")) {
+    return(NULL)
+  }
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+  sf::st_read(path, quiet = TRUE)
+}
+
+bbmri_map_cache_dir <- function() {
+  dir <- file.path(bbmri_script_dir(), "cache", "natural-earth")
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  dir
+}
+
+bbmri_cached_download <- function(url, filename) {
+  dest <- file.path(bbmri_map_cache_dir(), filename)
+  if (!file.exists(dest)) {
+    utils::download.file(url, destfile = dest, mode = "wb", quiet = TRUE)
+  }
+  dest
+}
+
+bbmri_read_cached_zipped_layer <- function(url, zip_name, label) {
+  zip_path <- bbmri_cached_download(url, zip_name)
+  layer_dir <- file.path(
+    bbmri_map_cache_dir(),
+    tools::file_path_sans_ext(zip_name)
+  )
+
+  if (!dir.exists(layer_dir) || length(list.files(layer_dir, pattern = "\\.shp$", full.names = TRUE)) == 0) {
+    dir.create(layer_dir, recursive = TRUE, showWarnings = FALSE)
+    utils::unzip(zip_path, exdir = layer_dir)
+  }
+
+  shp_files <- list.files(layer_dir, pattern = "\\.shp$", full.names = TRUE)
+  if (length(shp_files) == 0) {
+    stop("No shapefile found after extracting ", label, " from ", url, call. = FALSE)
+  }
+
+  obj <- sf::st_read(shp_files[[1]], quiet = TRUE)
+  names(obj) <- ifelse(is.na(names(obj)), names(obj), tolower(names(obj)))
+  obj
+}
+
+bbmri_load_countries <- function() {
+  bbmri_read_cached_zipped_layer(
+    "https://mapbox-geodata.s3.amazonaws.com/natural-earth-1.4.0/cultural/10m-admin-0-countries.zip",
+    "10m-admin-0-countries.zip",
+    "countries"
+  )
+}
+
+bbmri_load_states <- function() {
+  states <- bbmri_read_cached_zipped_layer(
+    "https://mapbox-geodata.s3.amazonaws.com/natural-earth-1.4.0/cultural/10m-admin-1-states-provinces-lines.zip",
+    "10m-admin-1-states-provinces-lines.zip",
+    "admin-1 states"
+  )
+  subset(states, adm0_a3 %in% c("USA", "CAN", "AUS"))
+}
+
+bbmri_load_lakes <- function() {
+  bbmri_read_cached_zipped_layer(
+    "https://mapbox-geodata.s3.amazonaws.com/natural-earth-1.4.0/physical/10m-lakes.zip",
+    "10m-lakes.zip",
+    "lakes"
+  )
+}
+
+bbmri_load_rivers <- function() {
+  bbmri_read_cached_zipped_layer(
+    "https://mapbox-geodata.s3.amazonaws.com/natural-earth-1.4.0/physical/10m-rivers-lake-centerlines.zip",
+    "10m-rivers-lake-centerlines.zip",
+    "rivers"
+  )
+}
+
+bbmri_coord_sf <- function(bbox, crs) {
+  bbox_sfc <- sf::st_as_sfc(sf::st_bbox(
+    c(
+      xmin = bbox[["xmin"]],
+      ymin = bbox[["ymin"]],
+      xmax = bbox[["xmax"]],
+      ymax = bbox[["ymax"]]
+    ),
+    crs = sf::st_crs(4326)
+  ))
+  projected_bbox <- sf::st_bbox(sf::st_transform(bbox_sfc, sf::st_crs(crs)))
+  ggplot2::coord_sf(
+    crs = sf::st_crs(crs),
+    default_crs = sf::st_crs(crs),
+    xlim = c(projected_bbox[["xmin"]], projected_bbox[["xmax"]]),
+    ylim = c(projected_bbox[["ymin"]], projected_bbox[["ymax"]]),
+    expand = FALSE
+  )
+}
+
+bbmri_void_theme <- function(background_fill) {
+  ggplot2::theme_void() +
+    ggplot2::theme(
+      panel.background = ggplot2::element_rect(fill = background_fill, colour = NA),
+      plot.background = ggplot2::element_rect(fill = background_fill, colour = NA),
+      plot.margin = ggplot2::margin(4, 4, 4, 4)
+    )
+}
+
+bbmri_font_family <- function() {
+  "sans"
+}
+
+bbmri_projected_bbox <- function(bbox, crs) {
+  bbox_sfc <- sf::st_as_sfc(sf::st_bbox(
+    c(
+      xmin = bbox[["xmin"]],
+      ymin = bbox[["ymin"]],
+      xmax = bbox[["xmax"]],
+      ymax = bbox[["ymax"]]
+    ),
+    crs = sf::st_crs(4326)
+  ))
+  sf::st_bbox(sf::st_transform(bbox_sfc, sf::st_crs(crs)))
+}
+
+bbmri_halo_step <- function(bbox, crs, output_width_px, px = 1.0) {
+  proj_bbox <- bbmri_projected_bbox(bbox, crs)
+  units_per_px <- (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]) / output_width_px
+  units_per_px * px
+}
+
+bbmri_geom_text_halo <- function(data, mapping, size, bbox, crs, output_width_px, family = bbmri_font_family(), colour = "black", halo_colour = "white", halo_px = 1.0, inner_halo_px = NULL, outer_halo_px = NULL, nudge_x = 0, nudge_y = 0, use_shadowtext = TRUE, ...) {
+  if (is.null(inner_halo_px)) {
+    inner_halo_px <- halo_px
+  }
+  if (is.null(outer_halo_px)) {
+    outer_halo_px <- halo_px * 2
+  }
+
+  inner_step <- bbmri_halo_step(bbox, crs, output_width_px, inner_halo_px)
+  outer_step <- bbmri_halo_step(bbox, crs, output_width_px, outer_halo_px)
+  halo_offsets <- list(
+    c(-1, 0),
+    c(1, 0),
+    c(0, -1),
+    c(0, 1),
+    c(-1, -1),
+    c(-1, 1),
+    c(1, -1),
+    c(1, 1)
+  )
+
+  outer_layers <- lapply(
+    halo_offsets,
+    function(offset) {
+      ggplot2::geom_text(
+        data = data,
+        mapping = mapping,
+        family = family,
+        colour = grDevices::adjustcolor(halo_colour, alpha.f = 0.25),
+        position = ggplot2::position_nudge(
+          x = nudge_x + offset[[1]] * outer_step,
+          y = nudge_y + offset[[2]] * outer_step
+        ),
+        size = size,
+        ...
+      )
+    }
+  )
+
+  inner_layers <- lapply(
+    halo_offsets,
+    function(offset) {
+      ggplot2::geom_text(
+        data = data,
+        mapping = mapping,
+        family = family,
+        colour = halo_colour,
+        position = ggplot2::position_nudge(
+          x = nudge_x + offset[[1]] * inner_step,
+          y = nudge_y + offset[[2]] * inner_step
+        ),
+        size = size,
+        ...
+      )
+    }
+  )
+
+  c(
+    outer_layers,
+    inner_layers,
+    list(
+      ggplot2::geom_text(
+        data = data,
+        mapping = mapping,
+        size = size,
+        family = family,
+        colour = colour,
+        position = ggplot2::position_nudge(x = nudge_x, y = nudge_y),
+        ...
+      )
+    )
+  )
+}
+
+bbmri_overlap_area <- function(a, b) {
+  width <- max(0, min(a$xmax, b$xmax) - max(a$xmin, b$xmin))
+  height <- max(0, min(a$ymax, b$ymax) - max(a$ymin, b$ymin))
+  width * height
+}
+
+bbmri_place_local_labels <- function(points_df, bbox, crs, output_width_px) {
+  if (nrow(points_df) == 0) {
+    return(points_df)
+  }
+
+  proj_bbox <- bbmri_projected_bbox(bbox, crs)
+  units_per_px <- (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]) / output_width_px
+  label_height <- units_per_px * 11
+  char_width <- units_per_px * 4.6
+  padding <- units_per_px * 2
+  point_boxes <- vector("list", nrow(points_df))
+
+  for (i in seq_len(nrow(points_df))) {
+    point_radius <- units_per_px * (3 + points_df$marker_width[[i]] * 3)
+    point_boxes[[i]] <- list(
+      xmin = points_df$x[[i]] - point_radius,
+      xmax = points_df$x[[i]] + point_radius,
+      ymin = points_df$y[[i]] - point_radius,
+      ymax = points_df$y[[i]] + point_radius
+    )
+  }
+
+  candidates <- list(
+    list(dx = 1.0, dy = 0.0, hjust = 0.0, vjust = 0.5),
+    list(dx = 0.85, dy = 0.5, hjust = 0.0, vjust = 0.0),
+    list(dx = 0.0, dy = 1.0, hjust = 0.5, vjust = 0.0),
+    list(dx = -0.85, dy = 0.5, hjust = 1.0, vjust = 0.0),
+    list(dx = -1.0, dy = 0.0, hjust = 1.0, vjust = 0.5),
+    list(dx = -0.85, dy = -0.5, hjust = 1.0, vjust = 1.0),
+    list(dx = 0.0, dy = -1.0, hjust = 0.5, vjust = 1.0),
+    list(dx = 0.85, dy = -0.5, hjust = 0.0, vjust = 1.0)
+  )
+  order_idx <- order(-points_df$marker_width, -nchar(points_df$biobankID))
+  label_boxes <- vector("list", nrow(points_df))
+  label_x <- numeric(nrow(points_df))
+  label_y <- numeric(nrow(points_df))
+  label_hjust <- numeric(nrow(points_df))
+  label_vjust <- numeric(nrow(points_df))
+
+  for (idx in order_idx) {
+    label_width <- max(units_per_px * 18, nchar(points_df$biobankID[[idx]]) * char_width)
+    min_radius <- units_per_px * (5 + points_df$marker_width[[idx]] * 2.2)
+    max_radius <- units_per_px * (12.5 + points_df$marker_width[[idx]] * 5.5)
+    best <- NULL
+
+    for (radius in seq(min_radius, max_radius, length.out = 7)) {
+      for (candidate in candidates) {
+        anchor_x <- points_df$x[[idx]] + candidate$dx * radius
+        anchor_y <- points_df$y[[idx]] + candidate$dy * radius
+        box <- list(
+          xmin = anchor_x - label_width * candidate$hjust - padding,
+          xmax = anchor_x + label_width * (1 - candidate$hjust) + padding,
+          ymin = anchor_y - label_height * (1 - candidate$vjust) - padding,
+          ymax = anchor_y + label_height * candidate$vjust + padding
+        )
+
+        score <- 0
+        for (other_box in label_boxes) {
+          if (!is.null(other_box)) {
+            score <- score + 6 * bbmri_overlap_area(box, other_box)
+          }
+        }
+        for (point_box in point_boxes) {
+          score <- score + 2 * bbmri_overlap_area(box, point_box)
+        }
+        if (box$xmin < proj_bbox[["xmin"]]) score <- score + (proj_bbox[["xmin"]] - box$xmin) * label_height
+        if (box$xmax > proj_bbox[["xmax"]]) score <- score + (box$xmax - proj_bbox[["xmax"]]) * label_height
+        if (box$ymin < proj_bbox[["ymin"]]) score <- score + (proj_bbox[["ymin"]] - box$ymin) * label_width
+        if (box$ymax > proj_bbox[["ymax"]]) score <- score + (box$ymax - proj_bbox[["ymax"]]) * label_width
+
+        if (
+          is.null(best) ||
+          score < best$score ||
+          (isTRUE(all.equal(score, best$score)) && radius < best$radius)
+        ) {
+          best <- list(
+            score = score,
+            radius = radius,
+            x = anchor_x,
+            y = anchor_y,
+            hjust = candidate$hjust,
+            vjust = candidate$vjust,
+            box = box
+          )
+        }
+      }
+    }
+
+    label_x[[idx]] <- best$x
+    label_y[[idx]] <- best$y
+    label_hjust[[idx]] <- best$hjust
+    label_vjust[[idx]] <- best$vjust
+    label_boxes[[idx]] <- best$box
+  }
+
+  points_df$label_x <- label_x
+  points_df$label_y <- label_y
+  points_df$label_hjust <- label_hjust
+  points_df$label_vjust <- label_vjust
+  points_df
+}
+
+bbmri_place_country_labels <- function(label_df, point_df, bbox, crs, output_width_px) {
+  if (nrow(label_df) == 0) {
+    return(label_df)
+  }
+
+  proj_bbox <- bbmri_projected_bbox(bbox, crs)
+  units_per_px <- (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]) / output_width_px
+  label_height <- units_per_px * 14
+  char_width <- units_per_px * 7
+  padding <- units_per_px * 3
+  point_radius <- units_per_px * 5
+  point_boxes <- vector("list", nrow(point_df))
+  label_boxes <- vector("list", nrow(label_df))
+  label_x <- numeric(nrow(label_df))
+  label_y <- numeric(nrow(label_df))
+
+  for (i in seq_len(nrow(point_df))) {
+    point_boxes[[i]] <- list(
+      xmin = point_df$x[[i]] - point_radius,
+      xmax = point_df$x[[i]] + point_radius,
+      ymin = point_df$y[[i]] - point_radius,
+      ymax = point_df$y[[i]] + point_radius
+    )
+  }
+
+  candidates <- list(
+    c(0, 0),
+    c(0, -8),
+    c(0, 8),
+    c(-8, 0),
+    c(8, 0),
+    c(0, -14),
+    c(0, 14),
+    c(-12, -8),
+    c(12, -8),
+    c(-12, 8),
+    c(12, 8)
+  )
+
+  for (idx in seq_len(nrow(label_df))) {
+    label_width <- max(units_per_px * 26, nchar(label_df$label[[idx]]) * char_width)
+    best <- NULL
+
+    for (candidate in candidates) {
+      anchor_x <- label_df$x[[idx]] + candidate[[1]] * units_per_px
+      anchor_y <- label_df$y[[idx]] + candidate[[2]] * units_per_px
+      box <- list(
+        xmin = anchor_x - label_width / 2 - padding,
+        xmax = anchor_x + label_width / 2 + padding,
+        ymin = anchor_y - label_height / 2 - padding,
+        ymax = anchor_y + label_height / 2 + padding
+      )
+
+      score <- 0
+      for (point_box in point_boxes) {
+        score <- score + 12 * bbmri_overlap_area(box, point_box)
+      }
+      for (other_box in label_boxes) {
+        if (!is.null(other_box)) {
+          score <- score + 4 * bbmri_overlap_area(box, other_box)
+        }
+      }
+      if (box$xmin < proj_bbox[["xmin"]]) score <- score + (proj_bbox[["xmin"]] - box$xmin) * label_height
+      if (box$xmax > proj_bbox[["xmax"]]) score <- score + (box$xmax - proj_bbox[["xmax"]]) * label_height
+      if (box$ymin < proj_bbox[["ymin"]]) score <- score + (proj_bbox[["ymin"]] - box$ymin) * label_width
+      if (box$ymax > proj_bbox[["ymax"]]) score <- score + (box$ymax - proj_bbox[["ymax"]]) * label_width
+      score <- score + (abs(candidate[[1]]) + abs(candidate[[2]])) * units_per_px * label_height * 0.2
+
+      if (
+        is.null(best) ||
+        score < best$score
+      ) {
+        best <- list(
+          score = score,
+          x = anchor_x,
+          y = anchor_y,
+          box = box
+        )
+      }
+    }
+
+    label_x[[idx]] <- best$x
+    label_y[[idx]] <- best$y
+    label_boxes[[idx]] <- best$box
+  }
+
+  label_df$x <- label_x
+  label_df$y <- label_y
+  label_df
+}
+
+bbmri_geom_text_repel_halo <- function(data, mapping, size, family = bbmri_font_family(), colour = "black", halo_colour = "white", halo_scale = 1.0, seed = 42, ...) {
+  list(
+    ggrepel::geom_text_repel(
+      data = data,
+      mapping = mapping,
+      size = size * halo_scale,
+      family = family,
+      colour = halo_colour,
+      seed = seed,
+      ...
+    ),
+    ggrepel::geom_text_repel(
+      data = data,
+      mapping = mapping,
+      size = size,
+      family = family,
+      colour = colour,
+      seed = seed,
+      ...
+    )
+  )
+}
+
+bbmri_crop_to_bbox <- function(layer, bbox) {
+  bbox_sfc <- sf::st_as_sfc(sf::st_bbox(
+    c(
+      xmin = bbox[["xmin"]],
+      ymin = bbox[["ymin"]],
+      xmax = bbox[["xmax"]],
+      ymax = bbox[["ymax"]]
+    ),
+    crs = sf::st_crs(4326)
+  ))
+  target_bbox <- sf::st_bbox(sf::st_transform(bbox_sfc, sf::st_crs(layer)))
+  geom_bboxes <- lapply(sf::st_geometry(layer), sf::st_bbox)
+  hits <- vapply(
+    geom_bboxes,
+    function(gbox) {
+      !(gbox[["xmax"]] < target_bbox[["xmin"]] ||
+        gbox[["xmin"]] > target_bbox[["xmax"]] ||
+        gbox[["ymax"]] < target_bbox[["ymin"]] ||
+        gbox[["ymin"]] > target_bbox[["ymax"]])
+    },
+    logical(1)
+  )
+  layer[hits, ]
+}
+
+bbmri_assign_standard_country_fill <- function(countries, cfg) {
+  countries$fill_group <- cfg$standard_colors$default_country
+  countries$fill_group[countries$iso_a2 %in% cfg$standard_country_groups$member] <- cfg$standard_colors$member
+  countries$fill_group[countries$iso_a2 %in% cfg$standard_country_groups$observer] <- cfg$standard_colors$observer
+  countries
+}
+
+bbmri_assign_oec_country_fill <- function(countries, cfg) {
+  countries$fill_group <- cfg$oec_colors$default_country
+  countries$fill_group[countries$iso_a2 %in% cfg$oec_country_groups$member] <- cfg$oec_colors$member
+  countries$fill_group[countries$iso_a2 %in% cfg$oec_country_groups$observer] <- cfg$oec_colors$observer
+  countries$fill_group[countries$iso_a2 %in% cfg$oec_country_groups$gray] <- cfg$oec_colors$gray_country
+  countries$fill_group[countries$adm0_a3 %in% c("CYN", "CNM", "KAS", "KNM")] <- cfg$oec_colors$gray_country
+  countries
+}
+
+bbmri_country_label_df <- function(countries, cfg, crs) {
+  label_countries <- countries[countries$iso_a2 %in% cfg$standard_country_labels, ]
+  if (nrow(label_countries) == 0) {
+    return(data.frame())
+  }
+
+  projected <- sf::st_transform(sf::st_point_on_surface(label_countries), crs)
+  coords <- sf::st_coordinates(projected)
+  labels <- data.frame(
+    iso_a2 = label_countries$iso_a2,
+    label = toupper(label_countries$name),
+    x = coords[, "X"],
+    y = coords[, "Y"],
+    stringsAsFactors = FALSE
+  )
+
+  offsets <- cfg$standard_label_offsets
+  labels <- merge(labels, offsets, by = "iso_a2", all.x = TRUE, sort = FALSE)
+  labels$dx[is.na(labels$dx)] <- 0
+  labels$dy[is.na(labels$dy)] <- 0
+  labels$x <- labels$x + labels$dx
+  labels$y <- labels$y + labels$dy
+  labels
+}
+
+bbmri_filter_valid_lonlat_points <- function(points, label = "points", max_abs_lat = 85.05113) {
+  points_4326 <- sf::st_transform(points, 4326)
+  coords <- sf::st_coordinates(points_4326)
+  keep <- (
+    is.finite(coords[, "X"]) &
+    is.finite(coords[, "Y"]) &
+    abs(coords[, "X"]) <= 180 &
+    abs(coords[, "Y"]) <= max_abs_lat
+  )
+
+  dropped <- sum(!keep)
+  if (dropped > 0) {
+    message("Dropping ", dropped, " ", label, " with invalid lon/lat values before projection.")
+  }
+
+  points_4326[keep, ]
+}
+
+bbmri_biobank_points_df <- function(points, crs, label = "points") {
+  filtered <- bbmri_filter_valid_lonlat_points(points, label = label)
+  projected <- sf::st_transform(filtered, crs)
+  coords <- sf::st_coordinates(projected)
+  out <- data.frame(
+    sf::st_drop_geometry(projected),
+    x = coords[, "X"],
+    y = coords[, "Y"],
+    stringsAsFactors = FALSE
+  )
+
+  out[is.finite(out$x) & is.finite(out$y), , drop = FALSE]
+}
+
+bbmri_filter_member_observer_points <- function(points, cfg) {
+  countries <- bbmri_load_countries()
+  allowed_codes <- union(
+    cfg$standard_country_groups$member,
+    cfg$standard_country_groups$observer
+  )
+  allowed <- countries[countries$iso_a2 %in% allowed_codes, c("iso_a2", "geometry")]
+  projected_points <- sf::st_transform(points, sf::st_crs(allowed))
+
+  hits <- sf::st_intersects(projected_points, allowed)
+  keep <- lengths(hits) > 0
+  filtered <- projected_points[keep, ]
+
+  if (nrow(filtered) == 0) {
+    stop("Member/observer point filtering produced no features.", call. = FALSE)
+  }
+
+  sf::st_transform(filtered, 4326)
+}
+
+bbmri_write_geojson <- function(obj, path) {
+  obj_4326 <- sf::st_transform(obj, 4326)
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  if (file.exists(path)) {
+    file.remove(path)
+  }
+  sf::st_write(obj_4326, path, driver = "GeoJSON", quiet = TRUE)
+}
+
+bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes) {
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+  raster_sizes <- export_sizes$png
+  raster_dpi <- 300
+  for (name in names(raster_sizes)) {
+    size <- raster_sizes[[name]]
+    ggplot2::ggsave(
+      filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
+      plot = plot,
+      width = unname(size[["width"]]),
+      height = unname(size[["height"]]),
+      units = "px",
+      bg = "white",
+      limitsize = FALSE
+    )
+
+    ggplot2::ggsave(
+      filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
+      plot = plot,
+      width = unname(size[["width"]]) / raster_dpi,
+      height = unname(size[["height"]]) / raster_dpi,
+      units = "in",
+      bg = "white",
+      limitsize = FALSE
+    )
+  }
+
+  vector_size <- export_sizes$vector
+  ggplot2::ggsave(
+    filename = file.path(output_dir, paste0(prefix, ".pdf")),
+    plot = plot,
+    width = unname(vector_size[["width"]]) / raster_dpi,
+    height = unname(vector_size[["height"]]) / raster_dpi,
+    units = "in",
+    bg = "white",
+    limitsize = FALSE
+  )
+
+  if (requireNamespace("svglite", quietly = TRUE)) {
+    ggplot2::ggsave(
+      filename = file.path(output_dir, paste0(prefix, ".svg")),
+      plot = plot,
+      width = unname(vector_size[["width"]]) / raster_dpi,
+      height = unname(vector_size[["height"]]) / raster_dpi,
+      units = "in",
+      bg = "white",
+      device = svglite::svglite,
+      limitsize = FALSE
+    )
+  } else {
+    message("Skipping SVG export because package 'svglite' is not installed.")
+  }
+}

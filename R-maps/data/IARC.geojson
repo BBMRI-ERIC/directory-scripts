@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "IARC"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4.87604,
+          45.74355
+        ]
+      }
+    }
+  ]
+}

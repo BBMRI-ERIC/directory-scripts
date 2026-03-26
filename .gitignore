@@ -3,3 +3,14 @@
 /data-check-cache/*
 # ignore setup of environment variables
 .env
+# generated map renders
+/R-maps/pilot-output/
+# local R library for map tooling
+/R-maps/r-lib/
+# cached/downloaded map inputs
+/R-maps/cache/
+# temporary map comparison artifacts
+/R-maps/compare-temp/
+# generated pilot GeoJSON inputs for map rendering
+/bbmri-directory-pilot.geojson
+/bbmri-directory-members-pilot.geojson

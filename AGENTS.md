@@ -2,6 +2,8 @@
 
 ## Project Structure & Module Organization
 - Top-level Python scripts drive validation and exports (for example `data-check.py`, `exporter-*.py`, `full-text-search.py`).
+- `R-maps/` hosts the in-repo `ggplot2` + `sf` replacement for legacy
+  Tilemill map renderers.
 - `checks/` contains Yapsy plugin checks (`*.py` + `*.yapsy-plugin`) loaded by `data-check.py`.
 - `data-check-cache/` and `indexdir/` are runtime caches/indexes; they can be purged with command flags.
 - Reference/config artifacts live at the repo root (for example `requirements.txt`, `geocoding.config`, `en_product1.xml`).
@@ -32,6 +34,10 @@
 - Write-capable maintenance CLIs should import `DirectorySession` from the local `directory_session_compat.py` wrapper around `molgenis_emx2_pyclient.Client`; do not import the removed legacy `molgenis_emx2.directory_client...` package path directly.
 - `nncontacts.py` is the single source of truth for BBMRI node contacts, member-node classification, staging-area parsing, and non-member/global area detection; do not re-encode that logic elsewhere.
 - Keep permitted non-country staging prefixes (currently `EXT`, `EU`, `IARC`) and staging-prefix-to-schema expectations in `nncontacts.py`; checks and tools such as `ValidateIDs` and `collection-factsheet-descriptor-updater.py` must use that shared configuration rather than hardcoding `EXT` rules locally.
+- New map-rendering work in `R-maps/` should treat `geocoding_2022.py` output as
+  the primary GeoJSON input and must not hardcode machine-specific legacy
+  Tilemill paths such as `/home/bbmriadmin/...`; keep external overlays
+  explicit/configurable.
 
 ## Modularization Guidelines
 - Keep exporters thin: CLI + orchestration only; move reusable logic into helper modules.

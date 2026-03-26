@@ -90,6 +90,8 @@ def lookForCoordinates(contactID, personsContacts, lookForCoordinatesFeatures):
 
     NOTE: Address fails a lot, maybe only by first field? But the separator is not consistent.
     '''
+    if not geocodingEnabled:
+        return None
     for contact in personsContacts:
         if contact['id'] == contactID:
 
@@ -97,7 +99,11 @@ def lookForCoordinates(contactID, personsContacts, lookForCoordinatesFeatures):
             for locFeature in lookForCoordinatesFeatures:
                 if locFeature in contact.keys():
                         lookBy.append(contact[locFeature])
-            location = geolocator.geocode(', '.join(lookBy))
+            try:
+                location = geolocator.geocode(', '.join(lookBy))
+            except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
+                log.warning('Geocoding failed for %s because the geocoding service is unavailable or rate-limited: %s', contactID, exc)
+                return None
             if location:
                 log.debug('Coordinates from: '+ ', '.join(lookBy))
                 return location
@@ -106,7 +112,11 @@ def lookForCoordinates(contactID, personsContacts, lookForCoordinatesFeatures):
                 places = 1
                 while places<len(lookBy):
 
-                    location = geolocator.geocode(', '.join(lookBy[places:len(lookBy)+1]))
+                    try:
+                        location = geolocator.geocode(', '.join(lookBy[places:len(lookBy)+1]))
+                    except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
+                        log.warning('Geocoding failed for %s because the geocoding service is unavailable or rate-limited: %s', contactID, exc)
+                        return None
                     
                     if location:
                         log.debug('Coordinates from: '+ ', '.join(lookBy[places:len(lookBy)+1]))
@@ -132,6 +142,19 @@ def dmm_to_dd(coord: str):
         decimal_degrees *= -1
 
     return decimal_degrees
+
+
+def parse_decimal_coordinates(longitude_raw, latitude_raw):
+    """Parse stored Directory coordinates into validated decimal lon/lat."""
+    longitude = float(re.sub(r',', r'.', longitude_raw))
+    latitude = float(re.sub(r',', r'.', latitude_raw))
+
+    if not (-180 <= longitude <= 180):
+        raise ValueError(f"longitude out of range: {longitude_raw!r}")
+    if not (-90 <= latitude <= 90):
+        raise ValueError(f"latitude out of range: {latitude_raw!r}")
+
+    return [longitude, latitude]
 
 def disableSSLCheck():
     ctx = ssl.create_default_context()
@@ -168,10 +191,14 @@ features['features'] = []
 
 # Get geolocator information
 geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
+geocodingEnabled = True
 
 # Try geolocator certificates
 try:
     geolocator.geocode('Graz, Austria')
+except geopy.exc.GeocoderRateLimited as exc:
+    log.warning('Geocoding startup probe was rate-limited; live geocoding is disabled for this run: %s', exc)
+    geocodingEnabled = False
 # If this does not work, disable ssl certificates:
 except geopy.exc.GeocoderUnavailable:
     log.debug('Disable SSL')
@@ -181,6 +208,9 @@ except geopy.exc.GeocoderUnavailable:
     # Try again:
     try:
         geolocator.geocode('Graz, Austria')
+    except geopy.exc.GeocoderRateLimited as exc:
+        log.warning('Geocoding startup probe was rate-limited after SSL fallback; live geocoding is disabled for this run: %s', exc)
+        geocodingEnabled = False
     # If this does not work, change adapter:
     except geopy.exc.GeocoderUnavailable:
         log.debug('Change adapter')
@@ -191,6 +221,9 @@ except geopy.exc.GeocoderUnavailable:
         # Try again:
         try:
             geolocator.geocode('Graz, Austria')
+        except geopy.exc.GeocoderRateLimited as exc:
+            log.warning('Geocoding startup probe was rate-limited after adapter fallback; live geocoding is disabled for this run: %s', exc)
+            geocodingEnabled = False
         except:
             log.warning('Geolocator fails with the following error:')
             sendEmail('eva.gaal93@gmail.com', ['eva.garcia-alvarez@bbmri-eric.eu'], 'Geolocator failed!')
@@ -300,14 +333,31 @@ for index, biobank in filtered_df.iterrows():
 
         elif not pd.isna(biobank['longitude']) and not pd.isna(biobank['latitude']):
             dmsSymbols = ['º','°']
-            #if '°' in biobank['longitude'] or '°' in biobank['latitude'] or '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
-            if any(x in biobank['longitude'] for x in dmsSymbols) or any(x in biobank['latitude'] for x in dmsSymbols):
-                biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
-            elif any(i in biobank['longitude'] for i in ['N', 'E', 'S', 'W']) or any(i in biobank['latitude'] for i in ['N', 'E', 'S', 'W']):
-                biobankGeometryDict['coordinates'] = [dmm_to_dd(biobank['longitude']), dmm_to_dd(biobank['latitude'])]
-            else:
-                biobankGeometryDict['coordinates'] = [float(re.sub(r',', r'.', biobank['longitude'])), float(re.sub(r',', r'.', biobank['latitude']))]
-            log.info(biobank['name'] + ': Coordinates provided')
+            try:
+                #if '°' in biobank['longitude'] or '°' in biobank['latitude'] or '°' in biobank['longitude'] or '°' in biobank['latitude']: # Change to decimal coordinates
+                if any(x in biobank['longitude'] for x in dmsSymbols) or any(x in biobank['latitude'] for x in dmsSymbols):
+                    biobankGeometryDict['coordinates'] = [dms2dec(biobank['longitude']), dms2dec(biobank['latitude'])]
+                elif any(i in biobank['longitude'] for i in ['N', 'E', 'S', 'W']) or any(i in biobank['latitude'] for i in ['N', 'E', 'S', 'W']):
+                    biobankGeometryDict['coordinates'] = [dmm_to_dd(biobank['longitude']), dmm_to_dd(biobank['latitude'])]
+                else:
+                    biobankGeometryDict['coordinates'] = parse_decimal_coordinates(
+                        biobank['longitude'],
+                        biobank['latitude'],
+                    )
+                log.info(biobank['name'] + ': Coordinates provided')
+            except (TypeError, ValueError) as exc:
+                log.warning('%s: invalid stored coordinates longitude=%r latitude=%r (%s)', biobank['name'], biobank['longitude'], biobank['latitude'], exc)
+                biobankGeometryDict = {}
+                location = None
+                if biobank['contact-id']:
+                    personsContacts = dir.getContacts()
+                    lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
+                    location = lookForCoordinates(biobank['contact-id'], personsContacts, lookForCoordinatesFeatures)
+                    if location:
+                        biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
+                        log.info(biobank['name'] + ": geodecoding done ")
+                    else:
+                        log.warning(biobank['name'] + ": geodecoding failed ")
         #elif biobank['contact-_href']: #EMX2:
         elif biobank['contact-id']:
             personsContacts = dir.getContacts()

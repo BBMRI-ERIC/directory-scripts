@@ -1,0 +1,369 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "properties": {
+                "name": "Austria",
+                "nodeType": "HQ"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    15.4685848,
+                    47.081898
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Belgium",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    4.3674418,
+                    50.8561229
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Bulgaria",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    23.326714,
+                    42.685984
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Cyprus",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    33.359624,
+                    35.1604383
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Czechia",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    16.5877997,
+                    49.195061
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Denmark",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    12.587481,
+                    55.666081
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Estonia",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    26.717847360525454,
+                    58.3729709
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Finland",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    22.259351,
+                    60.4499929
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Germany",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    13.3474159,
+                    52.541985
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    23.78092,
+                    37.99151
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Hungary",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    19.082059,
+                    47.485067
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "France",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    4.876232,
+                    45.743702
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Italy",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    9.2137546,
+                    45.5182975
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Latvia",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    24.031169018484768,
+                    56.9829563
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Lithuania",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    25.282104,
+                    54.751794
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Malta",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    14.483299,
+                    35.902165
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Netherlands",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    5.1068391,
+                    52.0877804
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Norway",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    10.4019248,
+                    63.4195043
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Poland",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    16.9063507,
+                    51.1715045
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Qatar",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    51.5115953,
+                    25.2948822
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Slovenia",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    15.6401029,
+                    46.5591185
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Spain",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    -3.690986314880891,
+                    40.476305499999995
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Sweden",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    17.638888,
+                    59.84497
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Switzerland",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    6.6613184,
+                    46.5420929
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Turkey",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    27.1310699,
+                    38.4224548
+                ],
+                "type": "Point"
+            }
+        },
+	{
+            "properties": {
+                "name": "Slovakia",
+                "nodeType": "NN"
+            },
+	    "type": "Feature",
+	    "geometry": {
+                "coordinates": [
+                    17.1077477,
+		    48.1485965
+                ],
+		"type": "Point"
+            }
+	}
+    ]
+}

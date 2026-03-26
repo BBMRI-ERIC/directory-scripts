@@ -1,0 +1,505 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "properties": {
+                "name": "BelgiumConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        4.3674418,
+                        50.8561229
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "BulgariaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        23.326714,
+                        42.685984
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "CyprusConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        33.359624,
+                        35.1604383
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "CzechiaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        16.5877997,
+                        49.195061
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "DenmarkConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        12.587481,
+                        55.666081
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "EstoniaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        26.717847360525454,
+                        58.3729709
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "FinlandConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        22.259351,
+                        60.4499929
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "GermanyConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        13.3474159,
+                        52.541985
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "Connecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        23.78092,
+                        37.99151
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "HungaryConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        19.082059,
+                        47.485067
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "FranceConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        4.876232,
+                        45.743702
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "ItalyConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        9.2137546,
+                        45.5182975
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "LatviaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        24.031169018484768,
+                        56.9829563
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "LithuaniaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        25.282104,
+                        54.751794
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "MaltaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        14.483299,
+                        35.902165
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "NetherlandsConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        5.1068391,
+                        52.0877804
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "NorwayConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        10.4019248,
+                        63.4195043
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "PolandConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        16.9063507,
+                        51.1715045
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "QatarConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        51.5115953,
+                        25.2948822
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "SloveniaConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        15.6401029,
+                        46.5591185
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "SpainConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        -3.690986314880891,
+                        40.476305499999995
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "SwedenConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        17.638888,
+                        59.84497
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "SwitzerlandConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        6.6613184,
+                        46.5420929
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "TurkeyConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        27.1310699,
+                        38.4224548
+                    ],
+                    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+                "type": "LineString"
+            }
+        },
+	{
+            "properties": {
+                "name": "SlovakiaConnecting LineString",
+		"stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [
+                        17.1077477,
+			48.1485965
+                    ],
+		    [
+                        15.4685848,
+                        47.081898
+                    ]
+                ],
+		"type": "LineString"
+            }
+	}
+    ]
+}
