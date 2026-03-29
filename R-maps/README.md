@@ -67,6 +67,26 @@ re-implementing geocoding.
   - `IARC.geojson`
   - `HQlineNN.geojson`
   - `onlyLinesHQlineNN.geojson`
+- Supports config-driven external-area inset windows. At the moment the first
+  configured inset is Qatar (`QA`), rendered as a floating window linked back
+  to HQ from the main map.
+- The main OEC framing now uses the original Tilemill bounds from
+  `project.mml`, not the earlier tighter Europe-only crop. That restores the
+  published Scandinavia/Turkey proportions more closely.
+- OEC composition must preserve the projected plot aspect ratio when placing
+  the main map and inset windows on the page. Stretching the `ggplot` into an
+  arbitrary `cowplot` box makes the correct `tmerc` CRS look visually
+  cylindrical.
+- The Qatar inset is intended for repositioning, not magnification. It stays
+  small and geographically proportionate to the main OEC map extent while
+  being moved closer to Europe for readability.
+- Inset geography must clip the full country layer to the inset bbox, not only
+  the masked partner country itself; otherwise neighboring-state context can
+  never appear.
+- The HQ anchor for OEC inset connectors must be resolved from the actually
+  rendered main-map panel on the target output device. Do not assume a generic
+  plot-box mapping is enough; that caused visible west/east drift of the HQ
+  connector landing and overlay box.
 - Excludes one specific biobank:
   - `bbmri-eric:ID:EXT_NASBIO`
 
@@ -81,6 +101,19 @@ work, the currently used copies are stored locally in `R-maps/data/`:
 
 These were copied from the legacy Tilemill data area and are still treated as
 explicit renderer inputs rather than being hardcoded into plotting logic.
+
+## Local Visual History
+
+For iterative visual tuning, keep short-lived local snapshots of rendered
+outputs under `R-maps/compare-temp/history/`:
+
+```bash
+bash R-maps/archive-visual-history.sh --label before-change
+bash R-maps/archive-visual-history.sh --label after-change
+```
+
+This is intended for human/agent visual comparison only. The history directory
+is ignored by Git and uses a small rolling retention.
 
 ## R Dependencies
 
@@ -147,14 +180,57 @@ headers, the Debian/Ubuntu package command above has not been applied yet.
    needed. For dense biobank labels, use a deterministic local-placement pass
    that allows only small shifts around each point instead of long-distance
    repel layouts.
+7. For `OEC-all`, keep all normal visible symbols on the `sf` geometry path.
+   If country polygons and connecting lines are correct but squares/dots are
+   not, the first thing to check is whether a layer accidentally fell back to
+   manual projected `x/y` rendering.
+
+## OEC-Specific Notes
+
+- The OEC map uses the custom Tilemill Transverse Mercator projection, not the
+  standard `EPSG:3857` path used by `nolabels` and `sized`.
+- OEC bbox handling must use true projected bbox sampling, not only
+  transformed corner points.
+- OEC country layers should be clipped to bbox rather than merely filtered by
+  intersection. Otherwise overseas territories can distort the visible Europe
+  extents.
+- `HQlineNN.geojson` and `onlyLinesHQlineNN.geojson` do not use identical
+  naming conventions. Point names are plain country names, while line names
+  append `Connecting LineString`.
+- OEC line styling currently uses a thin white under-stroke plus the orange
+  line on top.
+- OEC HQ inset-connector anchoring is now device-resolved per export size.
+  `small`, `med`, and `big` each build the map with the target device size,
+  resolve the HQ location from the rendered panel viewport, and then reuse that
+  normalized page anchor for both the connector source and the overlay HQ box.
+- The current OEC `IARC` implementation uses:
+  - `sf` anchor geometry
+  - light-blue observer circle
+  - embedded orange node square
+  - embedded orange biobank dot
+  - label anchored from shifted `sf` geometry
+
+## Multi-Agent Review Setup
+
+When visual parity work becomes fuzzy, the productive three-agent split was:
+
+- implementation/correctness agent
+- modularity/maintainability reviewer
+- visual clarity/parity reviewer
+
+The purpose was competition of ideas, not parallel rewrites of the same files.
+The main agent should still keep the critical rendering/debugging loop local and
+use the side agents mainly for critique and alternative framing.
 
 ## Initial Scope
 
 The scripts added now are scaffolding plus first-pass rendering logic. The next
 implementation steps should be:
 
-1. Document how the OEC overlay GeoJSON files are generated and who owns them.
-2. Compare the first R renders visually against the current Tilemill outputs.
-3. Tune label offsets and stroke/fill values until the outputs are stable across
-   the standard export sizes.
+1. Keep doing explicit parity checks against the published Tilemill outputs,
+   especially for `OEC-all`.
+2. Document how the OEC overlay GeoJSON files are generated and who owns them.
+3. Continue visual tuning of the QA inset placement and connector landing only
+   if a concrete parity problem remains; the geometric/projection bugs are now
+   largely resolved.
 4. Decide whether SVG export should be mandatory or optional via `svglite`.

@@ -99,6 +99,29 @@ Local temporary comparison material has been kept under:
 
 That folder is for disposable reference and side-by-side images only.
 
+Useful current references:
+
+- `directory-map-5-0-small-nolabels.png`
+- `directory-map-5-0-small-sized.png`
+- `directory-map-5-0-small-OEC-all.png`
+
+For `OEC-all`, do not rely only on abstract reasoning. Open the local render
+image and compare it visually after each material geometry/layout change.
+When reviewing `OEC-all`, treat surrounding white border as an independent
+quality criterion. The published original is not the source of truth for that
+one detail, because its border is also too generous.
+
+Before and after a material visual change, snapshot the current rendered
+outputs so evolution can be reviewed:
+
+```bash
+bash R-maps/archive-visual-history.sh --label before-oec-tune
+bash R-maps/archive-visual-history.sh --label after-oec-tune
+```
+
+These snapshots are kept locally under `R-maps/compare-temp/history/` with a
+small rolling retention and are not meant to be committed.
+
 ## 7. Shadowtext Setup
 
 The renderers automatically prepend `R-maps/r-lib` to `.libPaths()` if that
@@ -121,6 +144,7 @@ TRUE
 - adjust palette/extent/offset constants in `map_config.R`
 - adjust shared placement or halo behavior in `map_common.R`
 - keep renderer scripts focused on map-specific layer composition only
+- for `OEC-all`, keep normal visible symbols on `geom_sf(...)`
 
 ## 9. Known Risky Areas
 
@@ -129,3 +153,41 @@ TRUE
 - changing label placement logic without rechecking Tilemill parity
 - changing the halo helper without checking `nolabels`, `sized`, and `OEC-all`
   together
+- switching `OEC-all` symbol layers back to manual projected `x/y`
+- trying to infer HQ/NN node positions from `onlyLinesHQlineNN.geojson` without
+  first checking the existing `HQlineNN.geojson` point anchors
+
+## 10. Multi-Agent Review Pattern
+
+When a map problem is ambiguous rather than purely mechanical, use this split:
+
+- Agent 1: implementation quality
+  Focus on correctness, compactness, assertive validations, and safe code.
+- Agent 2: maintainability review
+  Focus on modularity, human manageability, and long-term sustainability.
+- Agent 3: visual review
+  Focus on compactness, legibility, and parity with published Tilemill output.
+
+This pattern worked well for OEC inset/layout work. The main agent should still
+keep the actual geometry debugging local if the next edit depends immediately on
+the result.
+
+## 11. OEC Geometry Checklist
+
+Before trusting an `OEC-all` change, verify:
+
+- countries are clipped, not merely bbox-filtered
+- the main OEC bbox still matches the original Tilemill `project.mml` bounds
+- the composed main/inset boxes preserve projected aspect instead of stretching
+  the plot to arbitrary page rectangles
+- node lines look correct
+- node squares sit on the expected line endpoints
+- biobank dots are not drifting relative to countries
+- `IARC` anchor, sub-symbols, and label all move consistently
+- QA inset is small, near Europe, and not unintentionally magnified
+- QA inset geography includes neighboring-state context, not only the masked
+  partner country polygon
+- HQ inset connector anchor is resolved on the actual rendered main-map panel,
+  not from generic outer-box math
+- the resolved HQ anchor remains effectively identical for `small`, `med`, and
+  `big` exports

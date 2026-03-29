@@ -173,16 +173,84 @@ bbmri_font_family <- function() {
 }
 
 bbmri_projected_bbox <- function(bbox, crs) {
-  bbox_sfc <- sf::st_as_sfc(sf::st_bbox(
-    c(
-      xmin = bbox[["xmin"]],
-      ymin = bbox[["ymin"]],
-      xmax = bbox[["xmax"]],
-      ymax = bbox[["ymax"]]
-    ),
-    crs = sf::st_crs(4326)
-  ))
-  sf::st_bbox(sf::st_transform(bbox_sfc, sf::st_crs(crs)))
+  bbmri_require_bbox(bbox, "Projected bbox source")
+
+  xs <- c(
+    seq(bbox[["xmin"]], bbox[["xmax"]], length.out = 64),
+    rep(bbox[["xmax"]], 64),
+    seq(bbox[["xmax"]], bbox[["xmin"]], length.out = 64),
+    rep(bbox[["xmin"]], 64)
+  )
+  ys <- c(
+    rep(bbox[["ymin"]], 64),
+    seq(bbox[["ymin"]], bbox[["ymax"]], length.out = 64),
+    rep(bbox[["ymax"]], 64),
+    seq(bbox[["ymax"]], bbox[["ymin"]], length.out = 64)
+  )
+
+  bbox_outline <- sf::st_as_sf(
+    data.frame(x = xs, y = ys),
+    coords = c("x", "y"),
+    crs = 4326
+  )
+  bbox_outline_proj <- sf::st_transform(bbox_outline, sf::st_crs(crs))
+  sf::st_bbox(bbox_outline_proj)
+}
+
+bbmri_require_bbox <- function(bbox, label = "bbox") {
+  required <- c("xmin", "ymin", "xmax", "ymax")
+  missing <- setdiff(required, names(bbox))
+  if (length(missing) > 0) {
+    stop(label, " is missing required fields: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!all(vapply(required, function(name) is.finite(bbox[[name]]), logical(1)))) {
+    stop(label, " must contain only finite numeric values.", call. = FALSE)
+  }
+  if (bbox[["xmin"]] >= bbox[["xmax"]] || bbox[["ymin"]] >= bbox[["ymax"]]) {
+    stop(label, " must satisfy xmin < xmax and ymin < ymax.", call. = FALSE)
+  }
+  invisible(bbox)
+}
+
+bbmri_project_point_to_npc <- function(x, y, bbox, crs) {
+  bbmri_require_bbox(bbox, "Projected NPC source bbox")
+  if (!is.finite(x) || !is.finite(y)) {
+    stop("Projected NPC source point must be finite.", call. = FALSE)
+  }
+  proj_bbox <- bbmri_projected_bbox(bbox, crs)
+  c(
+    x = (x - proj_bbox[["xmin"]]) / (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]),
+    y = (y - proj_bbox[["ymin"]]) / (proj_bbox[["ymax"]] - proj_bbox[["ymin"]])
+  )
+}
+
+bbmri_fit_box_to_aspect <- function(x, y, width, height, aspect) {
+  if (!is.finite(aspect) || aspect <= 0) {
+    stop("Aspect ratio must be a positive finite number.", call. = FALSE)
+  }
+  if (!all(is.finite(c(x, y, width, height))) || width <= 0 || height <= 0) {
+    stop("Container box must use finite positive width and height.", call. = FALSE)
+  }
+
+  container_aspect <- width / height
+  if (container_aspect >= aspect) {
+    fit_height <- height
+    fit_width <- fit_height * aspect
+    fit_x <- x + (width - fit_width) / 2
+    fit_y <- y
+  } else {
+    fit_width <- width
+    fit_height <- fit_width / aspect
+    fit_x <- x
+    fit_y <- y + (height - fit_height) / 2
+  }
+
+  list(
+    x = fit_x,
+    y = fit_y,
+    width = fit_width,
+    height = fit_height
+  )
 }
 
 bbmri_halo_step <- function(bbox, crs, output_width_px, px = 1.0) {
@@ -510,6 +578,36 @@ bbmri_crop_to_bbox <- function(layer, bbox) {
     logical(1)
   )
   layer[hits, ]
+}
+
+bbmri_clip_to_bbox <- function(layer, bbox) {
+  if (nrow(layer) == 0) {
+    return(layer)
+  }
+
+  bbox_sfc <- sf::st_as_sfc(sf::st_bbox(
+    c(
+      xmin = bbox[["xmin"]],
+      ymin = bbox[["ymin"]],
+      xmax = bbox[["xmax"]],
+      ymax = bbox[["ymax"]]
+    ),
+    crs = sf::st_crs(4326)
+  ))
+  bbox_on_layer_crs <- sf::st_transform(bbox_sfc, sf::st_crs(layer))
+  layer_valid <- suppressWarnings(sf::st_make_valid(layer))
+  clipped <- suppressWarnings(sf::st_intersection(layer_valid, bbox_on_layer_crs))
+  clipped[!sf::st_is_empty(clipped), , drop = FALSE]
+}
+
+bbmri_filter_sf_by_mask <- function(layer, mask, include = TRUE) {
+  if (nrow(layer) == 0 || nrow(mask) == 0) {
+    return(if (include) layer[0, ] else layer)
+  }
+
+  layer_on_mask_crs <- sf::st_transform(layer, sf::st_crs(mask))
+  hits <- lengths(sf::st_intersects(layer_on_mask_crs, mask)) > 0
+  layer[if (include) hits else !hits, ]
 }
 
 bbmri_assign_standard_country_fill <- function(countries, cfg) {

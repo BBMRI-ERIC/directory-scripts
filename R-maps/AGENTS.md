@@ -63,6 +63,12 @@ from `geocoding_2022.py`.
   overlap. `sized` currently does not.
 - `OEC-all` uses a materially different projection and style. Do not force it
   to share the standard-map geography or palette rules.
+- External/non-European OEC partner areas should be handled through the
+  config-driven `oec_insets` list in `map_config.R`, not through hardcoded
+  renderer branches. Qatar is only the first configured inset.
+- For `OEC-all`, country polygons, HQ/NN boxes, and biobank dots must share the
+  same `sf` geometry rendering path. Do not reintroduce manual projected `x/y`
+  plotting for normal symbols in that map.
 
 ## Current Labeling Rules
 
@@ -74,6 +80,11 @@ from `geocoding_2022.py`.
 - `nolabels` country labels and `IARC` use that explicit halo setup.
 - `sized` country labels use the same halo setup.
 - `OEC-all` `IARC` uses the same halo setup.
+- `OEC-all` `IARC` label now uses shifted `sf` geometry rather than a manual
+  `x/y` nudge path, because the latter produced projection drift.
+- `OEC-all` HQ anchoring for inset connectors must be resolved from the
+  actually rendered main-map panel on the target output device. Generic
+  plot-box math was not reliable enough and produced visible west/east drift.
 
 ## Current Placement Rules
 
@@ -95,6 +106,101 @@ from `geocoding_2022.py`.
 - `OEC-all` `IARC` label currently has an explicit northwest shim:
   - `nudge_x = -20000`
   - `nudge_y = 22000`
+- `OEC-all` main geography now uses the original Tilemill `project.mml`
+  bounds again. External partner areas configured in `oec_insets` are removed
+  from the main canvas and rendered in floating inset windows linked back to
+  HQ.
+- `OEC-all` Qatar is now handled as a repositioning inset, not as a magnified
+  map. The inset is deliberately small and should stay close to southeastern
+  Europe/Turkey while keeping Qatar itself geographically proportionate.
+- The QA connector landing point may need a tiny inset-local correction even
+  when the base node geometry is correct. Treat that as an inset-composition
+  detail, not as evidence that the QA node geometry itself is wrong.
+
+## Current OEC Projection Findings
+
+- The early OEC parity failures were caused by projection-path mismatches.
+- The custom Transverse Mercator bbox must be projected by sampling the bbox
+  boundary densely. Transforming only the four corner points is not sufficient.
+- Even with the correct CRS and bbox, the composed `cowplot` placement must
+  preserve the projected aspect ratio. Stretching the OEC panel into an
+  arbitrary page box makes it look like a cylindrical projection.
+- The current `oec_bbox` should stay aligned with the original Tilemill
+  `project.mml` bounds unless there is a deliberate visual redesign.
+- For OEC countries, bbox-hit filtering was not enough because overseas
+  territories from countries such as France distorted the projected extents.
+  Use real clipping for OEC country and OEC line layers.
+- For OEC inset geography, clipping only the masked country was also wrong:
+  it prevented any neighboring-state context from appearing. Inset geography
+  should clip the full country layer to the inset bbox, while points/nodes stay
+  filtered to the inset partner mask.
+- The legacy `HQlineNN.geojson` node points already sit on the correct line
+  endpoints. A later experiment that tried to "realign" them from line strings
+  was wrong and was removed.
+- `HQlineNN.geojson` uses plain country names such as `Belgium`, while
+  `onlyLinesHQlineNN.geojson` uses names such as
+  `BelgiumConnecting LineString`. If those files are ever matched by name
+  again, normalize that suffix explicitly.
+
+## Current OEC Symbol Rules
+
+- `OEC-all` country polygons, node squares, biobank dots, and the base `IARC`
+  observer circle are now rendered through `geom_sf(...)`.
+- This change materially fixed the earlier drift where OEC boxes and dots were
+  visibly off while the lines themselves were correct.
+- `IARC` remains a composite symbol:
+  - observer circle
+  - internal node square
+  - internal biobank dot
+- The internal `IARC` sub-symbols still use projected local offsets relative to
+  the `IARC` anchor point. That is acceptable because the anchor itself now
+  follows the `sf` geometry path.
+- OEC lines now use a white under-stroke plus the orange top stroke. This acts
+  as a lightweight halo and is visually preferable to simply making the lines
+  thicker.
+
+## Multi-Agent Review Pattern
+
+When OEC visual tuning becomes ambiguous, the useful multi-agent setup was:
+
+- implementation agent
+  Focus: computational correctness, compact/safe code, assertive validations.
+- modularity reviewer
+  Focus: maintainability, edit boundaries, sustainability of config and helper
+  abstractions.
+- visual reviewer
+  Focus: compactness, clarity, parity against published Tilemill outputs, and
+  whether the layout is actually pleasant rather than merely technically valid.
+
+For OEC visual review, surrounding white border / dead whitespace is a
+separate quality criterion. Do not force it to match the published original on
+that point, because the original OEC render also leaves too much white space.
+Prefer a tighter, visually balanced border even when that diverges from the
+reference image.
+
+This worked best when the main agent kept the critical-path rendering work local
+ and delegated only sidecar review/critique. The subagents were useful for:
+
+- challenging inset placement and Europe sizing
+- identifying abstraction problems in the first OEC inset implementation
+- catching visually broken "technically correct" states
+
+Do not delegate the actual last-mile geometry debugging if the next action is
+blocked on the answer; that part was faster locally.
+
+## Visual History Rule
+
+- The visual-review agent should keep several prior rendered states, not only
+  the latest file.
+- Use `archive-visual-history.sh` before and after material visual changes to
+  snapshot the current rendered outputs under `R-maps/compare-temp/history/`.
+- Keep the history local and ignored by Git. It is for short-term comparison,
+  not for committed artifacts.
+- Default retention should stay small and rolling (currently `--keep 8`) unless
+  a specific review session needs more.
+- For OEC inset anchor debugging, verify the resolved HQ page anchor against
+  all three raster export sizes (`small`, `med`, `big`). The intended behavior
+  is effectively identical normalized page coordinates across sizes.
 
 ## Export Rules
 
@@ -139,6 +245,7 @@ When changing map code, validate at least:
 ## What Not To Change Casually
 
 - `standard_bbox` and `oec_bbox`
+- `oec_insets`
 - `oec_crs`
 - `biobank_size_widths`
 - the `OEC-all` member/observer palette split

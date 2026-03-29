@@ -41,6 +41,16 @@ Current OEC overlay inputs:
 - `/home/hopet/codex/directory-scripts/R-maps/data/HQlineNN.geojson`
 - `/home/hopet/codex/directory-scripts/R-maps/data/onlyLinesHQlineNN.geojson`
 
+Local visual-review snapshots should be stored under
+`R-maps/compare-temp/history/` via `archive-visual-history.sh`. This is a
+rolling ignored workspace for comparing successive render states during visual
+tuning and should not be committed.
+
+For OEC visual review, surrounding white border is now treated as its own
+quality target rather than something to match exactly against the published
+Tilemill output. The original OEC render also leaves too much border, so future
+review should prefer tighter and better-balanced whitespace.
+
 ## Important Technical Decisions Already Made
 
 ### GeoJSON / Python Boundary
@@ -78,7 +88,26 @@ Current OEC overlay inputs:
 - Observer color is light blue, not orange.
 - HQ and nodes use squares, with HQ larger than node squares.
 - `IARC` is rendered as a larger light-blue observer circle.
-- `IARC` label is shimmed northwest to avoid the nearby node.
+- `IARC` label is now anchored from shifted `sf` geometry rather than manual
+  projected `x/y` text placement.
+- External non-European partner areas are now handled through the generic
+  `oec_insets` config list. The first configured inset is Qatar (`QA`), which
+  is removed from the main map and drawn in a floating inset window linked
+  back to HQ.
+- The main OEC bbox is back on the original Tilemill `project.mml` bounds.
+  This matters visually: the tighter experimental bbox made Norway/Finland too
+  large and caused Turkey/Scandinavia clipping relative to the published map.
+- A second independent OEC issue was page composition: the main map and inset
+  must be fitted into `cowplot` boxes while preserving their projected aspect
+  ratios. Otherwise the correct `tmerc` CRS still looks visually cylindrical.
+- The QA inset is intentionally small and geographically proportionate to the
+  main OEC extent. It is for repositioning closer to Europe, not for
+  magnifying Qatar.
+- Inset geography now clips the full country layer to the inset bbox, not only
+  Qatar itself. Without that, neighboring-state context can never be visible.
+- OEC lines now use a white under-stroke plus orange top stroke.
+- OEC node squares and biobank dots now render through `geom_sf(...)`, which
+  fixed the earlier symbol projection drift.
 
 ### Halo Rendering
 
@@ -117,16 +146,71 @@ Based on local comparison work against published Tilemill PNGs:
 - `bbmri-members-nolabels` is the closest to parity
 - `bbmri-members-sized` is broadly good, but still benefits from incremental
   label and proportion tuning
-- `bbmri-members-OEC-all` is still the furthest from parity and needs the most
-  future tuning
+- `bbmri-members-OEC-all` improved materially after the OEC projection-path
+  fixes, especially once country clipping and `geom_sf` symbol rendering were
+  applied
+
+## Key OEC Debugging Lessons
+
+These findings mattered and should not be rediscovered the hard way:
+
+1. OEC projected bbox math:
+   - projecting only bbox corners was wrong
+   - sampling the bbox boundary densely fixed main-map extent math
+
+2. OEC country extents:
+   - filtering intersecting countries was insufficient
+   - real clipping was required so overseas territories did not collapse the
+     Europe panel into a tiny area
+
+3. OEC symbols vs lines:
+   - lines could look correct while node boxes and biobank dots were still off
+   - the root cause was manual projected `x/y` plotting for symbols under the
+     custom OEC projection
+   - switching normal OEC symbols to `geom_sf(...)` fixed this
+
+4. `HQlineNN` vs `onlyLinesHQlineNN`:
+   - node points already sat on the correct line endpoints
+   - an attempted re-alignment from line endpoints was incorrect and removed
+   - line feature names append `Connecting LineString`, so naive name matching
+     is wrong
+
+5. QA inset:
+   - the purpose of the inset is repositioning, not enlargement
+   - QA should stay geographically proportionate and simply move closer to
+     Europe
+   - the QA connector endpoint may still need tiny visual tuning in inset space
+     even when the underlying node geometry is correct
+
+6. HQ anchor for inset connectors:
+   - generic plot-box or panel-box math was not reliable enough
+   - the stable solution was to render the main OEC plot into a temporary
+     device at the real target output size, enter the actual panel viewport,
+     and resolve the HQ page anchor from that rendered panel
+   - that resolved page anchor is then reused for both the QA connector source
+     and the overlay HQ box
+   - this was validated across `small`, `med`, and `big` and should remain the
+     pattern for future additional inset windows
+
+## Multi-Agent Setup That Was Used
+
+During the OEC parity work, a useful three-agent split was:
+
+- implementation/correctness
+- modularity/maintainability review
+- visual clarity/parity review
+
+This helped challenge bad inset layouts and overcomplicated abstractions, but
+the actual geometry/projection debugging was still best done locally by the
+main agent.
 
 ## Known Remaining Issues / Open Work
 
-1. `OEC-all` still needs focused visual tuning for:
-   - framing tightness
-   - HQ/node square prominence
-   - connector line weight
-   - final `IARC` and node interaction spacing
+1. `OEC-all` may still need focused visual tuning for:
+   - final QA inset placement
+   - exact QA connector landing point
+   - final perceived prominence of HQ/node squares
+   - any remaining `IARC` micro-spacing
 
 2. `sized` may still need:
    - final biobank label font-size tuning

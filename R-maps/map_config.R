@@ -8,10 +8,16 @@ bbmri_map_config <- function() {
       ymax = 72.1009
     ),
     oec_bbox = c(
-      xmin = -14.0,
-      ymin = 22.0,
-      xmax = 56.6895,
-      ymax = 67.0
+      xmin = -12.2,
+      ymin = 26.4,
+      xmax = 44.0,
+      ymax = 71.2
+    ),
+    oec_canvas = list(
+      main_x = 0.0,
+      main_y = 0.0,
+      main_width = 0.965,
+      main_height = 0.995
     ),
     standard_crs = 3857,
     oec_crs = "+proj=tmerc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=10.0 +lat_0=-10.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
@@ -93,6 +99,7 @@ bbmri_map_config <- function() {
       member = "#003674",
       observer = "#7fdfff",
       default_country = "#ffffff",
+      country_line = "#d5d5d5",
       gray_country = "#d3d3d3",
       biobank = "#e95713",
       biobank_fill = "#f49b71",
@@ -110,6 +117,40 @@ bbmri_map_config <- function() {
       biobank_stroke = 0.28,
       biobank_dx = 10000,
       biobank_dy = -8000
+    ),
+    oec_insets = list(
+      list(
+        id = "qa",
+        label = "Qatar",
+        mask_country_codes = c("QA"),
+        require_node = TRUE,
+        bbox = c(
+          xmin = 49.625,
+          ymin = 24.10,
+          xmax = 52.525,
+          ymax = 26.90
+        ),
+        placement = list(
+          x = 0.80,
+          y = 0.135,
+          width = 0.036,
+          height = 0.057
+        ),
+        connector = list(
+          source_node_type = "HQ",
+          source_name = NA_character_,
+          source_dx = 0.0,
+          source_dy = 0.0,
+          target_x = 0.1,
+          target_y = 0.5,
+          linewidth = 0.12
+        ),
+        frame = list(
+          border_colour = "#e95713",
+          border_linewidth = 0.8,
+          background_fill = "#fbfdff"
+        )
+      )
     ),
     biobank_size_widths = c(
       "0" = 5,
