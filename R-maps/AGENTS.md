@@ -16,6 +16,35 @@ pipeline. The current target maps are:
 The R code is responsible only for rendering. GeoJSON generation still starts
 from `geocoding_2022.py`.
 
+## Legacy Baseline That Still Matters
+
+Tilemill is no longer the implementation target, but some legacy map semantics
+are still the parity baseline and should remain documented here:
+
+- `bbmri-members-nolabels`
+  - standard Europe map
+  - no rivers or lakes
+  - fixed-size biobank dots
+  - no biobank labels
+  - country labels still exist
+- `bbmri-members-sized`
+  - same standard Europe map and country palette as `nolabels`
+  - no rivers or lakes
+  - biobank dot size follows `biobankSize`
+  - biobank labels use `biobankID`
+- `bbmri-members-OEC-all`
+  - custom `tmerc` projection
+  - white background
+  - dark-blue member countries
+  - light-blue observer countries
+  - orange HQ / node / biobank language
+  - simplified base map
+  - uses the member/observer GeoJSON subset, not the full directory point set
+
+Keep those semantics in AGENTS rather than in the README. The README should
+explain how to run and maintain the R pipeline, not serve as a Tilemill study
+document.
+
 ## Files And Ownership
 
 - `map_config.R`
@@ -116,6 +145,9 @@ from `geocoding_2022.py`.
 - The QA connector landing point may need a tiny inset-local correction even
   when the base node geometry is correct. Treat that as an inset-composition
   detail, not as evidence that the QA node geometry itself is wrong.
+- The current local overlay data now place the Slovakia node in Martin rather
+  than Bratislava. If the Slovakia node moves again, update both
+  `HQlineNN.geojson` and the matching endpoint in `onlyLinesHQlineNN.geojson`.
 
 ## Current OEC Projection Findings
 
@@ -219,6 +251,10 @@ blocked on the answer; that part was faster locally.
 - Because raster device math rounds at the pixel level, a configured size can
   occasionally land one pixel off in height on a specific output. Treat that as
   a rendering-device artifact unless it becomes materially visible.
+- `render_pilot_maps.R` must use the dedicated
+  `bbmri_save_members_oec_all_formats(...)` path for `OEC-all`, not the generic
+  `bbmri_save_plot_formats(...)` path. Otherwise the size-specific HQ-anchor
+  resolution is bypassed.
 
 ## External Inputs
 

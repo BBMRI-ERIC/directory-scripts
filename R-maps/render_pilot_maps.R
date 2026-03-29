@@ -69,13 +69,17 @@ main <- function() {
   bbmri_save_plot_formats(sized_plot, args$output_dir, "bbmri-members-sized", cfg$export_sizes)
 
   message("Rendering bbmri-members-OEC-all...")
-  oec_plot <- build_members_oec_all_map(
-    points_path = args$member_geojson,
-    iarc_path = args$iarc,
-    node_points_path = args$node_points,
-    node_lines_path = args$node_lines
+  bbmri_save_members_oec_all_formats(
+    args = list(
+      input = args$member_geojson,
+      iarc = args$iarc,
+      node_points = args$node_points,
+      node_lines = args$node_lines,
+      output_dir = args$output_dir,
+      output_prefix = "bbmri-members-OEC-all"
+    ),
+    export_sizes = cfg$export_sizes
   )
-  bbmri_save_plot_formats(oec_plot, args$output_dir, "bbmri-members-OEC-all", cfg$export_sizes)
 
   message("Pilot renders written to: ", args$output_dir)
 }
