@@ -36,12 +36,66 @@ Rscript R-maps/render_bbmri_members_oec_all.R \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
 
+### `global-nolabels`
+
+```bash
+Rscript R-maps/render_global_nolabels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+### `covid-nolabels`
+
+```bash
+Rscript R-maps/render_covid_nolabels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+### `quality_maps-nolabels`
+
+```bash
+Rscript R-maps/render_quality_maps_nolabels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+### `federated-platform`
+
+```bash
+Rscript R-maps/render_federated_platform.R \
+  --input=/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+### `CRC-cohort-sized`
+
+```bash
+Rscript R-maps/render_crc_cohort_sized.R \
+  --input=/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort.geojson \
+  --imaging=/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort-imaging.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
 ## 2. Regenerate The Full Pilot Set
 
 ### Bash wrapper
 
 ```bash
-./R-maps/export-all.sh
+bash R-maps/export-all.sh
+```
+
+```bash
+bash R-maps/export-all.sh --map-set extras
+```
+
+```bash
+bash R-maps/export-all.sh --map-set all
 ```
 
 ### Direct R entry point
@@ -56,21 +110,36 @@ What it does:
 - runs `geocoding_2022.py` through the local pilot Python env
 - writes `bbmri-directory-pilot.geojson`
 - derives `bbmri-directory-members-pilot.geojson`
-- renders all three maps
+- derives `bbmri-directory-covid-pilot.geojson` when extras are requested
+- derives `bbmri-directory-quality-pilot.geojson` when extras are requested
+- renders the requested map set
 
-## 3. Fast Parse Check
-
-```bash
-Rscript -e 'parse(file="R-maps/map_config.R"); parse(file="R-maps/map_common.R"); parse(file="R-maps/render_bbmri_members_nolabels.R"); parse(file="R-maps/render_bbmri_members_sized.R"); parse(file="R-maps/render_bbmri_members_oec_all.R")'
-```
-
-## 4. Verify Output Presence
+## 3. Run Prep Helpers Directly
 
 ```bash
-ls -1 R-maps/pilot-output/bbmri-members-*
+./.venv-maps/bin/python R-maps/prepare_covid_geojson.py \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson
 ```
 
-## 5. Verify Raster Sizes
+```bash
+./.venv-maps/bin/python R-maps/prepare_quality_geojson.py \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson
+```
+
+## 4. Fast Parse Check
+
+```bash
+Rscript -e 'for (f in c("R-maps/map_config.R","R-maps/map_common.R","R-maps/render_bbmri_members_nolabels.R","R-maps/render_bbmri_members_sized.R","R-maps/render_bbmri_members_oec_all.R","R-maps/render_global_nolabels.R","R-maps/render_covid_nolabels.R","R-maps/render_quality_maps_nolabels.R","R-maps/render_federated_platform.R","R-maps/render_crc_cohort_sized.R","R-maps/render_pilot_maps.R")) parse(file=f)'
+```
+
+## 5. Verify Output Presence
+
+```bash
+ls -1 R-maps/pilot-output/*
+```
+
+## 6. Verify Raster Sizes
 
 ```bash
 python3 - <<'PY'
@@ -81,7 +150,7 @@ for p in sorted(Path("R-maps/pilot-output").glob("*small.png")):
 PY
 ```
 
-## 6. Compare Against Published Tilemill References
+## 7. Compare Against Published Tilemill References
 
 Published references live at:
 
@@ -122,7 +191,7 @@ bash R-maps/archive-visual-history.sh --label after-oec-tune
 These snapshots are kept locally under `R-maps/compare-temp/history/` with a
 small rolling retention and are not meant to be committed.
 
-## 7. Shadowtext Setup
+## 8. Shadowtext Setup
 
 The renderers automatically prepend `R-maps/r-lib` to `.libPaths()` if that
 directory exists.
@@ -139,14 +208,15 @@ Expected result:
 TRUE
 ```
 
-## 8. Known Safe Edit Boundaries
+## 9. Known Safe Edit Boundaries
 
 - adjust palette/extent/offset constants in `map_config.R`
 - adjust shared placement or halo behavior in `map_common.R`
+- keep the Python prep helpers focused on data derivation only
 - keep renderer scripts focused on map-specific layer composition only
 - for `OEC-all`, keep normal visible symbols on `geom_sf(...)`
 
-## 9. Known Risky Areas
+## 10. Known Risky Areas
 
 - changing export logic in `bbmri_save_plot_formats(...)`
 - changing the OEC projection or bbox
@@ -156,8 +226,10 @@ TRUE
 - switching `OEC-all` symbol layers back to manual projected `x/y`
 - trying to infer HQ/NN node positions from `onlyLinesHQlineNN.geojson` without
   first checking the existing `HQlineNN.geojson` point anchors
+- guessing live replacements for `federated-platform` or `CRC-cohort-sized`
+  instead of using explicit snapshot inputs
 
-## 10. Multi-Agent Review Pattern
+## 11. Multi-Agent Review Pattern
 
 When a map problem is ambiguous rather than purely mechanical, use this split:
 
@@ -172,7 +244,7 @@ This pattern worked well for OEC inset/layout work. The main agent should still
 keep the actual geometry debugging local if the next edit depends immediately on
 the result.
 
-## 11. OEC Geometry Checklist
+## 12. OEC Geometry Checklist
 
 Before trusting an `OEC-all` change, verify:
 

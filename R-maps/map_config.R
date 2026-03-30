@@ -1,11 +1,35 @@
 bbmri_map_config <- function() {
+  scale_export_sizes <- function(small, med, big, scale = 2) {
+    list(
+      png = list(
+        small = c(width = small[[1]] * scale, height = small[[2]] * scale),
+        med = c(width = med[[1]] * scale, height = med[[2]] * scale),
+        big = c(width = big[[1]] * scale, height = big[[2]] * scale)
+      ),
+      vector = c(width = med[[1]] * scale, height = med[[2]] * scale)
+    )
+  }
+
   list(
     render_scale = 2,
+    marker_width_scale = 8.7,
     standard_bbox = c(
       xmin = -32.4316,
       ymin = 22.0,
       xmax = 56.6895,
       ymax = 72.1009
+    ),
+    classic_europe_bbox = c(
+      xmin = -32.4316,
+      ymin = 28.9985,
+      xmax = 56.6895,
+      ymax = 72.1009
+    ),
+    global_bbox = c(
+      xmin = -180.0,
+      ymin = -50.0,
+      xmax = 180.0,
+      ymax = 78.0
     ),
     oec_bbox = c(
       xmin = -12.2,
@@ -21,23 +45,46 @@ bbmri_map_config <- function() {
     ),
     standard_crs = 3857,
     oec_crs = "+proj=tmerc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=10.0 +lat_0=-10.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
-    export_sizes = list(
-      png = list(
-        small = c(width = 1200, height = 1018),
-        med = c(width = 3000, height = 2544),
-        big = c(width = 8002, height = 6786)
-      ),
-      vector = c(width = 3000, height = 2544)
+    export_sizes = scale_export_sizes(
+      small = c(600, 509),
+      med = c(1500, 1272),
+      big = c(4001, 3393)
+    ),
+    global_export_sizes = scale_export_sizes(
+      small = c(918, 509),
+      med = c(2300, 1272),
+      big = c(6140, 3393)
+    ),
+    crc_export_sizes = scale_export_sizes(
+      small = c(918, 509),
+      med = c(2300, 1272),
+      big = c(6140, 3393)
     ),
     standard_country_labels = c(
       "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES",
       "FI", "GR", "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL",
+      "QA",
       "SE", "SI", "SK", "TR"
     ),
+    fedplat_country_labels = c(
+      "AT", "CH", "CZ", "DE", "FI", "GB", "IT", "LV", "MT", "QA", "SE"
+    ),
     standard_label_offsets = data.frame(
-      iso_a2 = c("BE", "CH", "CY", "CZ", "GB", "MT", "NL"),
-      dx = c(0, 120000, 0, 80000, 0, 0, 0),
-      dy = c(20000, 40000, -110000, 0, -320000, -110000, -120000),
+      iso_a2 = c("BE", "CH", "CY", "CZ", "DE", "GB", "MT", "NL", "NO"),
+      dx = c(0, 120000, 0, 80000, 120000, 0, 0, -120000, 0),
+      dy = c(20000, 40000, -110000, 0, 30000, -320000, -110000, -120000, -4000000),
+      stringsAsFactors = FALSE
+    ),
+    standard_small_label_offsets = data.frame(
+      iso_a2 = c("AT", "CH", "CZ", "DE", "HU", "NO", "QA", "SI"),
+      dx = c(-90000, -140000, 130000, -140000, 120000, 0, 80000, 100000),
+      dy = c(90000, 90000, -20000, 110000, -30000, -200000, 30000, -80000),
+      stringsAsFactors = FALSE
+    ),
+    fedplat_label_offsets = data.frame(
+      iso_a2 = c("BE", "CH", "CZ", "GB", "NL"),
+      dx = c(0, 120000, 80000, 0, 0),
+      dy = c(20000, 40000, 0, -320000, -120000),
       stringsAsFactors = FALSE
     ),
     standard_label_style = list(
@@ -45,6 +92,18 @@ bbmri_map_config <- function() {
       inner_halo_px = 1.0,
       outer_halo_px = 3.0,
       alpha = 0.95
+    ),
+    country_label_scale_by_output = c(
+      small = 0.6,
+      med = 1.0,
+      big = 1.0,
+      vector = 1.0
+    ),
+    country_label_halo_scale_by_output = c(
+      small = 0.5,
+      med = 1.0,
+      big = 1.0,
+      vector = 1.0
     ),
     standard_iarc_symbol = list(
       halo_size = 3.45,
@@ -55,7 +114,20 @@ bbmri_map_config <- function() {
     ),
     sized_biobank_label_style = list(
       size = 0.95,
-      alpha = 0.95
+      alpha = 0.95,
+      colour = "#4a4a4a"
+    ),
+    sized_marker_scale_by_output = c(
+      small = 0.5,
+      med = 1.0,
+      big = 2.0,
+      vector = 1.0
+    ),
+    sized_marker_min_by_output = c(
+      small = 10 / 17,
+      med = 5 / 17,
+      big = 10 / 17,
+      vector = 5 / 17
     ),
     standard_iarc_label_placement = list(
       hjust = 1,
@@ -70,6 +142,11 @@ bbmri_map_config <- function() {
         "SK"
       ),
       observer = c("CY", "DK", "QA", "TR")
+    ),
+    fedplat_country_groups = list(
+      member = c("BE", "CH", "FI", "GR", "LT", "NL", "NO", "PL", "BG", "HU", "SI"),
+      observer = c("DK", "TR", "QA"),
+      fedplat = c("AT", "CZ", "DE", "EE", "IT", "MT", "CY", "LV", "SE")
     ),
     oec_country_groups = list(
       member = c(
@@ -92,7 +169,30 @@ bbmri_map_config <- function() {
       biobank = "#FF0066",
       standalone = "#FFCCCC",
       biobank_line = "#813",
-      iarc = "#7fdfff"
+      iarc = "#7fdfff",
+      geo_line = "#226688",
+      glacier = "#ffffff"
+    ),
+    quality_colors = list(
+      eric = "#f36f21",
+      accredited = "#004685",
+      other = "#6f7687",
+      line = "#004685"
+    ),
+    fedplat_colors = list(
+      member = "#0098cc",
+      observer = "#7fdfff",
+      fedplat = "#05B10F",
+      default_country = "#cccccc",
+      locator = "#ce7e00",
+      finder = "#c90076",
+      point_line = "#813"
+    ),
+    crc_colors = list(
+      cohort = "#FF0066",
+      cohort_line = "#813",
+      standalone = "#FFCCCC",
+      imaging = "#00CC00"
     ),
     oec_colors = list(
       background = "#ffffff",
@@ -104,6 +204,25 @@ bbmri_map_config <- function() {
       biobank = "#e95713",
       biobank_fill = "#f49b71",
       hq = "#e95713"
+    ),
+    fedplat_label_style = list(
+      size = 1.4,
+      alpha = 0.95,
+      colour = "#4a4a4a"
+    ),
+    quality_marker_style = list(
+      collection_width = 10,
+      biobank_width = 50,
+      alpha_collection = 0.8,
+      alpha_biobank = 0.5
+    ),
+    crc_marker_style = list(
+      main_alpha = 0.8,
+      imaging_alpha = 0.9,
+      imaging_width = 12,
+      cohort_min_width = 7,
+      cohort_high_base = 9,
+      cohort_high_slope = 0.10
     ),
     oec_iarc_symbol = list(
       halo_size = 4.15,
@@ -155,13 +274,13 @@ bbmri_map_config <- function() {
     biobank_size_widths = c(
       "0" = 5,
       "1" = 6,
-      "2" = 8,
-      "3" = 12,
-      "4" = 20,
-      "5" = 32,
-      "6" = 48,
-      "7" = 64,
-      "8" = 72
+      "2" = 10,
+      "3" = 18,
+      "4" = 36,
+      "5" = 64,
+      "6" = 96,
+      "7" = 128,
+      "8" = 144
     )
   )
 }

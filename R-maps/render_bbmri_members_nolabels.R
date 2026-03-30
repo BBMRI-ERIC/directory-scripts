@@ -8,13 +8,14 @@ script_dir <- if (length(file_arg) == 0) {
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
-build_members_nolabels_map <- function(points_path, iarc_path = NA_character_) {
+build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, output_variant = "med") {
   bbmri_require_packages(c("ggplot2", "sf"))
 
   cfg <- bbmri_map_config()
-  label_style <- cfg$standard_label_style
+  label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
   iarc_symbol <- cfg$standard_iarc_symbol
   iarc_label_placement <- cfg$standard_iarc_label_placement
+  output_width_px <- bbmri_output_width_px(cfg$export_sizes, output_variant)
   countries <- bbmri_crop_to_bbox(
     bbmri_assign_standard_country_fill(bbmri_load_countries(), cfg),
     cfg$standard_bbox
@@ -25,12 +26,24 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_) {
 
   country_labels <- bbmri_country_label_df(countries, cfg, cfg$standard_crs)
   point_df <- bbmri_biobank_points_df(points, cfg$standard_crs, label = "biobank points")
+  obstacle_df <- point_df[, c("x", "y")]
+  if (identical(output_variant, "small")) {
+    country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
+  }
+  if (!is.null(iarc)) {
+    iarc_df <- bbmri_biobank_points_df(iarc, cfg$standard_crs, label = "IARC points")
+    obstacle_df <- rbind(obstacle_df, iarc_df[, c("x", "y")])
+  } else {
+    iarc_df <- NULL
+  }
   country_labels <- bbmri_place_country_labels(
     country_labels,
-    point_df,
+    obstacle_df,
     bbox = cfg$standard_bbox,
     crs = cfg$standard_crs,
-    output_width_px = unname(cfg$export_sizes$vector[["width"]])
+    output_width_px = output_width_px,
+    label_size_scale = label_style$size / cfg$standard_label_style$size,
+    layout_variant = if (identical(output_variant, "small")) "small" else "default"
   )
   point_df$fill_color <- ifelse(
     point_df$biobankType == "standaloneCollection",
@@ -60,15 +73,14 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_) {
     size = label_style$size,
     bbox = cfg$standard_bbox,
     crs = cfg$standard_crs,
-    output_width_px = unname(cfg$export_sizes$vector[["width"]]),
+    output_width_px = output_width_px,
     family = bbmri_font_family(),
     inner_halo_px = label_style$inner_halo_px,
     outer_halo_px = label_style$outer_halo_px,
     alpha = label_style$alpha
   )
 
-  if (!is.null(iarc)) {
-    iarc_df <- bbmri_biobank_points_df(iarc, cfg$standard_crs, label = "IARC points")
+  if (!is.null(iarc_df)) {
     plot <- plot +
       ggplot2::geom_point(
         data = iarc_df,
@@ -103,7 +115,7 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_) {
         size = label_style$size,
         bbox = cfg$standard_bbox,
         crs = cfg$standard_crs,
-        output_width_px = unname(cfg$export_sizes$vector[["width"]]),
+        output_width_px = output_width_px,
         family = bbmri_font_family(),
         inner_halo_px = label_style$inner_halo_px,
         outer_halo_px = label_style$outer_halo_px,
@@ -120,6 +132,18 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_) {
   plot
 }
 
+save_members_nolabels_formats <- function(points_path, iarc_path, output_dir, prefix) {
+  cfg <- bbmri_map_config()
+  bbmri_save_plot_formats_from_builder(
+    build_plot = function(output_variant) {
+      build_members_nolabels_map(points_path, iarc_path, output_variant = output_variant)
+    },
+    output_dir = output_dir,
+    prefix = prefix,
+    export_sizes = cfg$export_sizes
+  )
+}
+
 main <- function() {
   args <- bbmri_parse_args(list(
     input = normalizePath(file.path(script_dir, "..", "bbmri-directory.geojson"), winslash = "/", mustWork = FALSE),
@@ -128,8 +152,7 @@ main <- function() {
     output_prefix = "bbmri-members-nolabels"
   ))
 
-  plot <- build_members_nolabels_map(args$input, args$iarc)
-  bbmri_save_plot_formats(plot, args$output_dir, args$output_prefix, bbmri_map_config()$export_sizes)
+  save_members_nolabels_formats(args$input, args$iarc, args$output_dir, args$output_prefix)
 }
 
 if (sys.nframe() == 0) {

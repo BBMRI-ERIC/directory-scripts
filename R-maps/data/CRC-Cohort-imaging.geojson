@@ -1,0 +1,145 @@
+{
+   "features" : [
+      {
+         "geometry" : {
+            "type" : "Point",
+            "coordinates" : [
+4.2662406, 50.8132361
+            ]
+         },
+         "properties" : {
+            "contribSize" : 50,
+            "biobankID" : "",
+            "biobankName" : "Biobanque du laboratoire d'anatomie pathologique",
+            "biobankType" : "biobank"
+         },
+         "type" : "Feature"
+      },
+      {
+         "properties" : {
+            "biobankType" : "biobank",
+            "biobankID" : "bbmri-eric:ID:AT_MUG",
+            "biobankName" : "Biobank Graz",
+            "contribSize" : 1066
+         },
+         "type" : "Feature",
+         "geometry" : {
+            "coordinates" : [
+               15.46588,
+               47.07492
+            ],
+            "type" : "Point"
+         }
+      },
+      {
+         "geometry" : {
+            "type" : "Point",
+            "coordinates" : [
+12.448677, 41.8025681
+            ]
+         },
+         "properties" : {
+            "contribSize" : 218,
+            "biobankID" : "",
+            "biobankName" : "Cancer Center Regina Elena Biobank",
+            "biobankType" : "biobank"
+         },
+         "type" : "Feature"
+      },
+      {
+         "type" : "Feature",
+         "geometry" : {
+            "coordinates" : [
+               16.5890801,
+               49.19426448
+            ],
+            "type" : "Point"
+         },
+         "properties" : {
+            "biobankType" : "biobank",
+            "biobankID" : "bbmri-eric:ID:CZ_MMCI",
+            "contribSize" : 300,
+            "biobankName" : "Bank of Biological Material, Masaryk Memorial Cancer Institute"
+         }
+      },
+      {
+         "properties" : {
+            "biobankName" : "Interdisciplinary Center for Biobanking-Luebeck",
+            "biobankID" : "bbmri-eric:ID:DE_ICBL",
+            "contribSize" : 417,
+            "biobankType" : "biobank"
+         },
+         "geometry" : {
+            "coordinates" : [
+               10.68729,
+               53.86893
+            ],
+            "type" : "Point"
+         },
+         "type" : "Feature"
+      },
+      {
+         "geometry" : {
+            "type" : "Point",
+            "coordinates" : [
+7.4231373, 46.9492109
+            ]
+         },
+         "properties" : {
+            "contribSize" : 871,
+            "biobankID" : "",
+            "biobankName" : "Gewebe Biobank Bern",
+            "biobankType" : "biobank"
+         },
+         "type" : "Feature"
+      },
+      {
+         "type" : "Feature",
+         "properties" : {
+            "biobankName" : "Malta BioBank",
+            "biobankID" : "bbmri-eric:ID:MT_MBB",
+            "contribSize" : 533,
+            "biobankType" : "biobank"
+         },
+         "geometry" : {
+            "type" : "Point",
+            "coordinates" : [
+               14.48501,
+               35.902776
+            ]
+         }
+      },
+      {
+         "geometry" : {
+            "type" : "Point",
+            "coordinates" : [
+13.375427, 52.5235853
+            ]
+         },
+         "properties" : {
+            "contribSize" : 1209,
+            "biobankID" : "",
+            "biobankName" : "Central Biomaterial Bank Charité (ZeBanC) Berlin",
+            "biobankType" : "biobank"
+         },
+         "type" : "Feature"
+      },
+      {
+         "geometry" : {
+            "coordinates" : [
+               17.6389267,
+               59.8585638
+            ],
+            "type" : "Point"
+         },
+         "type" : "Feature",
+         "properties" : {
+            "contribSize" : 1017,
+            "biobankName" : "UBR, Uppsala Bioresource",
+            "biobankID" : "bbmri-eric:ID:SE_2358",
+            "biobankType" : "biobank"
+         }
+      }
+   ],
+   "type" : "FeatureCollection"
+}

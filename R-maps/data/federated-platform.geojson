@@ -1,0 +1,355 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Heidelberg"
+            },
+            "geometry": {
+                "coordinates": [
+                    8.6724,
+                    49.3988
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Hannover"
+            },
+            "geometry": {
+                "coordinates": [
+                    9.7320,
+                    52.3759
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Luebeck"
+            },
+            "geometry": {
+                "coordinates": [
+                    10.684738,
+                    53.866444
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Marburg"
+            },
+            "geometry": {
+                "coordinates": [
+                    8.725064,
+                    50.811402
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Dresden"
+            },
+            "geometry": {
+                "coordinates": [
+                    13.737262,
+                    51.050407
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Cyprus"
+            },
+            "geometry": {
+                "coordinates": [
+                    33.1451285,
+                    34.9823018
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Regensburg"
+            },
+            "geometry": {
+                "coordinates": [
+                    12.0974869,
+                    49.0195333
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Wuerzburg"
+            },
+            "geometry": {
+                "coordinates": [
+                    9.932966,
+                    49.79245
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Prague"
+            },
+            "geometry": {
+                "coordinates": [
+                    14.4212535,
+                    50.0874654
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "LocatorBiobank",
+                "biobankLabel": "Uppsala"
+            },
+            "geometry": {
+                "coordinates": [
+                    17.6389,
+                    59.8586
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Rome",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    12.475157,
+                    41.8571148
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Olomouc",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    17.23522611,
+                    49.58600333
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    14.4213033,
+                    50.0677828
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    16.5890801,
+                    49.19426448
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Mannheim",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    8.4660395,
+                    49.4874592
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Brno",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    16.5686605,
+                    49.1678818
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Napoli",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    14.2203156,
+                    40.8627859
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Hradec Kralove",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    15.8244122,
+                    50.2001114
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    12.4481955,
+                    41.802814
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Berlin",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    13.41053,
+                    52.52437
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "biobankLabel": "Pilsen",
+                "biobankType": "LocatorBiobank"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    13.374591,
+                    49.736015
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "FinderBiobank",
+                "biobankLabel": "Tartu"
+            },
+            "geometry": {
+                "coordinates": [
+                    26.72245,
+                    58.3801207
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "FinderBiobank",
+                "biobankLabel": "Graz"
+            },
+            "geometry": {
+                "coordinates": [
+                    15.4382786,
+                    47.0708678
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "FinderBiobank",
+                "biobankLabel": "BBMRI-ERIC"
+            },
+            "geometry": {
+                "coordinates": [
+                    15.4382786,
+                    47.0708678
+                ],
+                "type": "Point"
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "biobankType": "FinderBiobank",
+                "biobankLabel": "Riga"
+            },
+            "geometry": {
+                "coordinates": [
+                    24.23296,
+                    56.96916
+                ],
+                "type": "Point"
+            }
+        }
+    ]
+}

@@ -11,10 +11,12 @@ Script for creating geoJSON
 import pprint
 import re
 import json
+import hashlib
 import configparser
 import ssl
 import logging as log
 import smtplib
+from pathlib import Path
 
 # Internal
 from cli_common import (
@@ -28,6 +30,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from diskcache import Cache
 
 cachesList = ['directory', 'geocoding']
 
@@ -84,44 +87,113 @@ else:
 ## Functions ##
 ###############
 
-def lookForCoordinates(contactID, personsContacts, lookForCoordinatesFeatures):
+def geocoding_cache_dir() -> str:
+    """Return the persistent global geocoding cache directory."""
+    return 'data-check-cache/geocoding'
+
+
+def geocoding_cache_key(contactID, lookBy):
+    """Return a stable cache key for one contact lookup signature."""
+    look_by_text = ' | '.join(str(value).strip() for value in lookBy if str(value).strip())
+    digest = hashlib.sha256(look_by_text.encode('utf-8')).hexdigest()
+    if contactID:
+        return f'contact:{contactID}:{digest}'
+    return f'query:{digest}'
+
+
+def safe_geocode(query: str):
+    """Resolve one geocoding query or disable live geocoding for this run."""
+    global geolocator
+    global geocodingEnabled
+
+    if not geocodingEnabled:
+        return ('disabled', None)
+
+    try:
+        location = geolocator.geocode(query)
+    except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
+        log.warning(
+            'Geocoding failed for %r because the geocoding service is unavailable or rate-limited: %s',
+            query,
+            exc,
+        )
+        geocodingEnabled = False
+        return ('disabled', None)
+    except geopy.exc.GeocoderUnavailable:
+        log.debug('Geocoding unavailable for %r; retrying with SSL fallback.', query)
+        disableSSLCheck()
+        try:
+            geolocator = geopy.geocoders.Nominatim(
+                user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',
+                timeout=15,
+            )
+            location = geolocator.geocode(query)
+        except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError, geopy.exc.GeocoderUnavailable) as exc:
+            log.warning(
+                'Geocoding failed for %r after SSL fallback: %s',
+                query,
+                exc,
+            )
+            geocodingEnabled = False
+            return ('disabled', None)
+
+    if location:
+        return ('resolved', location)
+    return ('not_found', None)
+
+
+def lookForCoordinates(contactID, personsContactsById, lookForCoordinatesFeatures, geocodingCache):
     '''
     Look for coordinates based on biobank contact.
 
     NOTE: Address fails a lot, maybe only by first field? But the separator is not consistent.
     '''
-    if not geocodingEnabled:
+    contact = personsContactsById.get(contactID)
+    if not contact:
         return None
-    for contact in personsContacts:
-        if contact['id'] == contactID:
 
-            lookBy = []
-            for locFeature in lookForCoordinatesFeatures:
-                if locFeature in contact.keys():
-                        lookBy.append(contact[locFeature])
-            try:
-                location = geolocator.geocode(', '.join(lookBy))
-            except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
-                log.warning('Geocoding failed for %s because the geocoding service is unavailable or rate-limited: %s', contactID, exc)
-                return None
-            if location:
-                log.debug('Coordinates from: '+ ', '.join(lookBy))
-                return location
-            # If location not found, remove specific fields and retain general ones.
-            else:
-                places = 1
-                while places<len(lookBy):
+    lookBy = []
+    for locFeature in lookForCoordinatesFeatures:
+        if locFeature in contact.keys() and contact[locFeature]:
+            lookBy.append(contact[locFeature])
+    if not lookBy:
+        return None
 
-                    try:
-                        location = geolocator.geocode(', '.join(lookBy[places:len(lookBy)+1]))
-                    except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
-                        log.warning('Geocoding failed for %s because the geocoding service is unavailable or rate-limited: %s', contactID, exc)
-                        return None
-                    
-                    if location:
-                        log.debug('Coordinates from: '+ ', '.join(lookBy[places:len(lookBy)+1]))
-                        return location
-                    places += 1
+    lookup_variants = [lookBy[places:len(lookBy) + 1] for places in range(0, len(lookBy))]
+
+    for lookup_values in lookup_variants:
+        cacheKey = geocoding_cache_key(contactID, lookup_values)
+        cachedEntry = geocodingCache.get(cacheKey)
+        if cachedEntry:
+            if cachedEntry.get('status') == 'resolved':
+                log.debug('Coordinates from geocoding cache: %s', ', '.join(lookup_values))
+                return cachedEntry['coordinates']
+            if cachedEntry.get('status') == 'not_found':
+                continue
+
+        if not geocodingEnabled:
+            return None
+
+        status, location = safe_geocode(', '.join(lookup_values))
+        if status == 'resolved':
+            coordinates = [float(location.longitude), float(location.latitude)]
+            geocodingCache[cacheKey] = {
+                'status': 'resolved',
+                'coordinates': coordinates,
+                'query': lookup_values,
+            }
+            log.debug('Coordinates from live geocoder: %s', ', '.join(lookup_values))
+            return coordinates
+        if status == 'not_found':
+            geocodingCache[cacheKey] = {
+                'status': 'not_found',
+                'query': lookup_values,
+            }
+            continue
+        if status == 'disabled':
+            return None
+
+    return None
 
 
 def dmm_to_dd(coord: str):
@@ -189,45 +261,27 @@ features = {}
 features['type'] = 'FeatureCollection'
 features['features'] = []
 
-# Get geolocator information
-geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
+# Initialize geolocator lazily. Do not perform a startup probe, because
+# repeated runs with a complete geocoding cache should not hit the live
+# geocoder at all.
+geolocator = geopy.geocoders.Nominatim(
+    user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',
+    timeout=15,
+)
 geocodingEnabled = True
 
-# Try geolocator certificates
-try:
-    geolocator.geocode('Graz, Austria')
-except geopy.exc.GeocoderRateLimited as exc:
-    log.warning('Geocoding startup probe was rate-limited; live geocoding is disabled for this run: %s', exc)
-    geocodingEnabled = False
-# If this does not work, disable ssl certificates:
-except geopy.exc.GeocoderUnavailable:
-    log.debug('Disable SSL')
-    disableSSLCheck()
-    geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
-
-    # Try again:
-    try:
-        geolocator.geocode('Graz, Austria')
-    except geopy.exc.GeocoderRateLimited as exc:
-        log.warning('Geocoding startup probe was rate-limited after SSL fallback; live geocoding is disabled for this run: %s', exc)
-        geocodingEnabled = False
-    # If this does not work, change adapter:
-    except geopy.exc.GeocoderUnavailable:
-        log.debug('Change adapter')
-        disableSSLCheck() # Need to be done again
-        geopy.geocoders.options.default_adapter_factory = geopy.adapters.URLLibAdapter
-        geolocator = geopy.geocoders.Nominatim(user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',timeout=15)
-
-        # Try again:
-        try:
-            geolocator.geocode('Graz, Austria')
-        except geopy.exc.GeocoderRateLimited as exc:
-            log.warning('Geocoding startup probe was rate-limited after adapter fallback; live geocoding is disabled for this run: %s', exc)
-            geocodingEnabled = False
-        except:
-            log.warning('Geolocator fails with the following error:')
-            sendEmail('eva.gaal93@gmail.com', ['eva.garcia-alvarez@bbmri-eric.eu'], 'Geolocator failed!')
-            raise
+geocodingCacheDir = geocoding_cache_dir()
+if not Path(geocodingCacheDir).exists():
+    Path(geocodingCacheDir).mkdir(parents=True, exist_ok=True)
+geocodingCache = Cache(geocodingCacheDir)
+if 'geocoding' in args.purgeCaches:
+    geocodingCache.clear()
+personsContacts = dir.getContacts()
+personsContactsById = {
+    contact['id']: contact
+    for contact in personsContacts
+    if isinstance(contact, dict) and 'id' in contact
+}
 
 # Get biobanks from Directory:
 # Flatten the results and create a pandas dataframe. Every entry per biobank is going to be a new column. As there are nested dictionaries, consecutive numbers are asigned to repeated keys.
@@ -348,23 +402,31 @@ for index, biobank in filtered_df.iterrows():
             except (TypeError, ValueError) as exc:
                 log.warning('%s: invalid stored coordinates longitude=%r latitude=%r (%s)', biobank['name'], biobank['longitude'], biobank['latitude'], exc)
                 biobankGeometryDict = {}
-                location = None
+                coordinates = None
                 if biobank['contact-id']:
-                    personsContacts = dir.getContacts()
                     lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
-                    location = lookForCoordinates(biobank['contact-id'], personsContacts, lookForCoordinatesFeatures)
-                    if location:
-                        biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
+                    coordinates = lookForCoordinates(
+                        biobank['contact-id'],
+                        personsContactsById,
+                        lookForCoordinatesFeatures,
+                        geocodingCache,
+                    )
+                    if coordinates:
+                        biobankGeometryDict['coordinates'] = coordinates
                         log.info(biobank['name'] + ": geodecoding done ")
                     else:
                         log.warning(biobank['name'] + ": geodecoding failed ")
         #elif biobank['contact-_href']: #EMX2:
         elif biobank['contact-id']:
-            personsContacts = dir.getContacts()
             lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
-            location = lookForCoordinates(biobank['contact-id'], personsContacts, lookForCoordinatesFeatures)
-            if location:
-                biobankGeometryDict['coordinates'] = [float(location.longitude), float(location.latitude)]
+            coordinates = lookForCoordinates(
+                biobank['contact-id'],
+                personsContactsById,
+                lookForCoordinatesFeatures,
+                geocodingCache,
+            )
+            if coordinates:
+                biobankGeometryDict['coordinates'] = coordinates
                 log.info(biobank['name'] + ": geodecoding done ")
             else:
                 log.warning(biobank['name'] + ": geodecoding failed ")
@@ -385,3 +447,4 @@ for index, biobank in filtered_df.iterrows():
 outFile = args.outName + '.geojson'
 with open(outFile, 'w') as outfile:
     json.dump(features, outfile, indent=4)
+geocodingCache.close()

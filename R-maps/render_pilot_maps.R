@@ -10,6 +10,11 @@ source(file.path(script_dir, "map_common.R"))
 source(file.path(script_dir, "render_bbmri_members_nolabels.R"))
 source(file.path(script_dir, "render_bbmri_members_sized.R"))
 source(file.path(script_dir, "render_bbmri_members_oec_all.R"))
+source(file.path(script_dir, "render_global_nolabels.R"))
+source(file.path(script_dir, "render_covid_nolabels.R"))
+source(file.path(script_dir, "render_quality_maps_nolabels.R"))
+source(file.path(script_dir, "render_federated_platform.R"))
+source(file.path(script_dir, "render_crc_cohort_sized.R"))
 
 bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_config, out_path) {
   out_base <- tools::file_path_sans_ext(out_path)
@@ -27,20 +32,45 @@ bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_c
   }
 }
 
+bbmri_run_python_helper <- function(python_bin, script_path, helper_args) {
+  args <- c(script_path, helper_args)
+  status <- system2(python_bin, args = args)
+  if (!identical(status, 0L)) {
+    stop(basename(script_path), " failed with exit status ", status, call. = FALSE)
+  }
+}
+
+bbmri_validate_map_set <- function(value) {
+  allowed <- c("core", "extras", "all")
+  if (!value %in% allowed) {
+    stop("Unsupported map set ", shQuote(value), "; expected one of ", paste(allowed, collapse = ", "), call. = FALSE)
+  }
+  value
+}
+
 main <- function() {
   cfg <- bbmri_map_config()
   repo_root <- normalizePath(file.path(script_dir, ".."), winslash = "/", mustWork = TRUE)
   args <- bbmri_parse_args(list(
+    map_set = "core",
     python = file.path(repo_root, ".venv-maps", "bin", "python"),
     geocoding_script = normalizePath(file.path(repo_root, "geocoding_2022.py"), winslash = "/", mustWork = TRUE),
     geocoding_config = normalizePath(file.path(repo_root, "geocoding.config"), winslash = "/", mustWork = TRUE),
+    covid_prep_script = normalizePath(file.path(script_dir, "prepare_covid_geojson.py"), winslash = "/", mustWork = TRUE),
+    quality_prep_script = normalizePath(file.path(script_dir, "prepare_quality_geojson.py"), winslash = "/", mustWork = TRUE),
     full_geojson = normalizePath(file.path(repo_root, "bbmri-directory-pilot.geojson"), winslash = "/", mustWork = FALSE),
     member_geojson = normalizePath(file.path(repo_root, "bbmri-directory-members-pilot.geojson"), winslash = "/", mustWork = FALSE),
+    covid_geojson = normalizePath(file.path(repo_root, "bbmri-directory-covid-pilot.geojson"), winslash = "/", mustWork = FALSE),
+    quality_geojson = normalizePath(file.path(repo_root, "bbmri-directory-quality-pilot.geojson"), winslash = "/", mustWork = FALSE),
     iarc = normalizePath(file.path(script_dir, "data", "IARC.geojson"), winslash = "/", mustWork = FALSE),
     node_points = normalizePath(file.path(script_dir, "data", "HQlineNN.geojson"), winslash = "/", mustWork = FALSE),
     node_lines = normalizePath(file.path(script_dir, "data", "onlyLinesHQlineNN.geojson"), winslash = "/", mustWork = FALSE),
+    federated_geojson = normalizePath(file.path(script_dir, "data", "federated-platform.geojson"), winslash = "/", mustWork = FALSE),
+    crc_geojson = normalizePath(file.path(script_dir, "data", "CRC-Cohort.geojson"), winslash = "/", mustWork = FALSE),
+    crc_imaging_geojson = normalizePath(file.path(script_dir, "data", "CRC-Cohort-imaging.geojson"), winslash = "/", mustWork = FALSE),
     output_dir = file.path(script_dir, "pilot-output")
   ))
+  args$map_set <- bbmri_validate_map_set(args$map_set)
 
   if (!file.exists(args$python)) {
     stop("Pilot Python interpreter not found: ", args$python, call. = FALSE)
@@ -55,31 +85,62 @@ main <- function() {
     out_path = args$full_geojson
   )
 
-  message("Deriving member/observer subset GeoJSON for OEC rendering...")
-  full_points <- bbmri_read_sf(args$full_geojson, "Pilot full biobank GeoJSON")
-  member_points <- bbmri_filter_member_observer_points(full_points, cfg)
-  bbmri_write_geojson(member_points, args$member_geojson)
+  if (args$map_set %in% c("core", "all")) {
+    message("Deriving member/observer subset GeoJSON for OEC rendering...")
+    full_points <- bbmri_read_sf(args$full_geojson, "Pilot full biobank GeoJSON")
+    member_points <- bbmri_filter_member_observer_points(full_points, cfg)
+    bbmri_write_geojson(member_points, args$member_geojson)
 
-  message("Rendering bbmri-members-nolabels...")
-  nolabels_plot <- build_members_nolabels_map(args$full_geojson, args$iarc)
-  bbmri_save_plot_formats(nolabels_plot, args$output_dir, "bbmri-members-nolabels", cfg$export_sizes)
+    message("Rendering bbmri-members-nolabels...")
+    save_members_nolabels_formats(args$full_geojson, args$iarc, args$output_dir, "bbmri-members-nolabels")
 
-  message("Rendering bbmri-members-sized...")
-  sized_plot <- build_members_sized_map(args$full_geojson, args$iarc)
-  bbmri_save_plot_formats(sized_plot, args$output_dir, "bbmri-members-sized", cfg$export_sizes)
+    message("Rendering bbmri-members-sized...")
+    save_members_sized_formats(args$full_geojson, args$iarc, args$output_dir, "bbmri-members-sized")
 
-  message("Rendering bbmri-members-OEC-all...")
-  bbmri_save_members_oec_all_formats(
-    args = list(
-      input = args$member_geojson,
-      iarc = args$iarc,
-      node_points = args$node_points,
-      node_lines = args$node_lines,
-      output_dir = args$output_dir,
-      output_prefix = "bbmri-members-OEC-all"
-    ),
-    export_sizes = cfg$export_sizes
-  )
+    message("Rendering bbmri-members-OEC-all...")
+    bbmri_save_members_oec_all_formats(
+      args = list(
+        input = args$member_geojson,
+        iarc = args$iarc,
+        node_points = args$node_points,
+        node_lines = args$node_lines,
+        output_dir = args$output_dir,
+        output_prefix = "bbmri-members-OEC-all"
+      ),
+      export_sizes = cfg$export_sizes
+    )
+  }
+
+  if (args$map_set %in% c("extras", "all")) {
+    message("Deriving COVID subset GeoJSON...")
+    bbmri_run_python_helper(
+      python_bin = args$python,
+      script_path = args$covid_prep_script,
+      helper_args = c("--input", args$full_geojson, "--output", args$covid_geojson)
+    )
+
+    message("Deriving quality map GeoJSON...")
+    bbmri_run_python_helper(
+      python_bin = args$python,
+      script_path = args$quality_prep_script,
+      helper_args = c("--output", args$quality_geojson)
+    )
+
+    message("Rendering global-nolabels...")
+    save_global_nolabels_formats(args$full_geojson, args$iarc, args$output_dir, "global-nolabels")
+
+    message("Rendering covid-nolabels...")
+    save_covid_nolabels_formats(args$covid_geojson, args$iarc, args$output_dir, "covid-nolabels")
+
+    message("Rendering quality_maps-nolabels...")
+    save_quality_maps_nolabels_formats(args$quality_geojson, args$iarc, args$output_dir, "quality_maps-nolabels")
+
+    message("Rendering federated-platform...")
+    save_federated_platform_formats(args$federated_geojson, args$iarc, args$output_dir, "federated-platform")
+
+    message("Rendering CRC-cohort-sized...")
+    save_crc_cohort_sized_formats(args$crc_geojson, args$crc_imaging_geojson, args$iarc, args$output_dir, "CRC-cohort-sized")
+  }
 
   message("Pilot renders written to: ", args$output_dir)
 }

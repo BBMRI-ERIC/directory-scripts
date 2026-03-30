@@ -2,95 +2,141 @@
 
 This folder contains the active R-based Directory map pipeline.
 
-The current supported outputs are:
+## Supported Maps
+
+Core maps:
 
 - `bbmri-members-nolabels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
 
-The R code is responsible for rendering. GeoJSON generation still starts from
-[`geocoding_2022.py`](/home/hopet/codex/directory-scripts/geocoding_2022.py).
+Extra maps:
+
+- `global-nolabels`
+- `covid-nolabels`
+- `quality_maps-nolabels`
+- `federated-platform`
+- `CRC-cohort-sized`
 
 ## Quick Start
 
-Render all three maps from the current Directory cache:
+Render the core maps:
 
 ```bash
 bash R-maps/export-all.sh
 ```
 
-Render a single map directly:
+Render only the extra maps:
 
 ```bash
-Rscript R-maps/render_bbmri_members_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+bash R-maps/export-all.sh --map-set extras
 ```
+
+Render everything:
 
 ```bash
-Rscript R-maps/render_bbmri_members_sized.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+bash R-maps/export-all.sh --map-set all
 ```
 
-```bash
-Rscript R-maps/render_bbmri_members_oec_all.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-members-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --node-points=/home/hopet/codex/directory-scripts/R-maps/data/HQlineNN.geojson \
-  --node-lines=/home/hopet/codex/directory-scripts/R-maps/data/onlyLinesHQlineNN.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
-```
+## How The Pipeline Works
 
-## Pipeline
+`export-all.sh` drives `render_pilot_maps.R`.
 
-`export-all.sh` runs the full local workflow:
+Shared inputs:
 
-1. generate `bbmri-directory-pilot.geojson` from the Directory cache
-2. derive `bbmri-directory-members-pilot.geojson`
-3. render `nolabels`, `sized`, and `OEC-all`
+1. `geocoding_2022.py` writes the full pilot GeoJSON
+2. helper prep scripts derive map-specific GeoJSONs when needed
+3. renderer scripts write `small` / `med` / `big` PNG and PDF outputs
 
-For `OEC-all`, the export path is size-specific on purpose. `small`, `med`,
-and `big` are built separately so the HQ anchor used by inset connectors is
-resolved against the actual target output size.
+`geocoding_2022.py` is expected to be cache-backed for both Directory data and
+live geocoding. Only entities still missing usable coordinates should trigger a
+live geocoder lookup, and successful or stable negative lookup results should
+be written into the shared global geocoding cache for reuse on later runs.
 
-## Important Files
+Derived GeoJSONs:
 
-- `map_config.R`
-  Central configuration for projections, extents, palettes, export sizes, and
-  inset settings.
-- `map_common.R`
-  Shared helpers for loading data, projection-aware geometry logic, label
-  helpers, and generic export support.
-- `render_bbmri_members_nolabels.R`
-  Standard map without biobank labels.
-- `render_bbmri_members_sized.R`
-  Standard map with size-scaled biobank dots and local biobank labels.
-- `render_bbmri_members_oec_all.R`
-  OEC map with custom projection and inset support.
-- `render_pilot_maps.R`
-  End-to-end local runner used by `export-all.sh`.
-- `data/`
-  Repo-local overlay GeoJSON inputs used by `OEC-all`.
+- `bbmri-directory-pilot.geojson`
+  Full Directory biobank point export from `geocoding_2022.py`
+- `bbmri-directory-members-pilot.geojson`
+  Member/observer subset for `bbmri-members-OEC-all`
+- `bbmri-directory-covid-pilot.geojson`
+  COVID subset derived from the full pilot GeoJSON plus live Directory network metadata
+- `bbmri-directory-quality-pilot.geojson`
+  Quality-map points derived from current Directory quality metadata
 
-## Inputs
+## Data Sources
 
-Standard maps use:
+Generated from current Directory/cache state:
 
-- full biobank GeoJSON from `geocoding_2022.py`
-- `R-maps/data/IARC.geojson`
+- `bbmri-members-nolabels`
+- `bbmri-members-sized`
+- `bbmri-members-OEC-all`
+- `global-nolabels`
+- `covid-nolabels`
+- `quality_maps-nolabels`
 
-`OEC-all` uses:
+Snapshot-backed local inputs:
 
-- member/observer subset GeoJSON
+- `R-maps/data/federated-platform.geojson`
+- `R-maps/data/CRC-Cohort.geojson`
+- `R-maps/data/CRC-Cohort-imaging.geojson`
+
+OEC overlays:
+
 - `R-maps/data/IARC.geojson`
 - `R-maps/data/HQlineNN.geojson`
 - `R-maps/data/onlyLinesHQlineNN.geojson`
 
-These overlay files are now local project inputs. They are part of the R map
-workflow and should be updated here when node geometry changes.
+## Direct Commands
+
+Render one map directly:
+
+```bash
+Rscript R-maps/render_global_nolabels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+```bash
+Rscript R-maps/render_quality_maps_nolabels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+```bash
+Rscript R-maps/render_federated_platform.R \
+  --input=/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+Prep helpers can also be run directly:
+
+```bash
+./.venv-maps/bin/python R-maps/prepare_covid_geojson.py \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson
+```
+
+```bash
+./.venv-maps/bin/python R-maps/prepare_quality_geojson.py \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson
+```
+
+## Important Files
+
+- `map_config.R`
+  Central map configuration: bboxes, export sizes, palettes, country groups, and inset settings
+- `map_common.R`
+  Shared helpers for Natural Earth loading, projections, label placement, and output export
+- `prepare_covid_geojson.py`
+  COVID subset derivation helper
+- `prepare_quality_geojson.py`
+  Quality-map GeoJSON derivation helper
+- `render_pilot_maps.R`
+  End-to-end runner used by `export-all.sh`
 
 ## Outputs
 
@@ -105,7 +151,7 @@ Generated outputs go to `R-maps/pilot-output/` and include:
 - `<prefix>.pdf`
 - `<prefix>.svg` when `svglite` is available
 
-`pilot-output/` is ignored by Git.
+Generated output and derived pilot GeoJSON files are ignored by Git.
 
 ## Dependencies
 
@@ -137,18 +183,6 @@ sudo apt-get install -y \
 mkdir -p R-maps/r-lib
 Rscript -e '.libPaths(c(normalizePath("R-maps/r-lib", mustWork = TRUE), .libPaths())); install.packages("shadowtext", repos = "https://cloud.r-project.org")'
 ```
-
-## Visual Review Helpers
-
-For local before/after snapshots during visual tuning:
-
-```bash
-bash R-maps/archive-visual-history.sh --label before-change
-bash R-maps/archive-visual-history.sh --label after-change
-```
-
-Snapshots are stored under `R-maps/compare-temp/history/` and are ignored by
-Git.
 
 ## Further Guidance
 

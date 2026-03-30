@@ -16,6 +16,11 @@ Implemented renderers:
 - `bbmri-members-nolabels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
+- `global-nolabels`
+- `covid-nolabels`
+- `quality_maps-nolabels`
+- `federated-platform`
+- `CRC-cohort-sized`
 
 Implemented outputs:
 
@@ -34,12 +39,20 @@ Pilot GeoJSON inputs:
 
 - `/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson`
 - `/home/hopet/codex/directory-scripts/bbmri-directory-members-pilot.geojson`
+- `/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson`
+- `/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson`
 
 Current OEC overlay inputs:
 
 - `/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson`
 - `/home/hopet/codex/directory-scripts/R-maps/data/HQlineNN.geojson`
 - `/home/hopet/codex/directory-scripts/R-maps/data/onlyLinesHQlineNN.geojson`
+
+Current snapshot-backed extra-map inputs:
+
+- `/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson`
+- `/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort.geojson`
+- `/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort-imaging.geojson`
 
 Local visual-review snapshots should be stored under
 `R-maps/compare-temp/history/` via `archive-visual-history.sh`. This is a
@@ -58,8 +71,19 @@ review should prefer tighter and better-balanced whitespace.
 - `geocoding_2022.py` stays in place.
 - It was already patched so invalid cached decimal coordinates are range-checked
   before export.
+- It now also uses a persistent global geocoding cache and no longer
+  performs an unconditional startup probe against the live geocoder. Repeated
+  runs on the same Directory snapshot should therefore reuse cached geocoding
+  results instead of touching the live geocoder again for already-seen
+  unresolved contacts.
 - The bad cached coordinates for `ES_BV` and `ES_IMIB` were explicitly handled
   during this work and should not silently reappear.
+- `prepare_covid_geojson.py` derives the COVID subset from the full pilot
+  GeoJSON plus live Directory metadata. It does not depend on `biobankCOVID`
+  being present in the full pilot GeoJSON.
+- `prepare_quality_geojson.py` derives quality-map points from current
+  Directory metadata. It uses raw quality references when available and falls
+  back to `combined_quality` for collection coverage.
 
 ### Standard Maps
 
@@ -109,6 +133,31 @@ review should prefer tighter and better-balanced whitespace.
 - OEC node squares and biobank dots now render through `geom_sf(...)`, which
   fixed the earlier symbol projection drift.
 
+### New Extra Maps
+
+- `global-nolabels`
+  - world viewport
+  - classic geography layers
+  - full pilot GeoJSON input
+- `covid-nolabels`
+  - world viewport
+  - classic geography layers
+  - COVID subset from `prepare_covid_geojson.py`
+- `quality_maps-nolabels`
+  - Europe viewport
+  - classic geography layers
+  - quality points from `prepare_quality_geojson.py`
+  - collection points are usually more numerous than biobank points
+- `federated-platform`
+  - Europe viewport
+  - snapshot-backed local GeoJSON input
+  - custom fedplat country palette and point labels from `biobankLabel`
+- `CRC-cohort-sized`
+  - world viewport from the legacy export script
+  - snapshot-backed local main/imaging GeoJSON inputs
+  - main cohort points are size-scaled by `contribSize`
+  - imaging points are a separate green overlay
+
 ### Halo Rendering
 
 Current halo implementation is manual in `bbmri_geom_text_halo(...)`:
@@ -149,6 +198,9 @@ Based on local comparison work against published Tilemill PNGs:
 - `bbmri-members-OEC-all` improved materially after the OEC projection-path
   fixes, especially once country clipping and `geom_sf` symbol rendering were
   applied
+- the five newly added extra-map renderers pass direct smoke-render checks, but
+  they have not yet gone through the same detailed visual tuning loop as the
+  original three migrated maps
 
 ## Key OEC Debugging Lessons
 
@@ -237,9 +289,16 @@ rendering.
 
 - `/home/hopet/codex/directory-scripts/R-maps/map_config.R`
 - `/home/hopet/codex/directory-scripts/R-maps/map_common.R`
+- `/home/hopet/codex/directory-scripts/R-maps/prepare_covid_geojson.py`
+- `/home/hopet/codex/directory-scripts/R-maps/prepare_quality_geojson.py`
 - `/home/hopet/codex/directory-scripts/R-maps/render_bbmri_members_nolabels.R`
 - `/home/hopet/codex/directory-scripts/R-maps/render_bbmri_members_sized.R`
 - `/home/hopet/codex/directory-scripts/R-maps/render_bbmri_members_oec_all.R`
+- `/home/hopet/codex/directory-scripts/R-maps/render_global_nolabels.R`
+- `/home/hopet/codex/directory-scripts/R-maps/render_covid_nolabels.R`
+- `/home/hopet/codex/directory-scripts/R-maps/render_quality_maps_nolabels.R`
+- `/home/hopet/codex/directory-scripts/R-maps/render_federated_platform.R`
+- `/home/hopet/codex/directory-scripts/R-maps/render_crc_cohort_sized.R`
 
 ## Recommended Next Steps
 
@@ -248,3 +307,5 @@ rendering.
    reimplemented with a better blur-like text effect.
 3. Keep the root repository docs unchanged unless the change is truly global.
    R-map-specific operational knowledge belongs in this folder.
+4. Do a visual-tuning pass for the five extra maps once the user starts
+   reviewing them side-by-side against the legacy Tilemill outputs.
