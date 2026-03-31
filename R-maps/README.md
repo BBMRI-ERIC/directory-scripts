@@ -23,30 +23,41 @@ Extra maps:
 Render the core maps:
 
 ```bash
-bash R-maps/export-all.sh
+bash R-maps/export.sh
 ```
 
 Render only the extra maps:
 
 ```bash
-bash R-maps/export-all.sh --map-set extras
+bash R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
 ```
 
 Render everything:
 
 ```bash
-bash R-maps/export-all.sh --map-set all
+bash R-maps/export.sh
+```
+
+Render only specific maps:
+
+```bash
+bash R-maps/export.sh bbmri-members-OEC-all global-nolabels
 ```
 
 ## How The Pipeline Works
 
-`export-all.sh` drives `render_pilot_maps.R`.
+`export.sh` drives `render_pilot_maps.R`.
 
 Shared inputs:
 
 1. `geocoding_2022.py` writes the full pilot GeoJSON
 2. helper prep scripts derive map-specific GeoJSONs when needed
 3. renderer scripts write `small` / `med` / `big` PNG and PDF outputs
+
+`bbmri-members-OEC-all` uses a dedicated page size instead of the standard
+landscape exporter sheet. The current target `med` page is approximately
+`15.8 x 13.7 cm` (`1866 x 1618 px` at `300 dpi`), with proportional `small`
+and `big` variants.
 
 `geocoding_2022.py` is expected to be cache-backed for both Directory data and
 live geocoding. Only entities still missing usable coordinates should trigger a
@@ -136,7 +147,7 @@ Prep helpers can also be run directly:
 - `prepare_quality_geojson.py`
   Quality-map GeoJSON derivation helper
 - `render_pilot_maps.R`
-  End-to-end runner used by `export-all.sh`
+  End-to-end runner used by `export.sh`
 
 ## Outputs
 

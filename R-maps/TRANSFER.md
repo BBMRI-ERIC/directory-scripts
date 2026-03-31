@@ -29,6 +29,14 @@ Implemented outputs:
 - default PDF
 - default SVG when `svglite` is available
 
+Current wrapper:
+
+- `/home/hopet/codex/directory-scripts/R-maps/export.sh`
+  Main POSIX-shell entry point that exports all maps by default or only the
+  explicitly named map ids.
+- `/home/hopet/codex/directory-scripts/R-maps/export-all.sh`
+  Compatibility shim that delegates to `export.sh`
+
 Current pilot outputs live in:
 
 - `/home/hopet/codex/directory-scripts/R-maps/pilot-output`
@@ -263,6 +271,9 @@ main agent.
    - exact QA connector landing point
    - final perceived prominence of HQ/node squares
    - any remaining `IARC` micro-spacing
+   - a more direct framing model for the main Europe panel; the current
+     `oec_projected_crop` controls projected-window fractions, which is only an
+     indirect proxy for how much of the page the visible basemap occupies
 
 2. `sized` may still need:
    - final biobank label font-size tuning

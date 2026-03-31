@@ -10,6 +10,17 @@ bbmri_map_config <- function() {
     )
   }
 
+  make_export_sizes <- function(small, med, big, vector = med) {
+    list(
+      png = list(
+        small = c(width = small[[1]], height = small[[2]]),
+        med = c(width = med[[1]], height = med[[2]]),
+        big = c(width = big[[1]], height = big[[2]])
+      ),
+      vector = c(width = vector[[1]], height = vector[[2]])
+    )
+  }
+
   list(
     render_scale = 2,
     marker_width_scale = 8.7,
@@ -32,16 +43,30 @@ bbmri_map_config <- function() {
       ymax = 78.0
     ),
     oec_bbox = c(
-      xmin = -12.2,
-      ymin = 26.4,
-      xmax = 44.0,
-      ymax = 71.2
+      xmin = -32.4316,
+      ymin = 27.0,
+      xmax = 56.6895,
+      ymax = 72.1009
+    ),
+    oec_geographic_exclusions = list(
+      atlantic_islands = c(
+        xmin = -32.5,
+        ymin = 20.0,
+        xmax = -10.5,
+        ymax = 42.0
+      )
+    ),
+    oec_projected_crop = c(
+      left = 0.66,
+      right = 0.02,
+      bottom = 0.08,
+      top = 0.24
     ),
     oec_canvas = list(
-      main_x = 0.0,
-      main_y = 0.0,
-      main_width = 0.965,
-      main_height = 0.995
+      main_x = 0.02,
+      main_y = 0.02,
+      main_width = 0.96,
+      main_height = 0.96
     ),
     standard_crs = 3857,
     oec_crs = "+proj=tmerc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=10.0 +lat_0=-10.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over",
@@ -49,6 +74,12 @@ bbmri_map_config <- function() {
       small = c(600, 509),
       med = c(1500, 1272),
       big = c(4001, 3393)
+    ),
+    oec_export_sizes = make_export_sizes(
+      small = c(1494, 1922),
+      med = c(3732, 4806),
+      big = c(9956, 12816),
+      vector = c(1866, 2403)
     ),
     global_export_sizes = scale_export_sizes(
       small = c(918, 509),
@@ -250,8 +281,8 @@ bbmri_map_config <- function() {
           ymax = 26.90
         ),
         placement = list(
-          x = 0.80,
-          y = 0.135,
+          x = 0.700,
+          y = 0.070,
           width = 0.036,
           height = 0.057
         ),

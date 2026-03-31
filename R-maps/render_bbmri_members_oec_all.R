@@ -234,6 +234,75 @@ bbmri_resolve_plot_page_npc <- function(plot, plot_box, inner_npc, device_width_
   )
 }
 
+bbmri_resolve_plot_panel_box <- function(plot, device_width_in = 10, device_height_in = 10) {
+  panel_vp_name <- bbmri_plot_panel_viewport_name(plot)
+  plot_grob <- ggplot2::ggplotGrob(plot)
+  tmp_pdf <- tempfile(fileext = ".pdf")
+
+  grDevices::pdf(tmp_pdf, width = device_width_in, height = device_height_in)
+  on.exit({
+    grDevices::dev.off()
+    unlink(tmp_pdf)
+  }, add = TRUE)
+
+  grid::grid.newpage()
+  grid::pushViewport(grid::viewport(
+    x = grid::unit(0, "npc"),
+    y = grid::unit(0, "npc"),
+    width = grid::unit(1, "npc"),
+    height = grid::unit(1, "npc"),
+    just = c("left", "bottom"),
+    name = "bbmri_full_plot_box"
+  ))
+  grid::grid.draw(plot_grob)
+  grid::seekViewport(panel_vp_name)
+
+  lower_left <- grid::deviceLoc(
+    x = grid::unit(0, "npc"),
+    y = grid::unit(0, "npc"),
+    valueOnly = FALSE
+  )
+  upper_right <- grid::deviceLoc(
+    x = grid::unit(1, "npc"),
+    y = grid::unit(1, "npc"),
+    valueOnly = FALSE
+  )
+  dev_dims <- grDevices::dev.size("in")
+  x0 <- grid::convertX(lower_left$x, "in", valueOnly = TRUE) / dev_dims[[1]]
+  y0 <- grid::convertY(lower_left$y, "in", valueOnly = TRUE) / dev_dims[[2]]
+  x1 <- grid::convertX(upper_right$x, "in", valueOnly = TRUE) / dev_dims[[1]]
+  y1 <- grid::convertY(upper_right$y, "in", valueOnly = TRUE) / dev_dims[[2]]
+
+  list(
+    x = x0,
+    y = y0,
+    width = x1 - x0,
+    height = y1 - y0
+  )
+}
+
+bbmri_expand_plot_box_for_panel <- function(panel_box, panel_rel_box) {
+  if (!all(is.finite(c(
+    panel_box$x, panel_box$y, panel_box$width, panel_box$height,
+    panel_rel_box$x, panel_rel_box$y, panel_rel_box$width, panel_rel_box$height
+  )))) {
+    stop("Panel box expansion requires finite coordinates.", call. = FALSE)
+  }
+  if (panel_rel_box$width <= 0 || panel_rel_box$height <= 0) {
+    stop("Panel-relative box must have positive width and height.", call. = FALSE)
+  }
+
+  plot_width <- panel_box$width / panel_rel_box$width
+  plot_height <- panel_box$height / panel_rel_box$height
+
+  list(
+    x = panel_box$x - panel_rel_box$x * plot_width,
+    y = panel_box$y - panel_rel_box$y * plot_height,
+    width = plot_width,
+    height = plot_height
+  )
+}
+
 
 bbmri_oec_validate_inset_cfg <- function(inset_cfg, countries) {
   required_top <- c("id", "label", "mask_country_codes", "bbox", "placement", "connector", "frame")
@@ -361,6 +430,7 @@ bbmri_oec_panel_plot <- function(
   node_lines,
   cfg,
   bbox,
+  projected_bbox = NULL,
   iarc_sf = NULL,
   draw_iarc_label = FALSE,
   frame = NULL,
@@ -376,7 +446,7 @@ bbmri_oec_panel_plot <- function(
       linewidth = 0.45
     ) +
     ggplot2::scale_fill_identity() +
-    bbmri_coord_sf(bbox, cfg$oec_crs) +
+    bbmri_coord_sf(bbox, cfg$oec_crs, projected_bbox = projected_bbox) +
     bbmri_void_theme(cfg$oec_colors$background) +
     ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
 
@@ -545,15 +615,22 @@ build_members_oec_all_map <- function(
     ,
     drop = FALSE
   ]
-  main_countries <- bbmri_clip_to_bbox(main_countries, cfg$oec_bbox)
+  for (exclusion_bbox in cfg$oec_geographic_exclusions) {
+    main_countries <- bbmri_exclude_bbox(main_countries, exclusion_bbox)
+  }
+  main_countries <- bbmri_clip_to_projected_bbox(main_countries, cfg$oec_bbox, cfg$oec_crs)
   main_points <- bbmri_filter_sf_by_mask(points, inset_mask, include = FALSE)
   main_node_points <- bbmri_filter_sf_by_mask(node_points, inset_mask, include = FALSE)
   main_node_lines <- bbmri_filter_sf_by_mask(node_lines, inset_mask, include = FALSE)
-  main_node_lines <- bbmri_clip_to_bbox(main_node_lines, cfg$oec_bbox)
+  main_node_lines <- bbmri_clip_to_projected_bbox(main_node_lines, cfg$oec_bbox, cfg$oec_crs)
   main_point_sf <- bbmri_filter_valid_lonlat_points(main_points, "member biobank points")
   main_node_df <- bbmri_biobank_points_df(main_node_points, cfg$oec_crs, label = "HQ/node points")
   main_node_sf <- bbmri_filter_valid_lonlat_points(main_node_points, "HQ/node points")
   iarc_sf <- bbmri_filter_valid_lonlat_points(iarc, "IARC points")
+  main_projected_bbox <- bbmri_crop_projected_bbox(
+    bbmri_projected_bbox(cfg$oec_bbox, cfg$oec_crs),
+    cfg$oec_projected_crop
+  )
 
   main_plot <- bbmri_oec_panel_plot(
     countries = main_countries,
@@ -562,34 +639,41 @@ build_members_oec_all_map <- function(
     node_lines = main_node_lines,
     cfg = cfg,
     bbox = cfg$oec_bbox,
+    projected_bbox = main_projected_bbox,
     iarc_sf = iarc_sf,
     draw_iarc_label = TRUE
   )
 
   main_panel <- cfg$oec_canvas
   main_plot_aspect <- {
-    projected_bbox <- bbmri_projected_bbox(cfg$oec_bbox, cfg$oec_crs)
-    (projected_bbox[["xmax"]] - projected_bbox[["xmin"]]) /
-      (projected_bbox[["ymax"]] - projected_bbox[["ymin"]])
+    (main_projected_bbox[["xmax"]] - main_projected_bbox[["xmin"]]) /
+      (main_projected_bbox[["ymax"]] - main_projected_bbox[["ymin"]])
   }
-  main_box <- bbmri_fit_box_to_aspect(
+  main_panel_box <- bbmri_cover_box_to_aspect(
     x = main_panel$main_x,
     y = main_panel$main_y,
     width = main_panel$main_width,
     height = main_panel$main_height,
-    aspect = main_plot_aspect
+    aspect = main_plot_aspect,
+    page_aspect = device_width_in / device_height_in
   )
+  main_plot_panel_rel_box <- bbmri_resolve_plot_panel_box(
+    main_plot,
+    device_width_in = device_width_in,
+    device_height_in = device_height_in
+  )
+  main_plot_box <- bbmri_expand_plot_box_for_panel(main_panel_box, main_plot_panel_rel_box)
   composed <- cowplot::ggdraw() + cowplot::draw_plot(
     main_plot,
-    x = main_box$x,
-    y = main_box$y,
-    width = main_box$width,
-    height = main_box$height
+    x = main_plot_box$x,
+    y = main_plot_box$y,
+    width = main_plot_box$width,
+    height = main_plot_box$height
   )
   hq_overlay_npc <- bbmri_oec_hq_anchor_npc(main_plot)
   hq_overlay_xy <- bbmri_resolve_plot_page_npc(
     plot = main_plot,
-    plot_box = main_box,
+    plot_box = main_plot_box,
     inner_npc = hq_overlay_npc,
     device_width_in = device_width_in,
     device_height_in = device_height_in
@@ -665,7 +749,8 @@ build_members_oec_all_map <- function(
       y = inset_cfg$placement$y,
       width = inset_cfg$placement$width,
       height = inset_cfg$placement$height,
-      aspect = inset_plot_aspect
+      aspect = inset_plot_aspect,
+      page_aspect = device_width_in / device_height_in
     )
     connector_npc <- if (identical(inset_cfg$connector$source_node_type, "HQ")) {
       hq_overlay_npc
@@ -675,7 +760,8 @@ build_members_oec_all_map <- function(
         connector_source$x[[1]],
         connector_source$y[[1]],
         cfg$oec_bbox,
-        cfg$oec_crs
+        cfg$oec_crs,
+        projected_bbox = main_projected_bbox
       )
     }
     connector_xy <- if (identical(inset_cfg$connector$source_node_type, "HQ")) {
@@ -685,8 +771,8 @@ build_members_oec_all_map <- function(
       )
     } else {
       c(
-        x = main_box$x + main_box$width * connector_npc[["x"]] + inset_cfg$connector$source_dx,
-        y = main_box$y + main_box$height * connector_npc[["y"]] + inset_cfg$connector$source_dy
+        x = main_panel_box$x + main_panel_box$width * connector_npc[["x"]] + inset_cfg$connector$source_dx,
+        y = main_panel_box$y + main_panel_box$height * connector_npc[["y"]] + inset_cfg$connector$source_dy
       )
     }
     inset_target_npc <- if (nrow(inset_node_df) > 0) {
@@ -751,7 +837,11 @@ build_members_oec_all_map <- function(
 bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
   dir.create(args$output_dir, recursive = TRUE, showWarnings = FALSE)
   raster_sizes <- export_sizes$png
-  raster_dpi <- 300
+  raster_dpi <- 600
+  pdf_dpi <- 300
+  vector_size <- export_sizes$vector
+  vector_width_in <- unname(vector_size[["width"]]) / pdf_dpi
+  vector_height_in <- unname(vector_size[["height"]]) / pdf_dpi
 
   for (name in names(raster_sizes)) {
     size <- raster_sizes[[name]]
@@ -778,17 +868,14 @@ bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
     ggplot2::ggsave(
       filename = file.path(args$output_dir, paste0(args$output_prefix, "-", name, ".pdf")),
       plot = plot,
-      width = width_in,
-      height = height_in,
+      width = unname(size[["width"]]) / pdf_dpi,
+      height = unname(size[["height"]]) / pdf_dpi,
       units = "in",
       bg = "white",
       limitsize = FALSE
     )
   }
 
-  vector_size <- export_sizes$vector
-  vector_width_in <- unname(vector_size[["width"]]) / raster_dpi
-  vector_height_in <- unname(vector_size[["height"]]) / raster_dpi
   vector_plot <- build_members_oec_all_map(
     points_path = args$input,
     iarc_path = args$iarc,
@@ -849,7 +936,7 @@ main <- function() {
 
   bbmri_save_members_oec_all_formats(
     args = args,
-    export_sizes = bbmri_map_config()$export_sizes
+    export_sizes = bbmri_map_config()$oec_export_sizes
   )
 }
 

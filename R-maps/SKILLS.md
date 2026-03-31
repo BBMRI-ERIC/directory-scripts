@@ -87,15 +87,15 @@ Rscript R-maps/render_crc_cohort_sized.R \
 ### Bash wrapper
 
 ```bash
-bash R-maps/export-all.sh
+bash R-maps/export.sh
 ```
 
 ```bash
-bash R-maps/export-all.sh --map-set extras
+bash R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
 ```
 
 ```bash
-bash R-maps/export-all.sh --map-set all
+bash R-maps/export.sh
 ```
 
 ### Direct R entry point

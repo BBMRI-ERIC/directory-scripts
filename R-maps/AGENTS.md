@@ -120,6 +120,11 @@ document.
 - `render_pilot_maps.R`
   End-to-end runner from cached Directory GeoJSON generation to the requested
   map set (`core`, `extras`, or `all`).
+- `export.sh`
+  POSIX-shell wrapper for selecting zero or more map ids. If no map ids are
+  provided, it exports all maps.
+- `export-all.sh`
+  Compatibility shim that delegates to `export.sh`.
 - `README.md`
   Human-oriented overview and dependency notes.
 - `SKILLS.md`
@@ -343,6 +348,10 @@ drift.
 - Even with the correct CRS and bbox, the composed `cowplot` placement must
   preserve the projected aspect ratio. Stretching the OEC panel into an
   arbitrary page box makes it look like a cylindrical projection.
+- For the main OEC panel, `contain` fitting was the wrong abstraction because
+  tighter projected crops could make the map appear smaller on the page. The
+  current implementation therefore uses a `cover` fit for the main panel so
+  the panel stays filled and overflow is clipped instead of shrinking the map.
 - The current `oec_bbox` should stay aligned with the original Tilemill
   `project.mml` bounds unless there is a deliberate visual redesign.
 - For OEC countries, bbox-hit filtering was not enough because overseas
@@ -352,6 +361,12 @@ drift.
   it prevented any neighboring-state context from appearing. Inset geography
   should clip the full country layer to the inset bbox, while points/nodes stay
   filtered to the inset partner mask.
+- The current `oec_projected_crop` values are still an indirect tuning knob.
+  They crop the projected bbox as fractions of the broad OEC window, not of
+  the actual visible Europe content. If future work needs precise page-fill
+  control, prefer computing a projected bbox from the visible main-map content
+  plus explicit north/south/east/west margins rather than pushing the crop
+  fractions further.
 - The legacy `HQlineNN.geojson` node points already sit on the correct line
   endpoints. A later experiment that tried to "realign" them from line strings
   was wrong and was removed.
