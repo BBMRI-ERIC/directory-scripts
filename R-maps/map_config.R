@@ -54,14 +54,33 @@ bbmri_map_config <- function() {
         ymin = 20.0,
         xmax = -10.5,
         ymax = 42.0
+      ),
+      arctic_islands = c(
+        xmin = 5.0,
+        ymin = 72.0,
+        xmax = 40.0,
+        ymax = 90.0
       )
     ),
-    oec_projected_crop = c(
-      left = 0.66,
-      right = 0.02,
-      bottom = 0.08,
-      top = 0.24
+    oec_content_margins = c(
+      left = 0.025,
+      right = 0.025,
+      bottom = 0.025,
+      top = 0.025
     ),
+    oec_content_trim_bias = c(
+      x = 0.50,
+      y = 0.50
+    ),
+    oec_main_north_cap_lat = 71.20,
+    oec_basemap_target_margins = c(
+      left = 0.095,
+      right = 0.075,
+      bottom = 0.045,
+      top = 0.030
+    ),
+    oec_basemap_fit_iterations = 2,
+    oec_basemap_fit_damping = 0.85,
     oec_canvas = list(
       main_x = 0.02,
       main_y = 0.02,
@@ -76,10 +95,10 @@ bbmri_map_config <- function() {
       big = c(4001, 3393)
     ),
     oec_export_sizes = make_export_sizes(
-      small = c(1494, 1922),
-      med = c(3732, 4806),
-      big = c(9956, 12816),
-      vector = c(1866, 2403)
+      small = c(2400, 1400),
+      med = c(6000, 3500),
+      big = c(16000, 9333),
+      vector = c(3000, 1750)
     ),
     global_export_sizes = scale_export_sizes(
       small = c(918, 509),
@@ -281,7 +300,7 @@ bbmri_map_config <- function() {
           ymax = 26.90
         ),
         placement = list(
-          x = 0.700,
+          x = 0.850,
           y = 0.070,
           width = 0.036,
           height = 0.057

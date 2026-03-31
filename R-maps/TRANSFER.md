@@ -132,6 +132,22 @@ review should prefer tighter and better-balanced whitespace.
 - A second independent OEC issue was page composition: the main map and inset
   must be fitted into `cowplot` boxes while preserving their projected aspect
   ratios. Otherwise the correct `tmerc` CRS still looks visually cylindrical.
+- A later OEC framing bug turned out to be `coord_sf(...)` order, not
+  projection math: if extra `geom_sf(...)` layers were added after the custom
+  `coord_sf(...)`, ggplot replaced the coordinate system with a default one and
+  silently discarded the intended projected bbox.
+- The current main OEC frame is now derived from the projected mainland-country
+  extent itself, not from crop fractions on the broad legacy OEC bbox and not
+  from the mixed point/line cloud. The renderer applies explicit geographic
+  exclusions first, then expands that mainland bbox to the target page aspect.
+- The current OEC sheet is also deliberately wider than the old portrait
+  experiments: `med` is now `6000 x 3500`, with proportional `small` / `big`
+  and vector sizes.
+- The current OEC mainland frame has two explicit high-north controls:
+  - `oec_main_north_cap_lat` caps the top around Mageroya rather than farther
+    north
+  - `oec_geographic_exclusions$arctic_islands` removes Bear Island / Bjornoya
+    and other remote Norway Arctic polygons from the base map
 - The QA inset is intentionally small and geographically proportionate to the
   main OEC extent. It is for repositioning closer to Europe, not for
   magnifying Qatar.
@@ -252,6 +268,24 @@ These findings mattered and should not be rediscovered the hard way:
    - this was validated across `small`, `med`, and `big` and should remain the
      pattern for future additional inset windows
 
+7. OEC main framing:
+   - using `oec_projected_crop` against the broad legacy OEC bbox was the
+     wrong abstraction because large numeric crop changes often had weak or
+     misleading visible effects
+   - the current stable frame is driven by the projected mainland-country
+     extent after explicit geographic exclusions, then expanded to the target
+     page aspect
+   - this only became visibly effective after moving `coord_sf(...)` to the
+     end of the OEC panel plot layer stack so later `geom_sf(...)` layers could
+     no longer replace the custom projected bbox with a default one
+   - the last important refinement was to stop the far north around Mageroya
+     and explicitly remove Bear Island / Bjornoya and the other remote Arctic
+     Norway polygons from the base geometry
+   - future OEC framing work should tune the dedicated OEC page size,
+     `oec_content_margins`, `oec_main_north_cap_lat`, and
+     `oec_geographic_exclusions`, not reintroduce broad-window crop fractions
+     or point-cloud auto-fit
+
 ## Multi-Agent Setup That Was Used
 
 During the OEC parity work, a useful three-agent split was:
@@ -271,9 +305,8 @@ main agent.
    - exact QA connector landing point
    - final perceived prominence of HQ/node squares
    - any remaining `IARC` micro-spacing
-   - a more direct framing model for the main Europe panel; the current
-     `oec_projected_crop` controls projected-window fractions, which is only an
-     indirect proxy for how much of the page the visible basemap occupies
+   - final tuning of the new content-derived Europe framing through
+     `oec_content_margins` and `oec_content_trim_bias`
 
 2. `sized` may still need:
    - final biobank label font-size tuning

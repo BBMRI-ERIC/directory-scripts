@@ -231,6 +231,128 @@ bbmri_crop_projected_bbox <- function(projected_bbox, crop) {
   cropped
 }
 
+bbmri_union_bbox <- function(bboxes, label = "bbox union") {
+  non_null <- Filter(Negate(is.null), bboxes)
+  if (length(non_null) == 0) {
+    stop(label, " requires at least one bbox.", call. = FALSE)
+  }
+  mins_x <- vapply(non_null, function(b) b[["xmin"]], numeric(1))
+  mins_y <- vapply(non_null, function(b) b[["ymin"]], numeric(1))
+  maxs_x <- vapply(non_null, function(b) b[["xmax"]], numeric(1))
+  maxs_y <- vapply(non_null, function(b) b[["ymax"]], numeric(1))
+  c(
+    xmin = min(mins_x),
+    ymin = min(mins_y),
+    xmax = max(maxs_x),
+    ymax = max(maxs_y)
+  )
+}
+
+bbmri_projected_content_bbox <- function(layers, crs, label = "projected content bbox") {
+  layer_bboxes <- lapply(layers, function(layer) {
+    if (is.null(layer) || nrow(layer) == 0) {
+      return(NULL)
+    }
+    projected_layer <- suppressWarnings(sf::st_transform(layer, sf::st_crs(crs)))
+    sf::st_bbox(projected_layer)
+  })
+  bbmri_union_bbox(layer_bboxes, label = label)
+}
+
+bbmri_expand_projected_bbox <- function(projected_bbox, margins) {
+  bbmri_require_bbox(projected_bbox, "Projected bbox to expand")
+  required <- c("left", "right", "bottom", "top")
+  missing <- setdiff(required, names(margins))
+  if (length(missing) > 0) {
+    stop("Projected bbox margins are missing required fields: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!all(vapply(required, function(name) is.finite(margins[[name]]), logical(1)))) {
+    stop("Projected bbox margins must be finite numbers.", call. = FALSE)
+  }
+  width <- projected_bbox[["xmax"]] - projected_bbox[["xmin"]]
+  height <- projected_bbox[["ymax"]] - projected_bbox[["ymin"]]
+  c(
+    xmin = projected_bbox[["xmin"]] - width * margins[["left"]],
+    ymin = projected_bbox[["ymin"]] - height * margins[["bottom"]],
+    xmax = projected_bbox[["xmax"]] + width * margins[["right"]],
+    ymax = projected_bbox[["ymax"]] + height * margins[["top"]]
+  )
+}
+
+bbmri_trim_projected_bbox_to_aspect <- function(projected_bbox, target_aspect, trim_bias = c(x = 0.5, y = 0.5)) {
+  bbmri_require_bbox(projected_bbox, "Projected bbox to trim")
+  if (!is.finite(target_aspect) || target_aspect <= 0) {
+    stop("Target aspect must be a positive finite number.", call. = FALSE)
+  }
+  if (!all(c("x", "y") %in% names(trim_bias))) {
+    stop("Trim bias must define x and y values.", call. = FALSE)
+  }
+  if (!all(vapply(trim_bias[c("x", "y")], function(value) is.finite(value) && value >= 0 && value <= 1, logical(1)))) {
+    stop("Trim bias values must be finite numbers between 0 and 1.", call. = FALSE)
+  }
+
+  width <- projected_bbox[["xmax"]] - projected_bbox[["xmin"]]
+  height <- projected_bbox[["ymax"]] - projected_bbox[["ymin"]]
+  aspect <- width / height
+  trimmed <- projected_bbox
+
+  if (aspect > target_aspect) {
+    target_width <- height * target_aspect
+    extra_width <- width - target_width
+    trim_left <- extra_width * trim_bias[["x"]]
+    trim_right <- extra_width - trim_left
+    trimmed[["xmin"]] <- projected_bbox[["xmin"]] + trim_left
+    trimmed[["xmax"]] <- projected_bbox[["xmax"]] - trim_right
+  } else if (aspect < target_aspect) {
+    target_height <- width / target_aspect
+    extra_height <- height - target_height
+    trim_bottom <- extra_height * trim_bias[["y"]]
+    trim_top <- extra_height - trim_bottom
+    trimmed[["ymin"]] <- projected_bbox[["ymin"]] + trim_bottom
+    trimmed[["ymax"]] <- projected_bbox[["ymax"]] - trim_top
+  }
+
+  bbmri_require_bbox(trimmed, "Trimmed projected bbox")
+  trimmed
+}
+
+bbmri_expand_projected_bbox_to_aspect <- function(projected_bbox, target_aspect, expand_bias = c(x = 0.5, y = 0.5)) {
+  bbmri_require_bbox(projected_bbox, "Projected bbox to expand to aspect")
+  if (!is.finite(target_aspect) || target_aspect <= 0) {
+    stop("Target aspect must be a positive finite number.", call. = FALSE)
+  }
+  if (!all(c("x", "y") %in% names(expand_bias))) {
+    stop("Expand bias must define x and y values.", call. = FALSE)
+  }
+  if (!all(vapply(expand_bias[c("x", "y")], function(value) is.finite(value) && value >= 0 && value <= 1, logical(1)))) {
+    stop("Expand bias values must be finite numbers between 0 and 1.", call. = FALSE)
+  }
+
+  width <- projected_bbox[["xmax"]] - projected_bbox[["xmin"]]
+  height <- projected_bbox[["ymax"]] - projected_bbox[["ymin"]]
+  aspect <- width / height
+  expanded <- projected_bbox
+
+  if (aspect < target_aspect) {
+    target_width <- height * target_aspect
+    extra_width <- target_width - width
+    add_left <- extra_width * expand_bias[["x"]]
+    add_right <- extra_width - add_left
+    expanded[["xmin"]] <- projected_bbox[["xmin"]] - add_left
+    expanded[["xmax"]] <- projected_bbox[["xmax"]] + add_right
+  } else if (aspect > target_aspect) {
+    target_height <- width / target_aspect
+    extra_height <- target_height - height
+    add_bottom <- extra_height * expand_bias[["y"]]
+    add_top <- extra_height - add_bottom
+    expanded[["ymin"]] <- projected_bbox[["ymin"]] - add_bottom
+    expanded[["ymax"]] <- projected_bbox[["ymax"]] + add_top
+  }
+
+  bbmri_require_bbox(expanded, "Expanded projected bbox")
+  expanded
+}
+
 bbmri_require_bbox <- function(bbox, label = "bbox") {
   required <- c("xmin", "ymin", "xmax", "ymax")
   missing <- setdiff(required, names(bbox))
@@ -256,6 +378,28 @@ bbmri_project_point_to_npc <- function(x, y, bbox, crs, projected_bbox = NULL) {
     x = (x - proj_bbox[["xmin"]]) / (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]),
     y = (y - proj_bbox[["ymin"]]) / (proj_bbox[["ymax"]] - proj_bbox[["ymin"]])
   )
+}
+
+bbmri_projected_parallel_y_cap <- function(latitude, bbox, crs, samples = 256) {
+  bbmri_require_bbox(bbox, "Parallel projection bbox")
+  if (!is.finite(latitude) || latitude < -90 || latitude > 90) {
+    stop("Latitude cap must be a finite number in [-90, 90].", call. = FALSE)
+  }
+  if (!is.finite(samples) || samples < 2) {
+    stop("Parallel projection sample count must be at least 2.", call. = FALSE)
+  }
+
+  pts <- sf::st_as_sf(
+    data.frame(
+      x = seq(bbox[["xmin"]], bbox[["xmax"]], length.out = as.integer(samples)),
+      y = rep(latitude, as.integer(samples))
+    ),
+    coords = c("x", "y"),
+    crs = 4326
+  )
+  pts_proj <- sf::st_transform(pts, sf::st_crs(crs))
+  coords <- sf::st_coordinates(pts_proj)
+  max(coords[, "Y"])
 }
 
 bbmri_fit_box_to_aspect <- function(x, y, width, height, aspect, page_aspect = 1.0) {

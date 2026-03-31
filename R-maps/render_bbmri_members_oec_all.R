@@ -303,6 +303,108 @@ bbmri_expand_plot_box_for_panel <- function(panel_box, panel_rel_box) {
   )
 }
 
+bbmri_measure_plot_nonwhite_margins <- function(plot, width_px, height_px, threshold = 0.995) {
+  if (!requireNamespace("png", quietly = TRUE)) {
+    stop("Package 'png' is required for OEC basemap auto-framing.", call. = FALSE)
+  }
+  tmp_png <- tempfile(fileext = ".png")
+  on.exit(unlink(tmp_png), add = TRUE)
+  ggplot2::ggsave(
+    filename = tmp_png,
+    plot = plot,
+    width = width_px,
+    height = height_px,
+    units = "px",
+    bg = "white",
+    limitsize = FALSE
+  )
+  image <- png::readPNG(tmp_png)
+  height <- dim(image)[1]
+  width <- dim(image)[2]
+  alpha <- if (length(dim(image)) >= 3 && dim(image)[3] >= 4) image[, , 4] else matrix(1, nrow = height, ncol = width)
+  nonwhite <- alpha > 0.001 & (
+    image[, , 1] < threshold |
+      image[, , 2] < threshold |
+      image[, , 3] < threshold
+  )
+  hits <- which(nonwhite, arr.ind = TRUE)
+  if (nrow(hits) == 0) {
+    stop("Failed to detect non-white pixels in the OEC basemap render.", call. = FALSE)
+  }
+
+  min_row <- min(hits[, "row"])
+  max_row <- max(hits[, "row"])
+  min_col <- min(hits[, "col"])
+  max_col <- max(hits[, "col"])
+
+  c(
+    left = (min_col - 1) / width,
+    right = (width - max_col) / width,
+    bottom = (height - max_row) / height,
+    top = (min_row - 1) / height
+  )
+}
+
+bbmri_autofit_oec_basemap_bbox <- function(initial_bbox, countries, cfg, target_aspect, device_width_in, device_height_in, frame = NULL) {
+  bbox <- initial_bbox
+  iterations <- cfg$oec_basemap_fit_iterations
+  damping <- cfg$oec_basemap_fit_damping
+  target_margins <- cfg$oec_basemap_target_margins
+  empty_sf <- sf::st_sf(geometry = sf::st_sfc(crs = sf::st_crs(cfg$oec_crs)))
+  main_panel <- cfg$oec_canvas
+
+  for (iter in seq_len(iterations)) {
+    basemap_plot <- bbmri_oec_panel_plot(
+      countries = countries,
+      point_sf = empty_sf,
+      node_sf = empty_sf,
+      node_lines = empty_sf,
+      cfg = cfg,
+      bbox = cfg$oec_bbox,
+      projected_bbox = bbox,
+      iarc_sf = NULL,
+      draw_iarc_label = FALSE,
+      frame = frame,
+      draw_node_lines = FALSE
+    )
+    main_panel_box <- bbmri_fit_box_to_aspect(
+      x = main_panel$main_x,
+      y = main_panel$main_y,
+      width = main_panel$main_width,
+      height = main_panel$main_height,
+      aspect = target_aspect,
+      page_aspect = device_width_in / device_height_in
+    )
+    plot_panel_rel_box <- bbmri_resolve_plot_panel_box(
+      basemap_plot,
+      device_width_in = device_width_in,
+      device_height_in = device_height_in
+    )
+    plot_box <- bbmri_expand_plot_box_for_panel(main_panel_box, plot_panel_rel_box)
+    basemap_page <- cowplot::ggdraw() +
+      cowplot::draw_plot(
+        basemap_plot,
+        x = plot_box$x,
+        y = plot_box$y,
+        width = plot_box$width,
+        height = plot_box$height
+      )
+    measure_width_px <- max(800L, as.integer(round(device_width_in * 150)))
+    measure_height_px <- max(1000L, as.integer(round(device_height_in * 150)))
+    measured <- bbmri_measure_plot_nonwhite_margins(basemap_page, measure_width_px, measure_height_px)
+    width <- bbox[["xmax"]] - bbox[["xmin"]]
+    height <- bbox[["ymax"]] - bbox[["ymin"]]
+
+    bbox[["xmin"]] <- bbox[["xmin"]] + width * damping * (measured[["left"]] - target_margins[["left"]])
+    bbox[["xmax"]] <- bbox[["xmax"]] - width * damping * (measured[["right"]] - target_margins[["right"]])
+    bbox[["ymin"]] <- bbox[["ymin"]] + height * damping * (measured[["bottom"]] - target_margins[["bottom"]])
+    bbox[["ymax"]] <- bbox[["ymax"]] - height * damping * (measured[["top"]] - target_margins[["top"]])
+    bbox <- bbmri_trim_projected_bbox_to_aspect(bbox, target_aspect, cfg$oec_content_trim_bias)
+  }
+
+  bbox
+}
+
 
 bbmri_oec_validate_inset_cfg <- function(inset_cfg, countries) {
   required_top <- c("id", "label", "mask_country_codes", "bbox", "placement", "connector", "frame")
@@ -445,10 +547,7 @@ bbmri_oec_panel_plot <- function(
       colour = cfg$oec_colors$country_line,
       linewidth = 0.45
     ) +
-    ggplot2::scale_fill_identity() +
-    bbmri_coord_sf(bbox, cfg$oec_crs, projected_bbox = projected_bbox) +
-    bbmri_void_theme(cfg$oec_colors$background) +
-    ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
+    ggplot2::scale_fill_identity()
 
   if (isTRUE(draw_node_lines) && nrow(node_lines) > 0) {
     plot <- plot +
@@ -579,7 +678,10 @@ bbmri_oec_panel_plot <- function(
     )
   }
 
-  plot
+  plot +
+    bbmri_coord_sf(bbox, cfg$oec_crs, projected_bbox = projected_bbox) +
+    bbmri_void_theme(cfg$oec_colors$background) +
+    ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
 }
 
 build_members_oec_all_map <- function(
@@ -627,9 +729,17 @@ build_members_oec_all_map <- function(
   main_node_df <- bbmri_biobank_points_df(main_node_points, cfg$oec_crs, label = "HQ/node points")
   main_node_sf <- bbmri_filter_valid_lonlat_points(main_node_points, "HQ/node points")
   iarc_sf <- bbmri_filter_valid_lonlat_points(iarc, "IARC points")
-  main_projected_bbox <- bbmri_crop_projected_bbox(
-    bbmri_projected_bbox(cfg$oec_bbox, cfg$oec_crs),
-    cfg$oec_projected_crop
+  main_panel <- cfg$oec_canvas
+  target_main_aspect <- (main_panel$main_width * (device_width_in / device_height_in)) / main_panel$main_height
+  main_country_bbox <- sf::st_bbox(sf::st_transform(main_countries, sf::st_crs(cfg$oec_crs)))
+  if (!is.null(cfg$oec_main_north_cap_lat) && is.finite(cfg$oec_main_north_cap_lat)) {
+    north_cap_y <- bbmri_projected_parallel_y_cap(cfg$oec_main_north_cap_lat, cfg$oec_bbox, cfg$oec_crs)
+    main_country_bbox[["ymax"]] <- min(main_country_bbox[["ymax"]], north_cap_y)
+  }
+  main_projected_bbox <- bbmri_expand_projected_bbox_to_aspect(
+    bbmri_expand_projected_bbox(main_country_bbox, cfg$oec_content_margins),
+    target_main_aspect,
+    cfg$oec_content_trim_bias
   )
 
   main_plot <- bbmri_oec_panel_plot(
@@ -644,12 +754,11 @@ build_members_oec_all_map <- function(
     draw_iarc_label = TRUE
   )
 
-  main_panel <- cfg$oec_canvas
   main_plot_aspect <- {
     (main_projected_bbox[["xmax"]] - main_projected_bbox[["xmin"]]) /
       (main_projected_bbox[["ymax"]] - main_projected_bbox[["ymin"]])
   }
-  main_panel_box <- bbmri_cover_box_to_aspect(
+  main_panel_box <- bbmri_fit_box_to_aspect(
     x = main_panel$main_x,
     y = main_panel$main_y,
     width = main_panel$main_width,

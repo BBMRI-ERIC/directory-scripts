@@ -56,8 +56,8 @@ Shared inputs:
 
 `bbmri-members-OEC-all` uses a dedicated page size instead of the standard
 landscape exporter sheet. The current target `med` page is approximately
-`15.8 x 13.7 cm` (`1866 x 1618 px` at `300 dpi`), with proportional `small`
-and `big` variants.
+`25.4 x 14.8 cm` (`3000 x 1750 px` at `300 dpi`, `6000 x 3500 px` at
+`600 dpi` raster), with proportional `small` and `big` variants.
 
 `geocoding_2022.py` is expected to be cache-backed for both Directory data and
 live geocoding. Only entities still missing usable coordinates should trigger a

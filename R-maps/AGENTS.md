@@ -357,16 +357,35 @@ drift.
 - For OEC countries, bbox-hit filtering was not enough because overseas
   territories from countries such as France distorted the projected extents.
   Use real clipping for OEC country and OEC line layers.
+- In `render_bbmri_members_oec_all.R`, `coord_sf(...)` must be attached after
+  all `geom_sf(...)` layers in the OEC panel plot. If extra `geom_sf(...)`
+  layers are added after a custom `coord_sf(...)`, ggplot can silently replace
+  the coordinate system with a default one and discard the intended projected
+  bbox.
 - For OEC inset geography, clipping only the masked country was also wrong:
   it prevented any neighboring-state context from appearing. Inset geography
   should clip the full country layer to the inset bbox, while points/nodes stay
   filtered to the inset partner mask.
-- The current `oec_projected_crop` values are still an indirect tuning knob.
-  They crop the projected bbox as fractions of the broad OEC window, not of
-  the actual visible Europe content. If future work needs precise page-fill
-  control, prefer computing a projected bbox from the visible main-map content
-  plus explicit north/south/east/west margins rather than pushing the crop
-  fractions further.
+- The current OEC main framing no longer uses the old fractional
+  `oec_projected_crop` model and no longer uses the earlier mixed-content
+  auto-fit path. The frame is now derived from the projected mainland-country
+  extent itself, after explicit geographic exclusions, then expanded to the
+  target page aspect.
+- The current OEC mainland frame has two extra geographic rules:
+  - a north cap around the Mageroya latitude so the view does not extend up to
+    Bear Island / Bjornoya
+  - an explicit Arctic-island exclusion so remote Norway polygons such as Bear
+    Island and Svalbard do not re-enter the frame through the base geometry
+- This is the preferred abstraction because it responds to the intended visible
+  Europe basemap rather than to opaque fractions of the much broader legacy OEC
+  bbox or to the incidental point/line cloud.
+- If future OEC framing work is needed, tune:
+  - the dedicated OEC export sheet size
+  - `oec_content_margins`
+  - `oec_content_trim_bias`
+  - `oec_main_north_cap_lat`
+  - `oec_geographic_exclusions`
+  instead of reintroducing broad-window crop fractions or point-cloud auto-fit.
 - The legacy `HQlineNN.geojson` node points already sit on the correct line
   endpoints. A later experiment that tried to "realign" them from line strings
   was wrong and was removed.
