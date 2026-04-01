@@ -125,6 +125,10 @@ document.
   provided, it exports all maps.
 - `README.md`
   Human-oriented overview and dependency notes.
+- `README.Rmd`
+  Narrative, RStudio-friendly framework guide.
+- `examples/`
+  Short runnable recipe scripts for RStudio and interactive maintenance.
 - `SKILLS.md`
   Folder-local workflows and commands.
 - `TRANSFER.md`

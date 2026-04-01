@@ -87,15 +87,15 @@ Rscript R-maps/render_crc_cohort_sized.R \
 ### Bash wrapper
 
 ```bash
-bash R-maps/export.sh
+sh R-maps/export.sh
 ```
 
 ```bash
-bash R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
+sh R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
 ```
 
 ```bash
-bash R-maps/export.sh
+sh R-maps/export.sh
 ```
 
 ### Direct R entry point
@@ -113,6 +113,30 @@ What it does:
 - derives `bbmri-directory-covid-pilot.geojson` when extras are requested
 - derives `bbmri-directory-quality-pilot.geojson` when extras are requested
 - renders the requested map set
+
+### RStudio-friendly walkthrough
+
+Open `R-maps/README.Rmd` in RStudio for the narrative guide and open the
+scripts in `R-maps/examples/` for short runnable recipes. The scripts are
+intended to be read and executed interactively, not just from the shell.
+
+Useful starting points:
+
+- `R-maps/examples/00_setup.R`
+- `R-maps/examples/01_render_existing_map.R`
+- `R-maps/examples/02_country_labels_and_coloring.R`
+- `R-maps/examples/03_legends_and_overlays.R`
+- `R-maps/examples/04_complex_overlay_template.R`
+
+### Built-in Map Sets
+
+The R runner also understands named sets:
+
+```bash
+Rscript R-maps/render_pilot_maps.R --map-set=core
+Rscript R-maps/render_pilot_maps.R --map-set=extras
+Rscript R-maps/render_pilot_maps.R --map-set=all
+```
 
 ## 3. Run Prep Helpers Directly
 

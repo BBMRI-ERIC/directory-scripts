@@ -2,6 +2,10 @@
 
 This folder contains the active R-based Directory map pipeline.
 
+For a narrative, RStudio-friendly walkthrough, open
+[README.Rmd](README.Rmd). For runnable recipes, open the scripts in
+[examples/](examples/).
+
 ## Supported Maps
 
 Core maps:
@@ -20,33 +24,45 @@ Extra maps:
 
 ## Quick Start
 
-Render the core maps:
+Render all maps (default):
 
 ```bash
-bash R-maps/export.sh
+sh R-maps/export.sh
 ```
 
 Render only the extra maps:
 
 ```bash
-bash R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
+sh R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
 ```
 
 Render everything:
 
 ```bash
-bash R-maps/export.sh
+sh R-maps/export.sh
 ```
 
 Render only specific maps:
 
 ```bash
-bash R-maps/export.sh bbmri-members-OEC-all global-nolabels
+sh R-maps/export.sh bbmri-members-OEC-all global-nolabels
+```
+
+Render a named set directly through the R runner:
+
+```bash
+Rscript R-maps/render_pilot_maps.R --map-set=core
+Rscript R-maps/render_pilot_maps.R --map-set=extras
+Rscript R-maps/render_pilot_maps.R --map-set=all
 ```
 
 ## How The Pipeline Works
 
 `export.sh` drives `render_pilot_maps.R`.
+
+If you prefer working interactively in RStudio, open `R-maps/README.Rmd` and
+the scripts in `R-maps/examples/`. They show the same shared helpers that the
+production renderers use, but in smaller recipe-sized pieces.
 
 Shared inputs:
 

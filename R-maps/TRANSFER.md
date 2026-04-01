@@ -35,6 +35,15 @@ Current wrapper:
   Main POSIX-shell entry point that exports all maps by default or only the
   explicitly named map ids.
 
+Human-facing docs now live in:
+
+- `/home/hopet/codex/directory-scripts/R-maps/README.md`
+- `/home/hopet/codex/directory-scripts/R-maps/README.Rmd`
+- `/home/hopet/codex/directory-scripts/R-maps/examples/`
+
+Use `README.Rmd` and the example scripts for RStudio-driven maintenance and
+framework walkthroughs.
+
 Current pilot outputs live in:
 
 - `/home/hopet/codex/directory-scripts/R-maps/pilot-output`

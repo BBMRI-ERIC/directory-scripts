@@ -1,0 +1,194 @@
+---
+title: "R Maps Framework Guide"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+# R Maps Framework
+
+This guide documents the active R-based BBMRI map framework. Use it together
+with `README.md`, the example scripts in `R-maps/examples/`, and the shared
+helpers in `map_config.R` and `map_common.R`.
+
+## Open In RStudio
+
+1. Open `/home/hopet/codex/directory-scripts` as an RStudio project or set the
+   working directory to the repository root.
+2. Open `R-maps/README.Rmd` for the narrative guide.
+3. Open one of the scripts in `R-maps/examples/` to run a concrete recipe.
+4. Source `R-maps/examples/00_setup.R` first when you want the shared paths and
+   helper objects.
+
+```r
+setwd("/home/hopet/codex/directory-scripts")
+source("R-maps/examples/00_setup.R")
+```
+
+## Shell Entry Point
+
+The POSIX wrapper remains the quickest way to export current maps:
+
+```bash
+sh R-maps/export.sh
+sh R-maps/export.sh bbmri-members-nolabels global-nolabels
+```
+
+The shell wrapper calls `render_pilot_maps.R`, which in turn calls the shared
+R renderers and helper scripts.
+
+If you want the named sets directly from R, the runner accepts:
+
+```bash
+Rscript R-maps/render_pilot_maps.R --map-set=core
+Rscript R-maps/render_pilot_maps.R --map-set=extras
+Rscript R-maps/render_pilot_maps.R --map-set=all
+```
+
+## Framework Layers
+
+The framework is intentionally split into stable layers:
+
+- `map_config.R`
+  - shared colors, extents, export sizes, label offsets, legend boxes, and
+    other style knobs
+- `map_common.R`
+  - reusable helpers for loading base geography, applying fills, placing
+    labels, building legends, clipping/projecting, and exporting outputs
+- `render_*.R`
+  - map-specific composition only
+- `prepare_*.py`
+  - data derivation only
+- `export.sh`
+  - command-line orchestration
+
+This separation is the main human-maintainability rule: prefer changing a
+shared helper or config value over copy-pasting behavior into a renderer.
+
+## Styling In One Place
+
+When you want to change visual behavior, the first stop should be
+`bbmri_map_config()`. It already controls:
+
+- country color groups
+- symbol colors
+- relative sizing
+- label placement offsets
+- legend placement and sizing
+- OEC inset configuration
+
+Shared helpers that consume those settings:
+
+- `bbmri_assign_standard_country_fill()`
+- `bbmri_assign_fedplat_country_fill()`
+- `bbmri_assign_oec_country_fill()`
+- `bbmri_country_label_df()`
+- `bbmri_place_country_labels()`
+- `bbmri_place_local_labels()`
+- `bbmri_add_circle_legend()`
+- `bbmri_add_quality_legend()`
+
+## Common Tasks
+
+### Render an existing map
+
+The renderer scripts are intentionally sourceable from RStudio:
+
+```r
+source("R-maps/examples/00_setup.R")
+source("R-maps/render_global_nolabels.R")
+
+save_global_nolabels_formats(
+  points_path = pilot_geojson,
+  iarc_path = iarc_geojson,
+  output_dir = example_output_dir,
+  prefix = "example-global-nolabels"
+)
+```
+
+### Change country names and label coverage
+
+Country labels are driven by `bbmri_country_label_df()` and the label-code list
+in `bbmri_map_config()`:
+
+- all countries: `cfg$standard_country_labels`
+- BBMRI-style member set only: `cfg$standard_country_groups$member`
+- any specific list: pass `label_codes = c("AT", "DE", "TR")`
+- none: pass `label_codes = character(0)` or skip labels entirely
+
+Example:
+
+```r
+labels <- bbmri_country_label_df(
+  countries,
+  cfg,
+  cfg$standard_crs,
+  label_codes = cfg$standard_country_groups$member
+)
+```
+
+### Add or remove a legend
+
+Legends are configured through the same shared framework as the plots:
+
+- `bbmri_add_circle_legend()` for generic symbol legends
+- `bbmri_add_quality_legend()` for quality-map semantics
+
+To move or resize a legend, change the box in `bbmri_map_config()` rather than
+hardcoding legend geometry in a renderer.
+
+### Add circles, lines, or other overlays
+
+The intended pattern is:
+
+1. prepare a small projected data frame or `sf` object
+2. choose the overlay meaning in config or a small spec object
+3. add the overlay as a renderer layer
+4. keep styling in config rather than in ad hoc layer constants
+
+For simple overlays, `geom_point()`, `geom_segment()`, and `geom_sf()` are the
+primary building blocks. For more complex overlays, keep the entity-to-visual
+mapping declarative in a local spec object so the code remains readable in
+RStudio.
+
+### Keep country styling consistent
+
+BBMRI member/observer coloring should come from the shared country-fill
+helpers. If a map needs extra country meaning, that should be an overlay on top
+of the shared fill logic, not a replacement of it.
+
+### Prepare for complex visualizations
+
+For pie charts, bar charts, or other per-entity summaries, use a tiny local
+spec object that declares:
+
+- which entity types receive which chart type
+- which value fields drive the chart
+- which colors, scales, and sizes apply
+
+That keeps the renderer easy to understand in RStudio and makes it obvious
+which part of the code controls appearance versus data selection.
+
+## Example Scripts
+
+The `R-maps/examples/` directory contains short, runnable recipe scripts:
+
+- `00_setup.R`
+  - shared paths and helper sources
+- `01_render_existing_map.R`
+  - render a current map from the existing pipeline
+- `02_country_labels_and_coloring.R`
+  - show the shared country-color and label controls
+- `03_legends_and_overlays.R`
+  - show overlay and legend composition
+- `04_complex_overlay_template.R`
+  - template for more complex per-entity visualizations
+
+## Notes On RStudio Usage
+
+- Open the scripts directly in RStudio and run selected lines interactively.
+- Keep the repository root as the working directory so the relative paths in
+  the examples resolve cleanly.
+- If you want a rendered HTML copy of this guide, call
+  `rmarkdown::render("R-maps/README.Rmd")`.
