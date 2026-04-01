@@ -12,11 +12,16 @@ build_crc_cohort_sized_map <- function(points_path, imaging_path, iarc_path = NA
   bbmri_require_packages(c("ggplot2", "sf"))
 
   cfg <- bbmri_map_config()
-  bbox <- cfg$global_bbox
-  export_sizes <- cfg$crc_export_sizes
+  bbox <- cfg$classic_europe_bbox
+  export_sizes <- cfg$export_sizes
   label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
   output_width_px <- bbmri_output_width_px(export_sizes, output_variant)
-  layers <- bbmri_prepare_classic_layers(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill)
+  layers <- bbmri_prepare_classic_layers(
+    bbox,
+    cfg,
+    fill_fn = bbmri_assign_standard_country_fill,
+    include_rivers = FALSE
+  )
   points <- bbmri_read_sf(points_path, "CRC cohort GeoJSON")
   bbmri_validate_geojson_columns(
     points,

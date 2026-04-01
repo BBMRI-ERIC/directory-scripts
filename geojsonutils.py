@@ -44,6 +44,10 @@ def get_entity_coordinates(entity: dict[str, Any]) -> Optional[list[float]]:
     latitude = _normalize_coordinate_component(entity.get('latitude'))
     if longitude is None or latitude is None:
         return None
+    if not (-180.0 <= longitude <= 180.0):
+        return None
+    if not (-90.0 <= latitude <= 90.0):
+        return None
     return [longitude, latitude]
 
 

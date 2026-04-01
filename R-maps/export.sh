@@ -162,8 +162,11 @@ while [ "$#" -gt 0 ]; do
       append_map "$1"
       shift
       ;;
-  esac
+    esac
 done
+
+cd "$repo_root"
+export DIRECTORY_CACHE_ROOT="$repo_root"
 
 exec "$rscript_bin" "$script_dir/render_pilot_maps.R" \
   --map-set="$map_set" \

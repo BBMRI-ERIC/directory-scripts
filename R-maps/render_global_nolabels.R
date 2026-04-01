@@ -17,7 +17,9 @@ build_global_nolabels_map <- function(points_path, iarc_path = NA_character_, ou
     export_sizes = cfg$global_export_sizes,
     cfg = cfg,
     iarc_path = iarc_path,
-    output_variant = output_variant
+    output_variant = output_variant,
+    include_rivers = FALSE,
+    country_layout_variant = "global"
   )
 }
 

@@ -12,7 +12,7 @@ build_quality_maps_nolabels_map <- function(points_path, iarc_path = NA_characte
   bbmri_require_packages(c("ggplot2", "sf"))
 
   cfg <- bbmri_map_config()
-  bbox <- cfg$classic_europe_bbox
+  bbox <- cfg$standard_bbox
   export_sizes <- cfg$export_sizes
   label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
   output_width_px <- bbmri_output_width_px(export_sizes, output_variant)
@@ -26,27 +26,7 @@ build_quality_maps_nolabels_map <- function(points_path, iarc_path = NA_characte
   iarc <- bbmri_read_optional_sf(iarc_path)
 
   point_df <- bbmri_biobank_points_df(points, cfg$standard_crs, label = "quality map points")
-  point_df$qual_id[is.na(point_df$qual_id)] <- "Other"
-  point_df$fill_color <- ifelse(
-    point_df$qual_id == "eric",
-    cfg$quality_colors$eric,
-    ifelse(
-      point_df$qual_id == "accredited",
-      cfg$quality_colors$accredited,
-      cfg$quality_colors$other
-    )
-  )
-  point_df$line_color <- point_df$fill_color
-  point_df$marker_width <- ifelse(
-    point_df$biobankType == "biobank",
-    bbmri_mapnik_marker_size(cfg$quality_marker_style$biobank_width, cfg),
-    bbmri_mapnik_marker_size(cfg$quality_marker_style$collection_width, cfg)
-  )
-  point_df$marker_alpha <- ifelse(
-    point_df$biobankType == "biobank",
-    cfg$quality_marker_style$alpha_biobank,
-    cfg$quality_marker_style$alpha_collection
-  )
+  point_df <- bbmri_assign_quality_point_style(point_df, cfg)
   country_labels <- bbmri_country_label_df(layers$countries, cfg, cfg$standard_crs)
   country_labels <- bbmri_place_country_labels(
     country_labels,
@@ -64,25 +44,9 @@ build_quality_maps_nolabels_map <- function(points_path, iarc_path = NA_characte
     bbox = bbox,
     crs = cfg$standard_crs,
     cfg = cfg
-  ) +
-    ggplot2::geom_point(
-      data = subset(point_df, biobankType == "biobank"),
-      ggplot2::aes(x = x, y = y, size = marker_width, fill = fill_color),
-      shape = 21,
-      stroke = 0.4,
-      colour = cfg$quality_colors$line,
-      alpha = cfg$quality_marker_style$alpha_biobank
-    ) +
-    ggplot2::geom_point(
-      data = subset(point_df, biobankType != "biobank"),
-      ggplot2::aes(x = x, y = y, size = marker_width, fill = fill_color),
-      shape = 21,
-      stroke = 0.35,
-      colour = cfg$quality_colors$line,
-      alpha = cfg$quality_marker_style$alpha_collection
-    ) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::scale_size_identity()
+  )
+  plot <- bbmri_add_quality_point_layers(plot, point_df, cfg)
+  plot <- bbmri_add_quality_legend(plot, bbox, cfg$standard_crs, cfg)
 
   plot <- plot + bbmri_geom_text_halo(
     data = country_labels,

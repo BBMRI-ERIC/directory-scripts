@@ -123,8 +123,6 @@ document.
 - `export.sh`
   POSIX-shell wrapper for selecting zero or more map ids. If no map ids are
   provided, it exports all maps.
-- `export-all.sh`
-  Compatibility shim that delegates to `export.sh`.
 - `README.md`
   Human-oriented overview and dependency notes.
 - `SKILLS.md`
@@ -148,13 +146,29 @@ document.
   helpers.
 - Keep map-specific scripts thin. Shared style/placement/export logic belongs
   in `map_common.R` and `map_config.R`.
+- Country coloring for BBMRI members and observers must stay consistent across
+  all non-OEC maps and must be driven from the shared standard-country
+  configuration, not duplicated in individual renderers.
+  - The source of truth is `cfg$standard_country_groups` plus
+    `bbmri_assign_standard_country_fill(...)`.
+  - If member/observer status changes in config, that change must propagate to
+    `nolabels`, `sized`, `quality_maps-nolabels`, `global-nolabels`,
+    `covid-nolabels`, `CRC-cohort-sized`, and any future standard/classic map
+    without per-renderer recoloring edits.
+  - Map-specific extra meaning may be added only as an overlay on top of that
+    shared base rule. `federated-platform` is the allowed model for this:
+    additional semantics may recolor or annotate countries, but that must be a
+    deliberate extension of the shared framework rather than a parallel
+    renderer-local membership palette.
 - Do not hardcode machine-specific legacy output paths into the renderers.
   External Tilemill-era overlays are passed as explicit inputs.
-- `global-nolabels`, `covid-nolabels`, `quality_maps-nolabels`,
-  `federated-platform`, and `CRC-cohort-sized` intentionally keep the classic
-  Tilemill geography layers. Do not apply the standard-map “no lakes/rivers”
-  simplification to those maps.
-- Do not reintroduce rivers or lakes into `nolabels` and `sized`.
+- Rivers must not be rendered in any map variant.
+  - This is a shared framework rule, not a renderer-by-renderer preference.
+  - Keep the classic/shared base helpers river-free so the omission propagates
+    consistently to `global-nolabels`, `covid-nolabels`,
+    `quality_maps-nolabels`, `federated-platform`, `CRC-cohort-sized`, and any
+    future classic-map variants automatically.
+  - `nolabels`, `sized`, and `OEC-all` must also remain river-free.
 - `sized` biobank labels should use constrained local placement only. No long
   repel shifts and no connector lines.
 - `sized` biobank labels are plain black text. They do not use the white halo.
@@ -170,6 +184,9 @@ document.
   not silently replace them with guessed live derivations.
 - `quality_maps-nolabels` and `covid-nolabels` are derived from current data
   and should stay reproducible from the current cache/Directory state.
+- `quality_maps-nolabels` must use the standard BBMRI country fill path for
+  countries and add its quality-specific colors only for points/legend.
+  Quality rendering must not override the shared country fill scale.
 - For `OEC-all`, country polygons, HQ/NN boxes, and biobank dots must share the
   same `sf` geometry rendering path. Do not reintroduce manual projected `x/y`
   plotting for normal symbols in that map.

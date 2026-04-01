@@ -1,8 +1,10 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 import copy
 import logging
+import os
 import os.path
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 import networkx as nx
@@ -14,6 +16,20 @@ from nncontacts import NNContacts
 
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
+REPO_ROOT = Path(__file__).resolve().parent
+
+
+def _cache_root() -> Path:
+    """Return the base directory for persistent caches."""
+    cache_root = os.environ.get("DIRECTORY_CACHE_ROOT")
+    if cache_root:
+        return Path(cache_root)
+    return Path.cwd()
+
+
+def _repo_cache_dir(*parts: str) -> str:
+    """Return a cache path anchored to the configured cache root."""
+    return str(_cache_root().joinpath(*parts))
 
 
 def get_directory_ontology_table(
@@ -29,7 +45,7 @@ def get_directory_ontology_table(
     the default public service.
     """
     base_url = directory_url or "https://directory.bbmri-eric.eu"
-    cache_dir = "data-check-cache/directory-DirectoryOntologies"
+    cache_dir = _repo_cache_dir("data-check-cache", "directory-DirectoryOntologies")
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
     cache = Cache(cache_dir)
@@ -108,7 +124,7 @@ class Directory:
         log.debug('Checking data in schema: ' + schema)
 
         schema_cache_suffix = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(schema))
-        cache_dir = f'data-check-cache/directory-{schema_cache_suffix}'
+        cache_dir = _repo_cache_dir("data-check-cache", f'directory-{schema_cache_suffix}')
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         cache = Cache(cache_dir)

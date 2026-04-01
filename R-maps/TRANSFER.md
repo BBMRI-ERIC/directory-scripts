@@ -34,8 +34,6 @@ Current wrapper:
 - `/home/hopet/codex/directory-scripts/R-maps/export.sh`
   Main POSIX-shell entry point that exports all maps by default or only the
   explicitly named map ids.
-- `/home/hopet/codex/directory-scripts/R-maps/export-all.sh`
-  Compatibility shim that delegates to `export.sh`
 
 Current pilot outputs live in:
 
@@ -141,7 +139,7 @@ review should prefer tighter and better-balanced whitespace.
   from the mixed point/line cloud. The renderer applies explicit geographic
   exclusions first, then expands that mainland bbox to the target page aspect.
 - The current OEC sheet is also deliberately wider than the old portrait
-  experiments: `med` is now `6000 x 3500`, with proportional `small` / `big`
+  experiments: `med` is now `4800 x 2800`, with proportional `small` / `big`
   and vector sizes.
 - The current OEC mainland frame has two explicit high-north controls:
   - `oec_main_north_cap_lat` caps the top around Mageroya rather than farther

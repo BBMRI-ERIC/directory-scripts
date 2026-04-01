@@ -16,7 +16,9 @@ import configparser
 import ssl
 import logging as log
 import smtplib
+import time
 from pathlib import Path
+import os
 
 # Internal
 from cli_common import (
@@ -33,6 +35,7 @@ from directory import Directory
 from diskcache import Cache
 
 cachesList = ['directory', 'geocoding']
+REPO_ROOT = Path(__file__).resolve().parent
 
 #####################
 ## Parse arguments ##
@@ -89,7 +92,10 @@ else:
 
 def geocoding_cache_dir() -> str:
     """Return the persistent global geocoding cache directory."""
-    return 'data-check-cache/geocoding'
+    cache_root = os.environ.get('DIRECTORY_CACHE_ROOT')
+    if cache_root:
+        return str(Path(cache_root) / 'data-check-cache' / 'geocoding')
+    return str(Path.cwd() / 'data-check-cache' / 'geocoding')
 
 
 def geocoding_cache_key(contactID, lookBy):
@@ -101,48 +107,127 @@ def geocoding_cache_key(contactID, lookBy):
     return f'query:{digest}'
 
 
+def biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contactID):
+    """Return a stable cache key for one biobank fallback-coordinate situation."""
+    source_text = ' | '.join(
+        str(value).strip()
+        for value in (biobankID, longitude_raw, latitude_raw, contactID)
+        if value is not None and str(value).strip()
+    )
+    digest = hashlib.sha256(source_text.encode('utf-8')).hexdigest()
+    return f'biobank:{biobankID}:{digest}'
+
+
+def get_cached_biobank_coordinates(geocodingCache, biobankID, longitude_raw, latitude_raw, contactID):
+    """Return cached fallback coordinates for one biobank/source signature."""
+    cacheKey = biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contactID)
+    cachedEntry = geocodingCache.get(cacheKey)
+    if cachedEntry and cachedEntry.get('status') == 'resolved':
+        return cachedEntry.get('coordinates')
+    return None
+
+
+def cache_biobank_coordinates(
+    geocodingCache,
+    biobankID,
+    longitude_raw,
+    latitude_raw,
+    contactID,
+    coordinates,
+    source,
+):
+    """Persist fallback coordinates for one biobank/source signature."""
+    cacheKey = biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contactID)
+    geocodingCache[cacheKey] = {
+        'status': 'resolved',
+        'coordinates': coordinates,
+        'source': source,
+        'longitude_raw': longitude_raw,
+        'latitude_raw': latitude_raw,
+        'contact_id': contactID,
+    }
+
+
 def safe_geocode(query: str):
     """Resolve one geocoding query or disable live geocoding for this run."""
     global geolocator
     global geocodingEnabled
+    global geocodingNextRequestMonotonic
 
     if not geocodingEnabled:
         return ('disabled', None)
 
-    try:
-        location = geolocator.geocode(query)
-    except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
-        log.warning(
-            'Geocoding failed for %r because the geocoding service is unavailable or rate-limited: %s',
-            query,
-            exc,
-        )
-        geocodingEnabled = False
-        return ('disabled', None)
-    except geopy.exc.GeocoderUnavailable:
-        log.debug('Geocoding unavailable for %r; retrying with SSL fallback.', query)
-        disableSSLCheck()
+    for attempt, backoff_seconds in enumerate((0.0, 3.0, 10.0), start = 1):
+        wait_seconds = max(0.0, geocodingNextRequestMonotonic - time.monotonic())
+        if wait_seconds > 0:
+            time.sleep(wait_seconds)
+        geocodingNextRequestMonotonic = time.monotonic() + 1.1
+
         try:
-            geolocator = geopy.geocoders.Nominatim(
-                user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',
-                timeout=15,
-            )
             location = geolocator.geocode(query)
-        except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError, geopy.exc.GeocoderUnavailable) as exc:
+        except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
+            if attempt < 3:
+                log.warning(
+                    'Geocoding attempt %d for %r failed because the geocoding service is unavailable or rate-limited: %s. Retrying after %.1fs.',
+                    attempt,
+                    query,
+                    exc,
+                    backoff_seconds,
+                )
+                time.sleep(backoff_seconds)
+                geocodingNextRequestMonotonic = max(
+                    geocodingNextRequestMonotonic,
+                    time.monotonic() + 1.1,
+                )
+                continue
             log.warning(
-                'Geocoding failed for %r after SSL fallback: %s',
+                'Geocoding failed for %r because the geocoding service is unavailable or rate-limited: %s',
                 query,
                 exc,
             )
             geocodingEnabled = False
             return ('disabled', None)
+        except geopy.exc.GeocoderUnavailable:
+            log.debug('Geocoding unavailable for %r; retrying with SSL fallback.', query)
+            disableSSLCheck()
+            try:
+                geolocator = geopy.geocoders.Nominatim(
+                    user_agent='Mozilla/5.0 (X11; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0',
+                    timeout=15,
+                )
+                location = geolocator.geocode(query)
+            except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError, geopy.exc.GeocoderUnavailable) as exc:
+                if attempt < 3:
+                    log.warning(
+                        'Geocoding attempt %d for %r failed after SSL fallback: %s. Retrying after %.1fs.',
+                        attempt,
+                        query,
+                        exc,
+                        backoff_seconds,
+                    )
+                    time.sleep(backoff_seconds)
+                    geocodingNextRequestMonotonic = max(
+                        geocodingNextRequestMonotonic,
+                        time.monotonic() + 1.1,
+                    )
+                    continue
+                log.warning(
+                    'Geocoding failed for %r after SSL fallback: %s',
+                    query,
+                    exc,
+                )
+                geocodingEnabled = False
+                return ('disabled', None)
 
-    if location:
-        return ('resolved', location)
-    return ('not_found', None)
+        if location:
+            return ('resolved', location)
+        return ('not_found', None)
+
+    geocodingEnabled = False
+    return ('disabled', None)
 
 
-def lookForCoordinates(contactID, personsContactsById, lookForCoordinatesFeatures, geocodingCache):
+def lookForCoordinates(contactID, personsContactsById, lookForCoordinatesFeatures, geocodingCache, allowLiveLookup = True):
     '''
     Look for coordinates based on biobank contact.
 
@@ -170,6 +255,9 @@ def lookForCoordinates(contactID, personsContactsById, lookForCoordinatesFeature
                 return cachedEntry['coordinates']
             if cachedEntry.get('status') == 'not_found':
                 continue
+
+        if not allowLiveLookup:
+            continue
 
         if not geocodingEnabled:
             return None
@@ -269,6 +357,7 @@ geolocator = geopy.geocoders.Nominatim(
     timeout=15,
 )
 geocodingEnabled = True
+geocodingNextRequestMonotonic = 0.0
 
 geocodingCacheDir = geocoding_cache_dir()
 if not Path(geocodingCacheDir).exists():
@@ -281,6 +370,11 @@ personsContactsById = {
     contact['id']: contact
     for contact in personsContacts
     if isinstance(contact, dict) and 'id' in contact
+}
+visibleCollectionsById = {
+    collection['id']: collection
+    for collection in dir.getCollections()
+    if isinstance(collection, dict) and 'id' in collection
 }
 
 # Get biobanks from Directory:
@@ -316,6 +410,8 @@ for column, value in config['Filter dataset'].items():
 if not 'filtered_df' in locals():
     filtered_df = df
 
+biobankCollectionIdColumns = list(filtered_df.filter(regex='collections-[0-9]*-id', axis=1).columns)
+
 if args.printDf:
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_colwidth', None)
@@ -332,12 +428,9 @@ for index, biobank in filtered_df.iterrows():
             biobankPropertiesDict['biobankID'] = biobank['id']
         if 'biobankSize' in biobankInputFeatures:
             OoM = []
-            # Get collections IDs:
-            collIDs = list(filtered_df.filter(regex='collections-[0-9]*-id', axis=1).columns)
-            for collID in collIDs:
+            for collID in biobankCollectionIdColumns:
                 if not isinstance(biobank[collID], float):
-                    # Within those columns get the one with the maximum value
-                    collection = dir.getCollectionById(biobank[collID])
+                    collection = visibleCollectionsById.get(biobank[collID])
                     if collection and 'order_of_magnitude' in collection:
                         OoM.append(int(collection['order_of_magnitude']))
             if OoM:
@@ -380,6 +473,17 @@ for index, biobank in filtered_df.iterrows():
         # Biobank geometry:
         biobankGeometryDict = {}
         location = None
+        biobankID = biobank['id']
+        contactID = biobank.get('contact-id')
+        longitude_raw = biobank.get('longitude')
+        latitude_raw = biobank.get('latitude')
+        cachedBiobankCoordinates = get_cached_biobank_coordinates(
+            geocodingCache,
+            biobankID,
+            longitude_raw,
+            latitude_raw,
+            contactID,
+        )
 
         # Override biobank location through config file:
         if biobank['name'] in config['Override biobank position'].keys():        
@@ -400,36 +504,97 @@ for index, biobank in filtered_df.iterrows():
                     )
                 log.info(biobank['name'] + ': Coordinates provided')
             except (TypeError, ValueError) as exc:
-                log.warning('%s: invalid stored coordinates longitude=%r latitude=%r (%s)', biobank['name'], biobank['longitude'], biobank['latitude'], exc)
                 biobankGeometryDict = {}
                 coordinates = None
-                if biobank['contact-id']:
+                log.warning(
+                    '%s: invalid stored coordinates longitude=%r latitude=%r (%s)',
+                    biobank['name'],
+                    biobank['longitude'],
+                    biobank['latitude'],
+                    exc,
+                )
+                if cachedBiobankCoordinates:
+                    biobankGeometryDict['coordinates'] = cachedBiobankCoordinates
+                    log.warning(
+                        '%s: replacing invalid stored coordinates with cached address-based fallback coordinates',
+                        biobank['name'],
+                    )
+                elif contactID:
                     lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
                     coordinates = lookForCoordinates(
-                        biobank['contact-id'],
+                        contactID,
+                        personsContactsById,
+                        lookForCoordinatesFeatures,
+                        geocodingCache,
+                        allowLiveLookup = False,
+                    )
+                    if coordinates:
+                        biobankGeometryDict['coordinates'] = coordinates
+                        cache_biobank_coordinates(
+                            geocodingCache,
+                            biobankID,
+                            longitude_raw,
+                            latitude_raw,
+                            contactID,
+                            coordinates,
+                            source = 'query_cache',
+                        )
+                        log.warning(
+                            '%s: replacing invalid stored coordinates with cached address-based geocoding result',
+                            biobank['name'],
+                        )
+                if not biobankGeometryDict and contactID:
+                    lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
+                    coordinates = lookForCoordinates(
+                        contactID,
                         personsContactsById,
                         lookForCoordinatesFeatures,
                         geocodingCache,
                     )
                     if coordinates:
                         biobankGeometryDict['coordinates'] = coordinates
-                        log.info(biobank['name'] + ": geodecoding done ")
+                        cache_biobank_coordinates(
+                            geocodingCache,
+                            biobankID,
+                            longitude_raw,
+                            latitude_raw,
+                            contactID,
+                            coordinates,
+                            source = 'geocoding',
+                        )
+                        log.warning(
+                            '%s: replacing invalid stored coordinates with address-based geocoding result',
+                            biobank['name'],
+                        )
                     else:
-                        log.warning(biobank['name'] + ": geodecoding failed ")
+                        log.warning(biobank['name'] + ": geocoding failed ")
         #elif biobank['contact-_href']: #EMX2:
-        elif biobank['contact-id']:
-            lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
-            coordinates = lookForCoordinates(
-                biobank['contact-id'],
-                personsContactsById,
-                lookForCoordinatesFeatures,
-                geocodingCache,
-            )
-            if coordinates:
-                biobankGeometryDict['coordinates'] = coordinates
-                log.info(biobank['name'] + ": geodecoding done ")
+        elif contactID:
+            if cachedBiobankCoordinates:
+                biobankGeometryDict['coordinates'] = cachedBiobankCoordinates
+                log.info('%s: coordinates restored from fallback cache', biobank['name'])
             else:
-                log.warning(biobank['name'] + ": geodecoding failed ")
+                lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
+                coordinates = lookForCoordinates(
+                    contactID,
+                    personsContactsById,
+                    lookForCoordinatesFeatures,
+                    geocodingCache,
+                )
+                if coordinates:
+                    biobankGeometryDict['coordinates'] = coordinates
+                    cache_biobank_coordinates(
+                        geocodingCache,
+                        biobankID,
+                        longitude_raw,
+                        latitude_raw,
+                        contactID,
+                        coordinates,
+                        source = 'geocoding',
+                    )
+                    log.info(biobank['name'] + ": geocoding done ")
+                else:
+                    log.warning(biobank['name'] + ": geocoding failed ")
         else:
             log.warning(biobank['name'] + ": no contact provided")
 

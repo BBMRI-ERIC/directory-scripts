@@ -44,20 +44,41 @@ bbmri_parse_args <- function(defaults) {
     if (!startsWith(arg, "--")) {
       stop("Unsupported argument format: ", arg, call. = FALSE)
     }
-    parts <- strsplit(sub("^--", "", arg), "=", fixed = TRUE)[[1]]
-    key <- gsub("-", "_", parts[[1]], fixed = TRUE)
-    value <- if (length(parts) > 1) parts[[2]] else TRUE
+    body <- sub("^--", "", arg)
+    eq_pos <- regexpr("=", body, fixed = TRUE)[[1]]
+    if (eq_pos < 0) {
+      key <- body
+      value <- TRUE
+    } else {
+      key <- substr(body, 1, eq_pos - 1)
+      value <- substr(body, eq_pos + 1, nchar(body))
+    }
+    key <- gsub("-", "_", key, fixed = TRUE)
+    if (!nzchar(key)) {
+      stop("Unsupported empty option name in argument: ", arg, call. = FALSE)
+    }
     args[[key]] <- value
   }
 
   args
 }
 
+bbmri_read_sf_quiet_warnings <- function(path) {
+  withCallingHandlers(
+    sf::st_read(path, quiet = TRUE),
+    warning = function(w) {
+      if (grepl("Non closed ring detected", conditionMessage(w), fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
 bbmri_read_sf <- function(path, label) {
   if (!file.exists(path)) {
     stop(label, " not found: ", path, call. = FALSE)
   }
-  sf::st_read(path, quiet = TRUE)
+  bbmri_read_sf_quiet_warnings(path)
 }
 
 bbmri_read_optional_sf <- function(path) {
@@ -67,7 +88,7 @@ bbmri_read_optional_sf <- function(path) {
   if (!file.exists(path)) {
     return(NULL)
   }
-  sf::st_read(path, quiet = TRUE)
+  bbmri_read_sf_quiet_warnings(path)
 }
 
 bbmri_map_cache_dir <- function() {
@@ -101,7 +122,7 @@ bbmri_read_cached_zipped_layer <- function(url, zip_name, label) {
     stop("No shapefile found after extracting ", label, " from ", url, call. = FALSE)
   }
 
-  obj <- sf::st_read(shp_files[[1]], quiet = TRUE)
+  obj <- bbmri_read_sf_quiet_warnings(shp_files[[1]])
   names(obj) <- ifelse(is.na(names(obj)), names(obj), tolower(names(obj)))
   obj
 }
@@ -179,6 +200,25 @@ bbmri_void_theme <- function(background_fill) {
 
 bbmri_font_family <- function() {
   "sans"
+}
+
+bbmri_svg_device_args <- function() {
+  list(system_fonts = list(sans = "DejaVu Sans", serif = "DejaVu Serif"))
+}
+
+bbmri_normalize_svg_font_families <- function(path) {
+  if (!file.exists(path)) {
+    return(invisible(FALSE))
+  }
+  lines <- readLines(path, warn = FALSE, encoding = "UTF-8")
+  lines <- gsub('font-family:[[:space:]]*"?Liberation Sans"?;', 'font-family: sans-serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?DejaVu Sans"?;', 'font-family: sans-serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?sans"?;', 'font-family: sans-serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?Liberation Serif"?;', 'font-family: serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?DejaVu Serif"?;', 'font-family: serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?serif"?;', 'font-family: serif;', lines, perl = TRUE)
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(TRUE)
 }
 
 bbmri_projected_bbox <- function(bbox, crs) {
@@ -731,6 +771,34 @@ bbmri_place_country_labels <- function(label_df, point_df, bbox, crs, output_wid
       c(0, -24),
       c(0, 24)
     )
+  } else if (identical(layout_variant, "global")) {
+    list(
+      c(0, 0),
+      c(0, -10),
+      c(0, 10),
+      c(-10, 0),
+      c(10, 0),
+      c(-14, -8),
+      c(14, -8),
+      c(-14, 8),
+      c(14, 8),
+      c(0, -18),
+      c(0, 18),
+      c(-18, 0),
+      c(18, 0),
+      c(-22, -12),
+      c(22, -12),
+      c(-22, 12),
+      c(22, 12),
+      c(-28, 0),
+      c(28, 0),
+      c(0, -26),
+      c(0, 26),
+      c(-32, -16),
+      c(32, -16),
+      c(-32, 16),
+      c(32, 16)
+    )
   } else {
     list(
       c(0, 0),
@@ -747,9 +815,9 @@ bbmri_place_country_labels <- function(label_df, point_df, bbox, crs, output_wid
     )
   }
 
-  point_overlap_weight <- if (identical(layout_variant, "small")) 16 else 12
-  label_overlap_weight <- if (identical(layout_variant, "small")) 12 else 4
-  move_penalty_weight <- if (identical(layout_variant, "small")) 0.08 else 0.2
+  point_overlap_weight <- if (identical(layout_variant, "small")) 16 else if (identical(layout_variant, "global")) 14 else 12
+  label_overlap_weight <- if (identical(layout_variant, "small")) 12 else if (identical(layout_variant, "global")) 8 else 4
+  move_penalty_weight <- if (identical(layout_variant, "small")) 0.08 else if (identical(layout_variant, "global")) 0.05 else 0.2
 
   for (idx in seq_len(nrow(label_df))) {
     label_width <- max(units_per_px * 26, nchar(label_df$label[[idx]]) * char_width)
@@ -968,7 +1036,10 @@ bbmri_country_label_df <- function(countries, cfg, crs, label_codes = cfg$standa
     return(data.frame())
   }
 
-  projected <- sf::st_transform(sf::st_point_on_surface(label_countries), crs)
+  projected <- sf::st_transform(
+    sf::st_point_on_surface(sf::st_geometry(label_countries)),
+    crs
+  )
   coords <- sf::st_coordinates(projected)
   labels <- data.frame(
     iso_a2 = label_countries$iso_a2,
@@ -991,6 +1062,78 @@ bbmri_mapnik_marker_size <- function(marker_width, cfg) {
   marker_width / cfg$marker_width_scale
 }
 
+bbmri_assign_quality_point_style <- function(point_df, cfg) {
+  point_df$qual_id[is.na(point_df$qual_id)] <- "Other"
+  point_df$fill_color <- ifelse(
+    point_df$qual_id == "eric",
+    cfg$quality_colors$eric,
+    ifelse(
+      point_df$qual_id == "accredited",
+      cfg$quality_colors$accredited,
+      cfg$quality_colors$other
+    )
+  )
+  point_df$legend_label <- ifelse(
+    point_df$qual_id == "eric",
+    "ERIC label",
+    ifelse(point_df$qual_id == "accredited", "Accredited", "Other")
+  )
+  point_df$marker_width <- ifelse(
+    point_df$biobankType == "biobank",
+    bbmri_mapnik_marker_size(cfg$quality_marker_style$biobank_width, cfg),
+    bbmri_mapnik_marker_size(cfg$quality_marker_style$collection_width, cfg)
+  )
+  point_df$marker_alpha <- ifelse(
+    point_df$biobankType == "biobank",
+    cfg$quality_marker_style$alpha_biobank,
+    cfg$quality_marker_style$alpha_collection
+  )
+  point_df
+}
+
+bbmri_add_quality_point_layers <- function(plot, point_df, cfg) {
+  plot +
+    ggplot2::geom_point(
+      data = subset(point_df, biobankType == "biobank"),
+      ggplot2::aes(x = x, y = y, size = marker_width, fill = fill_color),
+      shape = 21,
+      stroke = 0.4,
+      colour = cfg$quality_colors$line,
+      alpha = cfg$quality_marker_style$alpha_biobank
+    ) +
+    ggplot2::geom_point(
+      data = subset(point_df, biobankType != "biobank"),
+      ggplot2::aes(x = x, y = y, size = marker_width, fill = fill_color),
+      shape = 21,
+      stroke = 0.35,
+      colour = cfg$quality_colors$line,
+      alpha = cfg$quality_marker_style$alpha_collection
+    ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_size_identity()
+}
+
+bbmri_add_quality_legend <- function(plot, bbox, crs, cfg) {
+  bbmri_add_circle_legend(
+    plot = plot,
+    entries = data.frame(
+      label = c("ERIC label", "Accredited", "Other"),
+      fill = c(cfg$quality_colors$eric, cfg$quality_colors$accredited, cfg$quality_colors$other),
+      colour = c(cfg$quality_colors$line, cfg$quality_colors$line, cfg$quality_colors$line),
+      stroke = c(0.4, 0.4, 0.4),
+      alpha = c(0.85, 0.85, 0.85),
+      size = c(2.8, 2.8, 2.8),
+      stringsAsFactors = FALSE
+    ),
+    bbox = bbox,
+    crs = crs,
+    box = cfg$quality_legend_box,
+    title = "Quality",
+    title_size = 2.6,
+    text_size = 2.3
+  )
+}
+
 bbmri_validate_geojson_columns <- function(obj, required_columns, label) {
   missing <- setdiff(required_columns, names(obj))
   if (length(missing) > 0) {
@@ -1004,19 +1147,19 @@ bbmri_validate_geojson_columns <- function(obj, required_columns, label) {
   invisible(obj)
 }
 
-bbmri_prepare_classic_layers <- function(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill) {
+bbmri_prepare_classic_layers <- function(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill, include_rivers = FALSE) {
   list(
     countries = bbmri_crop_to_bbox(fill_fn(bbmri_load_countries(), cfg), bbox),
     states = bbmri_crop_to_bbox(bbmri_load_states(), bbox),
     lakes = bbmri_crop_to_bbox(bbmri_load_lakes(), bbox),
-    rivers = bbmri_crop_to_bbox(bbmri_load_rivers(), bbox),
+    rivers = NULL,
     glaciers = bbmri_crop_to_bbox(bbmri_load_glaciers(), bbox),
     geo_lines = bbmri_crop_to_bbox(bbmri_load_geo_lines(), bbox)
   )
 }
 
 bbmri_add_classic_base <- function(plot, layers, bbox, crs, cfg) {
-  plot +
+  plot <- plot +
     ggplot2::geom_sf(
       data = layers$countries,
       ggplot2::aes(fill = fill_group),
@@ -1036,13 +1179,6 @@ bbmri_add_classic_base <- function(plot, layers, bbox, crs, cfg) {
       linewidth = 0.2
     ) +
     ggplot2::geom_sf(
-      data = layers$rivers,
-      colour = cfg$standard_colors$line,
-      linewidth = 0.15,
-      alpha = 0.4,
-      lineend = "round"
-    ) +
-    ggplot2::geom_sf(
       data = layers$geo_lines,
       colour = cfg$standard_colors$geo_line,
       linewidth = 0.18,
@@ -1055,7 +1191,9 @@ bbmri_add_classic_base <- function(plot, layers, bbox, crs, cfg) {
       linewidth = 0.2,
       alpha = 0.25,
       linetype = "dashed"
-    ) +
+    )
+
+  plot +
     bbmri_coord_sf(bbox, crs) +
     bbmri_void_theme(cfg$standard_colors$water)
 }
@@ -1113,8 +1251,120 @@ bbmri_add_standard_iarc <- function(plot, iarc_df, cfg, bbox, crs, output_width_
   )
 }
 
-bbmri_build_classic_standard_points_map <- function(points_path, bbox, export_sizes, cfg, iarc_path = NA_character_, output_variant = "med") {
-  layers <- bbmri_prepare_classic_layers(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill)
+bbmri_fractional_projected_point <- function(x_frac, y_frac, bbox, crs, projected_bbox = NULL) {
+  proj_bbox <- if (is.null(projected_bbox)) bbmri_projected_bbox(bbox, crs) else projected_bbox
+  bbmri_require_bbox(proj_bbox, "Legend projected bbox")
+  c(
+    x = proj_bbox[["xmin"]] + (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]) * x_frac,
+    y = proj_bbox[["ymin"]] + (proj_bbox[["ymax"]] - proj_bbox[["ymin"]]) * y_frac
+  )
+}
+
+bbmri_add_circle_legend <- function(
+  plot,
+  entries,
+  bbox,
+  crs,
+  box = list(x = 0.03, y = 0.04, width = 0.22, height = 0.15),
+  title = NA_character_,
+  background_fill = grDevices::adjustcolor("#ffffff", alpha.f = 0.90),
+  border_colour = "#bbbbbb",
+  title_size = 2.6,
+  text_size = 2.3,
+  point_size = 2.8,
+  title_family = bbmri_font_family(),
+  text_family = bbmri_font_family(),
+  title_fontface = "bold",
+  row_start_frac = NULL,
+  row_step_frac = NULL
+) {
+  stopifnot(is.data.frame(entries))
+  if (nrow(entries) == 0) {
+    return(plot)
+  }
+
+  projected_bbox <- bbmri_projected_bbox(bbox, crs)
+  lower_left <- bbmri_fractional_projected_point(box$x, box$y, bbox, crs, projected_bbox)
+  upper_right <- bbmri_fractional_projected_point(box$x + box$width, box$y + box$height, bbox, crs, projected_bbox)
+  box_width <- upper_right[["x"]] - lower_left[["x"]]
+  box_height <- upper_right[["y"]] - lower_left[["y"]]
+
+  plot <- plot + ggplot2::annotate(
+    "rect",
+    xmin = lower_left[["x"]],
+    xmax = upper_right[["x"]],
+    ymin = lower_left[["y"]],
+    ymax = upper_right[["y"]],
+    fill = background_fill,
+    colour = border_colour,
+    linewidth = 0.25
+  )
+
+  has_title <- !is.null(title) && !is.na(title) && nzchar(title)
+  top_margin <- 0.16
+  if (has_title) {
+    title_xy <- c(
+      x = lower_left[["x"]] + box_width * 0.08,
+      y = upper_right[["y"]] - box_height * 0.10
+    )
+    plot <- plot + ggplot2::annotate(
+      "text",
+      x = title_xy[["x"]],
+      y = title_xy[["y"]],
+      label = title,
+      hjust = 0,
+      vjust = 1,
+      size = title_size,
+      family = title_family,
+      fontface = title_fontface,
+      colour = "#222222"
+    )
+    top_margin <- 0.34
+  }
+
+  if (is.null(row_start_frac)) {
+    row_start_frac <- if (has_title) 1 - top_margin else 0.82
+  }
+  if (is.null(row_step_frac)) {
+    row_step_frac <- if (nrow(entries) > 1) 0.18 else 0
+  }
+  for (idx in seq_len(nrow(entries))) {
+    row_y_frac <- row_start_frac - (idx - 1) * row_step_frac
+    row_y <- lower_left[["y"]] + box_height * row_y_frac
+    point_x <- lower_left[["x"]] + box_width * 0.12
+    label_x <- lower_left[["x"]] + box_width * 0.22
+    entry <- entries[idx, , drop = FALSE]
+
+    plot <- plot +
+      ggplot2::annotate(
+        "point",
+        x = point_x,
+        y = row_y,
+        shape = 21,
+        size = if ("size" %in% names(entry)) entry$size[[1]] else point_size,
+        stroke = if ("stroke" %in% names(entry)) entry$stroke[[1]] else 0.4,
+        fill = entry$fill[[1]],
+        colour = if ("colour" %in% names(entry)) entry$colour[[1]] else "#333333",
+        alpha = if ("alpha" %in% names(entry)) entry$alpha[[1]] else 1.0
+      ) +
+      ggplot2::annotate(
+        "text",
+        x = label_x,
+        y = row_y,
+        label = entry$label[[1]],
+        hjust = 0,
+        vjust = 0.5,
+        size = text_size,
+        family = text_family,
+        colour = "#222222"
+      )
+  }
+
+  plot
+}
+
+bbmri_build_classic_standard_points_map <- function(points_path, bbox, export_sizes, cfg, iarc_path = NA_character_, output_variant = "med", include_rivers = FALSE, country_layout_variant = NULL) {
+  layers <- bbmri_prepare_classic_layers(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill, include_rivers = include_rivers)
   points <- bbmri_read_sf(points_path, "Biobank GeoJSON")
   iarc <- bbmri_read_optional_sf(iarc_path)
   country_label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
@@ -1137,6 +1387,10 @@ bbmri_build_classic_standard_points_map <- function(points_path, bbox, export_si
   } else {
     iarc_df <- NULL
   }
+  if (is.null(country_layout_variant)) {
+    country_layout_variant <- if (identical(output_variant, "small")) "small" else "default"
+  }
+
   country_labels <- bbmri_place_country_labels(
     country_labels,
     obstacle_df,
@@ -1144,7 +1398,7 @@ bbmri_build_classic_standard_points_map <- function(points_path, bbox, export_si
     crs = cfg$standard_crs,
     output_width_px = output_width_px,
     label_size_scale = country_label_style$size / cfg$standard_label_style$size,
-    layout_variant = if (identical(output_variant, "small")) "small" else "default"
+    layout_variant = country_layout_variant
   )
 
   plot <- bbmri_add_classic_base(
@@ -1304,16 +1558,24 @@ bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes) {
   )
 
   if (requireNamespace("svglite", quietly = TRUE)) {
-    ggplot2::ggsave(
-      filename = file.path(output_dir, paste0(prefix, ".svg")),
-      plot = plot,
-      width = unname(vector_size[["width"]]) / raster_dpi,
-      height = unname(vector_size[["height"]]) / raster_dpi,
-      units = "in",
-      bg = "white",
-      device = svglite::svglite,
-      limitsize = FALSE
+    svg_path <- file.path(output_dir, paste0(prefix, ".svg"))
+    do.call(
+      ggplot2::ggsave,
+      c(
+        list(
+          filename = svg_path,
+          plot = plot,
+          width = unname(vector_size[["width"]]) / raster_dpi,
+          height = unname(vector_size[["height"]]) / raster_dpi,
+          units = "in",
+          bg = "white",
+          device = svglite::svglite,
+          limitsize = FALSE
+        ),
+        bbmri_svg_device_args()
+      )
     )
+    bbmri_normalize_svg_font_families(svg_path)
   } else {
     message("Skipping SVG export because package 'svglite' is not installed.")
   }
@@ -1361,16 +1623,24 @@ bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix,
   )
 
   if (requireNamespace("svglite", quietly = TRUE)) {
-    ggplot2::ggsave(
-      filename = file.path(output_dir, paste0(prefix, ".svg")),
-      plot = vector_plot,
-      width = unname(vector_size[["width"]]) / raster_dpi,
-      height = unname(vector_size[["height"]]) / raster_dpi,
-      units = "in",
-      bg = "white",
-      device = svglite::svglite,
-      limitsize = FALSE
+    svg_path <- file.path(output_dir, paste0(prefix, ".svg"))
+    do.call(
+      ggplot2::ggsave,
+      c(
+        list(
+          filename = svg_path,
+          plot = vector_plot,
+          width = unname(vector_size[["width"]]) / raster_dpi,
+          height = unname(vector_size[["height"]]) / raster_dpi,
+          units = "in",
+          bg = "white",
+          device = svglite::svglite,
+          limitsize = FALSE
+        ),
+        bbmri_svg_device_args()
+      )
     )
+    bbmri_normalize_svg_font_families(svg_path)
   } else {
     message("Skipping SVG export because package 'svglite' is not installed.")
   }

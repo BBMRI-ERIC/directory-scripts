@@ -95,10 +95,10 @@ bbmri_map_config <- function() {
       big = c(4001, 3393)
     ),
     oec_export_sizes = make_export_sizes(
-      small = c(2400, 1400),
-      med = c(6000, 3500),
-      big = c(16000, 9333),
-      vector = c(3000, 1750)
+      small = c(1920, 1120),
+      med = c(4800, 2800),
+      big = c(12840, 7490),
+      vector = c(2400, 1400)
     ),
     global_export_sizes = scale_export_sizes(
       small = c(918, 509),
@@ -259,6 +259,18 @@ bbmri_map_config <- function() {
       size = 1.4,
       alpha = 0.95,
       colour = "#4a4a4a"
+    ),
+    fedplat_legend_box = list(
+      x = 0.03,
+      y = 0.05,
+      width = 0.22,
+      height = 0.13
+    ),
+    quality_legend_box = list(
+      x = 0.03,
+      y = 0.05,
+      width = 0.24,
+      height = 0.18
     ),
     quality_marker_style = list(
       collection_width = 10,

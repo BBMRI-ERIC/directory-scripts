@@ -16,7 +16,12 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
   export_sizes <- cfg$export_sizes
   country_label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
   output_width_px <- bbmri_output_width_px(export_sizes, output_variant)
-  layers <- bbmri_prepare_classic_layers(bbox, cfg, fill_fn = bbmri_assign_fedplat_country_fill)
+  layers <- bbmri_prepare_classic_layers(
+    bbox,
+    cfg,
+    fill_fn = bbmri_assign_fedplat_country_fill,
+    include_rivers = FALSE
+  )
   points <- bbmri_read_sf(points_path, "Federated-platform GeoJSON")
   bbmri_validate_geojson_columns(
     points,
@@ -113,6 +118,32 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
         colour = cfg$fedplat_colors$point_line
       )
   }
+
+  plot <- bbmri_add_circle_legend(
+    plot = plot,
+    entries = data.frame(
+      label = c("Locator biobank", "Finder biobank"),
+      fill = c(cfg$fedplat_colors$locator, cfg$fedplat_colors$finder),
+      colour = c(cfg$fedplat_colors$point_line, cfg$fedplat_colors$point_line),
+      stroke = c(0.4, 0.4),
+      alpha = c(0.85, 0.85),
+      size = c(2.8, 2.8),
+      stringsAsFactors = FALSE
+    ),
+    bbox = bbox,
+    crs = cfg$standard_crs,
+    box = cfg$fedplat_legend_box,
+    title = "Platform role",
+    title_size = 2.6,
+    text_size = 2.3,
+    title_family = "serif",
+    text_family = "serif",
+    row_start_frac = 0.56,
+    row_step_frac = 0.20
+  ) +
+    ggplot2::theme(
+      legend.position = "none"
+    )
 
   plot
 }

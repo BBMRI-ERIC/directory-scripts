@@ -72,6 +72,12 @@ bbmri_map_ids_for_set <- function(map_set) {
 }
 
 bbmri_normalize_map_selection <- function(maps_value = "", map_set = "all") {
+  if (is.null(maps_value) || identical(maps_value, FALSE) || identical(maps_value, TRUE)) {
+    maps_value <- ""
+  }
+  if (!is.character(maps_value) || length(maps_value) != 1) {
+    stop("Map selection must be a single string or empty.", call. = FALSE)
+  }
   if (!is.null(maps_value) && nzchar(maps_value)) {
     map_ids <- trimws(strsplit(maps_value, ",", fixed = TRUE)[[1]])
     map_ids <- map_ids[nzchar(map_ids)]
