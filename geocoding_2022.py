@@ -148,6 +148,16 @@ def cache_biobank_coordinates(
     }
 
 
+def format_coordinate_pair(coordinates):
+    """Return a compact human-readable coordinate pair for warnings."""
+    if not coordinates or len(coordinates) < 2:
+        return "unknown"
+    try:
+        return f"{float(coordinates[0]):.6f}, {float(coordinates[1]):.6f}"
+    except (TypeError, ValueError):
+        return f"{coordinates[0]!r}, {coordinates[1]!r}"
+
+
 def safe_geocode(query: str):
     """Resolve one geocoding query or disable live geocoding for this run."""
     global geolocator
@@ -304,15 +314,28 @@ def dmm_to_dd(coord: str):
     return decimal_degrees
 
 
+def _parse_decimal_coordinate_component(raw_value, label, minimum, maximum):
+    """Parse one stored decimal coordinate component and report its own issue."""
+    cleaned = re.sub(r',', r'.', str(raw_value))
+    try:
+        value = float(cleaned)
+    except (TypeError, ValueError) as exc:
+        return None, f"{label} parse error: {exc}"
+
+    if not (minimum <= value <= maximum):
+        return None, f"{label} out of range: {raw_value!r}"
+
+    return value, None
+
+
 def parse_decimal_coordinates(longitude_raw, latitude_raw):
     """Parse stored Directory coordinates into validated decimal lon/lat."""
-    longitude = float(re.sub(r',', r'.', longitude_raw))
-    latitude = float(re.sub(r',', r'.', latitude_raw))
+    longitude, longitude_issue = _parse_decimal_coordinate_component(longitude_raw, "longitude", -180, 180)
+    latitude, latitude_issue = _parse_decimal_coordinate_component(latitude_raw, "latitude", -90, 90)
 
-    if not (-180 <= longitude <= 180):
-        raise ValueError(f"longitude out of range: {longitude_raw!r}")
-    if not (-90 <= latitude <= 90):
-        raise ValueError(f"latitude out of range: {latitude_raw!r}")
+    issues = [issue for issue in (longitude_issue, latitude_issue) if issue]
+    if issues:
+        raise ValueError("; ".join(issues))
 
     return [longitude, latitude]
 
@@ -516,8 +539,9 @@ for index, biobank in filtered_df.iterrows():
                 if cachedBiobankCoordinates:
                     biobankGeometryDict['coordinates'] = cachedBiobankCoordinates
                     log.warning(
-                        '%s: replacing invalid stored coordinates with cached address-based fallback coordinates',
+                        '%s: replacing invalid stored coordinates with cached address-based fallback coordinates (%s)',
                         biobank['name'],
+                        format_coordinate_pair(cachedBiobankCoordinates),
                     )
                 elif contactID:
                     lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
@@ -540,8 +564,9 @@ for index, biobank in filtered_df.iterrows():
                             source = 'query_cache',
                         )
                         log.warning(
-                            '%s: replacing invalid stored coordinates with cached address-based geocoding result',
+                            '%s: replacing invalid stored coordinates with cached address-based geocoding result (%s)',
                             biobank['name'],
+                            format_coordinate_pair(coordinates),
                         )
                 if not biobankGeometryDict and contactID:
                     lookForCoordinatesFeatures = ['address', 'zip', 'city','country']
@@ -563,8 +588,9 @@ for index, biobank in filtered_df.iterrows():
                             source = 'geocoding',
                         )
                         log.warning(
-                            '%s: replacing invalid stored coordinates with address-based geocoding result',
+                            '%s: replacing invalid stored coordinates with address-based geocoding result (%s)',
                             biobank['name'],
+                            format_coordinate_pair(coordinates),
                         )
                     else:
                         log.warning(biobank['name'] + ": geocoding failed ")
