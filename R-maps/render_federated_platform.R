@@ -1,10 +1,22 @@
-cmd_args <- commandArgs(trailingOnly = FALSE)
-file_arg <- grep("^--file=", cmd_args, value = TRUE)
-script_dir <- if (length(file_arg) == 0) {
-  normalizePath(".", winslash = "/", mustWork = TRUE)
-} else {
-  normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE)
+bbmri_detect_rmaps_dir <- function() {
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE))
+  }
+  candidates <- c(
+    normalizePath(".", winslash = "/", mustWork = TRUE),
+    normalizePath(file.path(".", "R-maps"), winslash = "/", mustWork = FALSE)
+  )
+  for (candidate in unique(candidates)) {
+    if (file.exists(file.path(candidate, "map_config.R")) && file.exists(file.path(candidate, "map_common.R"))) {
+      return(candidate)
+    }
+  }
+  stop("Unable to locate the R-maps directory.", call. = FALSE)
 }
+
+script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
@@ -15,6 +27,8 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
   bbox <- cfg$classic_europe_bbox
   export_sizes <- cfg$export_sizes
   country_label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
+  symbol_scale <- bbmri_symbol_scale_for_output(cfg, output_variant)
+  line_scale <- bbmri_line_scale_for_output(cfg, output_variant)
   output_width_px <- bbmri_output_width_px(export_sizes, output_variant)
   layers <- bbmri_prepare_classic_layers(
     bbox,
@@ -36,7 +50,7 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
     cfg$fedplat_colors$finder,
     cfg$fedplat_colors$locator
   )
-  point_df$marker_width <- bbmri_mapnik_marker_size(10, cfg)
+  point_df$marker_width <- bbmri_mapnik_marker_size(10, cfg) * symbol_scale
   point_df <- bbmri_place_local_labels(
     point_df,
     bbox = bbox,
@@ -66,13 +80,14 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
     layers = layers,
     bbox = bbox,
     crs = cfg$standard_crs,
-    cfg = cfg
+    cfg = cfg,
+    output_variant = output_variant
   ) +
     ggplot2::geom_point(
       data = point_df,
       ggplot2::aes(x = x, y = y, fill = fill_color, size = marker_width),
       shape = 21,
-      stroke = 0.4,
+      stroke = 0.4 * line_scale,
       colour = cfg$fedplat_colors$point_line,
       alpha = 0.8
     ) +
@@ -112,8 +127,8 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
         data = iarc_df,
         ggplot2::aes(x = x, y = y),
         shape = 21,
-        size = cfg$standard_iarc_symbol$observer_size,
-        stroke = cfg$standard_iarc_symbol$observer_stroke,
+        size = cfg$standard_iarc_symbol$observer_size * symbol_scale,
+        stroke = cfg$standard_iarc_symbol$observer_stroke * line_scale,
         fill = cfg$standard_colors$iarc,
         colour = cfg$fedplat_colors$point_line
       )
@@ -138,6 +153,9 @@ build_federated_platform_map <- function(points_path, iarc_path = NA_character_,
     text_size = 2.3,
     title_family = "serif",
     text_family = "serif",
+    point_scale = symbol_scale,
+    stroke_scale = line_scale,
+    line_scale = line_scale,
     row_start_frac = 0.56,
     row_step_frac = 0.20
   ) +

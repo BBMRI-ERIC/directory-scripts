@@ -11,16 +11,29 @@ For a narrative, RStudio-friendly walkthrough, open
 Core maps:
 
 - `bbmri-members-nolabels`
+- `bbmri-members-labels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
 
 Extra maps:
 
 - `global-nolabels`
+- `global-labels`
+- `global-sized`
 - `covid-nolabels`
+- `covid-labels`
+- `covid-sized`
 - `quality_maps-nolabels`
 - `federated-platform`
 - `CRC-cohort-sized`
+- `rare-diseases-nolabels`
+- `rare-diseases-labels`
+- `rare-diseases-sized`
+- `strategic-objectives`
+
+Notes:
+- `rare-diseases-nolabels` and `rare-diseases-labels` use fixed-size circles; only `rare-diseases-sized` scales circles by biobank size.
+- global/covid country labels use a wider placement search on small/med variants to reduce overlap.
 
 ## Quick Start
 
@@ -33,7 +46,7 @@ sh R-maps/export.sh
 Render only the extra maps:
 
 ```bash
-sh R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
+sh R-maps/export.sh global-nolabels global-labels global-sized covid-nolabels covid-labels covid-sized quality_maps-nolabels federated-platform CRC-cohort-sized rare-diseases-nolabels rare-diseases-labels rare-diseases-sized strategic-objectives
 ```
 
 Render everything:
@@ -68,7 +81,7 @@ Shared inputs:
 
 1. `geocoding_2022.py` writes the full pilot GeoJSON
 2. helper prep scripts derive map-specific GeoJSONs when needed
-3. renderer scripts write `small` / `med` / `big` PNG and PDF outputs
+3. renderer scripts write `small` / `med` / `big` PNG, PDF, and SVG outputs
 
 `bbmri-members-OEC-all` uses a dedicated page size instead of the standard
 landscape exporter sheet. The current target `med` page is approximately
@@ -90,23 +103,52 @@ Derived GeoJSONs:
   COVID subset derived from the full pilot GeoJSON plus live Directory network metadata
 - `bbmri-directory-quality-pilot.geojson`
   Quality-map points derived from current Directory quality metadata
+- `bbmri-directory-rare-diseases-pilot.geojson`
+  Rare-disease subset derived from current Directory collections/networks
+
+Biobank label-bearing maps strip the `bbmri-eric:ID:` prefix from the visible
+label text. For `bbmri-members-sized`, a temporary overlap-tuning pass can be
+requested with `--biobank-label-layout-variant=spread`; for a wider temporary
+shim spread, use `--biobank-label-layout-variant=spreadwide`.
+
+Strategic-objectives maps use the TOML scaffold at
+`R-maps/data/strategic-objectives-template.toml`. The renderer can generate:
+
+- per-SG recolor views
+- per-SO recolor or bars views
+- global recolor or bars views
+
+The shared implementation lives in `R-maps/strategic_objectives_common.R` and
+is intentionally sourceable from either the repository root or `R-maps/`
+itself, so it can be explored directly in RStudio without shell wrappers.
+The bundled example script renders an SO2-only subset so you can inspect the
+three supported levels without needing the full objective matrix first.
 
 ## Data Sources
 
 Generated from current Directory/cache state:
 
 - `bbmri-members-nolabels`
+- `bbmri-members-labels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
 - `global-nolabels`
+- `global-labels`
+- `global-sized`
 - `covid-nolabels`
+- `covid-labels`
+- `covid-sized`
 - `quality_maps-nolabels`
+- `rare-diseases-nolabels`
+- `rare-diseases-labels`
+- `rare-diseases-sized`
 
 Snapshot-backed local inputs:
 
 - `R-maps/data/federated-platform.geojson`
 - `R-maps/data/CRC-Cohort.geojson`
 - `R-maps/data/CRC-Cohort-imaging.geojson`
+- `R-maps/data/strategic-objectives-template.toml`
 
 OEC overlays:
 
@@ -125,6 +167,15 @@ Rscript R-maps/render_global_nolabels.R \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
 
+The standalone renderer defaults now point to the current pilot GeoJSON files:
+
+- `bbmri-directory-pilot.geojson`
+- `bbmri-directory-covid-pilot.geojson`
+- `bbmri-directory-rare-diseases-pilot.geojson`
+
+That makes the scripts runnable directly from RStudio without manual path
+fixups.
+
 ```bash
 Rscript R-maps/render_quality_maps_nolabels.R \
   --input=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson \
@@ -136,6 +187,12 @@ Rscript R-maps/render_quality_maps_nolabels.R \
 Rscript R-maps/render_federated_platform.R \
   --input=/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson \
   --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+```bash
+Rscript R-maps/render_strategic_objectives.R \
+  --input=/home/hopet/codex/directory-scripts/R-maps/data/strategic-objectives-template.toml \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
 
@@ -152,6 +209,12 @@ Prep helpers can also be run directly:
   --output=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson
 ```
 
+```bash
+./.venv-maps/bin/python R-maps/prepare_rare_diseases_geojson.py \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson
+```
+
 ## Important Files
 
 - `map_config.R`
@@ -162,8 +225,18 @@ Prep helpers can also be run directly:
   COVID subset derivation helper
 - `prepare_quality_geojson.py`
   Quality-map GeoJSON derivation helper
+- `prepare_rare_diseases_geojson.py`
+  Rare-disease GeoJSON derivation helper
+- `prepare_strategic_objectives_spec.py`
+  TOML/JSON normalization helper for strategic-objectives maps
 - `render_pilot_maps.R`
   End-to-end runner used by `export.sh`
+- `strategic-objectives-template.toml`
+  Scaffold for future strategic-objectives visualization data
+- `strategic_objectives_common.R`
+  Shared helpers for SO/SG map data loading, summarization, and rendering
+- `render_strategic_objectives.R`
+  CLI entrypoint for strategic-objectives maps
 
 ## Outputs
 
@@ -175,6 +248,9 @@ Generated outputs go to `R-maps/pilot-output/` and include:
 - `*-small.pdf`
 - `*-med.pdf`
 - `*-big.pdf`
+- `*-small.svg`
+- `*-med.svg`
+- `*-big.svg`
 - `<prefix>.pdf`
 - `<prefix>.svg` when `svglite` is available
 

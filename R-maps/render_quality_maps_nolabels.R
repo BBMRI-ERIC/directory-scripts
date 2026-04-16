@@ -1,10 +1,22 @@
-cmd_args <- commandArgs(trailingOnly = FALSE)
-file_arg <- grep("^--file=", cmd_args, value = TRUE)
-script_dir <- if (length(file_arg) == 0) {
-  normalizePath(".", winslash = "/", mustWork = TRUE)
-} else {
-  normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE)
+bbmri_detect_rmaps_dir <- function() {
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE))
+  }
+  candidates <- c(
+    normalizePath(".", winslash = "/", mustWork = TRUE),
+    normalizePath(file.path(".", "R-maps"), winslash = "/", mustWork = FALSE)
+  )
+  for (candidate in unique(candidates)) {
+    if (file.exists(file.path(candidate, "map_config.R")) && file.exists(file.path(candidate, "map_common.R"))) {
+      return(candidate)
+    }
+  }
+  stop("Unable to locate the R-maps directory.", call. = FALSE)
 }
+
+script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
@@ -43,10 +55,11 @@ build_quality_maps_nolabels_map <- function(points_path, iarc_path = NA_characte
     layers = layers,
     bbox = bbox,
     crs = cfg$standard_crs,
-    cfg = cfg
+    cfg = cfg,
+    output_variant = output_variant
   )
-  plot <- bbmri_add_quality_point_layers(plot, point_df, cfg)
-  plot <- bbmri_add_quality_legend(plot, bbox, cfg$standard_crs, cfg)
+  plot <- bbmri_add_quality_point_layers(plot, point_df, cfg, output_variant = output_variant)
+  plot <- bbmri_add_quality_legend(plot, bbox, cfg$standard_crs, cfg, output_variant = output_variant)
 
   plot <- plot + bbmri_geom_text_halo(
     data = country_labels,
@@ -69,7 +82,8 @@ build_quality_maps_nolabels_map <- function(points_path, iarc_path = NA_characte
       cfg = cfg,
       bbox = bbox,
       crs = cfg$standard_crs,
-      output_width_px = output_width_px
+      output_width_px = output_width_px,
+      output_variant = output_variant
     )
   }
 

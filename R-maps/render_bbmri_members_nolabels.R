@@ -1,10 +1,22 @@
-cmd_args <- commandArgs(trailingOnly = FALSE)
-file_arg <- grep("^--file=", cmd_args, value = TRUE)
-script_dir <- if (length(file_arg) == 0) {
-  normalizePath(".", winslash = "/", mustWork = TRUE)
-} else {
-  normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE)
+bbmri_detect_rmaps_dir <- function() {
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE))
+  }
+  candidates <- c(
+    normalizePath(".", winslash = "/", mustWork = TRUE),
+    normalizePath(file.path(".", "R-maps"), winslash = "/", mustWork = FALSE)
+  )
+  for (candidate in unique(candidates)) {
+    if (file.exists(file.path(candidate, "map_config.R")) && file.exists(file.path(candidate, "map_common.R"))) {
+      return(candidate)
+    }
+  }
+  stop("Unable to locate the R-maps directory.", call. = FALSE)
 }
+
+script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
@@ -26,6 +38,8 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
 
   country_labels <- bbmri_country_label_df(countries, cfg, cfg$standard_crs)
   point_df <- bbmri_biobank_points_df(points, cfg$standard_crs, label = "biobank points")
+  symbol_scale <- bbmri_symbol_scale_for_output(cfg, output_variant)
+  line_scale <- bbmri_line_scale_for_output(cfg, output_variant)
   obstacle_df <- point_df[, c("x", "y")]
   if (identical(output_variant, "small")) {
     country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
@@ -52,14 +66,14 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
   )
 
   plot <- ggplot2::ggplot() +
-    ggplot2::geom_sf(data = countries, ggplot2::aes(fill = fill_group), colour = "white", linewidth = 0.2) +
-    ggplot2::geom_sf(data = states, colour = cfg$standard_colors$line, linewidth = 0.2, alpha = 0.25, linetype = "dashed") +
+    ggplot2::geom_sf(data = countries, ggplot2::aes(fill = fill_group), colour = "white", linewidth = 0.2 * line_scale) +
+    ggplot2::geom_sf(data = states, colour = cfg$standard_colors$line, linewidth = 0.2 * line_scale, alpha = 0.25, linetype = "dashed") +
     ggplot2::geom_point(
       data = point_df,
       ggplot2::aes(x = x, y = y, fill = fill_color),
       shape = 21,
-      size = 1.15,
-      stroke = 0.4,
+      size = 1.15 * symbol_scale,
+      stroke = 0.4 * line_scale,
       colour = cfg$standard_colors$biobank_line,
       alpha = 0.8
     ) +
@@ -86,7 +100,7 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
         data = iarc_df,
         ggplot2::aes(x = x, y = y),
         shape = 21,
-        size = iarc_symbol$halo_size,
+        size = iarc_symbol$halo_size * symbol_scale,
         stroke = 0,
         fill = "white",
         colour = "white"
@@ -95,8 +109,8 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
         data = iarc_df,
         ggplot2::aes(x = x, y = y),
         shape = 21,
-        size = iarc_symbol$observer_size,
-        stroke = iarc_symbol$observer_stroke,
+        size = iarc_symbol$observer_size * symbol_scale,
+        stroke = iarc_symbol$observer_stroke * line_scale,
         fill = cfg$standard_colors$iarc,
         colour = "black"
       ) +
@@ -104,8 +118,8 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
         data = iarc_df,
         ggplot2::aes(x = x, y = y),
         shape = 21,
-        size = iarc_symbol$biobank_size,
-        stroke = iarc_symbol$biobank_stroke,
+        size = iarc_symbol$biobank_size * symbol_scale,
+        stroke = iarc_symbol$biobank_stroke * line_scale,
         fill = cfg$standard_colors$biobank,
         colour = cfg$standard_colors$biobank_line
       ) +
@@ -146,7 +160,7 @@ save_members_nolabels_formats <- function(points_path, iarc_path, output_dir, pr
 
 main <- function() {
   args <- bbmri_parse_args(list(
-    input = normalizePath(file.path(script_dir, "..", "bbmri-directory.geojson"), winslash = "/", mustWork = FALSE),
+    input = normalizePath(file.path(script_dir, "..", "bbmri-directory-pilot.geojson"), winslash = "/", mustWork = FALSE),
     iarc = NA_character_,
     output_dir = file.path(script_dir, "output"),
     output_prefix = "bbmri-members-nolabels"

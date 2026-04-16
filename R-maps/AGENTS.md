@@ -10,13 +10,21 @@ This folder contains the in-progress R replacement for the legacy Tilemill map
 pipeline. The current target maps are:
 
 - `bbmri-members-nolabels`
+- `bbmri-members-labels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
 - `global-nolabels`
+- `global-labels`
+- `global-sized`
 - `covid-nolabels`
+- `covid-labels`
+- `covid-sized`
 - `quality_maps-nolabels`
 - `federated-platform`
 - `CRC-cohort-sized`
+- `rare-diseases-nolabels`
+- `rare-diseases-labels`
+- `rare-diseases-sized`
 
 The R code is responsible for rendering plus a small amount of map-specific
 GeoJSON derivation. The base full-Directory point export still starts from
@@ -33,11 +41,24 @@ are still the parity baseline and should remain documented here:
   - fixed-size biobank dots
   - no biobank labels
   - country labels still exist
+- `bbmri-members-labels`
+  - same standard Europe map and country palette as `nolabels`
+  - no rivers or lakes
+  - biobank labels are rendered
 - `bbmri-members-sized`
   - same standard Europe map and country palette as `nolabels`
   - no rivers or lakes
   - biobank dot size follows `biobankSize`
   - biobank labels use `biobankID`
+- `global-labels` / `covid-labels`
+  - world viewport
+  - classic geography layers
+  - biobank labels are rendered
+- `global-sized` / `covid-sized`
+  - world viewport
+  - classic geography layers
+  - biobank dot size follows `biobankSize`
+  - biobank labels are rendered except on `small`
 - `bbmri-members-OEC-all`
   - custom `tmerc` projection
   - white background
@@ -49,10 +70,11 @@ are still the parity baseline and should remain documented here:
 - `global-nolabels`
   - standard Mercator map
   - world viewport
-  - classic Tilemill geography layers, including lakes/rivers
+  - classic Tilemill geography layers, excluding rivers
   - fixed-size biobank dots
   - no biobank labels
   - country labels and `IARC` still exist
+  - country label placement uses the wider `globalwide` search on small/med variants to reduce overlap
 - `covid-nolabels`
   - same world viewport and classic geography as `global-nolabels`
   - fixed-size dots
@@ -65,6 +87,21 @@ are still the parity baseline and should remain documented here:
   - `qual_id='eric'` is orange
   - `qual_id='accredited'` is dark blue
   - `qual_id='Other'` must remain explicit in the GeoJSON contract
+- `rare-diseases-*`
+  - Europe viewport with classic geography layers
+  - derived from Directory collections plus RD network membership
+  - `rare-diseases-nolabels` and `rare-diseases-labels` use fixed-size circles
+  - only `rare-diseases-sized` should size circles by biobank size
+  - non-member biobanks are green
+  - member rare-disease biobanks keep the shared RD member color
+- `strategic-objectives`
+  - TOML-driven SO/SG framework with a shared reusable R helper layer
+  - per-SG maps are recolor-only
+  - per-SO and global maps can be either recolor or bars views
+  - global means one all-SO overview, not one output per objective
+  - country involvement is always layered on top of the shared BBMRI
+    member/observer/non-member colors for uninvolved countries
+  - the shared implementation should stay easy to source from RStudio
 - `federated-platform`
   - Europe viewport with classic geography layers
   - country palette differs from standard maps
@@ -105,18 +142,36 @@ document.
   OEC map with custom projection and overlay inputs.
 - `render_global_nolabels.R`
   World standard map.
+- `render_global_labels.R`
+  World standard map with biobank labels.
+- `render_global_sized.R`
+  World sized map with biobank labels.
 - `render_covid_nolabels.R`
   World COVID subset map.
+- `render_covid_labels.R`
+  World COVID subset map with biobank labels.
+- `render_covid_sized.R`
+  World COVID subset sized map with biobank labels.
 - `render_quality_maps_nolabels.R`
   Quality map renderer from derived quality GeoJSON.
 - `render_federated_platform.R`
   Federated-platform renderer from snapshot-backed GeoJSON.
 - `render_crc_cohort_sized.R`
   CRC cohort renderer from snapshot-backed main/imaging GeoJSON.
+- `render_rare_diseases_common.R`
+  Shared helper for rare-disease map variants.
+- `render_rare_diseases_nolabels.R`
+  Rare-disease Europe map without labels.
+- `render_rare_diseases_labels.R`
+  Rare-disease Europe map with labels.
+- `render_rare_diseases_sized.R`
+  Rare-disease Europe map with sized points and labels.
 - `prepare_covid_geojson.py`
   Helper that derives the COVID subset from the full pilot GeoJSON plus live Directory metadata.
 - `prepare_quality_geojson.py`
   Helper that derives the quality-map GeoJSON from current Directory quality metadata.
+- `prepare_rare_diseases_geojson.py`
+  Helper that derives the rare-disease GeoJSON from current Directory collections and networks.
 - `render_pilot_maps.R`
   End-to-end runner from cached Directory GeoJSON generation to the requested
   map set (`core`, `extras`, or `all`).
@@ -176,6 +231,13 @@ document.
 - `sized` biobank labels should use constrained local placement only. No long
   repel shifts and no connector lines.
 - `sized` biobank labels are plain black text. They do not use the white halo.
+- `sized` should not render biobank labels on `small` outputs.
+- `bbmri-members-sized` supports temporary label-layout tuning via
+  `--biobank-label-layout-variant=spread` and the wider
+  `--biobank-label-layout-variant=spreadwide` variant for visual review.
+- In sized maps, smaller circles should be rendered above larger circles.
+- Biobank id labels must strip the `bbmri-eric:ID:` prefix in every map family
+  that shows biobank labels.
 - Country labels are uppercase and use the shared white halo treatment.
 - `nolabels` may optimize country-label positions locally to avoid biobank-dot
   overlap. `sized` currently does not.
@@ -188,9 +250,19 @@ document.
   not silently replace them with guessed live derivations.
 - `quality_maps-nolabels` and `covid-nolabels` are derived from current data
   and should stay reproducible from the current cache/Directory state.
+- `rare-diseases-*` is derived from current Directory collections and network
+  membership plus the full pilot GeoJSON. The inclusion rule is OR-combined:
+  keep biobanks with at least one RD collection or with RD network membership.
+  Biobanks in non-member countries or in the non-member RD network should be
+  colored green.
 - `quality_maps-nolabels` must use the standard BBMRI country fill path for
   countries and add its quality-specific colors only for points/legend.
   Quality rendering must not override the shared country fill scale.
+- Member/observer country coloring must stay consistent across all
+  standard/classic maps and must be driven centrally from
+  `cfg$standard_country_groups` plus `bbmri_assign_standard_country_fill(...)`.
+  Extra map-specific semantics may only overlay on top of that shared base
+  rule rather than replacing it.
 - For `OEC-all`, country polygons, HQ/NN boxes, and biobank dots must share the
   same `sf` geometry rendering path. Do not reintroduce manual projected `x/y`
   plotting for normal symbols in that map.
@@ -484,6 +556,9 @@ blocked on the answer; that part was faster locally.
   - `*-small.pdf`
   - `*-med.pdf`
   - `*-big.pdf`
+  - `*-small.svg`
+  - `*-med.svg`
+  - `*-big.svg`
   - default `<prefix>.pdf`
   - default `<prefix>.svg` when `svglite` is available
 - Raster exports are generated with fixed physical size plus varying DPI, not

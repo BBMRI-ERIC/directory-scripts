@@ -25,6 +25,9 @@ Rscript R-maps/render_bbmri_members_sized.R \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
 
+For temporary overlap tuning in the sized map, add
+`--biobank-label-layout-variant=spread`.
+
 ### `OEC-all`
 
 ```bash
@@ -54,6 +57,38 @@ Rscript R-maps/render_covid_nolabels.R \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
 
+### `global-labels` / `global-sized`
+
+```bash
+Rscript R-maps/render_global_labels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+```bash
+Rscript R-maps/render_global_sized.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+### `covid-labels` / `covid-sized`
+
+```bash
+Rscript R-maps/render_covid_labels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+```bash
+Rscript R-maps/render_covid_sized.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
 ### `quality_maps-nolabels`
 
 ```bash
@@ -62,6 +97,18 @@ Rscript R-maps/render_quality_maps_nolabels.R \
   --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
+
+### `strategic-objectives`
+
+```bash
+Rscript R-maps/render_strategic_objectives.R \
+  --input=/home/hopet/codex/directory-scripts/R-maps/data/strategic-objectives-template.toml \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+For interactive work in RStudio, source `R-maps/strategic_objectives_common.R`
+from either the repository root or from `R-maps/` directly. The helper now
+finds the folder in both cases.
 
 ### `federated-platform`
 
@@ -82,6 +129,30 @@ Rscript R-maps/render_crc_cohort_sized.R \
   --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
 ```
 
+### `rare-diseases-*`
+
+```bash
+./.venv-maps/bin/python R-maps/prepare_rare_diseases_geojson.py \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson
+```
+
+```bash
+Rscript R-maps/render_rare_diseases_labels.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+```bash
+Rscript R-maps/render_rare_diseases_sized.R \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson \
+  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
+  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+```
+
+`rare-diseases-nolabels` and `rare-diseases-labels` keep fixed-size circles; `rare-diseases-sized` is the only rare-disease variant that scales circles by biobank size.
+
 ## 2. Regenerate The Full Pilot Set
 
 ### Bash wrapper
@@ -91,7 +162,7 @@ sh R-maps/export.sh
 ```
 
 ```bash
-sh R-maps/export.sh global-nolabels covid-nolabels quality_maps-nolabels federated-platform CRC-cohort-sized
+sh R-maps/export.sh global-nolabels global-labels global-sized covid-nolabels covid-labels covid-sized quality_maps-nolabels federated-platform CRC-cohort-sized rare-diseases-nolabels rare-diseases-labels rare-diseases-sized strategic-objectives
 ```
 
 ```bash
@@ -128,6 +199,9 @@ Useful starting points:
 - `R-maps/examples/03_legends_and_overlays.R`
 - `R-maps/examples/04_complex_overlay_template.R`
 
+The biobank label helpers strip the `bbmri-eric:ID:` prefix before rendering.
+That is the expected behavior for all label-bearing maps.
+
 ### Built-in Map Sets
 
 The R runner also understands named sets:
@@ -151,10 +225,16 @@ Rscript R-maps/render_pilot_maps.R --map-set=all
   --output=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson
 ```
 
+```bash
+./.venv-maps/bin/python R-maps/prepare_rare_diseases_geojson.py \
+  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
+  --output=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson
+```
+
 ## 4. Fast Parse Check
 
 ```bash
-Rscript -e 'for (f in c("R-maps/map_config.R","R-maps/map_common.R","R-maps/render_bbmri_members_nolabels.R","R-maps/render_bbmri_members_sized.R","R-maps/render_bbmri_members_oec_all.R","R-maps/render_global_nolabels.R","R-maps/render_covid_nolabels.R","R-maps/render_quality_maps_nolabels.R","R-maps/render_federated_platform.R","R-maps/render_crc_cohort_sized.R","R-maps/render_pilot_maps.R")) parse(file=f)'
+Rscript -e 'for (f in c("R-maps/map_config.R","R-maps/map_common.R","R-maps/render_bbmri_members_nolabels.R","R-maps/render_bbmri_members_sized.R","R-maps/render_bbmri_members_labels.R","R-maps/render_bbmri_members_oec_all.R","R-maps/render_global_nolabels.R","R-maps/render_global_labels.R","R-maps/render_global_sized.R","R-maps/render_covid_nolabels.R","R-maps/render_covid_labels.R","R-maps/render_covid_sized.R","R-maps/render_quality_maps_nolabels.R","R-maps/render_federated_platform.R","R-maps/render_crc_cohort_sized.R","R-maps/render_rare_diseases_common.R","R-maps/render_rare_diseases_nolabels.R","R-maps/render_rare_diseases_labels.R","R-maps/render_rare_diseases_sized.R","R-maps/render_pilot_maps.R")) parse(file=f)'
 ```
 
 ## 5. Verify Output Presence

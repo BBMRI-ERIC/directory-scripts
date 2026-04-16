@@ -19,26 +19,32 @@ bbmri_detect_rmaps_dir <- function() {
 script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
+source(file.path(script_dir, "render_bbmri_members_sized.R"))
 
-build_covid_nolabels_map <- function(points_path, iarc_path = NA_character_, output_variant = "med") {
+build_global_sized_map <- function(points_path, iarc_path = NA_character_, output_variant = "med") {
   bbmri_require_packages(c("ggplot2", "sf"))
   cfg <- bbmri_map_config()
-  bbmri_build_classic_standard_points_map(
+  bbmri_build_sized_biobank_map(
     points_path = points_path,
     bbox = cfg$global_bbox,
     export_sizes = cfg$global_export_sizes,
     cfg = cfg,
     iarc_path = iarc_path,
     output_variant = output_variant,
-    include_rivers = FALSE
+    country_layout_variant = if (identical(output_variant, "big")) "global" else "globalwide",
+    include_rivers = FALSE,
+    include_biobank_labels = TRUE,
+    omit_biobank_labels_on_small = TRUE,
+    biobank_label_column = "biobankID",
+    biobank_label_layout_variant = if (identical(output_variant, "small")) "global" else if (identical(output_variant, "med")) "spread" else "default"
   )
 }
 
-save_covid_nolabels_formats <- function(points_path, iarc_path, output_dir, prefix) {
+save_global_sized_formats <- function(points_path, iarc_path, output_dir, prefix) {
   cfg <- bbmri_map_config()
   bbmri_save_plot_formats_from_builder(
     build_plot = function(output_variant) {
-      build_covid_nolabels_map(points_path, iarc_path, output_variant = output_variant)
+      build_global_sized_map(points_path, iarc_path, output_variant = output_variant)
     },
     output_dir = output_dir,
     prefix = prefix,
@@ -48,13 +54,13 @@ save_covid_nolabels_formats <- function(points_path, iarc_path, output_dir, pref
 
 main <- function() {
   args <- bbmri_parse_args(list(
-    input = normalizePath(file.path(script_dir, "..", "bbmri-directory-covid-pilot.geojson"), winslash = "/", mustWork = FALSE),
+    input = normalizePath(file.path(script_dir, "..", "bbmri-directory-pilot.geojson"), winslash = "/", mustWork = FALSE),
     iarc = NA_character_,
     output_dir = file.path(script_dir, "output"),
-    output_prefix = "covid-nolabels"
+    output_prefix = "global-sized"
   ))
 
-  save_covid_nolabels_formats(args$input, args$iarc, args$output_dir, args$output_prefix)
+  save_global_sized_formats(args$input, args$iarc, args$output_dir, args$output_prefix)
 }
 
 if (sys.nframe() == 0) {

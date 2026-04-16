@@ -133,6 +133,7 @@ labels <- bbmri_country_label_df(
 Legends are configured through the same shared framework as the plots:
 
 - `bbmri_add_circle_legend()` for generic symbol legends
+- `bbmri_add_rect_legend()` for stacked-bar and involvement swatches
 - `bbmri_add_quality_legend()` for quality-map semantics
 
 To move or resize a legend, change the box in `bbmri_map_config()` rather than
@@ -184,6 +185,27 @@ The `R-maps/examples/` directory contains short, runnable recipe scripts:
   - show overlay and legend composition
 - `04_complex_overlay_template.R`
   - template for more complex per-entity visualizations
+- `05_strategic_objectives_template.R`
+  - inspect the strategic-objectives TOML scaffold in RStudio
+- `06_strategic_objectives_maps.R`
+  - render the strategic-objectives family from the TOML scaffold, filtered to SO2
+- `render_bbmri_members_labels.R`, `render_global_labels.R`, `render_covid_labels.R`
+  - label variants with shared prefix stripping for biobank ids
+- `render_global_sized.R`, `render_covid_sized.R`
+  - sized variants for the global and COVID views
+- `render_rare_diseases_*.R`
+  - rare-disease maps from the dedicated prep helper
+
+For temporary overlap tuning in the sized member map, run the renderer with
+`--biobank-label-layout-variant=spread` and inspect the resulting outputs. If
+you need a wider experimental shim spread, use
+`--biobank-label-layout-variant=spreadwide`.
+
+The standalone renderer scripts default to the current pilot GeoJSON files:
+
+- `bbmri-directory-pilot.geojson`
+- `bbmri-directory-covid-pilot.geojson`
+- `bbmri-directory-rare-diseases-pilot.geojson`
 
 ## Notes On RStudio Usage
 

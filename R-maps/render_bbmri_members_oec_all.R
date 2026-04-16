@@ -1,10 +1,22 @@
-cmd_args <- commandArgs(trailingOnly = FALSE)
-file_arg <- grep("^--file=", cmd_args, value = TRUE)
-script_dir <- if (length(file_arg) == 0) {
-  normalizePath(".", winslash = "/", mustWork = TRUE)
-} else {
-  normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE)
+bbmri_detect_rmaps_dir <- function() {
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(normalizePath(dirname(sub("^--file=", "", file_arg[[1]])), winslash = "/", mustWork = TRUE))
+  }
+  candidates <- c(
+    normalizePath(".", winslash = "/", mustWork = TRUE),
+    normalizePath(file.path(".", "R-maps"), winslash = "/", mustWork = FALSE)
+  )
+  for (candidate in unique(candidates)) {
+    if (file.exists(file.path(candidate, "map_config.R")) && file.exists(file.path(candidate, "map_common.R"))) {
+      return(candidate)
+    }
+  }
+  stop("Unable to locate the R-maps directory.", call. = FALSE)
 }
+
+script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
@@ -536,7 +548,9 @@ bbmri_oec_panel_plot <- function(
   iarc_sf = NULL,
   draw_iarc_label = FALSE,
   frame = NULL,
-  draw_node_lines = TRUE
+  draw_node_lines = TRUE,
+  symbol_scale = 1.0,
+  line_scale = 1.0
 ) {
   iarc_symbol <- cfg$oec_iarc_symbol
 
@@ -545,21 +559,21 @@ bbmri_oec_panel_plot <- function(
       data = countries,
       ggplot2::aes(fill = fill_group),
       colour = cfg$oec_colors$country_line,
-      linewidth = 0.45
+      linewidth = 0.45 * line_scale
     ) +
     ggplot2::scale_fill_identity()
 
   if (isTRUE(draw_node_lines) && nrow(node_lines) > 0) {
-    plot <- plot +
+      plot <- plot +
       ggplot2::geom_sf(
         data = node_lines,
         colour = "white",
-        linewidth = 0.28
+        linewidth = 0.28 * line_scale
       ) +
       ggplot2::geom_sf(
         data = node_lines,
         colour = cfg$oec_colors$hq,
-        linewidth = 0.12
+        linewidth = 0.12 * line_scale
       )
   }
 
@@ -567,8 +581,8 @@ bbmri_oec_panel_plot <- function(
     plot <- plot + ggplot2::geom_sf(
       data = point_sf,
       shape = 21,
-      size = 1.1,
-      stroke = 0.25,
+      size = 1.1 * symbol_scale,
+      stroke = 0.25 * line_scale,
       fill = cfg$oec_colors$biobank_fill,
       colour = cfg$oec_colors$biobank
     )
@@ -581,8 +595,8 @@ bbmri_oec_panel_plot <- function(
       plot <- plot + ggplot2::geom_sf(
         data = node_nn,
         shape = 22,
-        size = 2.5,
-        stroke = 0.7,
+        size = 2.5 * symbol_scale,
+        stroke = 0.7 * line_scale,
         fill = cfg$oec_colors$hq,
         colour = "white"
       )
@@ -591,8 +605,8 @@ bbmri_oec_panel_plot <- function(
       plot <- plot + ggplot2::geom_sf(
         data = node_hq,
         shape = 22,
-        size = 3.2,
-        stroke = 0.7,
+        size = 3.2 * symbol_scale,
+        stroke = 0.7 * line_scale,
         fill = cfg$oec_colors$hq,
         colour = "white"
       )
@@ -608,7 +622,7 @@ bbmri_oec_panel_plot <- function(
       ggplot2::geom_sf(
         data = iarc_sf,
         shape = 21,
-        size = iarc_symbol$halo_size,
+        size = iarc_symbol$halo_size * symbol_scale,
         stroke = 0,
         fill = "white",
         colour = "white"
@@ -616,24 +630,24 @@ bbmri_oec_panel_plot <- function(
       ggplot2::geom_sf(
         data = iarc_sf,
         shape = 21,
-        size = iarc_symbol$observer_size,
-        stroke = iarc_symbol$observer_stroke,
+        size = iarc_symbol$observer_size * symbol_scale,
+        stroke = iarc_symbol$observer_stroke * line_scale,
         fill = cfg$oec_colors$observer,
         colour = "black"
       ) +
       ggplot2::geom_sf(
         data = iarc_node_sf,
         shape = 22,
-        size = iarc_symbol$node_size,
-        stroke = iarc_symbol$node_stroke,
+        size = iarc_symbol$node_size * symbol_scale,
+        stroke = iarc_symbol$node_stroke * line_scale,
         fill = cfg$oec_colors$hq,
         colour = "white"
       ) +
       ggplot2::geom_sf(
         data = iarc_biobank_sf,
         shape = 21,
-        size = iarc_symbol$biobank_size,
-        stroke = iarc_symbol$biobank_stroke,
+        size = iarc_symbol$biobank_size * symbol_scale,
+        stroke = iarc_symbol$biobank_stroke * line_scale,
         fill = cfg$oec_colors$biobank_fill,
         colour = cfg$oec_colors$biobank
       )
@@ -668,11 +682,11 @@ bbmri_oec_panel_plot <- function(
   }
 
   if (!is.null(frame)) {
-    plot <- plot + ggplot2::theme(
+        plot <- plot + ggplot2::theme(
       panel.border = ggplot2::element_rect(
         fill = frame$background_fill,
         colour = frame$border_colour,
-        linewidth = frame$border_linewidth
+        linewidth = frame$border_linewidth * line_scale
       ),
       plot.margin = ggplot2::margin(0, 0, 0, 0)
     )
@@ -689,12 +703,15 @@ build_members_oec_all_map <- function(
   iarc_path,
   node_points_path,
   node_lines_path,
+  output_variant = "med",
   device_width_in = 10,
   device_height_in = 10
 ) {
   bbmri_require_packages(c("ggplot2", "sf", "cowplot"))
 
   cfg <- bbmri_map_config()
+  symbol_scale <- bbmri_symbol_scale_for_output(cfg, output_variant)
+  line_scale <- bbmri_line_scale_for_output(cfg, output_variant)
   countries_all <- bbmri_assign_oec_country_fill(bbmri_load_countries(), cfg)
   points <- bbmri_read_sf(points_path, "Member biobank GeoJSON")
   iarc <- bbmri_read_sf(iarc_path, "IARC overlay")
@@ -751,7 +768,9 @@ build_members_oec_all_map <- function(
     bbox = cfg$oec_bbox,
     projected_bbox = main_projected_bbox,
     iarc_sf = iarc_sf,
-    draw_iarc_label = TRUE
+    draw_iarc_label = TRUE,
+    symbol_scale = symbol_scale,
+    line_scale = line_scale
   )
 
   main_plot_aspect <- {
@@ -812,7 +831,9 @@ build_members_oec_all_map <- function(
       iarc_sf = NULL,
       draw_iarc_label = FALSE,
       frame = inset_cfg$frame,
-      draw_node_lines = FALSE
+      draw_node_lines = FALSE,
+      symbol_scale = symbol_scale,
+      line_scale = line_scale
     )
     if (nrow(inset_cfg$node_points) > 0) {
       inset_label_sf <- bbmri_shift_sf_points(
@@ -917,13 +938,13 @@ build_members_oec_all_map <- function(
         x = c(connector_x, inset_end_x),
         y = c(connector_y, inset_end_y),
         colour = "white",
-        linewidth = inset_cfg$connector$linewidth + 0.16
+        linewidth = (inset_cfg$connector$linewidth + 0.16) * line_scale
       ) +
       cowplot::draw_line(
         x = c(connector_x, inset_end_x),
         y = c(connector_y, inset_end_y),
         colour = cfg$oec_colors$hq,
-        linewidth = inset_cfg$connector$linewidth
+        linewidth = inset_cfg$connector$linewidth * line_scale
       )
   }
 
@@ -933,8 +954,8 @@ build_members_oec_all_map <- function(
       x = hq_overlay_xy[["x"]],
       y = hq_overlay_xy[["y"]],
       shape = 22,
-      size = 3.2,
-      stroke = 0.7,
+      size = 3.2 * symbol_scale,
+      stroke = 0.7 * line_scale,
       fill = cfg$oec_colors$hq,
       colour = "white"
     )
@@ -961,6 +982,7 @@ bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
       iarc_path = args$iarc,
       node_points_path = args$node_points,
       node_lines_path = args$node_lines,
+      output_variant = name,
       device_width_in = width_in,
       device_height_in = height_in
     )
@@ -983,6 +1005,12 @@ bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
       bg = "white",
       limitsize = FALSE
     )
+    bbmri_save_svg_variant(
+      plot = plot,
+      path = file.path(args$output_dir, paste0(args$output_prefix, "-", name, ".svg")),
+      size = size,
+      raster_dpi = pdf_dpi
+    )
   }
 
   vector_plot <- build_members_oec_all_map(
@@ -990,6 +1018,7 @@ bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
     iarc_path = args$iarc,
     node_points_path = args$node_points,
     node_lines_path = args$node_lines,
+    output_variant = "vector",
     device_width_in = vector_width_in,
     device_height_in = vector_height_in
   )

@@ -11,6 +11,8 @@ EXAMPLE_SCRIPTS = [
     Path("R-maps/examples/02_country_labels_and_coloring.R"),
     Path("R-maps/examples/03_legends_and_overlays.R"),
     Path("R-maps/examples/04_complex_overlay_template.R"),
+    Path("R-maps/examples/05_strategic_objectives_template.R"),
+    Path("R-maps/examples/06_strategic_objectives_maps.R"),
 ]
 
 

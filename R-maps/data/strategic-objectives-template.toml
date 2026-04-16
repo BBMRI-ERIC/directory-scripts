@@ -1,0 +1,108 @@
+schema_version = 1
+note = "Fill in strategic objectives and goals for BBMRI-ERIC implementation involvement. Keep country codes uppercase and preserve the lead/contributor distinction at goal level."
+
+[[objectives]]
+id = "SO1"
+title = ""
+description = ""
+
+[[objectives]]
+id = "SO2"
+title = "SO2"
+description = "Current worked example scaffold for strategic-objective maps."
+
+  [[objectives.goals]]
+  id = "SO2.1"
+  title = ""
+  description = ""
+  contributors_nn = ["AT", "BG", "CY", "CZ", "DE", "GR", "HU", "LT", "LV"]
+  contributions_hq = ["HQ-IT", "QM", "ELSI"]
+  co_leads = [
+    { country = "IT", names = ["Matteo Pallocca"] },
+    { country = "NO", names = ["Kristian Hveem"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO2.2"
+  title = ""
+  description = ""
+  contributors_nn = ["AT", "CY", "DE", "ES", "GR", "HU", "IT", "NL"]
+  contributions_hq = ["HQ-IT", "QM", "BBD"]
+  co_leads = [
+    { country = "CH", names = ["Joséphine Uldry", "Flavien Delhaes"] },
+    { country = "PL", names = ["Agnieszka Matera-Witkiewicz", "Błażej Marciniak"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO2.3"
+  title = ""
+  description = ""
+  contributors_nn = ["CZ", "DE", "ES", "GR", "HU", "IT", "LV", "MT", "NL", "SI"]
+  contributions_hq = ["HQ-IT", "BBD"]
+  co_leads = [
+    { country = "AT", names = ["Georg Göbel", "Volodymyr Shekhovtsov"] },
+    { country = "NO", names = ["Therese Haugdahl Nøst"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO2.4"
+  title = ""
+  description = ""
+  contributors_nn = ["AT", "CY", "DE", "ES", "GR", "IT", "LT", "PL"]
+  contributions_hq = ["HQ-IT", "BBD"]
+  co_leads = [
+    { country = "CZ", names = ["Zdenka Dudova", "Radoslava Kacova"] },
+    { country = "SE", names = ["Tomas Snäckerström", "Peter Hedman"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO2.5"
+  title = ""
+  description = ""
+  contributors_nn = ["MT"]
+  contributions_hq = []
+  co_leads = [
+    { country = "LT", names = ["Arvydas Laurinavičius", "Dovilė Žilėnaitė-Petrulienė"] },
+    { country = "HQ-IT", names = ["Heimo Müller"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO2.6"
+  title = ""
+  description = ""
+  contributors_nn = ["GR", "LV"]
+  contributions_hq = ["BBD"]
+  co_leads = [
+    { country = "CZ", names = ["Zdenka Dudova", "Radoslava Kacova"] },
+    { country = "HQ-IT", names = ["Andreas Türk"] }
+  ]
+
+[[objectives]]
+id = "SO3"
+title = ""
+description = ""
+
+[[objectives]]
+id = "SO4"
+title = ""
+description = ""
+
+[[objectives]]
+id = "SO5"
+title = ""
+description = ""
+
+[[objectives]]
+id = "SO6"
+title = ""
+description = ""
+
+[[objectives]]
+id = "SO7"
+title = ""
+description = ""
+
+[[objectives]]
+id = "SO8"
+title = ""
+description = ""

@@ -14,13 +14,21 @@ GeoJSON source.
 Implemented renderers:
 
 - `bbmri-members-nolabels`
+- `bbmri-members-labels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
 - `global-nolabels`
+- `global-labels`
+- `global-sized`
 - `covid-nolabels`
+- `covid-labels`
+- `covid-sized`
 - `quality_maps-nolabels`
 - `federated-platform`
 - `CRC-cohort-sized`
+- `rare-diseases-nolabels`
+- `rare-diseases-labels`
+- `rare-diseases-sized`
 
 Implemented outputs:
 
@@ -41,6 +49,12 @@ Human-facing docs now live in:
 - `/home/hopet/codex/directory-scripts/R-maps/README.Rmd`
 - `/home/hopet/codex/directory-scripts/R-maps/examples/`
 
+The map framework now has a shared sized-map helper for all biobank-point
+families, plus a rare-disease prep path driven from Directory collections and
+networks. Biobank-id labels should strip the `bbmri-eric:ID:` prefix in every
+label-bearing map, and sized maps should keep smaller circles on top of larger
+ones. `small` sized variants continue to suppress biobank labels.
+
 Use `README.Rmd` and the example scripts for RStudio-driven maintenance and
 framework walkthroughs.
 
@@ -56,6 +70,7 @@ Pilot GeoJSON inputs:
 - `/home/hopet/codex/directory-scripts/bbmri-directory-members-pilot.geojson`
 - `/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson`
 - `/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson`
+- `/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson`
 
 Current OEC overlay inputs:
 
@@ -179,6 +194,13 @@ review should prefer tighter and better-balanced whitespace.
   - classic geography layers
   - quality points from `prepare_quality_geojson.py`
   - collection points are usually more numerous than biobank points
+- `strategic-objectives`
+  - TOML-driven SO/SG renderer with a shared helper layer
+  - per-SG = recolor only
+  - per-SO and global = recolor or bars
+  - global = one all-SO overview
+  - designed to be sourced from RStudio as a small helper library, not just
+    run through the shell wrapper
 - `federated-platform`
   - Europe viewport
   - snapshot-backed local GeoJSON input
@@ -218,6 +240,7 @@ Practical consequence:
 - the same dot/text sizes now stay visually comparable across `small`, `med`,
   and `big`
 - size-specific PDFs are also written
+- size-specific SVGs are also written
 
 ## Current Visual State
 

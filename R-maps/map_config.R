@@ -146,13 +146,25 @@ bbmri_map_config <- function() {
     country_label_scale_by_output = c(
       small = 0.6,
       med = 1.0,
-      big = 1.0,
+      big = 4.0,
       vector = 1.0
     ),
     country_label_halo_scale_by_output = c(
       small = 0.5,
       med = 1.0,
-      big = 1.0,
+      big = 4.0,
+      vector = 1.0
+    ),
+    symbol_scale_by_output = c(
+      small = 1.0,
+      med = 1.0,
+      big = 3.0,
+      vector = 1.0
+    ),
+    line_scale_by_output = c(
+      small = 1.0,
+      med = 1.0,
+      big = 2.0,
       vector = 1.0
     ),
     standard_iarc_symbol = list(
@@ -243,6 +255,32 @@ bbmri_map_config <- function() {
       cohort_line = "#813",
       standalone = "#FFCCCC",
       imaging = "#00CC00"
+    ),
+    rd_colors = list(
+      non_member = "#00AA00",
+      member = "#FF0066"
+    ),
+    so_colors = list(
+      lead = "#E66101",
+      contributor = "#5E3C99",
+      base_member = "#0098cc",
+      base_observer = "#7fdfff",
+      base_nonmember = "#cccccc",
+      bar_border = "#333333",
+      bar_background = "#ffffff"
+    ),
+    so_bar_style = list(
+      cluster_width_frac = 0.18,
+      bar_width_frac = 0.015,
+      bar_gap_frac = 0.004,
+      unit_height_frac = 0.020,
+      baseline_offset_frac = 0.010,
+      outline_linewidth = 0.18,
+      alpha = 0.88
+    ),
+    so_global_bar_style = list(
+      width_scale = 0.50,
+      height_scale = 0.80
     ),
     oec_colors = list(
       background = "#ffffff",
