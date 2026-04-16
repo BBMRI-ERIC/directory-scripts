@@ -3,8 +3,40 @@ note = "Fill in strategic objectives and goals for BBMRI-ERIC implementation inv
 
 [[objectives]]
 id = "SO1"
-title = ""
-description = ""
+title = "SO1"
+description = "Work programme entries for SO1 implementation involvement."
+
+  [[objectives.goals]]
+  id = "SO1.1"
+  title = "Engage with different Member State ministries"
+  description = ""
+  contributors_nn = ["MT"]
+  contributions_hq = ["BBD"]
+  co_leads = [
+    { country = "HQ-PA", names = ["Johanna Kostenzer"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO1.2"
+  title = "Scale up interactions and alliances with other research infrastructures and initiatives"
+  description = ""
+  contributors_nn = ["AT", "BE", "BG", "CZ", "ES", "GR", "IARC/WHO", "LT", "LV", "NL", "SI"]
+  contributions_hq = ["PA", "BBD", "ELSI", "QM", "HQ-IT"]
+  co_leads = [
+    { country = "CH", names = ["Joséphine Uldry", "Christine Joye"] },
+    { country = "IT", names = ["Marialuisa Lavitrano", "Monica Forni"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO1.3"
+  title = "Interconnect with viral, microbial, environmental, animal and/or plant collections"
+  description = ""
+  contributors_nn = ["BE", "CH", "DE", "ES", "GR", "IT", "LV", "NL", "SI"]
+  contributions_hq = ["QM", "BBD", "HQ-IT"]
+  co_leads = [
+    { country = "AT", names = ["Ingrid Walter", "Cornelia Stumptner", "Monika Wieser"] },
+    { country = "NO", names = ["Kristian Hveem"] }
+  ]
 
 [[objectives]]
 id = "SO2"
@@ -79,13 +111,131 @@ description = "Current worked example scaffold for strategic-objective maps."
 
 [[objectives]]
 id = "SO3"
-title = ""
-description = ""
+title = "SO3"
+description = "Green biobanking and sustainability-related implementation involvement."
+
+  [[objectives.goals]]
+  id = "SO3.1"
+  title = "Foster Greening for biobanking operations through mapping the challenges"
+  description = "Links to SO4"
+  contributors_nn = ["BE", "CY", "DE", "DK", "ES", "FI", "IARC/WHO", "IT", "LT"]
+  contributions_hq = ["BBD", "OEC", "ELSI"]
+  co_leads = [
+    { country = "AT", names = ["Monika Valjan", "Cornelia Stumptner", "Veronika Perz", "Sabrina Kral"] },
+    { country = "NL", names = ["Jörg Hamann"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO3.2"
+  title = "Achieve a Green biobanking approach, incl. Green Incentive and Green Label"
+  description = "Links to SO4"
+  contributors_nn = ["AT", "CH", "DK", "ES", "NL"]
+  contributions_hq = ["QM", "ELSI"]
+  co_leads = [
+    { country = "BBD", names = ["Saba Abdulghani"] },
+    { country = "IARC/WHO", names = ["Zisis Kozlakidis", "Stephanie Villar"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO3.3"
+  title = "Implement better waste management practices"
+  description = ""
+  contributors_nn = ["AT", "BE", "DE", "ES", "IARC/WHO", "LT", "NL"]
+  contributions_hq = ["OEC"]
+  co_leads = [
+    { country = "BBD", names = ["Saba Abdulghani"] },
+    { country = "GR", names = ["Sissy Kolyva"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO3.4"
+  title = "Promote green computing"
+  description = "Links to SO2"
+  contributors_nn = ["AT", "BE", "CY", "DE", "ES", "FI", "IARC/WHO", "LT", "MT", "NL", "SI"]
+  contributions_hq = ["OEC", "ELSI"]
+  co_leads = [
+    { country = "BBD", names = ["Saba Abdulghani"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO3.5"
+  title = "Develop an exchange platform for second use/exchange of technical equipment"
+  description = "Links to SO7"
+  contributors_nn = ["AT", "BE", "DE", "ES", "FI", "IARC/WHO", "LT", "MT", "NL"]
+  contributions_hq = ["OEC"]
+  co_leads = [
+    { country = "BBD", names = ["Saba Abdulghani"] }
+  ]
 
 [[objectives]]
 id = "SO4"
-title = ""
-description = ""
+title = "SO4"
+description = "Service models, partnerships, and risk-management implementation involvement."
+
+  [[objectives.goals]]
+  id = "SO4.1"
+  title = "Explore and develop new services models"
+  description = ""
+  contributors_nn = ["AT", "CZ", "DE", "ES", "GR", "SE"]
+  contributions_hq = ["FPM", "BBD", "QM", "ELSI", "HQ-IT"]
+  co_leads = [
+    { country = "FI", names = ["Tom Southerington"] },
+    { country = "CH", names = ["Sabine Bavamian", "Khalil Roy", "Lou Ferraton"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO4.2"
+  title = "Build different partnership models"
+  description = ""
+  contributors_nn = ["BE", "BG", "CZ", "DE", "FI", "GR", "HU", "IT", "LT", "PL", "QA"]
+  contributions_hq = ["FPM", "QM"]
+  co_leads = [
+    { country = "NO", names = ["Vegard Marschhäuser"] },
+    { country = "HQ-BBD", names = ["Manuela Pausan"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO4.3"
+  title = "Develop new membership and partnership models beyond ERIC Statutes"
+  description = "Links to SO8"
+  contributors_nn = ["GR", "IT"]
+  contributions_hq = ["FPM", "CO"]
+  co_leads = [
+    { country = "IARC/WHO", names = ["Zisis Kozlakidis", "Elodie Caboux"] },
+    { country = "HQ-PA", names = ["Elena Preziosa"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO4.4"
+  title = "Develop and implement risk assessment tools, including risks related to privacy, consent, or possible discrimination"
+  description = ""
+  contributors_nn = ["AT", "CY", "GR", "HU", "IT", "LT", "NO"]
+  contributions_hq = ["HQ-IT"]
+  co_leads = [
+    { country = "HQ-ELSI", names = ["Monica Cano-Abadia"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO4.5"
+  title = "Define and build a back-up system"
+  description = ""
+  contributors_nn = ["DE"]
+  contributions_hq = ["PA", "QM", "ELSI"]
+  co_leads = [
+    { country = "IARC/WHO", names = ["Zisis Kozlakidis", "Elodie Caboux"] },
+    { country = "HQ-BBD", names = ["Saba Abdulghani"] }
+  ]
+
+  [[objectives.goals]]
+  id = "SO4.6"
+  title = "Leverage funding and subsidies to support biobanks"
+  description = "Links to SO3"
+  contributors_nn = ["BE", "CY", "CZ", "DE", "SI"]
+  contributions_hq = ["PA"]
+  co_leads = [
+    { country = "LT", names = ["Daiva Dabkeviciene", "Sonata Jarmalaite"] },
+    { country = "HQ-BBD", names = ["Saba Abdulghani"] }
+  ]
 
 [[objectives]]
 id = "SO5"

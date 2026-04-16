@@ -1,0 +1,724 @@
+{
+  "schema_version": 1,
+  "note": "Fill in strategic objectives and goals for BBMRI-ERIC implementation involvement. Keep country codes uppercase and preserve the lead/contributor distinction at goal level.",
+  "objectives": [
+    {
+      "id": "SO1",
+      "title": "SO1",
+      "description": "Work programme entries for SO1 implementation involvement.",
+      "goals": [
+        {
+          "id": "SO1.1",
+          "title": "Engage with different Member State ministries",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "PA",
+              "country_raw": "HQ-PA",
+              "names": [
+                "Johanna Kostenzer"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "MT"
+          ],
+          "contributions_hq": [
+            "BBD"
+          ]
+        },
+        {
+          "id": "SO1.2",
+          "title": "Scale up interactions and alliances with other research infrastructures and initiatives",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "CH",
+              "country_raw": "CH",
+              "names": [
+                "Joséphine Uldry",
+                "Christine Joye"
+              ]
+            },
+            {
+              "country": "IT",
+              "country_raw": "IT",
+              "names": [
+                "Marialuisa Lavitrano",
+                "Monica Forni"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "BG",
+            "CZ",
+            "ES",
+            "GR",
+            "IARC/WHO",
+            "LT",
+            "LV",
+            "NL",
+            "SI"
+          ],
+          "contributions_hq": [
+            "PA",
+            "BBD",
+            "ELSI",
+            "QM",
+            "HQ-IT"
+          ]
+        },
+        {
+          "id": "SO1.3",
+          "title": "Interconnect with viral, microbial, environmental, animal and/or plant collections",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "AT",
+              "country_raw": "AT",
+              "names": [
+                "Ingrid Walter",
+                "Cornelia Stumptner",
+                "Monika Wieser"
+              ]
+            },
+            {
+              "country": "NO",
+              "country_raw": "NO",
+              "names": [
+                "Kristian Hveem"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "BE",
+            "CH",
+            "DE",
+            "ES",
+            "GR",
+            "IT",
+            "LV",
+            "NL",
+            "SI"
+          ],
+          "contributions_hq": [
+            "QM",
+            "BBD",
+            "HQ-IT"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SO2",
+      "title": "SO2",
+      "description": "Current worked example scaffold for strategic-objective maps.",
+      "goals": [
+        {
+          "id": "SO2.1",
+          "title": "",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "IT",
+              "country_raw": "IT",
+              "names": [
+                "Matteo Pallocca"
+              ]
+            },
+            {
+              "country": "NO",
+              "country_raw": "NO",
+              "names": [
+                "Kristian Hveem"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BG",
+            "CY",
+            "CZ",
+            "DE",
+            "GR",
+            "HU",
+            "LT",
+            "LV"
+          ],
+          "contributions_hq": [
+            "HQ-IT",
+            "QM",
+            "ELSI"
+          ]
+        },
+        {
+          "id": "SO2.2",
+          "title": "",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "CH",
+              "country_raw": "CH",
+              "names": [
+                "Joséphine Uldry",
+                "Flavien Delhaes"
+              ]
+            },
+            {
+              "country": "PL",
+              "country_raw": "PL",
+              "names": [
+                "Agnieszka Matera-Witkiewicz",
+                "Błażej Marciniak"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "CY",
+            "DE",
+            "ES",
+            "GR",
+            "HU",
+            "IT",
+            "NL"
+          ],
+          "contributions_hq": [
+            "HQ-IT",
+            "QM",
+            "BBD"
+          ]
+        },
+        {
+          "id": "SO2.3",
+          "title": "",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "AT",
+              "country_raw": "AT",
+              "names": [
+                "Georg Göbel",
+                "Volodymyr Shekhovtsov"
+              ]
+            },
+            {
+              "country": "NO",
+              "country_raw": "NO",
+              "names": [
+                "Therese Haugdahl Nøst"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "CZ",
+            "DE",
+            "ES",
+            "GR",
+            "HU",
+            "IT",
+            "LV",
+            "MT",
+            "NL",
+            "SI"
+          ],
+          "contributions_hq": [
+            "HQ-IT",
+            "BBD"
+          ]
+        },
+        {
+          "id": "SO2.4",
+          "title": "",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "CZ",
+              "country_raw": "CZ",
+              "names": [
+                "Zdenka Dudova",
+                "Radoslava Kacova"
+              ]
+            },
+            {
+              "country": "SE",
+              "country_raw": "SE",
+              "names": [
+                "Tomas Snäckerström",
+                "Peter Hedman"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "CY",
+            "DE",
+            "ES",
+            "GR",
+            "IT",
+            "LT",
+            "PL"
+          ],
+          "contributions_hq": [
+            "HQ-IT",
+            "BBD"
+          ]
+        },
+        {
+          "id": "SO2.5",
+          "title": "",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "LT",
+              "country_raw": "LT",
+              "names": [
+                "Arvydas Laurinavičius",
+                "Dovilė Žilėnaitė-Petrulienė"
+              ]
+            },
+            {
+              "country": "IT",
+              "country_raw": "HQ-IT",
+              "names": [
+                "Heimo Müller"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "MT"
+          ],
+          "contributions_hq": []
+        },
+        {
+          "id": "SO2.6",
+          "title": "",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "CZ",
+              "country_raw": "CZ",
+              "names": [
+                "Zdenka Dudova",
+                "Radoslava Kacova"
+              ]
+            },
+            {
+              "country": "IT",
+              "country_raw": "HQ-IT",
+              "names": [
+                "Andreas Türk"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "GR",
+            "LV"
+          ],
+          "contributions_hq": [
+            "BBD"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SO3",
+      "title": "SO3",
+      "description": "Green biobanking and sustainability-related implementation involvement.",
+      "goals": [
+        {
+          "id": "SO3.1",
+          "title": "Foster Greening for biobanking operations through mapping the challenges",
+          "description": "Links to SO4",
+          "co_leads": [
+            {
+              "country": "AT",
+              "country_raw": "AT",
+              "names": [
+                "Monika Valjan",
+                "Cornelia Stumptner",
+                "Veronika Perz",
+                "Sabrina Kral"
+              ]
+            },
+            {
+              "country": "NL",
+              "country_raw": "NL",
+              "names": [
+                "Jörg Hamann"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "BE",
+            "CY",
+            "DE",
+            "DK",
+            "ES",
+            "FI",
+            "IARC/WHO",
+            "IT",
+            "LT"
+          ],
+          "contributions_hq": [
+            "BBD",
+            "OEC",
+            "ELSI"
+          ]
+        },
+        {
+          "id": "SO3.2",
+          "title": "Achieve a Green biobanking approach, incl. Green Incentive and Green Label",
+          "description": "Links to SO4",
+          "co_leads": [
+            {
+              "country": "BBD",
+              "country_raw": "BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            },
+            {
+              "country": "IARC/WHO",
+              "country_raw": "IARC/WHO",
+              "names": [
+                "Zisis Kozlakidis",
+                "Stephanie Villar"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "CH",
+            "DK",
+            "ES",
+            "NL"
+          ],
+          "contributions_hq": [
+            "QM",
+            "ELSI"
+          ]
+        },
+        {
+          "id": "SO3.3",
+          "title": "Implement better waste management practices",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "BBD",
+              "country_raw": "BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            },
+            {
+              "country": "GR",
+              "country_raw": "GR",
+              "names": [
+                "Sissy Kolyva"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "DE",
+            "ES",
+            "IARC/WHO",
+            "LT",
+            "NL"
+          ],
+          "contributions_hq": [
+            "OEC"
+          ]
+        },
+        {
+          "id": "SO3.4",
+          "title": "Promote green computing",
+          "description": "Links to SO2",
+          "co_leads": [
+            {
+              "country": "BBD",
+              "country_raw": "BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "CY",
+            "DE",
+            "ES",
+            "FI",
+            "IARC/WHO",
+            "LT",
+            "MT",
+            "NL",
+            "SI"
+          ],
+          "contributions_hq": [
+            "OEC",
+            "ELSI"
+          ]
+        },
+        {
+          "id": "SO3.5",
+          "title": "Develop an exchange platform for second use/exchange of technical equipment",
+          "description": "Links to SO7",
+          "co_leads": [
+            {
+              "country": "BBD",
+              "country_raw": "BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "DE",
+            "ES",
+            "FI",
+            "IARC/WHO",
+            "LT",
+            "MT",
+            "NL"
+          ],
+          "contributions_hq": [
+            "OEC"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SO4",
+      "title": "SO4",
+      "description": "Service models, partnerships, and risk-management implementation involvement.",
+      "goals": [
+        {
+          "id": "SO4.1",
+          "title": "Explore and develop new services models",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "FI",
+              "country_raw": "FI",
+              "names": [
+                "Tom Southerington"
+              ]
+            },
+            {
+              "country": "CH",
+              "country_raw": "CH",
+              "names": [
+                "Sabine Bavamian",
+                "Khalil Roy",
+                "Lou Ferraton"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "CZ",
+            "DE",
+            "ES",
+            "GR",
+            "SE"
+          ],
+          "contributions_hq": [
+            "FPM",
+            "BBD",
+            "QM",
+            "ELSI",
+            "HQ-IT"
+          ]
+        },
+        {
+          "id": "SO4.2",
+          "title": "Build different partnership models",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "NO",
+              "country_raw": "NO",
+              "names": [
+                "Vegard Marschhäuser"
+              ]
+            },
+            {
+              "country": "HQ-BBD",
+              "country_raw": "HQ-BBD",
+              "names": [
+                "Manuela Pausan"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "BE",
+            "BG",
+            "CZ",
+            "DE",
+            "FI",
+            "GR",
+            "HU",
+            "IT",
+            "LT",
+            "PL",
+            "QA"
+          ],
+          "contributions_hq": [
+            "FPM",
+            "QM"
+          ]
+        },
+        {
+          "id": "SO4.3",
+          "title": "Develop new membership and partnership models beyond ERIC Statutes",
+          "description": "Links to SO8",
+          "co_leads": [
+            {
+              "country": "IARC/WHO",
+              "country_raw": "IARC/WHO",
+              "names": [
+                "Zisis Kozlakidis",
+                "Elodie Caboux"
+              ]
+            },
+            {
+              "country": "PA",
+              "country_raw": "HQ-PA",
+              "names": [
+                "Elena Preziosa"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "GR",
+            "IT"
+          ],
+          "contributions_hq": [
+            "FPM",
+            "CO"
+          ]
+        },
+        {
+          "id": "SO4.4",
+          "title": "Develop and implement risk assessment tools, including risks related to privacy, consent, or possible discrimination",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "HQ-ELSI",
+              "country_raw": "HQ-ELSI",
+              "names": [
+                "Monica Cano-Abadia"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "CY",
+            "GR",
+            "HU",
+            "IT",
+            "LT",
+            "NO"
+          ],
+          "contributions_hq": [
+            "HQ-IT"
+          ]
+        },
+        {
+          "id": "SO4.5",
+          "title": "Define and build a back-up system",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "IARC/WHO",
+              "country_raw": "IARC/WHO",
+              "names": [
+                "Zisis Kozlakidis",
+                "Elodie Caboux"
+              ]
+            },
+            {
+              "country": "HQ-BBD",
+              "country_raw": "HQ-BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "DE"
+          ],
+          "contributions_hq": [
+            "PA",
+            "QM",
+            "ELSI"
+          ]
+        },
+        {
+          "id": "SO4.6",
+          "title": "Leverage funding and subsidies to support biobanks",
+          "description": "Links to SO3",
+          "co_leads": [
+            {
+              "country": "LT",
+              "country_raw": "LT",
+              "names": [
+                "Daiva Dabkeviciene",
+                "Sonata Jarmalaite"
+              ]
+            },
+            {
+              "country": "HQ-BBD",
+              "country_raw": "HQ-BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "BE",
+            "CY",
+            "CZ",
+            "DE",
+            "SI"
+          ],
+          "contributions_hq": [
+            "PA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SO5",
+      "title": "",
+      "description": "",
+      "goals": []
+    },
+    {
+      "id": "SO6",
+      "title": "",
+      "description": "",
+      "goals": []
+    },
+    {
+      "id": "SO7",
+      "title": "",
+      "description": "",
+      "goals": []
+    },
+    {
+      "id": "SO8",
+      "title": "",
+      "description": "",
+      "goals": []
+    }
+  ]
+}
