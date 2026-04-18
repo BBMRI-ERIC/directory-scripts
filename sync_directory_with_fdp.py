@@ -281,7 +281,7 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'minAge': c['age_low'] if 'age_low' in c else None,
             'maxAge': c['age_high'] if 'age_high' in c else None,
             'numberOfRecords': c['size'] if 'size' in c else None,
-            'numberOfUniqueIndividuals': c['number_of_donors']
+            'numberOfUniqueIndividuals': c['number_of_donors'] if 'number_of_donors' in c else None
 
         } for c in biobank_data['collections']],
         FDP_IRI: missing_iris,
