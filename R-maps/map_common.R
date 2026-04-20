@@ -213,12 +213,15 @@ bbmri_normalize_svg_font_families <- function(path) {
   lines <- readLines(path, warn = FALSE, encoding = "UTF-8")
   lines <- gsub('font-family:[[:space:]]*"?Liberation Sans"?;', 'font-family: sans-serif;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?DejaVu Sans"?;', 'font-family: sans-serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?Nimbus Sans(?: L)?(?: Regular)?\"?;', 'font-family: sans-serif;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?sans"?;', 'font-family: sans-serif;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?DejaVu Sans Mono"?;', 'font-family: monospace;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?Liberation Mono"?;', 'font-family: monospace;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?Nimbus Mono PS"?;', 'font-family: monospace;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?mono"?;', 'font-family: monospace;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?Liberation Serif"?;', 'font-family: serif;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?DejaVu Serif"?;', 'font-family: serif;', lines, perl = TRUE)
+  lines <- gsub('font-family:[[:space:]]*"?Nimbus Roman(?: No9 L)?(?: Regular)?\"?;', 'font-family: serif;', lines, perl = TRUE)
   lines <- gsub('font-family:[[:space:]]*"?serif"?;', 'font-family: serif;', lines, perl = TRUE)
   writeLines(lines, path, useBytes = TRUE)
   invisible(TRUE)
@@ -2055,13 +2058,36 @@ bbmri_write_geojson <- function(obj, path) {
   sf::st_write(obj_4326, path, driver = "GeoJSON", quiet = TRUE)
 }
 
-bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes) {
+bbmri_select_export_sizes <- function(export_sizes, output_variants = NULL) {
+  if (is.null(output_variants) || !length(output_variants)) {
+    return(export_sizes)
+  }
+
+  selected_variants <- output_variants[output_variants %in% names(export_sizes$png)]
+  if (!length(selected_variants)) {
+    stop(
+      "No matching export size variants found: ",
+      paste(output_variants, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  list(
+    png = export_sizes$png[selected_variants],
+    vector = export_sizes$vector
+  )
+}
+
+bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes, output_variants = NULL, include_vector = TRUE, announce = TRUE) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
-  raster_sizes <- export_sizes$png
+  raster_sizes <- bbmri_select_export_sizes(export_sizes, output_variants)$png
   raster_dpi <- 300
   for (name in names(raster_sizes)) {
     size <- raster_sizes[[name]]
+    if (isTRUE(announce)) {
+      cat(prefix, "-", name, " ... ", sep = "")
+    }
     ggplot2::ggsave(
       filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
       plot = plot,
@@ -2071,6 +2097,9 @@ bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes) {
       bg = "white",
       limitsize = FALSE
     )
+    if (isTRUE(announce)) {
+      cat("PNG ", sep = "")
+    }
 
     ggplot2::ggsave(
       filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
@@ -2081,6 +2110,9 @@ bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes) {
       bg = "white",
       limitsize = FALSE
     )
+    if (isTRUE(announce)) {
+      cat("PDF ", sep = "")
+    }
 
     if (requireNamespace("svglite", quietly = TRUE)) {
       svg_path <- file.path(output_dir, paste0(prefix, "-", name, ".svg"))
@@ -2101,41 +2133,66 @@ bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes) {
         )
       )
       bbmri_normalize_svg_font_families(svg_path)
+      if (isTRUE(announce)) {
+        cat("SVG ", sep = "")
+      }
+    } else if (isTRUE(announce)) {
+      cat("SVG(skipped) ", sep = "")
+    }
+    if (isTRUE(announce)) {
+      cat("done\n", sep = "")
     }
   }
 
-  vector_size <- export_sizes$vector
-  ggplot2::ggsave(
-    filename = file.path(output_dir, paste0(prefix, ".pdf")),
-    plot = plot,
-    width = unname(vector_size[["width"]]) / raster_dpi,
-    height = unname(vector_size[["height"]]) / raster_dpi,
-    units = "in",
-    bg = "white",
-    limitsize = FALSE
-  )
-
-  if (requireNamespace("svglite", quietly = TRUE)) {
-    svg_path <- file.path(output_dir, paste0(prefix, ".svg"))
-    do.call(
-      ggplot2::ggsave,
-      c(
-        list(
-          filename = svg_path,
-          plot = plot,
-          width = unname(vector_size[["width"]]) / raster_dpi,
-          height = unname(vector_size[["height"]]) / raster_dpi,
-          units = "in",
-          bg = "white",
-          device = svglite::svglite,
-          limitsize = FALSE
-        ),
-        bbmri_svg_device_args()
-      )
+  if (isTRUE(include_vector)) {
+    vector_size <- export_sizes$vector
+    if (isTRUE(announce)) {
+      cat(prefix, " ... ", sep = "")
+    }
+    ggplot2::ggsave(
+      filename = file.path(output_dir, paste0(prefix, ".pdf")),
+      plot = plot,
+      width = unname(vector_size[["width"]]) / raster_dpi,
+      height = unname(vector_size[["height"]]) / raster_dpi,
+      units = "in",
+      bg = "white",
+      limitsize = FALSE
     )
-    bbmri_normalize_svg_font_families(svg_path)
-  } else {
-    message("Skipping SVG export because package 'svglite' is not installed.")
+    if (isTRUE(announce)) {
+      cat("PDF ", sep = "")
+    }
+
+    if (requireNamespace("svglite", quietly = TRUE)) {
+      svg_path <- file.path(output_dir, paste0(prefix, ".svg"))
+      do.call(
+        ggplot2::ggsave,
+        c(
+          list(
+            filename = svg_path,
+            plot = plot,
+            width = unname(vector_size[["width"]]) / raster_dpi,
+            height = unname(vector_size[["height"]]) / raster_dpi,
+            units = "in",
+            bg = "white",
+            device = svglite::svglite,
+            limitsize = FALSE
+          ),
+          bbmri_svg_device_args()
+        )
+      )
+      bbmri_normalize_svg_font_families(svg_path)
+      if (isTRUE(announce)) {
+        cat("SVG ", sep = "")
+      }
+    } else {
+      message("Skipping SVG export because package 'svglite' is not installed.")
+      if (isTRUE(announce)) {
+        cat("SVG(skipped) ", sep = "")
+      }
+    }
+    if (isTRUE(announce)) {
+      cat("done\n", sep = "")
+    }
   }
 }
 
@@ -2163,14 +2220,17 @@ bbmri_save_svg_variant <- function(plot, path, size, raster_dpi = 300) {
   invisible(TRUE)
 }
 
-bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix, export_sizes) {
+bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix, export_sizes, output_variants = NULL, include_vector = TRUE, announce = TRUE) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
-  raster_sizes <- export_sizes$png
+  raster_sizes <- bbmri_select_export_sizes(export_sizes, output_variants)$png
   raster_dpi <- 300
   for (name in names(raster_sizes)) {
     size <- raster_sizes[[name]]
     plot <- build_plot(name)
+    if (isTRUE(announce)) {
+      cat(prefix, "-", name, " ... ", sep = "")
+    }
     ggplot2::ggsave(
       filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
       plot = plot,
@@ -2180,13 +2240,9 @@ bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix,
       bg = "white",
       limitsize = FALSE
     )
-
-    bbmri_save_svg_variant(
-      plot = plot,
-      path = file.path(output_dir, paste0(prefix, "-", name, ".svg")),
-      size = size,
-      raster_dpi = raster_dpi
-    )
+    if (isTRUE(announce)) {
+      cat("PNG ", sep = "")
+    }
 
     ggplot2::ggsave(
       filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
@@ -2197,40 +2253,77 @@ bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix,
       bg = "white",
       limitsize = FALSE
     )
+    if (isTRUE(announce)) {
+      cat("PDF ", sep = "")
+    }
+
+    if (bbmri_save_svg_variant(
+      plot = plot,
+      path = file.path(output_dir, paste0(prefix, "-", name, ".svg")),
+      size = size,
+      raster_dpi = raster_dpi
+    )) {
+      if (isTRUE(announce)) {
+        cat("SVG ", sep = "")
+      }
+    } else if (isTRUE(announce)) {
+      cat("SVG(skipped) ", sep = "")
+    }
+
+    if (isTRUE(announce)) {
+      cat("done\n", sep = "")
+    }
   }
 
-  vector_size <- export_sizes$vector
-  vector_plot <- build_plot("vector")
-  ggplot2::ggsave(
-    filename = file.path(output_dir, paste0(prefix, ".pdf")),
-    plot = vector_plot,
-    width = unname(vector_size[["width"]]) / raster_dpi,
-    height = unname(vector_size[["height"]]) / raster_dpi,
-    units = "in",
-    bg = "white",
-    limitsize = FALSE
-  )
-
-  if (requireNamespace("svglite", quietly = TRUE)) {
-    svg_path <- file.path(output_dir, paste0(prefix, ".svg"))
-    do.call(
-      ggplot2::ggsave,
-      c(
-        list(
-          filename = svg_path,
-          plot = vector_plot,
-          width = unname(vector_size[["width"]]) / raster_dpi,
-          height = unname(vector_size[["height"]]) / raster_dpi,
-          units = "in",
-          bg = "white",
-          device = svglite::svglite,
-          limitsize = FALSE
-        ),
-        bbmri_svg_device_args()
-      )
+  if (isTRUE(include_vector)) {
+    vector_size <- export_sizes$vector
+    vector_plot <- build_plot("vector")
+    if (isTRUE(announce)) {
+      cat(prefix, " ... ", sep = "")
+    }
+    ggplot2::ggsave(
+      filename = file.path(output_dir, paste0(prefix, ".pdf")),
+      plot = vector_plot,
+      width = unname(vector_size[["width"]]) / raster_dpi,
+      height = unname(vector_size[["height"]]) / raster_dpi,
+      units = "in",
+      bg = "white",
+      limitsize = FALSE
     )
-    bbmri_normalize_svg_font_families(svg_path)
-  } else {
-    message("Skipping SVG export because package 'svglite' is not installed.")
+    if (isTRUE(announce)) {
+      cat("PDF ", sep = "")
+    }
+
+    if (requireNamespace("svglite", quietly = TRUE)) {
+      svg_path <- file.path(output_dir, paste0(prefix, ".svg"))
+      do.call(
+        ggplot2::ggsave,
+        c(
+          list(
+            filename = svg_path,
+            plot = vector_plot,
+            width = unname(vector_size[["width"]]) / raster_dpi,
+            height = unname(vector_size[["height"]]) / raster_dpi,
+            units = "in",
+            bg = "white",
+            device = svglite::svglite,
+            limitsize = FALSE
+          ),
+          bbmri_svg_device_args()
+        )
+      )
+      bbmri_normalize_svg_font_families(svg_path)
+      if (isTRUE(announce)) {
+        cat("SVG ", sep = "")
+      }
+    } else {
+      message("Skipping SVG export because package 'svglite' is not installed.")
+      if (isTRUE(announce)) {
+        cat("SVG(skipped) ", sep = "")
+      }
+    }
+    if (isTRUE(announce)) {
+      cat("done\n", sep = "")
+    }
   }
 }

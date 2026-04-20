@@ -348,6 +348,335 @@ bbmri_so_role_fill <- function(summary_df, cfg) {
   summary_df
 }
 
+bbmri_so_bar_anchor_df <- function(countries, cfg, crs, label_codes, bbox = cfg$standard_bbox) {
+  anchor_df <- bbmri_country_anchor_df(countries, crs, label_codes = label_codes)
+  label_anchor_df <- bbmri_country_label_df(countries, cfg, crs, label_codes = label_codes)
+  if (nrow(anchor_df) == 0) {
+    return(anchor_df)
+  }
+
+  anchor_df$label_x <- label_anchor_df$x[match(anchor_df$iso_a2, label_anchor_df$iso_a2)]
+  anchor_df$label_y <- label_anchor_df$y[match(anchor_df$iso_a2, label_anchor_df$iso_a2)]
+  anchor_df$bar_x <- anchor_df$x
+  anchor_df$bar_y <- anchor_df$y
+
+  proj_bbox <- bbmri_projected_bbox(bbox, crs)
+  use_label_anchor <- is.na(anchor_df$bar_x) | is.na(anchor_df$bar_y) |
+    anchor_df$bar_x < proj_bbox[["xmin"]] | anchor_df$bar_x > proj_bbox[["xmax"]] |
+    anchor_df$bar_y < proj_bbox[["ymin"]] | anchor_df$bar_y > proj_bbox[["ymax"]]
+  if (any(use_label_anchor, na.rm = TRUE)) {
+    label_available <- !is.na(anchor_df$label_x) & !is.na(anchor_df$label_y)
+    use_label_anchor <- use_label_anchor & label_available
+    anchor_df$bar_x[use_label_anchor] <- anchor_df$label_x[use_label_anchor]
+    anchor_df$bar_y[use_label_anchor] <- anchor_df$label_y[use_label_anchor]
+  }
+
+  anchor_df
+}
+
+bbmri_so_global_bar_positions_to_df <- function(positions, cfg) {
+  if (is.null(positions) || !length(positions)) {
+    return(NULL)
+  }
+  if (is.data.frame(positions)) {
+    pos_df <- positions
+  } else if (is.list(positions)) {
+    pos_names <- names(positions)
+    if (is.null(pos_names) || !length(pos_names)) {
+      return(NULL)
+    }
+    pos_rows <- lapply(seq_along(positions), function(idx) {
+      pos <- positions[[idx]]
+      if (is.null(pos)) {
+        return(NULL)
+      }
+      iso <- toupper(trimws(pos_names[[idx]]))
+      if (!nzchar(iso)) {
+        return(NULL)
+      }
+      lon <- NA_real_
+      lat <- NA_real_
+      if (is.list(pos) && !is.null(names(pos))) {
+        lon_name <- intersect(names(pos), c("lon", "lng", "longitude", "x"))
+        lat_name <- intersect(names(pos), c("lat", "latitude", "y"))
+        if (length(lon_name) && length(lat_name)) {
+          lon <- as.numeric(pos[[lon_name[[1]]]])
+          lat <- as.numeric(pos[[lat_name[[1]]]])
+        }
+      }
+      if ((!is.finite(lon) || !is.finite(lat)) && length(pos) >= 2) {
+        pos_vec <- as.numeric(unlist(pos, use.names = FALSE))
+        lon <- pos_vec[[1]]
+        lat <- pos_vec[[2]]
+      }
+      if (!is.finite(lon) || !is.finite(lat)) {
+        return(NULL)
+      }
+      data.frame(
+        iso_a2 = iso,
+        lon = lon,
+        lat = lat,
+        stringsAsFactors = FALSE
+      )
+    })
+    pos_rows <- Filter(Negate(is.null), pos_rows)
+    if (!length(pos_rows)) {
+      return(NULL)
+    }
+    pos_df <- do.call(rbind, pos_rows)
+  } else {
+    return(NULL)
+  }
+
+  if (!all(c("iso_a2", "lon", "lat") %in% names(pos_df))) {
+    return(NULL)
+  }
+  pos_df <- pos_df[is.finite(pos_df$lon) & is.finite(pos_df$lat), , drop = FALSE]
+  if (nrow(pos_df) == 0) {
+    return(NULL)
+  }
+  pos_sf <- sf::st_as_sf(pos_df, coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+  pos_sf <- sf::st_transform(pos_sf, cfg$standard_crs)
+  coords <- sf::st_coordinates(pos_sf)
+  data.frame(
+    iso_a2 = toupper(trimws(pos_df$iso_a2)),
+    bar_x = coords[, 1],
+    bar_y = coords[, 2],
+    stringsAsFactors = FALSE
+  )
+}
+
+bbmri_apply_global_bar_positions <- function(anchor_df, positions, cfg) {
+  if (nrow(anchor_df) == 0) {
+    return(anchor_df)
+  }
+  pos_df <- bbmri_so_global_bar_positions_to_df(positions, cfg)
+  if (is.null(pos_df) || nrow(pos_df) == 0) {
+    return(anchor_df)
+  }
+  idx <- match(pos_df$iso_a2, anchor_df$iso_a2)
+  hit <- !is.na(idx)
+  if (!any(hit)) {
+    return(anchor_df)
+  }
+  anchor_df$bar_x[idx[hit]] <- pos_df$bar_x[hit]
+  anchor_df$bar_y[idx[hit]] <- pos_df$bar_y[hit]
+  anchor_df
+}
+
+bbmri_so_global_bar_frame_box <- function(bar_x, bar_y, bar_width, bar_gap, unit_height, baseline_offset, objective_count, max_total_height, prefix_width = unit_height * 0.45, country_label_offset = unit_height * 1.12, country_label_width = NULL) {
+  cluster_width <- objective_count * bar_width + max(0, objective_count - 1) * bar_gap
+  start_x <- bar_x - cluster_width / 2
+  baseline_y <- bar_y - baseline_offset
+  label_y <- baseline_y - unit_height * 0.82
+  label_bottom_y <- baseline_y - country_label_offset
+  if (is.null(country_label_width) || !is.finite(country_label_width) || country_label_width <= 0) {
+    country_label_width <- unit_height * 1.10
+  }
+  label_half_width <- country_label_width * 0.95 / 2
+  list(
+    xmin = min(
+      start_x - bar_gap * 0.40,
+      start_x - bar_gap * 0.50 - prefix_width - bar_gap * 0.03
+    ),
+    xmax = max(
+      start_x + cluster_width + bar_gap * 0.03,
+      bar_x + label_half_width + bar_gap * 0.06
+    ),
+    ymin = min(label_y - unit_height * 0.28, label_bottom_y - unit_height * 0.18),
+    ymax = baseline_y + max_total_height * unit_height + unit_height * 0.06
+  )
+}
+
+bbmri_so_global_bar_country_labels <- function(anchor_df, country_labels, baseline_offset) {
+  if (nrow(anchor_df) == 0 || nrow(country_labels) == 0) {
+    return(country_labels[0, , drop = FALSE])
+  }
+  anchor_match <- match(country_labels$iso_a2, anchor_df$iso_a2)
+  valid <- !is.na(anchor_match)
+  if (!any(valid)) {
+    return(country_labels[0, , drop = FALSE])
+  }
+  labels <- country_labels[valid, , drop = FALSE]
+  anchor_match <- anchor_match[valid]
+  labels$x <- anchor_df$bar_x[anchor_match]
+  labels$y <- anchor_df$bar_y[anchor_match] - baseline_offset
+  labels$hjust <- 0.5
+  labels$vjust <- 0.5
+  labels
+}
+
+bbmri_so_resolve_global_bar_positions <- function(anchor_df, summary_df, cfg, bbox, export_sizes, output_variant, objective_order, bar_width, bar_gap, unit_height, baseline_offset, country_label_offset = unit_height * 1.18, country_label_width_map = NULL) {
+  if (nrow(anchor_df) == 0) {
+    return(anchor_df)
+  }
+  required <- c("iso_a2", "bar_x", "bar_y")
+  if (!all(required %in% names(anchor_df))) {
+    stop("Global bar anchors must provide iso_a2, bar_x, and bar_y.", call. = FALSE)
+  }
+
+  proj_bbox <- bbmri_projected_bbox(bbox, cfg$standard_crs)
+  units_per_px <- (proj_bbox[["xmax"]] - proj_bbox[["xmin"]]) / bbmri_output_width_px(export_sizes, output_variant)
+  touch_margin <- units_per_px * 4
+
+  counts <- vapply(anchor_df$iso_a2, function(iso) {
+    row <- summary_df[summary_df$country == iso, , drop = FALSE]
+    if (nrow(row) == 0) {
+      return(0)
+    }
+    max(row$lead_count[[1]] + row$contributor_count[[1]], 1)
+  }, numeric(1))
+  order_idx <- order(-counts, -anchor_df$bar_y, anchor_df$iso_a2)
+
+  box_separated <- function(box, other, margin) {
+    box$xmax < other$xmin - margin ||
+      other$xmax < box$xmin - margin ||
+      box$ymax < other$ymin - margin ||
+      other$ymax < box$ymin - margin
+  }
+
+  chosen_boxes <- list()
+  for (idx in order_idx) {
+    x <- anchor_df$bar_x[[idx]]
+    y <- anchor_df$bar_y[[idx]]
+    max_total_height <- counts[[idx]]
+    iso <- anchor_df$iso_a2[[idx]]
+    label_width <- if (!is.null(country_label_width_map) && iso %in% names(country_label_width_map)) {
+      as.numeric(country_label_width_map[[iso]])
+    } else {
+      NA_real_
+    }
+    best_box <- NULL
+
+    for (iter in seq_len(120L)) {
+      box <- bbmri_so_global_bar_frame_box(
+        x,
+        y,
+        bar_width = bar_width,
+        bar_gap = bar_gap,
+        unit_height = unit_height,
+        baseline_offset = baseline_offset,
+        objective_count = length(objective_order),
+        max_total_height = max_total_height,
+        country_label_offset = country_label_offset,
+        country_label_width = label_width
+      )
+
+      overlaps <- chosen_boxes[!vapply(chosen_boxes, box_separated, logical(1), other = box, margin = touch_margin)]
+      if (!length(overlaps)) {
+        best_box <- box
+        break
+      }
+
+      move_x <- 0
+      move_y <- 0
+      overlap_count <- length(overlaps)
+      box_cx <- (box$xmin + box$xmax) / 2
+      box_cy <- (box$ymin + box$ymax) / 2
+      for (other in overlaps) {
+        other_cx <- (other$xmin + other$xmax) / 2
+        other_cy <- (other$ymin + other$ymax) / 2
+        overlap_x <- min(box$xmax, other$xmax) - max(box$xmin, other$xmin) + touch_margin
+        overlap_y <- min(box$ymax, other$ymax) - max(box$ymin, other$ymin) + touch_margin
+        step_x <- max(overlap_x * 0.35, units_per_px * 4)
+        step_y <- max(overlap_y * 0.35, units_per_px * 4)
+        move_x <- move_x + if (box_cx <= other_cx) -step_x else step_x
+        move_y <- move_y + if (box_cy <= other_cy) -step_y else step_y
+      }
+
+      x <- x + move_x / overlap_count
+      y <- y + move_y / overlap_count
+      best_box <- box
+    }
+
+    anchor_df$bar_x[[idx]] <- x
+    anchor_df$bar_y[[idx]] <- y
+    chosen_boxes[[length(chosen_boxes) + 1L]] <- if (is.null(best_box)) {
+      bbmri_so_global_bar_frame_box(
+        x,
+          y,
+          bar_width = bar_width,
+          bar_gap = bar_gap,
+          unit_height = unit_height,
+          baseline_offset = baseline_offset,
+          objective_count = length(objective_order),
+          max_total_height = max_total_height,
+          country_label_offset = country_label_offset,
+          country_label_width = label_width
+        )
+      } else {
+      best_box
+    }
+  }
+
+  if (nrow(anchor_df) > 1L) {
+    for (iter in seq_len(80L)) {
+      boxes <- lapply(seq_len(nrow(anchor_df)), function(idx) {
+        bbmri_so_global_bar_frame_box(
+          anchor_df$bar_x[[idx]],
+          anchor_df$bar_y[[idx]],
+          bar_width = bar_width,
+          bar_gap = bar_gap,
+          unit_height = unit_height,
+          baseline_offset = baseline_offset,
+          objective_count = length(objective_order),
+          max_total_height = counts[[idx]],
+          country_label_offset = country_label_offset,
+          country_label_width = if (!is.null(country_label_width_map) && anchor_df$iso_a2[[idx]] %in% names(country_label_width_map)) as.numeric(country_label_width_map[[anchor_df$iso_a2[[idx]]]]) else NA_real_
+        )
+      })
+
+      overlap_pairs <- list()
+      pair_idx <- 0L
+      for (i in seq_along(boxes)) {
+        for (j in seq_len(i - 1L)) {
+          if (box_separated(boxes[[i]], boxes[[j]], touch_margin)) {
+            next
+          }
+          pair_idx <- pair_idx + 1L
+          overlap_pairs[[pair_idx]] <- c(i, j)
+        }
+      }
+      if (!length(overlap_pairs)) {
+        break
+      }
+
+      shift_x <- numeric(nrow(anchor_df))
+      shift_y <- numeric(nrow(anchor_df))
+      for (pair in overlap_pairs) {
+        i <- pair[[1]]
+        j <- pair[[2]]
+        box <- boxes[[i]]
+        other <- boxes[[j]]
+        overlap_x <- min(box$xmax, other$xmax) - max(box$xmin, other$xmin) + touch_margin
+        overlap_y <- min(box$ymax, other$ymax) - max(box$ymin, other$ymin) + touch_margin
+        box_cx <- (box$xmin + box$xmax) / 2
+        box_cy <- (box$ymin + box$ymax) / 2
+        other_cx <- (other$xmin + other$xmax) / 2
+        other_cy <- (other$ymin + other$ymax) / 2
+
+        if (overlap_x <= overlap_y) {
+          step <- max(overlap_x / 3, units_per_px * 3)
+          direction <- if (box_cx <= other_cx) -1 else 1
+          shift_x[[i]] <- shift_x[[i]] + direction * step
+          shift_x[[j]] <- shift_x[[j]] - direction * step
+        } else {
+          step <- max(overlap_y / 3, units_per_px * 3)
+          direction <- if (box_cy <= other_cy) -1 else 1
+          shift_y[[i]] <- shift_y[[i]] + direction * step
+          shift_y[[j]] <- shift_y[[j]] - direction * step
+        }
+      }
+
+      damp <- 0.40
+      anchor_df$bar_x <- anchor_df$bar_x + shift_x * damp
+      anchor_df$bar_y <- anchor_df$bar_y + shift_y * damp
+    }
+  }
+
+  anchor_df
+}
+
 bbmri_so_prepare_layers <- function(bbox, cfg) {
   bbmri_prepare_classic_layers(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill, include_rivers = FALSE)
 }
@@ -387,7 +716,6 @@ bbmri_so_make_recolor_plot <- function(spec, level, objective_filter = NULL, goa
   if (identical(output_variant, "small")) {
     country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
   }
-
   plot <- bbmri_add_classic_base(
     ggplot2::ggplot(),
     layers = layers,
@@ -396,6 +724,9 @@ bbmri_so_make_recolor_plot <- function(spec, level, objective_filter = NULL, goa
     cfg = cfg,
     output_variant = output_variant
   ) + ggplot2::scale_fill_identity()
+  plot <- plot + ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
+  plot <- plot + ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
+  plot <- plot + ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
   plot <- plot + bbmri_geom_text_halo(
     data = country_labels,
     mapping = ggplot2::aes(x = x, y = y, label = label),
@@ -409,24 +740,40 @@ bbmri_so_make_recolor_plot <- function(spec, level, objective_filter = NULL, goa
     alpha = bbmri_country_label_style_for_output(cfg, output_variant)$alpha
   )
 
-  if (nrow(summary_df) > 0) {
-    plot <- bbmri_add_rect_legend(
-      plot = plot,
-      entries = data.frame(
-        label = c("Lead", "Contributor"),
-        fill = c(cfg$so_colors$lead, cfg$so_colors$contributor),
-        colour = c(cfg$so_colors$bar_border, cfg$so_colors$bar_border),
-        alpha = c(0.88, 0.88),
-        linewidth = c(0.25, 0.25),
-        stringsAsFactors = FALSE
-      ),
-      bbox = bbox,
-      crs = cfg$standard_crs,
-      box = list(x = 0.03, y = 0.05, width = 0.22, height = 0.12),
-      title = "Strategic involvement",
-      text_size = 2.1
-    )
-  }
+  legend_entries <- data.frame(
+    label = c(
+      "Lead",
+      "Contributor",
+      "Member (without SO involvement)",
+      "Observer (without SO involvement)"
+    ),
+    fill = c(
+      cfg$so_colors$lead,
+      cfg$so_colors$contributor,
+      cfg$so_colors$base_member,
+      cfg$so_colors$base_observer
+    ),
+    colour = c(
+      cfg$so_colors$bar_border,
+      cfg$so_colors$bar_border,
+      cfg$so_colors$bar_border,
+      cfg$so_colors$bar_border
+    ),
+    alpha = c(0.88, 0.88, 0.88, 0.88),
+    linewidth = c(0.25, 0.25, 0.25, 0.25),
+    stringsAsFactors = FALSE
+  )
+  plot <- bbmri_add_rect_legend(
+    plot = plot,
+    entries = legend_entries,
+    bbox = bbox,
+    crs = cfg$standard_crs,
+    box = list(x = 0.03, y = 0.05, width = 0.23, height = 0.145),
+    title = "Strategic involvement",
+    text_size = 2.0,
+    row_start_frac = 0.69,
+    row_step_frac = 0.155
+  )
 
   title_text <- switch(
     level,
@@ -455,18 +802,12 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
     objective_filter <- NULL
     goal_filter <- NULL
   }
+
   layers <- bbmri_so_prepare_layers(bbox, cfg)
   summary_df <- bbmri_so_objective_summary(spec, objective_filter = objective_filter, goal_filter = goal_filter)
   summary_df <- bbmri_so_role_fill(summary_df, cfg)
 
-  if (is.null(country_label_codes)) {
-    country_label_codes <- cfg$standard_country_labels
-  }
-  country_labels <- bbmri_country_label_df(layers$countries, cfg, cfg$standard_crs, label_codes = country_label_codes)
-  if (identical(output_variant, "small")) {
-    country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
-  }
-
+  proj_bbox <- bbmri_projected_bbox(bbox, cfg$standard_crs)
   plot <- bbmri_add_classic_base(
     ggplot2::ggplot(),
     layers = layers,
@@ -475,23 +816,66 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
     cfg = cfg,
     output_variant = output_variant
   ) + ggplot2::scale_fill_identity()
+  plot <- plot + ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
 
-  anchor_df <- bbmri_country_anchor_df(layers$countries, cfg$standard_crs, label_codes = unique(summary_df$country))
-  if (nrow(anchor_df) > 0) {
-    proj_bbox <- bbmri_projected_bbox(bbox, cfg$standard_crs)
-    width_units <- proj_bbox[["xmax"]] - proj_bbox[["xmin"]]
-    height_units <- proj_bbox[["ymax"]] - proj_bbox[["ymin"]]
-    bar_style <- cfg$so_bar_style
-    global_bar_style <- cfg$so_global_bar_style %||% list(width_scale = 1, height_scale = 1)
-    if (level == "global") {
-      bar_style <- modifyList(bar_style, list())
+  width_units <- proj_bbox[["xmax"]] - proj_bbox[["xmin"]]
+  height_units <- proj_bbox[["ymax"]] - proj_bbox[["ymin"]]
+  bar_style <- cfg$so_bar_style
+  global_bar_style <- cfg$so_global_bar_style %||% list(width_scale = 1, height_scale = 1)
+  width_scale <- if (level == "global") as.numeric(global_bar_style$width_scale %||% 1) else 1
+  height_scale <- if (level == "global") as.numeric(global_bar_style$height_scale %||% 1) else 1
+  bar_width <- width_units * bar_style$bar_width_frac * width_scale
+  bar_gap <- width_units * bar_style$bar_gap_frac * width_scale
+  unit_height <- height_units * bar_style$unit_height_frac * height_scale
+  baseline_offset <- height_units * bar_style$baseline_offset_frac
+  country_label_offset <- unit_height * 1.18
+  manual_global_positions <- NULL
+  if (level == "global" && !is.null(cfg$so_global_bar_positions) && output_variant %in% names(cfg$so_global_bar_positions)) {
+    manual_global_positions <- cfg$so_global_bar_positions[[output_variant]]
+  }
+
+  if (is.null(country_label_codes)) {
+    country_label_codes <- cfg$standard_country_labels
+  }
+  if (level == "global") {
+    bar_country_codes <- unique(summary_df$country)
+    country_label_codes <- setdiff(country_label_codes, bar_country_codes)
+  } else {
+    bar_country_codes <- character(0)
+  }
+  country_labels <- bbmri_country_label_df(layers$countries, cfg, cfg$standard_crs, label_codes = country_label_codes)
+  if (identical(output_variant, "small")) {
+    country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
+  }
+
+  anchor_df <- bbmri_so_bar_anchor_df(layers$countries, cfg, cfg$standard_crs, unique(summary_df$country), bbox = bbox)
+  if (level == "global" && nrow(anchor_df) > 0) {
+    if (!is.null(manual_global_positions) && length(manual_global_positions) > 0) {
+      anchor_df <- bbmri_apply_global_bar_positions(anchor_df, manual_global_positions, cfg)
     }
-    width_scale <- if (level == "global") as.numeric(global_bar_style$width_scale %||% 1) else 1
-    height_scale <- if (level == "global") as.numeric(global_bar_style$height_scale %||% 1) else 1
-    bar_width <- width_units * bar_style$bar_width_frac * width_scale
-    bar_gap <- width_units * bar_style$bar_gap_frac * width_scale
-    unit_height <- height_units * bar_style$unit_height_frac * height_scale
-    baseline_offset <- height_units * bar_style$baseline_offset_frac
+  }
+
+  bar_country_labels <- NULL
+  bar_country_label_width_map <- NULL
+  bar_country_label_pool <- NULL
+  if (level == "global" && nrow(anchor_df) > 0) {
+    all_country_labels <- bbmri_country_label_df(layers$countries, cfg, cfg$standard_crs, label_codes = cfg$standard_country_labels)
+    if (identical(output_variant, "small")) {
+      all_country_labels <- bbmri_apply_label_offsets(all_country_labels, cfg$standard_small_label_offsets)
+    }
+    bar_country_label_pool <- all_country_labels[all_country_labels$iso_a2 %in% unique(summary_df$country), , drop = FALSE]
+    if (nrow(bar_country_label_pool) > 0) {
+      bar_country_label_width_map <- setNames(
+        pmax(
+          bbmri_country_label_style_for_output(cfg, output_variant)$size * 1.05,
+          nchar(bar_country_label_pool$label) * bbmri_country_label_style_for_output(cfg, output_variant)$size * 0.24
+        ),
+        bar_country_label_pool$iso_a2
+      )
+    }
+  }
+
+  if (nrow(anchor_df) > 0) {
     bar_rows <- list()
     row_idx <- 0L
 
@@ -506,8 +890,44 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
       objective_order <- unique(summary_df$objective_id)
     }
     objective_order <- unique(objective_order)
-    label_rows <- list()
-    label_idx <- 0L
+
+    if (level == "global" && isTRUE(cfg$so_global_bar_style$resolve_positions) && (is.null(manual_global_positions) || !length(manual_global_positions))) {
+      anchor_df <- bbmri_so_resolve_global_bar_positions(
+        anchor_df = anchor_df,
+        summary_df = summary_df,
+        cfg = cfg,
+        bbox = bbox,
+        export_sizes = export_sizes,
+        output_variant = output_variant,
+        objective_order = objective_order,
+        bar_width = bar_width,
+        bar_gap = bar_gap,
+        unit_height = unit_height,
+        baseline_offset = baseline_offset,
+        country_label_offset = country_label_offset,
+        country_label_width_map = bar_country_label_width_map
+      )
+    }
+
+    if (level == "global" && !is.null(bar_country_label_pool) && nrow(bar_country_label_pool) > 0) {
+      bar_country_labels <- bbmri_so_global_bar_country_labels(anchor_df, bar_country_label_pool, baseline_offset)
+      if (nrow(bar_country_labels) > 0 && !is.null(bar_country_label_width_map)) {
+        bar_country_label_width_map <- bar_country_label_width_map[bar_country_labels$iso_a2]
+      }
+      if (nrow(country_labels) > 0) {
+        bar_country_iso <- unique(bar_country_labels$iso_a2)
+        country_labels <- country_labels[!country_labels$iso_a2 %in% bar_country_iso, , drop = FALSE]
+      }
+    }
+
+    slot_rows <- list()
+    slot_idx <- 0L
+    digit_rows <- list()
+    digit_idx <- 0L
+    prefix_rows <- list()
+    prefix_idx <- 0L
+    frame_rows <- list()
+    frame_idx <- 0L
 
     for (anchor in seq_len(nrow(anchor_df))) {
       iso <- anchor_df$iso_a2[[anchor]]
@@ -515,7 +935,12 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
       if (nrow(country_summary) == 0) {
         next
       }
-      baseline_y <- anchor_df$y[[anchor]] - baseline_offset
+      baseline_y <- anchor_df$bar_y[[anchor]] - baseline_offset
+      max_total_height <- max(country_summary$lead_count + country_summary$contributor_count, na.rm = TRUE)
+      if (!is.finite(max_total_height) || max_total_height < 1) {
+        max_total_height <- 1
+      }
+
       if (level == "so") {
         row_sum <- country_summary[1, , drop = FALSE]
         bar_total <- row_sum$lead_count[[1]] + row_sum$contributor_count[[1]]
@@ -524,8 +949,8 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
         }
         row_idx <- row_idx + 1L
         bar_rows[[row_idx]] <- data.frame(
-          xmin = anchor_df$x[[anchor]] - bar_width / 2,
-          xmax = anchor_df$x[[anchor]] + bar_width / 2,
+          xmin = anchor_df$bar_x[[anchor]] - bar_width / 2,
+          xmax = anchor_df$bar_x[[anchor]] + bar_width / 2,
           ymin = baseline_y,
           ymax = baseline_y + row_sum$lead_count[[1]] * unit_height,
           fill = cfg$so_colors$lead,
@@ -536,8 +961,8 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
         if (row_sum$contributor_count[[1]] > 0) {
           row_idx <- row_idx + 1L
           bar_rows[[row_idx]] <- data.frame(
-            xmin = anchor_df$x[[anchor]] - bar_width / 2,
-            xmax = anchor_df$x[[anchor]] + bar_width / 2,
+            xmin = anchor_df$bar_x[[anchor]] - bar_width / 2,
+            xmax = anchor_df$bar_x[[anchor]] + bar_width / 2,
             ymin = baseline_y + row_sum$lead_count[[1]] * unit_height,
             ymax = baseline_y + bar_total * unit_height,
             fill = cfg$so_colors$contributor,
@@ -548,15 +973,15 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
         }
       } else {
         cluster_width <- length(objective_order) * bar_width + max(0, length(objective_order) - 1) * bar_gap
-        start_x <- anchor_df$x[[anchor]] - cluster_width / 2
+        start_x <- anchor_df$bar_x[[anchor]] - cluster_width / 2
         label_y <- baseline_y - unit_height * 0.85
-        label_idx <- label_idx + 1L
-        label_rows[[label_idx]] <- data.frame(
-          x = anchor_df$x[[anchor]],
+        prefix_idx <- prefix_idx + 1L
+        prefix_rows[[prefix_idx]] <- data.frame(
+          x = start_x - unit_height * 0.45,
           y = label_y,
-          label = paste0("SO: ", paste(sub("^SO", "", objective_order), collapse = "")),
+          label = "SO: ",
           colour = "#303030",
-          hjust = 0.5,
+          hjust = 1,
           stringsAsFactors = FALSE
         )
         for (o_idx in seq_along(objective_order)) {
@@ -564,11 +989,33 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
           obj_row <- country_summary[country_summary$objective_id == objective_id, , drop = FALSE]
           lead_ct <- if (nrow(obj_row) == 0) 0 else obj_row$lead_count[[1]]
           contrib_ct <- if (nrow(obj_row) == 0) 0 else obj_row$contributor_count[[1]]
+          slot_x <- start_x + (o_idx - 1) * (bar_width + bar_gap)
+          x1 <- slot_x
+          x2 <- x1 + bar_width
+          slot_idx <- slot_idx + 1L
+          slot_rows[[slot_idx]] <- data.frame(
+            xmin = x1,
+            xmax = x2,
+            ymin = baseline_y,
+            ymax = baseline_y + unit_height,
+            fill = grDevices::adjustcolor("#d9d9d9", alpha.f = 0.18),
+            role = "slot",
+            country = iso,
+            objective_id = objective_id,
+            stringsAsFactors = FALSE
+          )
+          digit_idx <- digit_idx + 1L
+          digit_rows[[digit_idx]] <- data.frame(
+            x = x1 + bar_width / 2,
+            y = label_y,
+            label = sub("^SO", "", objective_id),
+            colour = if (lead_ct + contrib_ct > 0) "#303030" else "#8a8a8a",
+            hjust = 0.5,
+            stringsAsFactors = FALSE
+          )
           if (lead_ct + contrib_ct <= 0) {
             next
           }
-          x1 <- start_x + (o_idx - 1) * (bar_width + bar_gap)
-          x2 <- x1 + bar_width
           if (lead_ct > 0) {
             row_idx <- row_idx + 1L
             bar_rows[[row_idx]] <- data.frame(
@@ -599,8 +1046,46 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
           }
         }
       }
+
+      if (level == "global") {
+        frame_box <- bbmri_so_global_bar_frame_box(
+          bar_x = anchor_df$bar_x[[anchor]],
+          bar_y = anchor_df$bar_y[[anchor]],
+          bar_width = bar_width,
+          bar_gap = bar_gap,
+          unit_height = unit_height,
+          baseline_offset = baseline_offset,
+          objective_count = length(objective_order),
+          max_total_height = max_total_height,
+          country_label_offset = country_label_offset,
+          country_label_width = if (!is.null(bar_country_label_width_map) && iso %in% names(bar_country_label_width_map)) {
+            as.numeric(bar_country_label_width_map[[iso]])
+          } else {
+            NULL
+          }
+        )
+        frame_idx <- frame_idx + 1L
+        frame_rows[[frame_idx]] <- data.frame(
+          xmin = frame_box$xmin,
+          xmax = frame_box$xmax,
+          ymin = frame_box$ymin,
+          ymax = frame_box$ymax,
+          stringsAsFactors = FALSE
+        )
+      }
     }
 
+    if (level == "global" && length(frame_rows) > 0) {
+      frames_df <- do.call(rbind, frame_rows)
+      plot <- plot +
+        ggplot2::geom_rect(
+          data = frames_df,
+          ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+          fill = NA,
+          colour = "#000000",
+          linewidth = 0.12
+        )
+    }
     if (length(bar_rows) > 0) {
       bars_df <- do.call(rbind, bar_rows)
       plot <- plot +
@@ -613,13 +1098,25 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
         ) +
         ggplot2::scale_fill_identity()
     }
-    if (length(label_rows) > 0) {
-      labels_df <- do.call(rbind, label_rows)
+    if (isTRUE(global_bar_style$show_slots) && length(slot_rows) > 0) {
+      slots_df <- do.call(rbind, slot_rows)
+      plot <- plot +
+        ggplot2::geom_rect(
+          data = slots_df,
+          ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = fill),
+          colour = grDevices::adjustcolor(cfg$so_colors$bar_border, alpha.f = 0.35),
+          linewidth = bar_style$outline_linewidth * 0.8,
+          alpha = 0.75
+        ) +
+        ggplot2::scale_fill_identity()
+    }
+    if (length(digit_rows) > 0) {
+      digits_df <- do.call(rbind, digit_rows)
       plot <- plot +
         ggplot2::geom_text(
-          data = labels_df,
+          data = digits_df,
           ggplot2::aes(x = x, y = y, label = label, colour = colour, hjust = hjust),
-          family = "mono",
+          family = bbmri_font_family(),
           size = 2.0,
           fontface = "plain",
           vjust = 1,
@@ -627,6 +1124,35 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
         ) +
         ggplot2::scale_colour_identity()
     }
+    if (length(prefix_rows) > 0) {
+      prefix_df <- do.call(rbind, prefix_rows)
+      plot <- plot +
+        ggplot2::geom_text(
+          data = prefix_df,
+          ggplot2::aes(x = x, y = y, label = label, colour = colour, hjust = hjust),
+          family = bbmri_font_family(),
+          size = 2.0,
+          fontface = "plain",
+          vjust = 1,
+          show.legend = FALSE
+        ) +
+        ggplot2::scale_colour_identity()
+    }
+  }
+
+  if (level == "global" && !is.null(bar_country_labels) && nrow(bar_country_labels) > 0) {
+    plot <- plot + bbmri_geom_text_halo(
+      data = bar_country_labels,
+      mapping = ggplot2::aes(x = x, y = y, label = label, hjust = hjust, vjust = vjust),
+      size = bbmri_country_label_style_for_output(cfg, output_variant)$size,
+      bbox = bbox,
+      crs = cfg$standard_crs,
+      output_width_px = bbmri_output_width_px(export_sizes, output_variant),
+      family = bbmri_font_family(),
+      inner_halo_px = bbmri_country_label_style_for_output(cfg, output_variant)$inner_halo_px,
+      outer_halo_px = bbmri_country_label_style_for_output(cfg, output_variant)$outer_halo_px,
+      alpha = bbmri_country_label_style_for_output(cfg, output_variant)$alpha
+    )
   }
 
   plot <- plot + bbmri_geom_text_halo(
@@ -643,11 +1169,11 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
   )
 
   legend_entries <- data.frame(
-    label = c("Lead", "Contributor"),
-    fill = c(cfg$so_colors$lead, cfg$so_colors$contributor),
-    colour = c(cfg$so_colors$bar_border, cfg$so_colors$bar_border),
-    alpha = c(0.88, 0.88),
-    linewidth = c(0.25, 0.25),
+    label = c("Lead", "Contributor", "Member", "Observer"),
+    fill = c(cfg$so_colors$lead, cfg$so_colors$contributor, cfg$so_colors$base_member, cfg$so_colors$base_observer),
+    colour = c(cfg$so_colors$bar_border, cfg$so_colors$bar_border, cfg$so_colors$bar_border, cfg$so_colors$bar_border),
+    alpha = c(0.88, 0.88, 0.88, 0.88),
+    linewidth = c(0.25, 0.25, 0.25, 0.25),
     stringsAsFactors = FALSE
   )
   plot <- bbmri_add_rect_legend(
@@ -655,14 +1181,16 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
     entries = legend_entries,
     bbox = bbox,
     crs = cfg$standard_crs,
-    box = list(x = 0.03, y = 0.05, width = 0.22, height = 0.12),
+    box = list(x = 0.03, y = 0.05, width = 0.27, height = 0.145),
     title = "Strategic involvement",
-    text_size = 2.1
+    text_size = 1.95,
+    row_start_frac = 0.69,
+    row_step_frac = 0.155
   )
+
   plot + ggplot2::labs(title = if (level == "global") "Strategic objectives overview" else if (bbmri_has_text(objective_filter)) objective_filter else "Strategic objectives")
 }
-
-bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_prefix, levels = c("sg", "so", "global"), modes = c("recolor", "bars"), objective_filter = NULL, goal_filter = NULL, country_label_codes = NULL, cfg = NULL, objective_order = NULL) {
+bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_prefix, levels = c("sg", "so", "global"), modes = c("recolor", "bars"), objective_filter = NULL, goal_filter = NULL, country_label_codes = NULL, cfg = NULL, objective_order = NULL, output_variants = NULL) {
   if (is.null(cfg)) {
     cfg <- bbmri_map_config()
   }
@@ -712,7 +1240,9 @@ bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_pre
       },
       output_dir = output_dir,
       prefix = target_prefix,
-      export_sizes = cfg$export_sizes
+      export_sizes = cfg$export_sizes,
+      output_variants = output_variants,
+      include_vector = is.null(output_variants)
     )
   }
   invisible(TRUE)

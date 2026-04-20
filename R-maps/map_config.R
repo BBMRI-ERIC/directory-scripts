@@ -21,6 +21,34 @@ bbmri_map_config <- function() {
     )
   }
 
+  # Seed positions are the geographic centers of the countries.
+  # They are intended as a human-editable starting point for manual per-size tuning.
+  so_global_bar_position_seed <- list(
+    DE = c(lon = 10.392360, lat = 51.218588),
+    IT = c(lon = 12.007595, lat = 42.954625),
+    ES = c(lon = -3.632857, lat = 40.348739),
+    PL = c(lon = 19.380227, lat = 52.187936),
+    NL = c(lon = 5.357191, lat = 52.186263),
+    GR = c(lon = 22.970991, lat = 39.108193),
+    BE = c(lon = 4.636528, lat = 50.643486),
+    CZ = c(lon = 15.310535, lat = 49.741379),
+    HU = c(lon = 19.404981, lat = 47.175034),
+    SE = c(lon = 17.002863, lat = 63.415060),
+    AT = c(lon = 14.138867, lat = 47.595876),
+    CH = c(lon = 8.216605, lat = 46.804176),
+    BG = c(lon = 25.220918, lat = 42.780797),
+    DK = c(lon = 10.043369, lat = 55.984666),
+    FI = c(lon = 26.306482, lat = 64.905896),
+    NO = c(lon = 16.777994, lat = 73.309406),
+    LT = c(lon = 23.883398, lat = 55.341185),
+    LV = c(lon = 24.905259, lat = 56.861583),
+    SI = c(lon = 14.810122, lat = 46.119189),
+    EE = c(lon = 25.534850, lat = 58.681223),
+    QA = c(lon = 51.187645, lat = 25.314758),
+    CY = c(lon = 32.990284, lat = 34.915276),
+    MT = c(lon = 14.404172, lat = 35.920902)
+  )
+
   list(
     render_scale = 2,
     marker_width_scale = 8.7,
@@ -279,8 +307,39 @@ bbmri_map_config <- function() {
       alpha = 0.88
     ),
     so_global_bar_style = list(
-      width_scale = 0.50,
-      height_scale = 0.80
+      width_scale = 0.42,
+      height_scale = 0.80,
+      show_slots = FALSE,
+      resolve_positions = FALSE
+    ),
+    so_global_bar_positions = list(
+      small = so_global_bar_position_seed,
+      med = list(
+    AT = c(lon = 14.99, lat = 43.90),
+    BE = c(lon = 1.50, lat = 48.64),
+    BG = c(lon = 30.28, lat = 43.87),
+    CH = c(lon = 8.216605, lat = 46.804176),
+    CY = c(lon = 32.990284, lat = 34.915276),
+    CZ = c(lon = 16.80, lat = 49.88),
+    DE = c(lon = 10.00, lat = 51.218588),
+    DK = c(lon = 10.00, lat = 56.00),
+    EE = c(lon = 29.31, lat = 59.14),
+    ES = c(lon = -3.632857, lat = 40.348739),
+    FI = c(lon = 26.306482, lat = 64.905896),
+    GR = c(lon = 22.970991, lat = 39.108193),
+    HU = c(lon = 25.58, lat = 48.00),
+    IT = c(lon = 6.99, lat = 39.30),
+    LT = c(lon = 27.82, lat = 53.71),
+    LV = c(lon = 21.4, lat = 57.80),
+    MT = c(lon = 14.404172, lat = 33.62),
+    NL = c(lon = 2.00, lat = 54.48),
+    NO = c(lon = 8.70, lat = 60.79),
+    PL = c(lon = 18.16, lat = 54.87),
+    QA = c(lon = 51.187645, lat = 25.314758),
+    SE = c(lon = 17.002863, lat = 63.415060),
+    SI = c(lon = 14.90, lat = 40.03)
+  ),
+      big = so_global_bar_position_seed
     ),
     oec_colors = list(
       background = "#ffffff",

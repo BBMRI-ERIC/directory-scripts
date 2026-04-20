@@ -162,6 +162,8 @@ main <- function() {
   ))
   args$map_set <- bbmri_validate_map_set(args$map_set)
   selected_maps <- bbmri_normalize_map_selection(args$maps, args$map_set)
+  cat("Generating maps: ", paste(selected_maps, collapse = ", "), "\n", sep = "")
+  cat("Output directory: ", args$output_dir, "\n", sep = "")
 
   needs_full_geojson <- any(selected_maps %in% c(
     "bbmri-members-nolabels",

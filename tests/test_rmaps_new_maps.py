@@ -35,7 +35,15 @@ def test_rare_disease_prep_script_compiles():
     py = shutil.which("python3")
     if py is None:
         pytest.skip("python3 not available")
-    subprocess.run([py, "-m", "py_compile", "R-maps/prepare_rare_diseases_geojson.py"], check=True)
+    subprocess.run(
+        [
+            py,
+            "-m",
+            "py_compile",
+            "R-maps/prepare_rare_diseases_geojson.py",
+        ],
+        check=True,
+    )
 
 
 def test_label_layer_order_and_rare_disease_fixed_sizes():
@@ -88,5 +96,15 @@ def test_strategic_objectives_template_is_valid_toml_and_normalizes():
 
     assert data["schema_version"] == 1
     assert [obj["id"] for obj in data["objectives"]] == ["SO1", "SO2", "SO3", "SO4", "SO5", "SO6", "SO7", "SO8"]
-    so2 = next(obj for obj in data["objectives"] if obj["id"] == "SO2")
-    assert len(so2["goals"]) == 6
+    expected_goal_counts = {
+        "SO1": 3,
+        "SO2": 6,
+        "SO3": 5,
+        "SO4": 6,
+        "SO5": 1,
+        "SO6": 3,
+        "SO7": 3,
+        "SO8": 3,
+    }
+    for objective in data["objectives"]:
+        assert len(objective["goals"]) == expected_goal_counts[objective["id"]]

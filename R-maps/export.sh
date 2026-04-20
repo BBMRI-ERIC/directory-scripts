@@ -168,6 +168,13 @@ done
 cd "$repo_root"
 export DIRECTORY_CACHE_ROOT="$repo_root"
 
+if [ -n "$maps" ]; then
+  printf 'Generating maps: %s\n' "$maps"
+else
+  printf 'Generating maps from map-set: %s\n' "$map_set"
+fi
+printf 'Output directory: %s\n' "$output_dir"
+
 exec "$rscript_bin" "$script_dir/render_pilot_maps.R" \
   --map-set="$map_set" \
   --maps="$maps" \

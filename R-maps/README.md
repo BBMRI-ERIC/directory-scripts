@@ -69,6 +69,15 @@ Rscript R-maps/render_pilot_maps.R --map-set=extras
 Rscript R-maps/render_pilot_maps.R --map-set=all
 ```
 
+Convenience wrappers:
+
+```bash
+sh R-maps/regenerate-common-maps.sh
+sh R-maps/regenerate-strategic-objectives.sh
+sh R-maps/regenerate-strategic-objectives.sh example-strategic-objectives-so2-global-bars-med
+sh R-maps/regenerate-strategic-objectives.sh example-strategic-objectives-so2-so-SO2-recolor example-strategic-objectives-so2-sg-SO2.6-recolor-big
+```
+
 ## How The Pipeline Works
 
 `export.sh` drives `render_pilot_maps.R`.
@@ -231,12 +240,16 @@ Prep helpers can also be run directly:
   TOML/JSON normalization helper for strategic-objectives maps
 - `render_pilot_maps.R`
   End-to-end runner used by `export.sh`
+- `regenerate-common-maps.sh`
+  Thin shell wrapper for the standard BBMRI map suite
 - `strategic-objectives-template.toml`
   Scaffold for future strategic-objectives visualization data
 - `strategic_objectives_common.R`
   Shared helpers for SO/SG map data loading, summarization, and rendering
 - `render_strategic_objectives.R`
   CLI entrypoint for strategic-objectives maps
+- `regenerate-strategic-objectives.sh`
+  Thin shell wrapper for the example SO/SG map family
 
 ## Outputs
 

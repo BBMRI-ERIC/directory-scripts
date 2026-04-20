@@ -118,7 +118,7 @@
       "goals": [
         {
           "id": "SO2.1",
-          "title": "",
+          "title": "Datafication at source",
           "description": "",
           "co_leads": [
             {
@@ -155,7 +155,7 @@
         },
         {
           "id": "SO2.2",
-          "title": "",
+          "title": "Enable reproducible research through good data traceability and quality management",
           "description": "",
           "co_leads": [
             {
@@ -193,7 +193,7 @@
         },
         {
           "id": "SO2.3",
-          "title": "",
+          "title": "Ensure international interoperable connectivity with (local, national and international) medical data ecosystems",
           "description": "",
           "co_leads": [
             {
@@ -231,7 +231,7 @@
         },
         {
           "id": "SO2.4",
-          "title": "",
+          "title": "Expand the Federated Platform",
           "description": "",
           "co_leads": [
             {
@@ -268,7 +268,7 @@
         },
         {
           "id": "SO2.5",
-          "title": "",
+          "title": "Enable on-demand easily accessible data generation to advance biobanking",
           "description": "",
           "co_leads": [
             {
@@ -294,7 +294,7 @@
         },
         {
           "id": "SO2.6",
-          "title": "",
+          "title": "Increase capacities to host result data",
           "description": "",
           "co_leads": [
             {
@@ -698,27 +698,398 @@
     },
     {
       "id": "SO5",
-      "title": "",
-      "description": "",
-      "goals": []
+      "title": "SO5",
+      "description": "National-node and biobank empowerment implementation involvement.",
+      "goals": [
+        {
+          "id": "SO5.1",
+          "title": "Empower National Nodes and biobanks",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "HQ-BBD",
+              "country_raw": "HQ-BBD",
+              "names": [
+                "Saba Abdulghani"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "BG",
+            "CH",
+            "CY",
+            "CZ",
+            "DE",
+            "EE",
+            "ES",
+            "FI",
+            "GR",
+            "HU",
+            "IT",
+            "LT",
+            "LV",
+            "MT",
+            "NL",
+            "SI"
+          ],
+          "contributions_hq": [
+            "PA",
+            "OEC",
+            "QM"
+          ]
+        }
+      ]
     },
     {
       "id": "SO6",
-      "title": "",
-      "description": "",
-      "goals": []
+      "title": "SO6",
+      "description": "Academy and career-development implementation involvement.",
+      "goals": [
+        {
+          "id": "SO6.1",
+          "title": "Evolve the BBMRI-ERIC Academy",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "DE",
+              "country_raw": "DE",
+              "names": [
+                "Ulrike Felgenhauer",
+                "Ronny Baber"
+              ]
+            },
+            {
+              "country": "ES",
+              "country_raw": "ES",
+              "names": [
+                "Elena Molina Roldán",
+                "Teresa Escámez Martínez"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "CY",
+            "ES",
+            "GR",
+            "HU",
+            "IT",
+            "QA",
+            "SE"
+          ],
+          "contributions_hq": [
+            "QM",
+            "ELSI"
+          ]
+        },
+        {
+          "id": "SO6.2",
+          "title": "Build specific career development programmes for RI community",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "DE",
+              "country_raw": "DE",
+              "names": [
+                "Ulrike Felgenhauer",
+                "Sara Nussbeck"
+              ]
+            },
+            {
+              "country": "IT",
+              "country_raw": "IT",
+              "names": [
+                "Marialuisa Lavitrano",
+                "Monica Forni"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "CH",
+            "ES",
+            "GR",
+            "HU",
+            "LT",
+            "NL",
+            "SE"
+          ],
+          "contributions_hq": [
+            "QM",
+            "FPM"
+          ]
+        },
+        {
+          "id": "SO6.3",
+          "title": "Ensure biobanking adapts to and leverages innovative technological developments",
+          "description": "Links to SO4",
+          "co_leads": [
+            {
+              "country": "LT",
+              "country_raw": "LT",
+              "names": [
+                "Daiva Dabkeviciene"
+              ]
+            },
+            {
+              "country": "SE",
+              "country_raw": "SE",
+              "names": [
+                "Anna Beskow"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "CZ",
+            "ES"
+          ],
+          "contributions_hq": [
+            "BBD",
+            "QM"
+          ]
+        }
+      ]
     },
     {
       "id": "SO7",
-      "title": "",
-      "description": "",
-      "goals": []
+      "title": "SO7",
+      "description": "Communication and stakeholder-engagement implementation involvement.",
+      "goals": [
+        {
+          "id": "SO7.1",
+          "title": "Strengthen communication, outreach, and demonstrate impact to key stakeholders, e.g. EU and national ministries, universities and hospitals, funders and foundations through existing and new digital channels",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "BE",
+              "country_raw": "BE",
+              "names": [
+                "Annelies Debucquoy",
+                "Elke Smits"
+              ]
+            },
+            {
+              "country": "DE",
+              "country_raw": "DE",
+              "names": [
+                "Verena Huth",
+                "Ronny Baber"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BG",
+            "CH",
+            "CY",
+            "CZ",
+            "EE",
+            "ES",
+            "FI",
+            "GR",
+            "HU",
+            "IT",
+            "LT",
+            "LV",
+            "MT",
+            "NL",
+            "SE",
+            "SI"
+          ],
+          "contributions_hq": [
+            "OEC"
+          ]
+        },
+        {
+          "id": "SO7.2",
+          "title": "Improve stakeholder engagement by continuing to strengthen the Stakeholder Forum Patients and Citizens’ Pillar",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "DE",
+              "country_raw": "DE",
+              "names": [
+                "Verena Huth",
+                "Ronny Baber"
+              ]
+            },
+            {
+              "country": "HU",
+              "country_raw": "HU",
+              "names": [
+                "Molnar Maria Judit",
+                "Márta Széll"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "BG",
+            "CZ",
+            "ES",
+            "FI",
+            "GR",
+            "IT",
+            "LT",
+            "MT",
+            "SE"
+          ],
+          "contributions_hq": [
+            "PA",
+            "OEC"
+          ]
+        },
+        {
+          "id": "SO7.3",
+          "title": "Strengthen ability to illustrate the socio-economic value of biobanking – samples, data and biomolecular resources of BBMRI-ERIC and wider biobanking community",
+          "description": "Links to SO4",
+          "co_leads": [
+            {
+              "country": "IARC/WHO",
+              "country_raw": "IARC/WHO",
+              "names": [
+                "Zisis Kozlakidis",
+                "Elodie Caboux"
+              ]
+            },
+            {
+              "country": "PA",
+              "country_raw": "HQ-PA",
+              "names": [
+                "Johanna Kostenzer"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "CH",
+            "CY",
+            "CZ",
+            "DE",
+            "GR",
+            "IT",
+            "LT",
+            "MT",
+            "QA"
+          ],
+          "contributions_hq": [
+            "OEC",
+            "FPM",
+            "ELSI"
+          ]
+        }
+      ]
     },
     {
       "id": "SO8",
-      "title": "",
-      "description": "",
-      "goals": []
+      "title": "SO8",
+      "description": "Global engagement and policy-leadership implementation involvement.",
+      "goals": [
+        {
+          "id": "SO8.1",
+          "title": "Identify and implement different “BBMRI-ERIC Global” formats",
+          "description": "Links to SO4 and SO5",
+          "co_leads": [
+            {
+              "country": "QA",
+              "country_raw": "QA",
+              "names": [
+                "Dr. Fatima M Kafood",
+                "Dr. Eleni Fthenou"
+              ]
+            },
+            {
+              "country": "PA",
+              "country_raw": "HQ-PA",
+              "names": [
+                "Johanna Kostenzer"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "CY",
+            "GR",
+            "IT"
+          ],
+          "contributions_hq": [
+            "FPM"
+          ]
+        },
+        {
+          "id": "SO8.2",
+          "title": "Lead global standardisation initiatives",
+          "description": "Links to SO1, SO2, SO4, SO6",
+          "co_leads": [
+            {
+              "country": "AT",
+              "country_raw": "AT",
+              "names": [
+                "Cornelia Stumptner",
+                "Helmuth Haslacher"
+              ]
+            },
+            {
+              "country": "PL",
+              "country_raw": "PL",
+              "names": [
+                "Agnieszka Matera-Witkiewicz",
+                "Joanna Gleńska-Olender"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "AT",
+            "BE",
+            "CH",
+            "CZ",
+            "DE",
+            "ES",
+            "IARC/WHO",
+            "IT",
+            "NL"
+          ],
+          "contributions_hq": [
+            "QM",
+            "ELSI",
+            "HQ-IT",
+            "PA"
+          ]
+        },
+        {
+          "id": "SO8.3",
+          "title": "Consolidate BBMRI-ERIC’s position as an opinion leader for health and life sciences RIs within the overall EU and global policy arena",
+          "description": "",
+          "co_leads": [
+            {
+              "country": "GR",
+              "country_raw": "GR",
+              "names": [
+                "Sissy Kolyva",
+                "Dimitris Thanos"
+              ]
+            },
+            {
+              "country": "PA",
+              "country_raw": "HQ-PA",
+              "names": [
+                "Elena Preziosa"
+              ]
+            }
+          ],
+          "contributors_nn": [
+            "MT",
+            "WHO",
+            "IARC"
+          ],
+          "contributions_hq": [
+            "OEC"
+          ]
+        }
+      ]
     }
   ]
 }
