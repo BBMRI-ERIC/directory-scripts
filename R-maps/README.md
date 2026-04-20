@@ -43,6 +43,13 @@ Render all maps (default):
 sh R-maps/export.sh
 ```
 
+Force a fresh Directory cache before the GeoJSON export step:
+
+```bash
+sh R-maps/export.sh --purge-directory-cache
+sh R-maps/regenerate-common-maps.sh --purge-directory-cache
+```
+
 Render only the extra maps:
 
 ```bash

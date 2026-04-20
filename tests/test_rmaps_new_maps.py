@@ -61,6 +61,49 @@ def test_rare_disease_prep_script_compiles():
     )
 
 
+def test_rmaps_export_help_mentions_directory_cache_purge_option():
+    shell = shutil.which("sh")
+    if shell is None:
+        pytest.skip("sh not available")
+
+    completed = subprocess.run(
+        [shell, "R-maps/export.sh", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "--purge-directory-cache" in completed.stdout
+
+
+def test_rmaps_geocoding_export_adds_directory_cache_purge_flag():
+    rscript = shutil.which("Rscript")
+    if rscript is None:
+        pytest.skip("Rscript not available")
+
+    script = r'''
+source("R-maps/render_pilot_maps.R")
+tmp_dir <- tempfile("rmaps-geocode-")
+dir.create(tmp_dir)
+out_path <- file.path(tmp_dir, "demo.geojson")
+captured <- tempfile("rmaps-args-")
+system2 <- function(command, args = character(), ...) {
+  writeLines(args, captured)
+  file.create(out_path)
+  0L
+}
+bbmri_run_geocoding_export(
+  python_bin = "python3",
+  geocoding_script = "geocoding_2022.py",
+  geocoding_config = "geocoding.config",
+  out_path = out_path,
+  purge_directory_cache = TRUE
+)
+args <- readLines(captured, warn = FALSE)
+stopifnot("--purge-cache" %in% args, "directory" %in% args)
+'''
+    subprocess.run([rscript, "-e", script], check=True)
+
+
 def test_label_layer_order_and_rare_disease_fixed_sizes():
     """Verify label layer order and rare disease fixed sizes.
 

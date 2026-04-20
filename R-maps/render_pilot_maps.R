@@ -43,13 +43,16 @@ source(file.path(script_dir, "render_rare_diseases_labels.R"))
 source(file.path(script_dir, "render_rare_diseases_sized.R"))
 source(file.path(script_dir, "strategic_objectives_common.R"))
 
-bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_config, out_path) {
+bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_config, out_path, purge_directory_cache = FALSE) {
   out_base <- tools::file_path_sans_ext(out_path)
   args <- c(
     geocoding_script,
     "--out-name", out_base,
     geocoding_config
   )
+  if (isTRUE(purge_directory_cache)) {
+    args <- c(args, "--purge-cache", "directory")
+  }
   status <- system2(python_bin, args = args)
   if (!identical(status, 0L)) {
     stop("geocoding_2022.py failed with exit status ", status, call. = FALSE)
@@ -65,6 +68,17 @@ bbmri_run_python_helper <- function(python_bin, script_path, helper_args) {
   if (!identical(status, 0L)) {
     stop(basename(script_path), " failed with exit status ", status, call. = FALSE)
   }
+}
+
+bbmri_parse_bool_flag <- function(value) {
+  if (is.null(value) || identical(value, FALSE) || identical(value, 0L)) {
+    return(FALSE)
+  }
+  if (is.logical(value)) {
+    return(isTRUE(value))
+  }
+  value <- tolower(trimws(as.character(value)[[1]]))
+  value %in% c("1", "true", "t", "yes", "y")
 }
 
 bbmri_validate_map_set <- function(value) {
@@ -158,6 +172,7 @@ main <- function() {
     crc_geojson = normalizePath(file.path(script_dir, "data", "CRC-Cohort.geojson"), winslash = "/", mustWork = FALSE),
     crc_imaging_geojson = normalizePath(file.path(script_dir, "data", "CRC-Cohort-imaging.geojson"), winslash = "/", mustWork = FALSE),
     strategic_objectives_spec = normalizePath(file.path(script_dir, "data", "strategic-objectives-template.toml"), winslash = "/", mustWork = FALSE),
+    purge_directory_cache = FALSE,
     output_dir = file.path(script_dir, "pilot-output")
   ))
   args$map_set <- bbmri_validate_map_set(args$map_set)
@@ -194,7 +209,8 @@ main <- function() {
       python_bin = args$python,
       geocoding_script = args$geocoding_script,
       geocoding_config = args$geocoding_config,
-      out_path = args$full_geojson
+      out_path = args$full_geojson,
+      purge_directory_cache = bbmri_parse_bool_flag(args$purge_directory_cache)
     )
   }
 
