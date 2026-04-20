@@ -55,7 +55,7 @@ class ICD10CodesHelper:
       m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
       if m:
          log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
-         if m.group('block') == 'E' and (int(m.group('code')) == 66):
+         if m.group('block') == 'E' and (65 <= int(m.group('code')) <= 68):
             return True
          else:
             return False
