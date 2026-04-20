@@ -205,7 +205,9 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             try:
                 session.get_by_id('fdp_IRI', d['id'], attributes='id')
             except MolgenisRequestError:
-                missing_iris.append((d['id'], get_disease_ontology_code(d['id'])))
+                ontology_code = get_disease_ontology_code(d['id'])
+                if ontology_code is not None:
+                    missing_iris.append((d['id'], ontology_code))
 
         for t in collection['type']:
             # same as diagnosis for collection type
@@ -279,7 +281,7 @@ def get_records_to_add(biobank_data, session, directory_prefix):
             'minAge': c['age_low'] if 'age_low' in c else None,
             'maxAge': c['age_high'] if 'age_high' in c else None,
             'numberOfRecords': c['size'] if 'size' in c else None,
-            'numberOfUniqueIndividuals': c['number_of_donors']
+            'numberOfUniqueIndividuals': c['number_of_donors'] if 'number_of_donors' in c else None
 
         } for c in biobank_data['collections']],
         FDP_IRI: missing_iris,
