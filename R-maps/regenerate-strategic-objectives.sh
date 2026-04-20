@@ -7,7 +7,7 @@ repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
 cd "$repo_root"
 
 if [ "$#" -gt 0 ]; then
-  printf 'Generating strategic-objectives example maps into %s for: %s\n' "$script_dir/compare-temp/examples" "$*"
+  printf 'Generating strategic-objectives example maps into %s for targets/options: %s\n' "$script_dir/compare-temp/examples" "$*"
 else
   printf 'Generating strategic-objectives example maps into %s\n' "$script_dir/compare-temp/examples"
 fi

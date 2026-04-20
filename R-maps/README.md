@@ -74,8 +74,8 @@ Convenience wrappers:
 ```bash
 sh R-maps/regenerate-common-maps.sh
 sh R-maps/regenerate-strategic-objectives.sh
-sh R-maps/regenerate-strategic-objectives.sh example-strategic-objectives-so2-global-bars-med
-sh R-maps/regenerate-strategic-objectives.sh example-strategic-objectives-so2-so-SO2-recolor example-strategic-objectives-so2-sg-SO2.6-recolor-big
+sh R-maps/regenerate-strategic-objectives.sh SO2-bars SO2.6-recolor-big
+sh R-maps/regenerate-strategic-objectives.sh --formats=png,svg --sizes=small,med
 ```
 
 ## How The Pipeline Works
@@ -126,6 +126,20 @@ Strategic-objectives maps use the TOML scaffold at
 - per-SG recolor views
 - per-SO recolor or bars views
 - global recolor or bars views
+
+The strategic-objectives example wrapper writes the short `SO*` filenames:
+
+- `SO-recolor-*` and `SO-bars-*` for the global views
+- `SO1-recolor-*`, `SO1-bars-*`, ... for the objective views
+- `SO1.1-recolor-*`, ... for the goal views
+
+You can restrict the generated raster/vector formats and size variants from the
+command line, for example `--formats=png,svg --sizes=small,med`.
+The standalone `render_strategic_objectives.R` CLI accepts the same `--sizes`
+and `--formats` filters, plus `--target-name-style=legacy|short` when you want
+to switch between the historical `strategic-objectives-*` filenames and the
+short `SO*` naming used by the example wrapper. In `short` mode the CLI now
+defaults to the `SO` prefix automatically unless you override `--output-prefix`.
 
 The shared implementation lives in `R-maps/strategic_objectives_common.R` and
 is intentionally sourceable from either the repository root or `R-maps/`

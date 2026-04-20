@@ -52,6 +52,47 @@ if (requireNamespace("svglite", quietly = TRUE)) {
     subprocess.run([rscript, "-e", script], check=True)
 
 
+def test_strategic_objectives_short_names_support_format_and_size_filters():
+    rscript = shutil.which("Rscript")
+    if rscript is None:
+        pytest.skip("Rscript not available")
+
+    script = r'''
+source("R-maps/strategic_objectives_common.R")
+spec <- bbmri_load_strategic_objectives_spec("R-maps/data/strategic-objectives-template.toml")
+so2_spec <- bbmri_so_subset_spec(spec, objective_ids = "SO2")
+tmp_dir <- tempfile("so-short-")
+dir.create(tmp_dir)
+bbmri_save_strategic_objectives_formats(
+  spec = so2_spec,
+  output_dir = tmp_dir,
+  output_prefix = "SO",
+  levels = c("sg", "so", "global"),
+  modes = c("recolor", "bars"),
+  output_variants = c("small", "med"),
+  output_formats = c("png", "svg"),
+  target_name_style = "short"
+)
+stopifnot(
+  file.exists(file.path(tmp_dir, "SO-recolor-small.png")),
+  file.exists(file.path(tmp_dir, "SO-bars-med.png")),
+  file.exists(file.path(tmp_dir, "SO2-recolor-small.png")),
+  file.exists(file.path(tmp_dir, "SO2-bars-med.png")),
+  file.exists(file.path(tmp_dir, "SO2.1-recolor-small.png")),
+  !file.exists(file.path(tmp_dir, "SO-recolor-small.pdf")),
+  !file.exists(file.path(tmp_dir, "SO.svg"))
+)
+if (requireNamespace("svglite", quietly = TRUE)) {
+  stopifnot(
+    file.exists(file.path(tmp_dir, "SO-recolor-small.svg")),
+    file.exists(file.path(tmp_dir, "SO2-recolor-small.svg")),
+    file.exists(file.path(tmp_dir, "SO2.1-recolor-small.svg"))
+  )
+}
+'''
+    subprocess.run([rscript, "-e", script], check=True)
+
+
 def test_strategic_objectives_subset_helper_keeps_so2_only():
     rscript = shutil.which("Rscript")
     if rscript is None:
@@ -89,7 +130,7 @@ plot <- bbmri_so_make_bars_plot(
 )
 built <- ggplot2::ggplot_build(plot)
 all_labels <- unique(unlist(lapply(built$data, function(df) if ("label" %in% names(df)) as.character(df$label) else character(0))))
-stopifnot("SO:" %in% all_labels, all(as.character(1:8) %in% all_labels))
+stopifnot(any(trimws(all_labels) == "SO:"), all(as.character(1:8) %in% all_labels))
 '''
     subprocess.run([rscript, "-e", script], check=True)
 

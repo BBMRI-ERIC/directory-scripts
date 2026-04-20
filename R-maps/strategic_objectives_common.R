@@ -338,6 +338,29 @@ bbmri_so_target_descriptors <- function(spec, levels = c("sg", "so", "global"), 
   descriptors
 }
 
+bbmri_so_target_prefix <- function(output_prefix, level, objective_id = NULL, goal_id = NULL, target_name_style = c("legacy", "short")) {
+  target_name_style <- match.arg(target_name_style)
+  if (target_name_style == "short") {
+    if (level == "global") {
+      return(output_prefix)
+    }
+    if (level == "so") {
+      return(objective_id)
+    }
+    if (level == "sg") {
+      return(goal_id)
+    }
+  }
+
+  if (level == "sg") {
+    return(paste0(output_prefix, "-sg-", goal_id))
+  }
+  if (level == "so") {
+    return(paste0(output_prefix, "-so-", objective_id))
+  }
+  paste0(output_prefix, "-global")
+}
+
 bbmri_so_role_fill <- function(summary_df, cfg) {
   if (nrow(summary_df) == 0) {
     return(summary_df)
@@ -1190,10 +1213,11 @@ bbmri_so_make_bars_plot <- function(spec, level, objective_filter = NULL, goal_f
 
   plot + ggplot2::labs(title = if (level == "global") "Strategic objectives overview" else if (bbmri_has_text(objective_filter)) objective_filter else "Strategic objectives")
 }
-bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_prefix, levels = c("sg", "so", "global"), modes = c("recolor", "bars"), objective_filter = NULL, goal_filter = NULL, country_label_codes = NULL, cfg = NULL, objective_order = NULL, output_variants = NULL) {
+bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_prefix, levels = c("sg", "so", "global"), modes = c("recolor", "bars"), objective_filter = NULL, goal_filter = NULL, country_label_codes = NULL, cfg = NULL, objective_order = NULL, output_variants = NULL, output_formats = NULL, target_name_style = c("legacy", "short")) {
   if (is.null(cfg)) {
     cfg <- bbmri_map_config()
   }
+  target_name_style <- match.arg(target_name_style)
   descriptors <- bbmri_so_target_descriptors(spec, levels = levels, objective_filter = objective_filter, goal_filter = goal_filter, modes = modes)
   if (!length(descriptors)) {
     stop("No strategic-objectives render targets matched the requested filters.", call. = FALSE)
@@ -1206,13 +1230,17 @@ bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_pre
     if (level == "sg" && !identical(mode, "recolor")) {
       next
     }
-    target_prefix <- if (level == "sg") {
-      paste0(output_prefix, "-sg-", goal_id, "-", mode)
-    } else if (level == "so") {
-      paste0(output_prefix, "-so-", objective_id, "-", mode)
-    } else {
-      paste0(output_prefix, "-global-", mode)
-    }
+    target_prefix <- paste0(
+      bbmri_so_target_prefix(
+        output_prefix = output_prefix,
+        level = level,
+        objective_id = objective_id,
+        goal_id = goal_id,
+        target_name_style = target_name_style
+      ),
+      "-",
+      mode
+    )
     bbmri_save_plot_formats_from_builder(
       build_plot = function(output_variant) {
         if (identical(mode, "recolor")) {
@@ -1242,7 +1270,8 @@ bbmri_save_strategic_objectives_formats <- function(spec, output_dir, output_pre
       prefix = target_prefix,
       export_sizes = cfg$export_sizes,
       output_variants = output_variants,
-      include_vector = is.null(output_variants)
+      output_formats = output_formats,
+      include_vector = is.null(output_variants) && is.null(output_formats)
     )
   }
   invisible(TRUE)

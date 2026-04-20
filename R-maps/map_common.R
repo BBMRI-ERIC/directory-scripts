@@ -2078,66 +2078,91 @@ bbmri_select_export_sizes <- function(export_sizes, output_variants = NULL) {
   )
 }
 
-bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes, output_variants = NULL, include_vector = TRUE, announce = TRUE) {
+bbmri_select_export_formats <- function(output_formats = NULL) {
+  if (is.null(output_formats) || !length(output_formats)) {
+    return(c("png", "pdf", "svg"))
+  }
+
+  selected_formats <- unique(tolower(trimws(as.character(output_formats))))
+  selected_formats <- selected_formats[nzchar(selected_formats)]
+  allowed_formats <- c("png", "pdf", "svg")
+  selected_formats <- selected_formats[selected_formats %in% allowed_formats]
+  if (!length(selected_formats)) {
+    stop(
+      "No matching export formats found: ",
+      paste(output_formats, collapse = ", "),
+      ". Expected a comma-separated list from png, pdf, and svg.",
+      call. = FALSE
+    )
+  }
+  selected_formats
+}
+
+bbmri_save_plot_formats <- function(plot, output_dir, prefix, export_sizes, output_variants = NULL, output_formats = NULL, include_vector = TRUE, announce = TRUE) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
   raster_sizes <- bbmri_select_export_sizes(export_sizes, output_variants)$png
+  selected_formats <- bbmri_select_export_formats(output_formats)
   raster_dpi <- 300
   for (name in names(raster_sizes)) {
     size <- raster_sizes[[name]]
     if (isTRUE(announce)) {
       cat(prefix, "-", name, " ... ", sep = "")
     }
-    ggplot2::ggsave(
-      filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
-      plot = plot,
-      width = unname(size[["width"]]),
-      height = unname(size[["height"]]),
-      units = "px",
-      bg = "white",
-      limitsize = FALSE
-    )
-    if (isTRUE(announce)) {
-      cat("PNG ", sep = "")
-    }
-
-    ggplot2::ggsave(
-      filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
-      plot = plot,
-      width = unname(size[["width"]]) / raster_dpi,
-      height = unname(size[["height"]]) / raster_dpi,
-      units = "in",
-      bg = "white",
-      limitsize = FALSE
-    )
-    if (isTRUE(announce)) {
-      cat("PDF ", sep = "")
-    }
-
-    if (requireNamespace("svglite", quietly = TRUE)) {
-      svg_path <- file.path(output_dir, paste0(prefix, "-", name, ".svg"))
-      do.call(
-        ggplot2::ggsave,
-        c(
-          list(
-            filename = svg_path,
-            plot = plot,
-            width = unname(size[["width"]]) / raster_dpi,
-            height = unname(size[["height"]]) / raster_dpi,
-            units = "in",
-            bg = "white",
-            device = svglite::svglite,
-            limitsize = FALSE
-          ),
-          bbmri_svg_device_args()
-        )
+    if ("png" %in% selected_formats) {
+      ggplot2::ggsave(
+        filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
+        plot = plot,
+        width = unname(size[["width"]]),
+        height = unname(size[["height"]]),
+        units = "px",
+        bg = "white",
+        limitsize = FALSE
       )
-      bbmri_normalize_svg_font_families(svg_path)
       if (isTRUE(announce)) {
-        cat("SVG ", sep = "")
+        cat("PNG ", sep = "")
       }
-    } else if (isTRUE(announce)) {
-      cat("SVG(skipped) ", sep = "")
+    }
+    if ("pdf" %in% selected_formats) {
+      ggplot2::ggsave(
+        filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
+        plot = plot,
+        width = unname(size[["width"]]) / raster_dpi,
+        height = unname(size[["height"]]) / raster_dpi,
+        units = "in",
+        bg = "white",
+        limitsize = FALSE
+      )
+      if (isTRUE(announce)) {
+        cat("PDF ", sep = "")
+      }
+    }
+    if ("svg" %in% selected_formats) {
+      if (requireNamespace("svglite", quietly = TRUE)) {
+        svg_path <- file.path(output_dir, paste0(prefix, "-", name, ".svg"))
+        do.call(
+          ggplot2::ggsave,
+          c(
+            list(
+              filename = svg_path,
+              plot = plot,
+              width = unname(size[["width"]]) / raster_dpi,
+              height = unname(size[["height"]]) / raster_dpi,
+              units = "in",
+              bg = "white",
+              device = svglite::svglite,
+              limitsize = FALSE
+            ),
+            bbmri_svg_device_args()
+          )
+        )
+        bbmri_normalize_svg_font_families(svg_path)
+        if (isTRUE(announce)) {
+          cat("SVG ", sep = "")
+        }
+      } else if (isTRUE(announce)) {
+        cat("SVG(skipped) ", sep = "")
+      }
     }
     if (isTRUE(announce)) {
       cat("done\n", sep = "")
@@ -2220,10 +2245,11 @@ bbmri_save_svg_variant <- function(plot, path, size, raster_dpi = 300) {
   invisible(TRUE)
 }
 
-bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix, export_sizes, output_variants = NULL, include_vector = TRUE, announce = TRUE) {
+bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix, export_sizes, output_variants = NULL, output_formats = NULL, include_vector = TRUE, announce = TRUE) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
   raster_sizes <- bbmri_select_export_sizes(export_sizes, output_variants)$png
+  selected_formats <- bbmri_select_export_formats(output_formats)
   raster_dpi <- 300
   for (name in names(raster_sizes)) {
     size <- raster_sizes[[name]]
@@ -2231,43 +2257,47 @@ bbmri_save_plot_formats_from_builder <- function(build_plot, output_dir, prefix,
     if (isTRUE(announce)) {
       cat(prefix, "-", name, " ... ", sep = "")
     }
-    ggplot2::ggsave(
-      filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
-      plot = plot,
-      width = unname(size[["width"]]),
-      height = unname(size[["height"]]),
-      units = "px",
-      bg = "white",
-      limitsize = FALSE
-    )
-    if (isTRUE(announce)) {
-      cat("PNG ", sep = "")
-    }
-
-    ggplot2::ggsave(
-      filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
-      plot = plot,
-      width = unname(size[["width"]]) / raster_dpi,
-      height = unname(size[["height"]]) / raster_dpi,
-      units = "in",
-      bg = "white",
-      limitsize = FALSE
-    )
-    if (isTRUE(announce)) {
-      cat("PDF ", sep = "")
-    }
-
-    if (bbmri_save_svg_variant(
-      plot = plot,
-      path = file.path(output_dir, paste0(prefix, "-", name, ".svg")),
-      size = size,
-      raster_dpi = raster_dpi
-    )) {
+    if ("png" %in% selected_formats) {
+      ggplot2::ggsave(
+        filename = file.path(output_dir, paste0(prefix, "-", name, ".png")),
+        plot = plot,
+        width = unname(size[["width"]]),
+        height = unname(size[["height"]]),
+        units = "px",
+        bg = "white",
+        limitsize = FALSE
+      )
       if (isTRUE(announce)) {
-        cat("SVG ", sep = "")
+        cat("PNG ", sep = "")
       }
-    } else if (isTRUE(announce)) {
-      cat("SVG(skipped) ", sep = "")
+    }
+    if ("pdf" %in% selected_formats) {
+      ggplot2::ggsave(
+        filename = file.path(output_dir, paste0(prefix, "-", name, ".pdf")),
+        plot = plot,
+        width = unname(size[["width"]]) / raster_dpi,
+        height = unname(size[["height"]]) / raster_dpi,
+        units = "in",
+        bg = "white",
+        limitsize = FALSE
+      )
+      if (isTRUE(announce)) {
+        cat("PDF ", sep = "")
+      }
+    }
+    if ("svg" %in% selected_formats) {
+      if (bbmri_save_svg_variant(
+        plot = plot,
+        path = file.path(output_dir, paste0(prefix, "-", name, ".svg")),
+        size = size,
+        raster_dpi = raster_dpi
+      )) {
+        if (isTRUE(announce)) {
+          cat("SVG ", sep = "")
+        }
+      } else if (isTRUE(announce)) {
+        cat("SVG(skipped) ", sep = "")
+      }
     }
 
     if (isTRUE(announce)) {

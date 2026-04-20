@@ -312,6 +312,7 @@ bbmri_map_config <- function() {
       show_slots = FALSE,
       resolve_positions = FALSE
     ),
+    so_global_bar_position_seed = so_global_bar_position_seed,
     so_global_bar_positions = list(
       small = so_global_bar_position_seed,
       med = list(

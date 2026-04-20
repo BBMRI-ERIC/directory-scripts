@@ -54,3 +54,45 @@ stopifnot(
 )
 '''
     subprocess.run([rscript, "-e", script], check=True)
+
+
+def test_rmaps_save_formats_can_filter_output_formats_and_sizes():
+    rscript = shutil.which("Rscript")
+    if rscript is None:
+        pytest.skip("Rscript not available")
+
+    script = r'''
+source("R-maps/map_config.R")
+source("R-maps/map_common.R")
+cfg <- bbmri_map_config()
+tmp_dir <- tempfile("rmaps-formats-")
+dir.create(tmp_dir)
+build_plot <- function(output_variant) {
+  ggplot2::ggplot(data.frame(x = 1, y = 1)) +
+    ggplot2::geom_point(ggplot2::aes(x = x, y = y), size = 2)
+}
+bbmri_save_plot_formats_from_builder(
+  build_plot,
+  tmp_dir,
+  "demo",
+  cfg$export_sizes,
+  output_variants = c("small", "med"),
+  output_formats = c("png", "svg"),
+  include_vector = FALSE
+)
+stopifnot(
+  file.exists(file.path(tmp_dir, "demo-small.png")),
+  file.exists(file.path(tmp_dir, "demo-med.png")),
+  !file.exists(file.path(tmp_dir, "demo-big.png")),
+  !file.exists(file.path(tmp_dir, "demo-small.pdf")),
+  !file.exists(file.path(tmp_dir, "demo.svg"))
+)
+if (requireNamespace("svglite", quietly = TRUE)) {
+  stopifnot(
+    file.exists(file.path(tmp_dir, "demo-small.svg")),
+    file.exists(file.path(tmp_dir, "demo-med.svg")),
+    !file.exists(file.path(tmp_dir, "demo-big.svg"))
+  )
+}
+'''
+    subprocess.run([rscript, "-e", script], check=True)
