@@ -52,6 +52,7 @@ def test_schema_argument_accepts_schema_and_legacy_package_names():
     assert parser.parse_args([]).schema == "ERIC"
     assert parser.parse_args(["--schema", "BBMRI-EU"]).schema == "BBMRI-EU"
     assert parser.parse_args(["--package", "BBMRI-NL"]).schema == "BBMRI-NL"
+    assert parser.parse_args(["--emergency-skip-dag-checks"]).emergency_skip_dag_checks is True
 
 
 def test_qc_arguments_can_be_enabled_selectively():
@@ -182,6 +183,18 @@ def test_build_directory_kwargs_uses_schema_and_withdrawn_scope():
     assert kwargs["purgeCaches"] == ["directory"]
     assert kwargs["include_withdrawn_entities"] is True
     assert kwargs["only_withdrawn_entities"] is True
+    assert kwargs["skip_graph_dag_validation"] is False
+
+
+def test_build_directory_kwargs_passes_emergency_dag_skip_flag():
+    parser = build_parser()
+    add_directory_schema_argument(parser, default="ERIC")
+
+    args = parser.parse_args(["--emergency-skip-dag-checks"])
+
+    kwargs = build_directory_kwargs(args)
+
+    assert kwargs["skip_graph_dag_validation"] is True
 
 
 def test_configure_logging_sets_debug_level():

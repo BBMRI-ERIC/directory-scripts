@@ -95,6 +95,7 @@ class Directory:
         directory_url: Optional[str] = None,
         include_withdrawn_entities: bool = False,
         only_withdrawn_entities: bool = False,
+        skip_graph_dag_validation: bool = False,
     ):
         """Initialize a directory snapshot and build query/helper graphs.
 
@@ -113,6 +114,10 @@ class Directory:
             only_withdrawn_entities: When True, public biobank/collection
                 accessors return only withdrawn entities. Implies
                 include_withdrawn_entities.
+            skip_graph_dag_validation: Emergency override that skips
+                collection/service/study DAG acyclicity checks. Traversal
+                helpers may produce unreliable results if the data contains
+                hierarchy cycles.
         """
         if purgeCaches is None:
             purgeCaches = list()
@@ -372,29 +377,17 @@ class Directory:
 
         log.info('Checks of directory data as graphs')
         # now we check if all the edges in the graph are in both directions
-        for e in self.directoryGraph.edges():
-            if not self.directoryGraph.has_edge(e[1],e[0]):
-                #raise Exception('DirectoryStructure', 'directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                log.warning('DirectoryStructure - directoryGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.directoryGraph.add_edge(e[1],e[0])
-        for e in self.contactGraph.edges():
-            if not self.contactGraph.has_edge(e[1],e[0]):
-                #raise Exception('DirectoryStructure', 'contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                log.warning('DirectoryStructure - contactGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.contactGraph.add_edge(e[1],e[0])
-        for e in self.directoryServicesGraph.edges():
-            if not self.directoryServicesGraph.has_edge(e[1],e[0]):
-                log.warning('DirectoryStructure - directoryServicesGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.directoryServicesGraph.add_edge(e[1], e[0])
-        for e in self.directoryStudiesGraph.edges():
-            if not self.directoryStudiesGraph.has_edge(e[1],e[0]):
-                log.warning('DirectoryStructure - directoryStudiesGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.directoryStudiesGraph.add_edge(e[1], e[0])
-        for e in self.networkGraph.edges():
-            if not self.networkGraph.has_edge(e[1],e[0]):
-                #raise Exception('DirectoryStructure', 'networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                log.warning('DirectoryStructure - networkGraph: Missing edge: ' + e[1] + ' to ' + e[0])
-                self.networkGraph.add_edge(e[1],e[0])
+        self._ensure_bidirectional_edges(self.directoryGraph, "directoryGraph")
+        self._ensure_bidirectional_edges(self.contactGraph, "contactGraph")
+        self._ensure_bidirectional_edges(
+            self.directoryServicesGraph,
+            "directoryServicesGraph",
+        )
+        self._ensure_bidirectional_edges(
+            self.directoryStudiesGraph,
+            "directoryStudiesGraph",
+        )
+        self._ensure_bidirectional_edges(self.networkGraph, "networkGraph")
 
         # now make graphs immutable
         nx.freeze(self.directoryGraph)
@@ -407,16 +400,135 @@ class Directory:
         nx.freeze(self.networkGraph)
 
         # we check that DAG is indeed DAG :-)
-        if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryCollectionsDAG):
-            raise Exception('DirectoryStructure', 'Collection DAG is not DAG')
-        if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryServicesDAG):
-            raise Exception('DirectoryStructure', 'Service DAG is not DAG')
-        if not nx.algorithms.dag.is_directed_acyclic_graph(self.directoryStudiesDAG):
-            raise Exception('DirectoryStructure', 'Study DAG is not DAG')
+        self._validate_directory_dags(
+            self.directoryCollectionsDAG,
+            self.directoryServicesDAG,
+            self.directoryStudiesDAG,
+            skip_validation=skip_graph_dag_validation,
+        )
 
         log.info('Directory structure initialized')
         self.__orphacodesmapper = None
         self._collection_withdrawn_cache = {}
+
+    @staticmethod
+    def _edge_label(source: Any, target: Any) -> str:
+        """Return a stable human-readable graph edge label."""
+        return f"{source} -> {target}"
+
+    @classmethod
+    def _cycle_diagnostics(cls, graph: nx.DiGraph) -> tuple[str, str, list[Any]]:
+        """Return cycle path, edge list, and node list for a non-DAG graph."""
+        try:
+            cycle_edges = nx.find_cycle(graph)
+        except nx.NetworkXNoCycle:
+            return "<cycle unavailable>", "<cycle edges unavailable>", []
+
+        normalized_edges = [(edge[0], edge[1]) for edge in cycle_edges]
+        cycle_nodes = [normalized_edges[0][0]]
+        cycle_nodes.extend(target for _, target in normalized_edges)
+        cycle_path = " -> ".join(str(node) for node in cycle_nodes)
+        edge_list = ", ".join(
+            cls._edge_label(source, target) for source, target in normalized_edges
+        )
+        return cycle_path, edge_list, cycle_nodes
+
+    @staticmethod
+    def _debug_log_offending_nodes(
+        graph: nx.DiGraph,
+        graph_name: str,
+        node_ids: list[Any],
+    ) -> None:
+        """Log full node payloads for graph diagnostics in debug mode."""
+        for node_id in node_ids:
+            log.debug(
+                "DirectoryStructure - %s offending node %s data: %r",
+                graph_name,
+                node_id,
+                graph.nodes[node_id].get("data"),
+            )
+
+    @classmethod
+    def _ensure_bidirectional_edges(cls, graph: nx.DiGraph, graph_name: str) -> None:
+        """Ensure every edge in a traversal graph has a reverse edge."""
+        missing_reverse_edges = [
+            (source, target)
+            for source, target in list(graph.edges())
+            if not graph.has_edge(target, source)
+        ]
+        if not missing_reverse_edges:
+            return
+
+        log.warning(
+            "DirectoryStructure - %s has %d edge(s) without a reverse edge.",
+            graph_name,
+            len(missing_reverse_edges),
+        )
+        for source, target in missing_reverse_edges:
+            log.warning(
+                "DirectoryStructure - %s: Missing reverse edge for %s; adding %s.",
+                graph_name,
+                cls._edge_label(source, target),
+                cls._edge_label(target, source),
+            )
+            cls._debug_log_offending_nodes(graph, graph_name, [source, target])
+            graph.add_edge(target, source)
+
+    @classmethod
+    def _validate_directed_acyclic_graph(
+        cls,
+        graph: nx.DiGraph,
+        graph_name: str,
+        label: str,
+    ) -> None:
+        """Raise an actionable error if a supposed DAG contains a cycle."""
+        if nx.algorithms.dag.is_directed_acyclic_graph(graph):
+            return
+
+        cycle_path, cycle_edges, cycle_nodes = cls._cycle_diagnostics(graph)
+        cls._debug_log_offending_nodes(graph, graph_name, cycle_nodes)
+        raise Exception(
+            "DirectoryStructure",
+            (
+                f"{label} is not DAG: {graph_name} violates the directed "
+                f"acyclic graph requirement; offending cycle: {cycle_path}; "
+                f"cycle edges: {cycle_edges}"
+            ),
+        )
+
+    @classmethod
+    def _validate_directory_dags(
+        cls,
+        collections_dag: nx.DiGraph,
+        services_dag: nx.DiGraph,
+        studies_dag: nx.DiGraph,
+        *,
+        skip_validation: bool,
+    ) -> None:
+        """Validate Directory hierarchy DAGs unless emergency mode is enabled."""
+        if skip_validation:
+            log.warning(
+                "Emergency mode enabled: skipping Directory DAG acyclicity "
+                "validation for collection, service, and study graphs. "
+                "Proceed at own risk; hierarchy traversal results may be unreliable."
+            )
+            return
+
+        cls._validate_directed_acyclic_graph(
+            collections_dag,
+            "directoryCollectionsDAG",
+            "Collection DAG",
+        )
+        cls._validate_directed_acyclic_graph(
+            services_dag,
+            "directoryServicesDAG",
+            "Service DAG",
+        )
+        cls._validate_directed_acyclic_graph(
+            studies_dag,
+            "directoryStudiesDAG",
+            "Study DAG",
+        )
 
     @staticmethod
     def _load_quality_table(session: Client, table_name: str, schema: str) -> pd.DataFrame:
@@ -682,15 +794,36 @@ class Directory:
 
     def isCollectionWithdrawn(self, collectionID: str) -> bool:
         """Return whether a collection is withdrawn, including inherited state."""
+        return self._is_collection_withdrawn(collectionID, [])
+
+    def _is_collection_withdrawn(
+        self,
+        collectionID: str,
+        parent_path: list[str],
+    ) -> bool:
+        """Return inherited collection withdrawal state without recursing forever."""
         if collectionID in self._collection_withdrawn_cache:
             return self._collection_withdrawn_cache[collectionID]
+        if collectionID in parent_path:
+            cycle_path = parent_path[parent_path.index(collectionID):] + [collectionID]
+            log.warning(
+                "DirectoryStructure - collection withdrawal inheritance cycle "
+                "detected while checking %s: %s. Treating cyclic parent "
+                "inheritance as not withdrawn for this path.",
+                collectionID,
+                " -> ".join(cycle_path),
+            )
+            return False
 
         collection = self.directoryGraph.nodes[collectionID]['data']
         withdrawn = self._is_explicitly_withdrawn(collection)
         if not withdrawn:
             withdrawn = self.isBiobankWithdrawn(collection['biobank']['id'])
         if not withdrawn and 'parent_collection' in collection:
-            withdrawn = self.isCollectionWithdrawn(collection['parent_collection']['id'])
+            withdrawn = self._is_collection_withdrawn(
+                collection['parent_collection']['id'],
+                parent_path + [collectionID],
+            )
 
         self._collection_withdrawn_cache[collectionID] = withdrawn
         return withdrawn

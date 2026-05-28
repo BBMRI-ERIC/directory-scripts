@@ -257,6 +257,15 @@ def add_directory_schema_argument(
         ["--package"],
         dest=dest,
     )
+    parser.add_argument(
+        "--emergency-skip-dag-checks",
+        dest="emergency_skip_dag_checks",
+        action="store_true",
+        help=(
+            "emergency mode: skip Directory hierarchy DAG acyclicity checks so "
+            "the tool can proceed at own risk when live data contains a cycle"
+        ),
+    )
 
 
 def build_directory_kwargs(args, *, pp=None) -> dict:
@@ -272,6 +281,9 @@ def build_directory_kwargs(args, *, pp=None) -> dict:
         "pp": pp,
         "include_withdrawn_entities": include_withdrawn,
         "only_withdrawn_entities": bool(getattr(args, "only_withdrawn", False)),
+        "skip_graph_dag_validation": bool(
+            getattr(args, "emergency_skip_dag_checks", False)
+        ),
     }
     username = getattr(args, "username", None)
     password = getattr(args, "password", None)

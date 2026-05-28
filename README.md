@@ -59,6 +59,7 @@ Common CLI conventions across validation/export tools:
 - `--only-withdrawn` when a tool supports withdrawn-only processing
 - `--purge-cache ...` and `--purge-all-caches` for cache purging
 - `-P` / `--schema` for Directory-backed tools; normal read/export/check tools default to `ERIC`, while `directory-tables-modifier.py` always requires an explicit staging area
+- `--emergency-skip-dag-checks` for Directory-backed read/export/check tools when Directory hierarchy data contains a cycle and you need to proceed at your own risk; this skips collection/service/study DAG acyclicity enforcement but still logs the emergency mode and any cycle-safe withdrawal-inheritance fallbacks
 
 Cache scope is now tool-specific:
 - exporters that only read the Directory expose only the `directory` cache

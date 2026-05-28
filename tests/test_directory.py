@@ -325,6 +325,119 @@ def test_get_collection_by_id_raise_on_missing():
         directory.getCollectionById("missing-id", raise_on_missing=True)
 
 
+def test_bidirectional_graph_validation_reports_and_repairs_missing_reverse_edges(
+    caplog,
+):
+    graph = nx.DiGraph()
+    graph.add_node("source", data={"id": "source"})
+    graph.add_node("target", data={"id": "target"})
+    graph.add_edge("source", "target")
+
+    with caplog.at_level("DEBUG", logger="BBMRI Directory"):
+        Directory._ensure_bidirectional_edges(graph, "contactGraph")
+
+    assert graph.has_edge("target", "source")
+    assert "contactGraph has 1 edge(s) without a reverse edge" in caplog.text
+    assert "source -> target" in caplog.text
+    assert "target -> source" in caplog.text
+    assert "offending node source data" in caplog.text
+    assert "offending node target data" in caplog.text
+
+
+def test_dag_validation_reports_offending_graph_cycle_and_debug_node_data(caplog):
+    graph = nx.DiGraph()
+    graph.add_node("biobank1", data={"id": "biobank1", "name": "Biobank"})
+    graph.add_node("collection1", data={"id": "collection1", "name": "Collection"})
+    graph.add_edge("biobank1", "collection1")
+    graph.add_edge("collection1", "biobank1")
+
+    with caplog.at_level("DEBUG", logger="BBMRI Directory"):
+        with pytest.raises(Exception) as exc_info:
+            Directory._validate_directed_acyclic_graph(
+                graph,
+                "directoryCollectionsDAG",
+                "Collection DAG",
+            )
+
+    error_message = str(exc_info.value)
+    assert "Collection DAG is not DAG" in error_message
+    assert "directoryCollectionsDAG" in error_message
+    assert "directed acyclic graph requirement" in error_message
+    assert "offending cycle" in error_message
+    assert "cycle edges" in error_message
+    assert "biobank1" in error_message
+    assert "collection1" in error_message
+    assert "offending node biobank1 data" in caplog.text
+    assert "offending node collection1 data" in caplog.text
+
+
+def test_directory_dag_validation_emergency_skip_allows_cyclic_graph(caplog):
+    cyclic_collections = nx.DiGraph()
+    cyclic_collections.add_edge("collection1", "collection2")
+    cyclic_collections.add_edge("collection2", "collection1")
+    empty_services = nx.DiGraph()
+    empty_studies = nx.DiGraph()
+
+    with caplog.at_level("WARNING", logger="BBMRI Directory"):
+        Directory._validate_directory_dags(
+            cyclic_collections,
+            empty_services,
+            empty_studies,
+            skip_validation=True,
+        )
+
+    assert "Emergency mode enabled" in caplog.text
+    assert "Proceed at own risk" in caplog.text
+
+
+def test_directory_dag_validation_rejects_cyclic_graph_without_emergency_skip():
+    cyclic_collections = nx.DiGraph()
+    cyclic_collections.add_edge("collection1", "collection2")
+    cyclic_collections.add_edge("collection2", "collection1")
+
+    with pytest.raises(Exception):
+        Directory._validate_directory_dags(
+            cyclic_collections,
+            nx.DiGraph(),
+            nx.DiGraph(),
+            skip_validation=False,
+        )
+
+
+def test_collection_withdrawn_inheritance_handles_parent_cycle(caplog):
+    directory = Directory.__new__(Directory)
+    directory._collection_withdrawn_cache = {}
+    directory.directoryGraph = nx.DiGraph()
+    directory.directoryGraph.add_node(
+        "biobank1",
+        data={"id": "biobank1", "withdrawn": False},
+    )
+    directory.directoryGraph.add_node(
+        "collection1",
+        data={
+            "id": "collection1",
+            "biobank": {"id": "biobank1"},
+            "parent_collection": {"id": "collection2"},
+            "withdrawn": False,
+        },
+    )
+    directory.directoryGraph.add_node(
+        "collection2",
+        data={
+            "id": "collection2",
+            "biobank": {"id": "biobank1"},
+            "parent_collection": {"id": "collection1"},
+            "withdrawn": False,
+        },
+    )
+
+    with caplog.at_level("WARNING", logger="BBMRI Directory"):
+        assert directory.isCollectionWithdrawn("collection1") is False
+
+    assert "collection withdrawal inheritance cycle detected" in caplog.text
+    assert "collection1 -> collection2 -> collection1" in caplog.text
+
+
 def test_is_countable_collection_rejects_unsupported_metric():
     directory = _make_directory_stub()
     with pytest.raises(ValueError):
