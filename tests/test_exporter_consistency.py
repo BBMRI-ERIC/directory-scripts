@@ -280,6 +280,14 @@ class SharedDirectoryStub:
             raise KeyError(biobank_id)
         return None
 
+    def getLoadedBiobankById(self, biobank_id, raise_on_missing=False):
+        for biobank in self.biobanks:
+            if biobank["id"] == biobank_id:
+                return biobank
+        if raise_on_missing:
+            raise KeyError(biobank_id)
+        return None
+
     def getBiobankCountry(self, biobank_id):
         return self.getBiobankById(biobank_id)["country"]
 
@@ -303,6 +311,14 @@ class SharedDirectoryStub:
                     self.isCollectionWithdrawn(collection_id)
                 ):
                     break
+                return collection
+        if raise_on_missing:
+            raise KeyError(collection_id)
+        return None
+
+    def getLoadedCollectionById(self, collection_id, raise_on_missing=False):
+        for collection in self.collections:
+            if collection["id"] == collection_id:
                 return collection
         if raise_on_missing:
             raise KeyError(collection_id)
@@ -425,16 +441,16 @@ class SharedDirectoryStub:
             return False
         parent = collection.get("parent_collection")
         while parent is not None:
-            parent_collection = self.getCollectionById(parent["id"])
+            parent_collection = self.getLoadedCollectionById(parent["id"])
             if metric in parent_collection and isinstance(parent_collection[metric], int):
                 return False
             parent = parent_collection.get("parent_collection")
         return True
 
 
-def _run_script(monkeypatch, script_name, argv):
+def _run_script(monkeypatch, script_name, argv, directory_class=SharedDirectoryStub):
     fake_directory_module = types.ModuleType("directory")
-    fake_directory_module.Directory = SharedDirectoryStub
+    fake_directory_module.Directory = directory_class
     monkeypatch.setitem(sys.modules, "directory", fake_directory_module)
     monkeypatch.setattr(sys, "argv", [script_name, *argv])
 
@@ -446,6 +462,22 @@ def _run_script(monkeypatch, script_name, argv):
             run_name="__main__",
         )
     return globals_dict, stdout.getvalue(), stderr.getvalue()
+
+
+class WithdrawnCohortUnderActiveBiobankDirectoryStub(SharedDirectoryStub):
+    """Directory stub with a withdrawn cohort collection under an active biobank."""
+
+    BASE_COLLECTIONS = copy.deepcopy(SharedDirectoryStub.BASE_COLLECTIONS)
+    BASE_COLLECTIONS[3]["type"] = ["COHORT"]
+
+
+class CohortTotalsDirectoryStub(SharedDirectoryStub):
+    """Directory stub with cohort collections covering explicit and OoM totals."""
+
+    BASE_COLLECTIONS = copy.deepcopy(SharedDirectoryStub.BASE_COLLECTIONS)
+    BASE_COLLECTIONS[0]["type"] = ["COHORT"]
+    BASE_COLLECTIONS[1]["type"] = ["COHORT"]
+    BASE_COLLECTIONS[2]["type"] = ["POPULATION_BASED"]
 
 
 def test_directory_stats_matches_exporter_all_active_totals(monkeypatch):
@@ -544,6 +576,53 @@ def test_exporter_all_writes_clickable_id_hyperlinks(monkeypatch, tmp_path):
     assert study_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/study/study1","study1")'
     assert contact_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/person/ct1","ct1")'
     assert network_formula == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/network/net1","net1")'
+
+
+def test_exporter_cohorts_only_withdrawn_handles_active_parent_biobank(
+    monkeypatch,
+    tmp_path,
+):
+    workbook = tmp_path / "cohorts.xlsx"
+
+    exporter_globals, _, _ = _run_script(
+        monkeypatch,
+        "exporter-cohorts.py",
+        ["-N", "--only-withdrawn", "-X", str(workbook)],
+        directory_class=WithdrawnCohortUnderActiveBiobankDirectoryStub,
+    )
+
+    assert [collection["id"] for collection in exporter_globals["cohortCollections"]] == [
+        "col4"
+    ]
+    assert exporter_globals["cohortBiobankIds"] == {"bbmri-eric:ID:EXT_BB2"}
+    assert exporter_globals["cohortCountries"] == {"DE"}
+
+
+def test_exporter_cohorts_reports_explicit_and_oom_totals(monkeypatch):
+    exporter_globals, stdout, _ = _run_script(
+        monkeypatch,
+        "exporter-cohorts.py",
+        [],
+        directory_class=CohortTotalsDirectoryStub,
+    )
+
+    assert [collection["id"] for collection in exporter_globals["cohortCollections"]] == [
+        "col1",
+        "col2",
+        "col3",
+    ]
+    assert exporter_globals["cohortCollectionSamplesExplicit"] == 100
+    assert exporter_globals["cohortCollectionDonorsExplicit"] == 10
+    assert exporter_globals["cohortCollectionSamplesIncOoM"] == 1100
+    assert exporter_globals["cohortCollectionDonorsIncOoM"] == 110
+    assert (
+        "- total of samples/donors advertised explicitly in cohort collections: "
+        "100 / 10"
+    ) in stdout
+    assert (
+        "- total of samples/donors advertised in cohort collections including "
+        "OoM estimates: 1100 / 110"
+    ) in stdout
 
 
 def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):

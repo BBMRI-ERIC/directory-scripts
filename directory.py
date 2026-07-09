@@ -1081,6 +1081,33 @@ class Directory:
         log.warning("Biobank %r not found in loaded directory snapshot.", biobankId)
         return None
 
+    def getLoadedBiobankById(
+        self,
+        biobankId: str,
+        raise_on_missing: bool = False,
+    ) -> Optional[dict[str, Any]]:
+        """Return a loaded biobank by id, ignoring the current withdrawn scope.
+
+        Use this when resolving parent context for a visible collection/service.
+        For user-facing entity lists, prefer ``getBiobankById(...)`` so the
+        configured withdrawn scope is respected.
+
+        Args:
+            biobankId: Biobank identifier.
+            raise_on_missing: Raise KeyError when not found.
+
+        Returns:
+            Matching loaded biobank or None when not found and
+            raise_on_missing is False.
+        """
+        biobank = self._get_loaded_biobank_by_id(biobankId)
+        if biobank is not None:
+            return biobank
+        if raise_on_missing:
+            raise KeyError(f"Biobank {biobankId!r} not found in loaded directory snapshot.")
+        log.warning("Biobank %r not found in loaded directory snapshot.", biobankId)
+        return None
+
     def getBiobanksCount(self):
         """Return the number of loaded biobanks."""
         return len(self.getBiobanks())
@@ -1138,6 +1165,33 @@ class Directory:
         log.warning("Collection %r not found in loaded directory snapshot.", collectionId)
         return None
 
+    def getLoadedCollectionById(
+        self,
+        collectionId: str,
+        raise_on_missing: bool = False,
+    ) -> Optional[dict[str, Any]]:
+        """Return a loaded collection by id, ignoring the current withdrawn scope.
+
+        Use this when resolving parent context for a visible collection. For
+        user-facing entity lists, prefer ``getCollectionById(...)`` so the
+        configured withdrawn scope is respected.
+
+        Args:
+            collectionId: Collection identifier.
+            raise_on_missing: Raise KeyError when not found.
+
+        Returns:
+            Matching loaded collection or None when not found and
+            raise_on_missing is False.
+        """
+        for collection in self.collections:
+            if collection['id'] == collectionId:
+                return collection
+        if raise_on_missing:
+            raise KeyError(f"Collection {collectionId!r} not found in loaded directory snapshot.")
+        log.warning("Collection %r not found in loaded directory snapshot.", collectionId)
+        return None
+
     def getCollectionsCount(self):
         """Return the number of loaded collections."""
         return len(self.getCollections())
@@ -1185,14 +1239,14 @@ class Directory:
             if not 'parent_collection' in collection:
                 return True
             else:
-                parent = self.getCollectionById(collection['parent_collection']['id'])
+                parent = self.getLoadedCollectionById(collection['parent_collection']['id'])
                 parent_dist = 1
                 while parent is not None:
                     if metric in parent and isinstance(parent[metric], int):
                         log.debug(f'Collection {collectionID} is not countable as it has countable parent {parent["id"]} (distance {parent_dist}) for metric {metric}.')
                         return False
                     if 'parent_collection' in parent:
-                        parent = self.getCollectionById(parent['parent_collection']['id'])
+                        parent = self.getLoadedCollectionById(parent['parent_collection']['id'])
                         parent_dist += 1
                     else:
                         if parent_dist > 1:

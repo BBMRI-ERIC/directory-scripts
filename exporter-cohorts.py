@@ -24,6 +24,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from oomutils import estimate_count_from_oom_or_none
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -54,11 +55,15 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 cohortCollections = []
 cohortBiobankIds = set()
 cohortCountries = set()
+cohortCollectionSamplesExplicit = 0
+cohortCollectionDonorsExplicit = 0
+cohortCollectionSamplesIncOoM = 0
+cohortCollectionDonorsIncOoM = 0
 
 for collection in dir.getCollections():
     log.debug("Analyzing collection " + collection['id'])
     biobankId = dir.getCollectionBiobankId(collection['id'])
-    biobank = dir.getBiobankById(biobankId)
+    biobank = dir.getLoadedBiobankById(biobankId, raise_on_missing=True)
     country = biobank['country']
 
     biobank_capabilities = []
@@ -117,6 +122,30 @@ for collection in dir.getCollections():
         cohortCollections.append(collection)
         cohortBiobankIds.add(biobankId)
         cohortCountries.add(country)
+        if dir.isCountableCollection(collection['id'], 'size'):
+            cohortCollectionSamplesExplicit += collection['size']
+            cohortCollectionSamplesIncOoM += collection['size']
+        else:
+            if dir.isTopLevelCollection(collection['id']):
+                estimate = estimate_count_from_oom_or_none(
+                    collection.get('order_of_magnitude'),
+                    collection_id=collection['id'],
+                    field_name='order_of_magnitude',
+                )
+                if estimate is not None:
+                    cohortCollectionSamplesIncOoM += estimate
+        if dir.isCountableCollection(collection['id'], 'number_of_donors'):
+            cohortCollectionDonorsExplicit += collection['number_of_donors']
+            cohortCollectionDonorsIncOoM += collection['number_of_donors']
+        else:
+            if dir.isTopLevelCollection(collection['id']):
+                estimate = estimate_count_from_oom_or_none(
+                    collection.get('order_of_magnitude_donors'),
+                    collection_id=collection['id'],
+                    field_name='order_of_magnitude_donors',
+                )
+                if estimate is not None:
+                    cohortCollectionDonorsIncOoM += estimate
 
 pd_cohortCollections = pd.DataFrame(cohortCollections)
 pddfutils.tidyCollectionDf(pd_cohortCollections)
@@ -125,7 +154,7 @@ def printCollectionStdout(collectionList : List, headerStr : str):
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])
-        biobank = dir.getBiobankById(biobankId)
+        biobank = dir.getLoadedBiobankById(biobankId, raise_on_missing=True)
         print("   Collection: " + collection['id'] + " - " + collection['name'] + ". Parent biobank: " +  biobankId + " - " + biobank['name'])
 
 if not args.nostdout:
@@ -136,6 +165,11 @@ if not args.nostdout:
     print("- total number of cohort biobanks: %d"%(len(cohortBiobankIds)))
     print("- total number of cohort collections: %d"%(len(cohortCollections)))
     print("- total number of cohort countries: %d"%(len(cohortCountries)))
+    print("Estimated totals:")
+    print("- total of samples/donors advertised explicitly in cohort collections: %d / %d" % (
+        cohortCollectionSamplesExplicit, cohortCollectionDonorsExplicit))
+    print("- total of samples/donors advertised in cohort collections including OoM estimates: %d / %d" % (
+        cohortCollectionSamplesIncOoM, cohortCollectionDonorsIncOoM))
 
 if args.outputXLSX is not None:
     write_xlsx_tables(

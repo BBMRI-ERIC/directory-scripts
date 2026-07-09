@@ -208,6 +208,7 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 - Prefer `snake_case` names and small reusable helpers.
 - Keep exporters thin: CLI + orchestration only.
 - Keep shared Directory logic in `directory.py`.
+- When code needs parent/context data for an entity already selected by the current withdrawn scope, use scope-independent loaded lookups (`getLoadedBiobankById(...)`, `getLoadedCollectionById(...)`) rather than user-facing scope-filtered lookups. This keeps withdrawn-only exports and ancestor counting from dropping active parents or double-counting children.
 - `exporter-all.py` is the broad entity dump: when its sheet layout changes, keep the workbook tabs and stdout sections aligned across biobanks, collections, services, studies, contacts, and networks, and keep any withdrawn-in-main-workbook option additive rather than replacing the existing separate-workbook path.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.
 - Keep CLI help output consistent across scripts: standard options first (`-h`, `-v`, `-d`, then Directory target/auth options), then tool-specific options.

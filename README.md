@@ -173,7 +173,7 @@ python3 exporter-bbmri-cohorts.py -X bbmri_cohorts_stats.xlsx -XWE bbmri_cohorts
 python3 exporter-cMDR.py -X cMDR.xlsx
 python3 exporter-cMDR.py -G cMDR-map.geojson
 ```
-- **exporter-cohorts.py** - lists COHORT/POPULATION_BASED collections and summaries per country/biobank.  
+- **exporter-cohorts.py** - lists COHORT/POPULATION_BASED collections and summaries per country/biobank. Standard output also reports explicit sample/donor totals and totals including OoM estimates, using the same top-level-only counting policy as `exporter-all.py` to avoid double-counting subcollections.
 ```
 python3 exporter-cohorts.py -X cohorts.xlsx
 ```
