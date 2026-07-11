@@ -31,6 +31,11 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import (
+    build_fact_sheet_summary,
+    build_fact_sheet_xlsx_tables,
+    print_fact_sheet_summary,
+)
 #from checks.BBMRICohorts import BBMRICohorts
 from warningscontainer import WarningsContainer
 from yapsy.PluginManager import PluginManager
@@ -59,15 +64,28 @@ def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFr
             if isinstance(coll['size'], int) and isinstance(coll['number_of_donors'], int):
                 nrSampDonProv = 'Y'
 
-        #Facts table
+        # Facts table: report all-star observations only; never add fact rows.
         if coll['facts'] != []:
-            for fact in dir.getFacts():
-                if fact['collection']['id'] == coll['id']:
-                    if 'number_of_samples' in fact:
-                        collsFactsSamples += fact['number_of_samples']
-            if collsFactsSamples > 0:
+            fact_summary = build_fact_sheet_summary([coll], dir)
+            all_star_sample_rows = [
+                row
+                for row in fact_summary["all_star_rows"]
+                if isinstance(row.get("number_of_samples"), int)
+            ]
+            if all_star_sample_rows:
                 factsProvided = 'Y'
-                df_collFactsSampleNumber.loc[len(df_collFactsSampleNumber)] = [network,entity,str(coll['country']['id']),str(coll['name']),str(coll['id']),int(collsFactsSamples)]
+                for row in all_star_sample_rows:
+                    df_collFactsSampleNumber.loc[len(df_collFactsSampleNumber)] = [
+                        network,
+                        entity,
+                        str(coll['country']['id']),
+                        str(coll['name']),
+                        str(coll['id']),
+                        str(row.get("fact_id", "")),
+                        int(row["number_of_samples"]),
+                    ]
+                if len(all_star_sample_rows) == 1:
+                    collsFactsSamples = int(all_star_sample_rows[0]["number_of_samples"])
         if coll['id'] in collIDsWARNING:
             warningProvided = 'Y'
         if coll['id'] in collIDsERROR:
@@ -83,16 +101,19 @@ def addBB2Df(BBList : list, network : str, entity : str, df : pd.DataFrame, df_b
         log.info(network + '\t'+ entity +'\t' + str(biobank_cohort['country']['id']))
     return df, df_bb
 
-def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str, dfStats2 : pd.DataFrame, statsLabel2 : str, numberSamplesFacts : pd.DataFrame, samplesFactsLabel : str):
+def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str, dfStats2 : pd.DataFrame, statsLabel2 : str, numberSamplesFacts : pd.DataFrame, samplesFactsLabel : str, extraSheets = None):
+    sheet_specs = [
+        (dfBiobanks, biobanksLabel),
+        (dfCollections, collectionsLabel),
+        (dfStats, statsLabel),
+        (dfStats2, statsLabel2),
+        (numberSamplesFacts, samplesFactsLabel),
+    ]
+    if extraSheets:
+        sheet_specs.extend(extraSheets)
     write_xlsx_tables(
         filename,
-        [
-            (dfBiobanks, biobanksLabel),
-            (dfCollections, collectionsLabel),
-            (dfStats, statsLabel),
-            (dfStats2, statsLabel2),
-            (numberSamplesFacts, samplesFactsLabel),
-        ],
+        sheet_specs,
     )
 
 
@@ -199,7 +220,7 @@ for collection in dir.getCollections():
         
 df  = pd.DataFrame(columns = ['Network','Entity','Country','CollWithSampleDonorProvided','CollWithFactsProvided','nrSamplesFactTables','ErrorProvided','WarningProvided'])
 df_coll  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID'])
-df_collFactsSampleNumber  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID','NumberOfSamples'])
+df_collFactsSampleNumber  = pd.DataFrame(columns = ['Network','Entity','Country','Name','ID','FactID','NumberOfSamples'])
 
 # Retrieve the warnings
 warningContainer = WarningsContainer()
@@ -263,4 +284,27 @@ df_onlyColl = df[df['Entity'] == 'Collection']
 df_lessCol = df_onlyColl[['Network','Entity','Country']]
 statsdf2 = df_lessCol.groupby(['Network','Entity','Country']).size().reset_index(name='Count')
 
-outputExcelBiobanksCollections(args.outputXLSX[0], df_bb, "Biobanks", df_coll, "Collections", statsdf2, "Stats", statsdf, "StatsDetailed", df_collFactsSampleNumber, "NumberOfSamplesFactTable")
+bbmriCohortFactSheetCollections = (
+    bbmri_cohort_coll
+    + bbmri_cohort_dna_coll
+    + bbmri_cohort_bbcoll
+    + bbmri_cohort_dna_bbcoll
+)
+
+if not args.nostdout:
+    print_fact_sheet_summary(bbmriCohortFactSheetCollections, dir)
+
+outputExcelBiobanksCollections(
+    args.outputXLSX[0],
+    df_bb,
+    "Biobanks",
+    df_coll,
+    "Collections",
+    statsdf2,
+    "Stats",
+    statsdf,
+    "StatsDetailed",
+    df_collFactsSampleNumber,
+    "NumberOfSamplesFactTable",
+    build_fact_sheet_xlsx_tables(bbmriCohortFactSheetCollections, dir),
+)

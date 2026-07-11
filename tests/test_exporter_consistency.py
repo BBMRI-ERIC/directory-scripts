@@ -539,6 +539,10 @@ def test_exporter_all_can_append_withdrawn_sheets_to_main_workbook(monkeypatch, 
         "Studies",
         "Contacts",
         "Networks",
+        "Fact sheet summary",
+        "Fact sheet all-star rows",
+        "Fact sheet distributions",
+        "Fact sheet margin rows",
         "Withdrawn biobanks",
         "Withdrawn collections",
         "Withdrawn services",
@@ -615,6 +619,13 @@ def test_exporter_cohorts_reports_explicit_and_oom_totals(monkeypatch):
     assert exporter_globals["cohortCollectionDonorsExplicit"] == 10
     assert exporter_globals["cohortCollectionSamplesIncOoM"] == 1100
     assert exporter_globals["cohortCollectionDonorsIncOoM"] == 110
+    assert "Fact-sheet summary:" in stdout
+    assert "- collections with fact sheets: 3 / 3" in stdout
+    assert "sample/donor values are fact-row observations" not in stdout
+    assert (
+        "- all-star totals for collections with populated all-but-one-star rows: "
+        "0 samples / 0 donors (from 0 collections with one populated all-star row)"
+    ) in stdout
     assert (
         "- total of samples/donors advertised explicitly in cohort collections: "
         "100 / 10"
@@ -623,6 +634,28 @@ def test_exporter_cohorts_reports_explicit_and_oom_totals(monkeypatch):
         "- total of samples/donors advertised in cohort collections including "
         "OoM estimates: 1100 / 110"
     ) in stdout
+
+
+def test_exporter_cohorts_writes_fact_sheet_summary_sheets(monkeypatch, tmp_path):
+    workbook = tmp_path / "cohorts.xlsx"
+
+    _run_script(
+        monkeypatch,
+        "exporter-cohorts.py",
+        ["-N", "-X", str(workbook)],
+        directory_class=CohortTotalsDirectoryStub,
+    )
+
+    import pandas as pd
+
+    sheet_names = pd.ExcelFile(workbook).sheet_names
+    assert "Fact sheet summary" in sheet_names
+    assert "Fact sheet all-star rows" in sheet_names
+    assert "Fact sheet distributions" in sheet_names
+    summary = pd.read_excel(workbook, sheet_name="Fact sheet summary").iloc[0]
+    assert summary["collections"] == 3
+    assert summary["collections_with_fact_sheets"] == 3
+    assert summary["populated_all_star_rows"] == 3
 
 
 def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):
@@ -671,7 +704,15 @@ def test_exporter_cmdr_writes_sorted_hyperlinked_workbook(monkeypatch, tmp_path)
     from openpyxl import load_workbook
 
     wb = load_workbook(workbook)
-    assert wb.sheetnames == ["Biobanks", "Collections", "Studies"]
+    assert wb.sheetnames == [
+        "Biobanks",
+        "Collections",
+        "Studies",
+        "Fact sheet summary",
+        "Fact sheet all-star rows",
+        "Fact sheet distributions",
+        "Fact sheet margin rows",
+    ]
     assert wb["Biobanks"]["A2"].value == "CZ"
     assert wb["Biobanks"]["B2"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:CZ_BB1","bbmri-eric:ID:CZ_BB1")'
     assert wb["Biobanks"]["B3"].value == '=HYPERLINK("https://directory.example.test/ERIC/directory/#/biobank/bbmri-eric:ID:EXT_BB2","bbmri-eric:ID:EXT_BB2")'

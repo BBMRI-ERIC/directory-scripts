@@ -21,6 +21,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
 from oomutils import (
@@ -262,6 +263,12 @@ if not args.nostdout:
     len(collectionsObesityDiagnosed), len(biobanksObesityDiagnosed)))
     print("- total of obesity samples: %d explicit, %d with OoM; donors: %d explicit" % (
     obesitySamplesExplicit, obesitySamplesIncOoM,  obesityDonorsExplicit))
+    print_fact_sheet_summary(
+        collectionsPediatricOnlyObesityDiagnosed
+        + collectionsPediatricObesityDiagnosed
+        + collectionsObesityDiagnosed,
+        dir,
+    )
 
 for df in (pd_collectionsPediatricOnlyObesityDiagnosed, pd_collectionsPediatricObesityDiagnosed, pd_collectionsObesityDiagnosed):
     pddfutils.tidyCollectionDf(df)
@@ -273,5 +280,11 @@ if args.outputXLSX is not None:
             (pd_collectionsPediatricOnlyObesityDiagnosed, 'Pediatric-only obesity'),
             (pd_collectionsPediatricObesityDiagnosed, 'Pediatric obesity'),
             (pd_collectionsObesityDiagnosed, 'Obesity'),
+            *build_fact_sheet_xlsx_tables(
+                collectionsPediatricOnlyObesityDiagnosed
+                + collectionsPediatricObesityDiagnosed
+                + collectionsObesityDiagnosed,
+                dir,
+            ),
         ],
     )

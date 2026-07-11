@@ -22,6 +22,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
 from oomutils import (
@@ -410,6 +411,15 @@ if not args.nostdout:
         pediatricCancerCollectionSamplesExplicit, pediatricCancerCollectionDonorsExplicit))
     print("- total of samples advertised in pediatric cancer-relevant collections including OoM estimates: %d samples" % (
         pediatricCancerCollectionSamplesIncOoM))
+    print_fact_sheet_summary(
+        cancerExistingDiagnosed
+        + cancerExistingControls
+        + cancerProspective
+        + pediatricCancerExistingDiagnosed
+        + pediatricOnlyCancerExistingDiagnosed
+        + pediatricOnlyCancerOnlyExistingDiagnosed,
+        dir,
+    )
 
 for df in (pd_cancerExistingDiagnosed, pd_cancerOnlyExistingDiagnosed, pd_pediatricCancerExistingDiagnosed, pd_pediatricOnlyCancerExistingDiagnosed, pd_pediatricOnlyCancerOnlyExistingDiagnosed): 
     pddfutils.tidyCollectionDf(df)
@@ -427,5 +437,14 @@ if args.outputXLSX is not None:
             (pd_pediatricOnlyCancerExistingDiagnosed, 'Pediatric cancer-only'),
             (pd_pediatricOnlyCancerOnlyExistingDiagnosed, 'Ped-only cancer-only'),
             (pd_pediatricOnlyCancerOnlyBiobanks, 'Ped-only cancer-only BBs'),
+            *build_fact_sheet_xlsx_tables(
+                cancerExistingDiagnosed
+                + cancerExistingControls
+                + cancerProspective
+                + pediatricCancerExistingDiagnosed
+                + pediatricOnlyCancerExistingDiagnosed
+                + pediatricOnlyCancerOnlyExistingDiagnosed,
+                dir,
+            ),
         ],
     )

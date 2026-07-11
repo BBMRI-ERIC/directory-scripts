@@ -24,6 +24,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from oomutils import (
     describe_oom_estimate_policy,
     estimate_count_from_oom,
@@ -250,6 +251,10 @@ if not args.nostdout:
     print("- total number of donors advertised explicitly in COVID-relevant collections: %d"%(covidCollectionDonorsExplicit))
     print("- total number of samples advertised in COVID-only collections including OoM estimates: %d"%(covidOnlyCollectionSamplesIncOoM))
     print("- total number of samples advertised in COVID-relevant collections including OoM estimates: %d"%(covidCollectionSamplesIncOoM))
+    print_fact_sheet_summary(
+        covidExistingDiagnosed + covidExistingControls + covidProspective + covidOther,
+        dir,
+    )
 
 for df in (pd_covidExistingDiagnosed,pd_covidExistingControls,pd_covidProspective,pd_covidOther):
     pddfutils.tidyCollectionDf(df)
@@ -265,5 +270,9 @@ if args.outputXLSX is not None:
             (pd_covidExistingControls, 'COVID Controls'),
             (pd_covidProspective, 'COVID Prospective'),
             (pd_covidOther, 'COVID Other'),
+            *build_fact_sheet_xlsx_tables(
+                covidExistingDiagnosed + covidExistingControls + covidProspective + covidOther,
+                dir,
+            ),
         ],
     )

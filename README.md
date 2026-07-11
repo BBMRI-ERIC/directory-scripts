@@ -177,6 +177,7 @@ python3 exporter-cMDR.py -G cMDR-map.geojson
 ```
 python3 exporter-cohorts.py -X cohorts.xlsx
 ```
+- Collection-based exporters also include fact-sheet summaries when they produce collection summaries. The workbook sheets `Fact sheet summary`, `Fact sheet all-star rows`, `Fact sheet distributions`, and `Fact sheet margin rows` report populated all-star and all-but-one-star fact rows as row observations. All-but-one-star marginal rows are not summed within a fact sheet; exporter stdout reports per-variable/per-value sample/donor totals only across collections with one row for that value, and may sum one populated all-star total per collection across selected collections or across collections that also have marginal rows.
 - **exporter-country.py** - counts biobanks/collections per country (stdout or XLSX).  
 ```
 python3 exporter-country.py
