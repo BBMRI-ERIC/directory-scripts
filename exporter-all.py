@@ -21,6 +21,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from oomutils import (
     describe_oom_estimate_policy,
     estimate_count_from_oom_or_none,
@@ -448,6 +449,7 @@ if not args.nostdout:
         allCollectionSamplesExplicit, allCollectionDonorsExplicit))
     print("- total of samples/donors advertised in all-relevant collections including OoM estimates: %d / %d" % (
         allCollectionSamplesIncOoM, allCollectionDonorsIncOoM))
+    print_fact_sheet_summary(allCollections, dir)
 
 for df in (pd_allCollections, pd_withdrawnCollections):
     if not df.empty:
@@ -469,7 +471,7 @@ for df in (pd_allNetworks, pd_withdrawnNetworks):
         pddfutils.tidyNetworkDf(df)
 
 if args.outputXLSX is not None:
-    extra_sheets = []
+    extra_sheets = build_fact_sheet_xlsx_tables(allCollections, dir)
     if args.includeWithdrawnSheetsInOutput:
         extra_sheets.extend(
             [
@@ -513,4 +515,5 @@ if args.outputXLSXwithdrawn is not None:
         "Withdrawn contacts",
         pd_withdrawnNetworks,
         "Withdrawn networks",
+        build_fact_sheet_xlsx_tables(withdrawnCollections, dir),
     )

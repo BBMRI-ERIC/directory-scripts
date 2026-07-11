@@ -24,6 +24,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 import pddfutils
 from xlsxutils import write_xlsx_tables
 
@@ -124,6 +125,7 @@ if not args.nostdout:
     print("- total number of ECRAID-relevant biobanks: %d"%(len(ecraidRelevantBiobanks)))
     print("- total number of ECRAID-relevant collections with BSL-2/BSL-3 labs: %d"%(len(ecraidBSLCollections)))
     print("- total number of ECRAID-relevant pathogen collections: %d"%(len(ecraidPathogenCollections)))
+    print_fact_sheet_summary(ecraidBSLCollections + ecraidPathogenCollections, dir)
 
 for df in (pd_ecraidBSLCollections,pd_ecraidPathogenCollections):
     pddfutils.tidyCollectionDf(df)
@@ -137,5 +139,9 @@ if args.outputXLSX is not None:
             (pd_ecraidBSLCollections, 'Collections with BSL labs', False),
             (pd_ecraidPathogenCollections, 'Pathogen collections', False),
             (pd_ecraidRelevantBiobanks, 'Institutions', False),
+            *build_fact_sheet_xlsx_tables(
+                ecraidBSLCollections + ecraidPathogenCollections,
+                dir,
+            ),
         ],
     )

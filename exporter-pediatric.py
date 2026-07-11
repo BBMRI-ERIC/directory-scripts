@@ -21,6 +21,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from orphacodes import OrphaCodes
 from icd10codeshelper import ICD10CodesHelper
 from oomutils import (
@@ -263,6 +264,7 @@ if not args.nostdout:
     print("- total of samples advertised in pediatric collections including OoM estimates: %d" % (pediatricCollectionSamplesIncOoM))
     print("- total of samples/donors advertised explicitly in pediatric-only collections: %d / %d" % (pediatricOnlyCollectionSamplesExplicit, pediatricOnlyCollectionDonorsExplicit))
     print("- total of samples advertised in pediatric-only collections including OoM estimates: %d" % (pediatricOnlyCollectionSamplesIncOoM))
+    print_fact_sheet_summary(pediatricExistingDiagnosed + pediatricOnlyExistingDiagnosed, dir)
 
 for df in (pd_pediatricExistingDiagnosed, pd_pediatricOnlyExistingDiagnosed):
     pddfutils.tidyCollectionDf(df)
@@ -273,5 +275,9 @@ if args.outputXLSX is not None:
         [
             (pd_pediatricExistingDiagnosed, 'Pediatric'),
             (pd_pediatricOnlyExistingDiagnosed, 'Pediatric-only'),
+            *build_fact_sheet_xlsx_tables(
+                pediatricExistingDiagnosed + pediatricOnlyExistingDiagnosed,
+                dir,
+            ),
         ],
     )

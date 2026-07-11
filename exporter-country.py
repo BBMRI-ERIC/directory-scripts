@@ -24,6 +24,8 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
+from xlsxutils import write_xlsx_tables
 
 cachesList = ['directory']
 
@@ -52,8 +54,9 @@ log.info('Total collections: ' + str(dir.getCollectionsCount()))
 countryBiobanks = {}
 countryBiobanksWithCollections = {}
 countryCollections = {}
+selectedCollections = dir.getCollections()
 
-for collection in dir.getCollections():
+for collection in selectedCollections:
     collectionId = collection['id']
     log.debug("Analyzing collection " + collectionId)
     biobankId = dir.getCollectionBiobankId(collectionId)
@@ -95,11 +98,16 @@ for country_code in sorted(countryBiobanks):
             f"collections = {len(countryCollections.get(country_code, set()))}"
         )
 
+if not args.nostdout:
+    print_fact_sheet_summary(selectedCollections, dir)
+
 if args.outputXLSX is not None:
-    pd.DataFrame(output_rows).to_excel(
+    write_xlsx_tables(
         args.outputXLSX[0],
-        sheet_name='Country summary',
-        index=False,
+        [
+            (pd.DataFrame(output_rows), 'Country summary', False),
+            *build_fact_sheet_xlsx_tables(selectedCollections, dir),
+        ],
     )
 
 #for collection in countryCollections['UK']:

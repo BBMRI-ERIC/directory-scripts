@@ -18,6 +18,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from geojsonutils import get_entity_coordinates, make_point_feature, write_feature_collection
 import pddfutils
 from xlsxutils import write_xlsx_tables
@@ -258,6 +259,7 @@ if not args.nostdout:
     print(f"- biobanks linked to studies: {len(cmdrBiobanks)}")
     print(f"- collections linked to studies: {len(cmdrCollections)}")
     print(f"- studies linked to collections: {len(cmdrStudies)}")
+    print_fact_sheet_summary(cmdrCollections, dir)
 
 if args.outputXLSX is not None:
     pd_biobanks = pd.DataFrame(cmdrBiobanks)
@@ -341,6 +343,7 @@ if args.outputXLSX is not None:
                     'hide_columns': hidden_columns,
                 },
             ),
+            *build_fact_sheet_xlsx_tables(cmdrCollections, dir),
         ],
     )
 

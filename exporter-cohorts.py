@@ -24,6 +24,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
+from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
 from oomutils import estimate_count_from_oom_or_none
 import pddfutils
 from xlsxutils import write_xlsx_tables
@@ -170,9 +171,13 @@ if not args.nostdout:
         cohortCollectionSamplesExplicit, cohortCollectionDonorsExplicit))
     print("- total of samples/donors advertised in cohort collections including OoM estimates: %d / %d" % (
         cohortCollectionSamplesIncOoM, cohortCollectionDonorsIncOoM))
+    print_fact_sheet_summary(cohortCollections, dir)
 
 if args.outputXLSX is not None:
     write_xlsx_tables(
         args.outputXLSX[0],
-        [(pd_cohortCollections, 'Cohort collections', False)],
+        [
+            (pd_cohortCollections, 'Cohort collections', False),
+            *build_fact_sheet_xlsx_tables(cohortCollections, dir),
+        ],
     )
