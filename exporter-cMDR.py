@@ -8,6 +8,7 @@ import pandas as pd
 
 from cli_common import (
     add_directory_schema_argument,
+    add_fact_sheet_summary_arguments,
     add_logging_arguments,
     add_no_stdout_argument,
     add_purge_cache_arguments,
@@ -16,6 +17,7 @@ from cli_common import (
     build_directory_kwargs,
     build_parser,
     configure_logging,
+    warn_if_no_star_fact_sums_enabled,
 )
 from directory import Directory
 from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
@@ -33,6 +35,7 @@ add_logging_arguments(parser)
 add_xlsx_output_argument(parser, default_filename='cMDR.xlsx')
 add_no_stdout_argument(parser)
 add_directory_schema_argument(parser, default="ERIC")
+add_fact_sheet_summary_arguments(parser)
 add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument(
@@ -46,6 +49,7 @@ parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
 configure_logging(args)
+warn_if_no_star_fact_sums_enabled(args)
 
 dir = Directory(**build_directory_kwargs(args, pp=pp))
 
@@ -259,7 +263,7 @@ if not args.nostdout:
     print(f"- biobanks linked to studies: {len(cmdrBiobanks)}")
     print(f"- collections linked to studies: {len(cmdrCollections)}")
     print(f"- studies linked to collections: {len(cmdrStudies)}")
-    print_fact_sheet_summary(cmdrCollections, dir)
+    print_fact_sheet_summary(cmdrCollections, dir, allow_no_star_fact_sums=args.allow_no_star_fact_sums)
 
 if args.outputXLSX is not None:
     pd_biobanks = pd.DataFrame(cmdrBiobanks)
@@ -343,7 +347,7 @@ if args.outputXLSX is not None:
                     'hide_columns': hidden_columns,
                 },
             ),
-            *build_fact_sheet_xlsx_tables(cmdrCollections, dir),
+            *build_fact_sheet_xlsx_tables(cmdrCollections, dir, allow_no_star_fact_sums=args.allow_no_star_fact_sums),
         ],
     )
 

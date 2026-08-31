@@ -23,6 +23,24 @@ def normalize_oom_value(value: Any) -> int | None:
     return int(value)
 
 
+def get_oom_interval(value: Any) -> tuple[int, int]:
+    """Return the inclusive lower and exclusive upper bounds for an OoM value."""
+    oom = normalize_oom_value(value)
+    if oom is None:
+        raise ValueError("OoM value is missing.")
+    if oom < 0:
+        raise ValueError(f"OoM value must be non-negative, got {oom!r}.")
+    return 10**oom, 10 ** (oom + 1)
+
+
+def count_matches_oom(count: Any, oom_value: Any) -> bool:
+    """Return whether an integer count lies in the represented OoM interval."""
+    if not isinstance(count, int) or isinstance(count, bool):
+        return False
+    lower, upper = get_oom_interval(oom_value)
+    return lower <= count < upper
+
+
 def get_oom_upper_bound_coefficient() -> float:
     """Return the configured coefficient applied to the OoM upper bound."""
     raw_value = os.getenv(

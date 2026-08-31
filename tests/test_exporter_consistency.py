@@ -480,6 +480,23 @@ class CohortTotalsDirectoryStub(SharedDirectoryStub):
     BASE_COLLECTIONS[2]["type"] = ["POPULATION_BASED"]
 
 
+class CohortNoStarFallbackDirectoryStub(CohortTotalsDirectoryStub):
+    """Cohort fixture with one fully concrete fact row and no margins."""
+
+    BASE_FACTS = copy.deepcopy(CohortTotalsDirectoryStub.BASE_FACTS)
+    BASE_FACTS["col1"].append(
+        {
+            "id": "f1-concrete",
+            "sex": "FEMALE",
+            "age_range": "Adult",
+            "sample_type": "SERUM",
+            "disease": "C50",
+            "number_of_samples": 20,
+            "number_of_donors": 8,
+        }
+    )
+
+
 def test_directory_stats_matches_exporter_all_active_totals(monkeypatch):
     stats_globals, _, _ = _run_script(
         monkeypatch,
@@ -656,6 +673,37 @@ def test_exporter_cohorts_writes_fact_sheet_summary_sheets(monkeypatch, tmp_path
     assert summary["collections"] == 3
     assert summary["collections_with_fact_sheets"] == 3
     assert summary["populated_all_star_rows"] == 3
+
+
+def test_exporter_cohorts_no_star_fallback_is_warned_and_separate(
+    monkeypatch,
+    tmp_path,
+):
+    workbook = tmp_path / "cohorts-fallback.xlsx"
+
+    _, stdout, _ = _run_script(
+        monkeypatch,
+        "exporter-cohorts.py",
+        ["--allow-no-star-fact-sums", "-X", str(workbook)],
+        directory_class=CohortNoStarFallbackDirectoryStub,
+    )
+
+    assert "WARNING: No-star fact-sheet fallback is enabled" in stdout
+    assert "UNSAFE no-star fallback distributions" in stdout
+
+    import pandas as pd
+
+    sheet_names = pd.ExcelFile(workbook).sheet_names
+    assert "Fact sheet no-star fallback" in sheet_names
+    fallback = pd.read_excel(workbook, sheet_name="Fact sheet no-star fallback")
+    female = fallback[(fallback["dimension"] == "sex") & (fallback["value_id"] == "FEMALE")].iloc[0]
+    assert female["number_of_samples"] == 20
+    assert female["number_of_donors"] == 8
+    assert female["no_star_fallback_collections"] == 1
+    assert bool(female["assumption_violating"]) is True
+
+    authoritative = pd.read_excel(workbook, sheet_name="Fact sheet distributions")
+    assert authoritative.empty
 
 
 def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):

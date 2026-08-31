@@ -18,6 +18,7 @@ import os.path
 from cli_common import (
     add_directory_auth_arguments,
     add_directory_schema_argument,
+    add_fact_sheet_summary_arguments,
     add_logging_arguments,
     add_no_stdout_argument,
     add_optional_xlsx_output_argument,
@@ -29,6 +30,7 @@ from cli_common import (
     build_directory_kwargs,
     build_parser,
     configure_logging,
+    warn_if_no_star_fact_sums_enabled,
 )
 from directory import Directory
 from fact_sheet_summary import (
@@ -157,6 +159,7 @@ add_optional_xlsx_output_argument(
     help_text='write warnings and errors to the provided XLSX file',
 )
 add_no_stdout_argument(parser)
+add_fact_sheet_summary_arguments(parser)
 parser.add_argument('-W', '--warnings', dest='warnings', action='store_true', help='print warning information on stdout')
 add_withdrawn_scope_arguments(parser)
 parser.add_argument('--print-filtered-dataframe', '--print-filtered-df', dest='printDf', default=False, action="store_true", help='Print filtered data frame to stdout')
@@ -170,6 +173,7 @@ outputXLSX = args.outputXLSX
 outputWEXLSX = args.outputWEXLSX
 
 configure_logging(args)
+warn_if_no_star_fact_sums_enabled(args)
 
 # Get info from Directory
 pp = pprint.PrettyPrinter(indent=4)
@@ -292,7 +296,11 @@ bbmriCohortFactSheetCollections = (
 )
 
 if not args.nostdout:
-    print_fact_sheet_summary(bbmriCohortFactSheetCollections, dir)
+    print_fact_sheet_summary(
+        bbmriCohortFactSheetCollections,
+        dir,
+        allow_no_star_fact_sums=args.allow_no_star_fact_sums,
+    )
 
 outputExcelBiobanksCollections(
     args.outputXLSX[0],
@@ -306,5 +314,9 @@ outputExcelBiobanksCollections(
     "StatsDetailed",
     df_collFactsSampleNumber,
     "NumberOfSamplesFactTable",
-    build_fact_sheet_xlsx_tables(bbmriCohortFactSheetCollections, dir),
+    build_fact_sheet_xlsx_tables(
+        bbmriCohortFactSheetCollections,
+        dir,
+        allow_no_star_fact_sums=args.allow_no_star_fact_sums,
+    ),
 )

@@ -10,6 +10,7 @@ import pandas as pd
 
 from cli_common import (
     add_directory_schema_argument,
+    add_fact_sheet_summary_arguments,
     add_logging_arguments,
     add_no_stdout_argument,
     add_optional_xlsx_output_argument,
@@ -19,6 +20,7 @@ from cli_common import (
     build_directory_kwargs,
     build_parser,
     configure_logging,
+    warn_if_no_star_fact_sums_enabled,
 )
 from directory import Directory
 from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
@@ -47,6 +49,7 @@ add_optional_xlsx_output_argument(
 )
 add_no_stdout_argument(parser)
 add_directory_schema_argument(parser, default="ERIC")
+add_fact_sheet_summary_arguments(parser)
 add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.add_argument(
@@ -78,6 +81,7 @@ if args.includeWithdrawnSheetsInOutput and not args.include_withdrawn:
     parser.error("--include-withdrawn-sheets-in-output requires -w/--include-withdrawn.")
 
 configure_logging(args)
+warn_if_no_star_fact_sums_enabled(args)
 
 
 ### Initialize variables
@@ -449,7 +453,7 @@ if not args.nostdout:
         allCollectionSamplesExplicit, allCollectionDonorsExplicit))
     print("- total of samples/donors advertised in all-relevant collections including OoM estimates: %d / %d" % (
         allCollectionSamplesIncOoM, allCollectionDonorsIncOoM))
-    print_fact_sheet_summary(allCollections, dir)
+    print_fact_sheet_summary(allCollections, dir, allow_no_star_fact_sums=args.allow_no_star_fact_sums)
 
 for df in (pd_allCollections, pd_withdrawnCollections):
     if not df.empty:
@@ -471,7 +475,7 @@ for df in (pd_allNetworks, pd_withdrawnNetworks):
         pddfutils.tidyNetworkDf(df)
 
 if args.outputXLSX is not None:
-    extra_sheets = build_fact_sheet_xlsx_tables(allCollections, dir)
+    extra_sheets = build_fact_sheet_xlsx_tables(allCollections, dir, allow_no_star_fact_sums=args.allow_no_star_fact_sums)
     if args.includeWithdrawnSheetsInOutput:
         extra_sheets.extend(
             [
@@ -515,5 +519,5 @@ if args.outputXLSXwithdrawn is not None:
         "Withdrawn contacts",
         pd_withdrawnNetworks,
         "Withdrawn networks",
-        build_fact_sheet_xlsx_tables(withdrawnCollections, dir),
+        build_fact_sheet_xlsx_tables(withdrawnCollections, dir, allow_no_star_fact_sums=args.allow_no_star_fact_sums),
     )

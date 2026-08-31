@@ -273,8 +273,15 @@ def test_build_biobank_stats_include_services_facts_and_subcollection_counts():
     assert bb1["collections_with_facts"] == 2
     assert bb1["collections_with_all_star"] == 2
     assert bb1["collections_missing_valid_all_star"] == 0
+    assert bb1["collections_with_all_but_one_star"] == 0
+    assert bb1["collections_with_complete_all_but_one_star"] == 0
+    assert bb1["collections_missing_complete_all_but_one_star"] == 2
     assert bb1["collections_all_star_inconsistent_samples"] == 1
     assert bb1["collections_all_star_inconsistent_donors"] == 1
+    assert bb1["collections_all_star_inconsistent_samples_oom"] == 0
+    assert bb1["collections_all_star_inconsistent_donors_oom"] == 0
+    assert bb1["collections_all_but_one_inconsistent_samples"] == 0
+    assert bb1["collections_all_but_one_inconsistent_donors"] == 0
     assert bb1["collection_type_breakdown"] == "CASE_CONTROL=1; DISEASE_SPECIFIC=1; POPULATION=1"
     assert bb1["service_type_breakdown"] == "BIOANALYTICAL_SERVICES=1; SEQUENCING=2"
 
@@ -291,6 +298,9 @@ def test_build_biobank_stats_supports_oom_fallback_services_and_missing_all_star
     assert bb2["collections_with_facts"] == 1
     assert bb2["collections_with_all_star"] == 0
     assert bb2["collections_missing_valid_all_star"] == 1
+    assert bb2["collections_with_all_but_one_star"] == 1
+    assert bb2["collections_with_complete_all_but_one_star"] == 1
+    assert bb2["collections_missing_complete_all_but_one_star"] == 0
 
     assert all(row["id"] != "bb3" for row in rows)
 
@@ -322,8 +332,10 @@ def test_build_directory_stats_emits_breakdown_and_warning_rows():
         for row in stats["fact_sheet_warning_rows"]
     }
     assert warning_codes == {
+        ("col1", "missing_all_but_one"),
         ("col2", "all_star_samples_mismatch"),
         ("col2", "all_star_donors_mismatch"),
+        ("col2", "missing_all_but_one"),
         ("col4", "missing_all_star"),
     }
 
@@ -349,8 +361,15 @@ def test_build_stats_summary_aggregates_all_metrics():
     assert summary["collections_with_facts"] == 3
     assert summary["collections_with_all_star"] == 2
     assert summary["collections_missing_valid_all_star"] == 1
+    assert summary["collections_with_all_but_one_star"] == 1
+    assert summary["collections_with_complete_all_but_one_star"] == 1
+    assert summary["collections_missing_complete_all_but_one_star"] == 2
     assert summary["collections_all_star_inconsistent_samples"] == 1
     assert summary["collections_all_star_inconsistent_donors"] == 1
+    assert summary["collections_all_star_inconsistent_samples_oom"] == 0
+    assert summary["collections_all_star_inconsistent_donors_oom"] == 0
+    assert summary["collections_all_but_one_inconsistent_samples"] == 0
+    assert summary["collections_all_but_one_inconsistent_donors"] == 0
     assert summary["top_level_collection_type_breakdown"] == "CASE_CONTROL=2; DISEASE_SPECIFIC=1; POPULATION=3"
     assert summary["subcollection_type_breakdown"] == "CASE_CONTROL=1"
     assert summary["service_type_breakdown"] == "BIOANALYTICAL_SERVICES=1; BIOINFORMATICS_AND_DATA_SCIENCES=1; SEQUENCING=3"

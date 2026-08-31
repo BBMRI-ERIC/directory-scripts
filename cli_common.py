@@ -8,6 +8,7 @@ import os
 from typing import Iterable, Optional
 
 from dotenv import load_dotenv
+from fact_sheet_utils import NO_STAR_FACT_SUMS_WARNING
 
 
 load_dotenv()
@@ -133,6 +134,25 @@ def add_no_stdout_argument(parser: argparse.ArgumentParser) -> None:
         dest="nostdout",
         action="store_true",
     )
+
+
+def add_fact_sheet_summary_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the explicit opt-in for assumption-violating no-star sums."""
+    parser.add_argument(
+        "--allow-no-star-fact-sums",
+        dest="allow_no_star_fact_sums",
+        action="store_true",
+        help=(
+            "derive missing fact-sheet marginal distributions by summing fully "
+            "concrete no-star rows (unsafe: rows may overlap or be incomplete)"
+        ),
+    )
+
+
+def warn_if_no_star_fact_sums_enabled(args) -> None:
+    """Log the common unsafe-fallback warning when the opt-in is enabled."""
+    if getattr(args, "allow_no_star_fact_sums", False):
+        log.warning(NO_STAR_FACT_SUMS_WARNING)
 
 
 def add_validation_warning_argument(parser: argparse.ArgumentParser) -> None:
