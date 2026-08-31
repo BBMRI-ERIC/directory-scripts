@@ -32,6 +32,19 @@ CLI_SCRIPTS = [
     "exporter-quality-label.py",
 ]
 
+FACT_SHEET_EXPORTERS = [
+    "exporter-all.py",
+    "exporter-bbmri-cohorts.py",
+    "exporter-cMDR.py",
+    "exporter-cohorts.py",
+    "exporter-country.py",
+    "exporter-covid.py",
+    "exporter-ecraid.py",
+    "exporter-mission-cancer.py",
+    "exporter-obesity.py",
+    "exporter-pediatric.py",
+]
+
 
 @pytest.mark.parametrize("script_name", CLI_SCRIPTS)
 def test_cli_help_runs(script_name):
@@ -44,6 +57,15 @@ def test_cli_help_runs(script_name):
     )
     assert result.returncode == 0, result.stderr
     assert "usage:" in result.stdout.lower()
+
+
+@pytest.mark.parametrize("script_name", FACT_SHEET_EXPORTERS)
+def test_fact_sheet_exporter_help_exposes_no_star_fallback(script_name):
+    source = (REPO_ROOT / script_name).read_text(encoding="utf-8")
+
+    assert "add_fact_sheet_summary_arguments(parser)" in source
+    assert "warn_if_no_star_fact_sums_enabled(args)" in source
+    assert "allow_no_star_fact_sums=args.allow_no_star_fact_sums" in source
 
 
 def test_data_check_non_eric_schema_requires_auth():

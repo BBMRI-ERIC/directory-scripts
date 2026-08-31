@@ -3,9 +3,11 @@ import pytest
 from oomutils import (
     DEFAULT_OOM_UPPER_BOUND_COEFFICIENT,
     ENV_OOM_UPPER_BOUND_COEFFICIENT,
+    count_matches_oom,
     describe_oom_estimate_policy,
     estimate_count_from_oom,
     estimate_count_from_oom_or_none,
+    get_oom_interval,
     get_oom_upper_bound_coefficient,
     normalize_oom_value,
 )
@@ -40,3 +42,13 @@ def test_invalid_oom_policy_rejected(monkeypatch):
 
     with pytest.raises(ValueError):
         get_oom_upper_bound_coefficient()
+
+
+def test_oom_interval_consistency_is_independent_of_estimate_policy(monkeypatch):
+    monkeypatch.setenv(ENV_OOM_UPPER_BOUND_COEFFICIENT, "0.3")
+
+    assert get_oom_interval(2) == (100, 1000)
+    assert count_matches_oom(100, 2)
+    assert count_matches_oom(999, {"id": "2"})
+    assert not count_matches_oom(99, 2)
+    assert not count_matches_oom(1000, 2)

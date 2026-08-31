@@ -7,7 +7,14 @@ from typing import Any
 
 import pandas as pd
 
-from fact_sheet_utils import FACT_DIMENSION_KEYS, normalize_fact_dimension_value
+from fact_sheet_utils import (
+    FACT_DIMENSION_KEYS,
+    get_dimension_values,
+    get_matching_one_star_rows,
+    get_no_star_rows,
+    normalize_fact_dimension_value,
+    NO_STAR_FACT_SUMS_WARNING,
+)
 
 
 COUNT_FIELDS = ("number_of_samples", "number_of_donors")
@@ -24,6 +31,12 @@ SUMMARY_COLUMNS = [
     "all_star_donors_total_for_collections_with_all_star_rows",
     "all_star_samples_total_for_collections_with_all_but_one_rows",
     "all_star_donors_total_for_collections_with_all_but_one_rows",
+    "allow_no_star_fact_sums",
+    "collections_with_no_star_fallback",
+    "no_star_fallback_distribution_values",
+    "no_star_fallback_contributions",
+    "no_star_fallback_source_rows",
+    "fact_sheet_summary_warning",
 ]
 ALL_STAR_COLUMNS = [
     "collection_id",
@@ -39,6 +52,10 @@ ALL_BUT_ONE_VALUE_COLUMNS = [
     "collections_with_value",
     "fact_rows_with_value",
     "collections_with_single_value_row",
+    "authoritative_collections",
+    "no_star_fallback_collections",
+    "no_star_fallback_source_rows",
+    "assumption_violating",
     "number_of_samples",
     "number_of_donors",
     "sample_values",
@@ -114,6 +131,7 @@ def _build_all_but_one_row(
     dimension: str,
     value_id: str,
     value_label: str,
+    matching_margin_rows: int,
 ) -> dict[str, Any]:
     """Return one populated all-but-one-star observation row."""
     return {
@@ -125,6 +143,42 @@ def _build_all_but_one_row(
         "value_label": value_label,
         "number_of_samples": _row_count_value(fact, "number_of_samples"),
         "number_of_donors": _row_count_value(fact, "number_of_donors"),
+        "source": "all_but_one_star",
+        "source_fact_ids": str(fact.get("id", "")),
+        "source_fact_rows": 1,
+        "matching_margin_rows": matching_margin_rows,
+    }
+
+
+def _build_no_star_fallback_row(
+    collection: dict[str, Any],
+    facts: list[dict[str, Any]],
+    dimension: str,
+    value_id: str,
+    value_label: str,
+) -> dict[str, Any]:
+    """Return one assumption-violating contribution derived from no-star rows."""
+    fact_ids = [str(fact.get("id", "")) for fact in facts]
+    return {
+        "collection_id": collection["id"],
+        "collection_name": collection.get("name", ""),
+        "fact_id": ",".join(fact_ids),
+        "dimension": dimension,
+        "value_id": value_id,
+        "value_label": value_label,
+        "number_of_samples": sum(
+            fact["number_of_samples"]
+            for fact in facts
+            if _is_numeric_count(fact.get("number_of_samples"))
+        ),
+        "number_of_donors": sum(
+            fact["number_of_donors"]
+            for fact in facts
+            if _is_numeric_count(fact.get("number_of_donors"))
+        ),
+        "source": "no_star_fallback",
+        "source_fact_ids": ";".join(fact_ids),
+        "source_fact_rows": len(facts),
     }
 
 
@@ -151,7 +205,10 @@ def _sum_one_value_row_per_collection(
     sample_total = 0
     donor_total = 0
     for collection_rows in rows_by_collection.values():
-        if len(collection_rows) != 1:
+        if (
+            len(collection_rows) != 1
+            or collection_rows[0]["matching_margin_rows"] != 1
+        ):
             continue
         collections_with_single_value_row += 1
         row = collection_rows[0]
@@ -165,14 +222,23 @@ def _sum_one_value_row_per_collection(
 def _build_all_but_one_value_rows(
     all_but_one_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Group all-but-one observations by value with conservative totals."""
+    """Group authoritative contributions by distribution value only."""
     grouped_rows: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in all_but_one_rows:
         key = (row["dimension"], row["value_id"], row["value_label"])
         grouped_rows[key].append(row)
 
     value_rows = []
-    for (dimension, value_id, value_label), rows in sorted(grouped_rows.items()):
+    keys = sorted(grouped_rows)
+    for dimension, value_id, value_label in keys:
+        rows = grouped_rows[(dimension, value_id, value_label)]
+        rows_by_collection: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            rows_by_collection[row["collection_id"]].append(row)
+        matching_margin_rows = sum(
+            max(row["matching_margin_rows"] for row in collection_rows)
+            for collection_rows in rows_by_collection.values()
+        )
         collections_with_single_value_row, sample_total, donor_total = (
             _sum_one_value_row_per_collection(rows)
         )
@@ -182,14 +248,47 @@ def _build_all_but_one_value_rows(
                 "value_id": value_id,
                 "value_label": value_label,
                 "collections_with_value": len({row["collection_id"] for row in rows}),
-                "fact_rows_with_value": len(rows),
+                "fact_rows_with_value": matching_margin_rows,
                 "collections_with_single_value_row": collections_with_single_value_row,
+                "authoritative_collections": collections_with_single_value_row,
+                "no_star_fallback_collections": 0,
+                "no_star_fallback_source_rows": 0,
+                "assumption_violating": False,
                 "number_of_samples": sample_total,
                 "number_of_donors": donor_total,
                 "sample_values": _format_observation_values(rows, "number_of_samples"),
                 "donor_values": _format_observation_values(rows, "number_of_donors"),
             }
         )
+    return value_rows
+
+
+def _build_no_star_fallback_value_rows(
+    fallback_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Group unsafe no-star fallback contributions in a separate stream."""
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in fallback_rows:
+        grouped[(row["dimension"], row["value_id"], row["value_label"])].append(row)
+    value_rows = []
+    for dimension, value_id, value_label in sorted(grouped):
+        rows = grouped[(dimension, value_id, value_label)]
+        value_rows.append({
+            "dimension": dimension,
+            "value_id": value_id,
+            "value_label": value_label,
+            "collections_with_value": len({row["collection_id"] for row in rows}),
+            "fact_rows_with_value": 0,
+            "collections_with_single_value_row": 0,
+            "authoritative_collections": 0,
+            "no_star_fallback_collections": len({row["collection_id"] for row in rows}),
+            "no_star_fallback_source_rows": sum(row["source_fact_rows"] for row in rows),
+            "assumption_violating": True,
+            "number_of_samples": sum(row["number_of_samples"] for row in rows),
+            "number_of_donors": sum(row["number_of_donors"] for row in rows),
+            "sample_values": _format_observation_values(rows, "number_of_samples"),
+            "donor_values": _format_observation_values(rows, "number_of_donors"),
+        })
     return value_rows
 
 
@@ -254,6 +353,8 @@ def _format_dimension_value(row: dict[str, Any]) -> str:
 def build_fact_sheet_summary(
     collections: list[dict[str, Any]],
     directory,
+    *,
+    allow_no_star_fact_sums: bool = False,
 ) -> dict[str, Any]:
     """Return non-additive fact-sheet summaries for selected collections.
 
@@ -266,6 +367,7 @@ def build_fact_sheet_summary(
     collections = _unique_collections(collections)
     all_star_rows = []
     all_but_one_rows = []
+    no_star_fallback_rows = []
     collections_with_fact_sheets = set()
     collections_with_populated_all_star_rows = set()
     collections_with_populated_all_but_one_star_rows = set()
@@ -290,7 +392,7 @@ def build_fact_sheet_summary(
             fixed_dimensions = [
                 key
                 for key, value in normalized_dimensions.items()
-                if value not in (None, "*")
+                if value not in (None, "", "*")
             ]
             if len(fixed_dimensions) != 1:
                 continue
@@ -300,19 +402,61 @@ def build_fact_sheet_summary(
                 for key in FACT_DIMENSION_KEYS
             ):
                 continue
+            matching_margin_rows = len(
+                get_matching_one_star_rows(
+                    facts,
+                    fixed_dimension,
+                    normalized_dimensions[fixed_dimension],
+                )
+            )
             if not _is_populated_fact_row(fact):
                 continue
             value_id, value_label = _value_id_and_label(fact.get(fixed_dimension))
             collections_with_populated_all_but_one_star_rows.add(collection_id)
-            all_but_one_rows.append(
-                _build_all_but_one_row(
-                    collection,
-                    fact,
-                    fixed_dimension,
-                    value_id,
-                    value_label,
-                )
+            row = _build_all_but_one_row(
+                collection,
+                fact,
+                fixed_dimension,
+                value_id,
+                value_label,
+                matching_margin_rows,
             )
+            all_but_one_rows.append(row)
+
+        if not allow_no_star_fact_sums:
+            continue
+        no_star_facts = get_no_star_rows(facts)
+        if not no_star_facts:
+            continue
+        dimension_values = get_dimension_values(facts)
+        for dimension in FACT_DIMENSION_KEYS:
+            for value in dimension_values[dimension]:
+                matching_margins = get_matching_one_star_rows(
+                    facts,
+                    dimension,
+                    value,
+                )
+                if matching_margins:
+                    continue
+                matching_fallback_facts = [
+                    fact
+                    for fact in no_star_facts
+                    if normalize_fact_dimension_value(fact.get(dimension)) == value
+                    and _is_populated_fact_row(fact)
+                ]
+                if not matching_fallback_facts:
+                    continue
+                raw_value = matching_fallback_facts[0].get(dimension)
+                value_id, value_label = _value_id_and_label(raw_value)
+                no_star_fallback_rows.append(
+                    _build_no_star_fallback_row(
+                        collection,
+                        matching_fallback_facts,
+                        dimension,
+                        value_id,
+                        value_label,
+                    )
+                )
 
     (
         margin_collections_with_single_all_star_total,
@@ -355,21 +499,59 @@ def build_fact_sheet_summary(
         "all_star_donors_total_for_collections_with_all_but_one_rows": (
             margin_collection_donor_total
         ),
+        "allow_no_star_fact_sums": allow_no_star_fact_sums,
+        "collections_with_no_star_fallback": len(
+            {row["collection_id"] for row in no_star_fallback_rows}
+        ),
+        "no_star_fallback_distribution_values": len(
+            {
+                (row["dimension"], row["value_id"])
+                for row in no_star_fallback_rows
+            }
+        ),
+        "no_star_fallback_contributions": len(no_star_fallback_rows),
+        "no_star_fallback_source_rows": len(
+            {
+                (row["collection_id"], fact_id)
+                for row in no_star_fallback_rows
+                for fact_id in row["source_fact_ids"].split(";")
+            }
+        ),
+        "fact_sheet_summary_warning": (
+            NO_STAR_FACT_SUMS_WARNING if allow_no_star_fact_sums else ""
+        ),
     }
     return {
         "totals": totals,
         "all_star_rows": all_star_rows,
         "all_but_one_rows": all_but_one_rows,
+        "no_star_fallback_rows": no_star_fallback_rows,
         "all_but_one_value_rows": _build_all_but_one_value_rows(all_but_one_rows),
+        "no_star_fallback_value_rows": _build_no_star_fallback_value_rows(
+            no_star_fallback_rows
+        ),
     }
 
 
 def build_fact_sheet_summary_frames(
     collections: list[dict[str, Any]],
     directory,
+    *,
+    allow_no_star_fact_sums: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Return dataframe views of the fact-sheet summary."""
-    summary = build_fact_sheet_summary(collections, directory)
+    summary = build_fact_sheet_summary(
+        collections,
+        directory,
+        allow_no_star_fact_sums=allow_no_star_fact_sums,
+    )
+    return _build_fact_sheet_summary_frames(summary)
+
+
+def _build_fact_sheet_summary_frames(
+    summary: dict[str, Any],
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Return dataframe views for an already-built fact-sheet summary."""
     return (
         pd.DataFrame([summary["totals"]], columns=SUMMARY_COLUMNS),
         pd.DataFrame(summary["all_star_rows"], columns=ALL_STAR_COLUMNS),
@@ -384,17 +566,33 @@ def build_fact_sheet_summary_frames(
 def build_fact_sheet_xlsx_tables(
     collections: list[dict[str, Any]],
     directory,
+    *,
+    allow_no_star_fact_sums: bool = False,
 ) -> list[tuple[pd.DataFrame, str, bool]]:
     """Return XLSX sheet specs for non-additive fact-sheet summaries."""
-    summary_df, all_star_df, value_df, row_df = build_fact_sheet_summary_frames(
+    summary = build_fact_sheet_summary(
         collections,
         directory,
+        allow_no_star_fact_sums=allow_no_star_fact_sums,
+    )
+    summary_df, all_star_df, value_df, row_df = _build_fact_sheet_summary_frames(
+        summary
     )
     return [
         (summary_df, "Fact sheet summary", False),
         (all_star_df, "Fact sheet all-star rows", False),
         (value_df, "Fact sheet distributions", False),
         (row_df, "Fact sheet margin rows", False),
+        *([
+            (
+                pd.DataFrame(
+                    summary["no_star_fallback_value_rows"],
+                    columns=ALL_BUT_ONE_VALUE_COLUMNS,
+                ),
+                "Fact sheet no-star fallback",
+                False,
+            )
+        ] if allow_no_star_fact_sums else []),
     ]
 
 
@@ -402,11 +600,28 @@ def print_fact_sheet_summary(
     collections: list[dict[str, Any]],
     directory,
     label: str = "Fact-sheet summary",
+    *,
+    allow_no_star_fact_sums: bool = False,
 ) -> None:
     """Print a compact non-additive fact-sheet summary for selected collections."""
-    summary = build_fact_sheet_summary(collections, directory)
+    summary = build_fact_sheet_summary(
+        collections,
+        directory,
+        allow_no_star_fact_sums=allow_no_star_fact_sums,
+    )
     totals = summary["totals"]
     print(label + ":")
+    if allow_no_star_fact_sums:
+        print("WARNING: " + NO_STAR_FACT_SUMS_WARNING)
+        print(
+            "- UNSAFE no-star fallback provenance: %d collections / "
+            "%d distribution values / %d source rows"
+            % (
+                totals["collections_with_no_star_fallback"],
+                totals["no_star_fallback_distribution_values"],
+                totals["no_star_fallback_source_rows"],
+            )
+        )
     print(
         "- collections with fact sheets: %d / %d"
         % (totals["collections_with_fact_sheets"], totals["collections"])
@@ -458,6 +673,22 @@ def print_fact_sheet_summary(
                     _format_dimension_value(row),
                     row["number_of_samples"],
                     row["number_of_donors"],
-                    row["collections_with_single_value_row"],
+                    row["authoritative_collections"]
+                    + row["no_star_fallback_collections"],
+                )
+            )
+    if summary["no_star_fallback_value_rows"]:
+        print("- UNSAFE no-star fallback distributions (not combined with all-but-one-star):")
+        current_dimension = None
+        for row in summary["no_star_fallback_value_rows"]:
+            if row["dimension"] != current_dimension:
+                current_dimension = row["dimension"]
+                print(f"  - {current_dimension}:")
+            print(
+                "    - %s: %d samples / %d donors from %d collections (%d source rows)"
+                % (
+                    _format_dimension_value(row), row["number_of_samples"],
+                    row["number_of_donors"], row["no_star_fallback_collections"],
+                    row["no_star_fallback_source_rows"],
                 )
             )

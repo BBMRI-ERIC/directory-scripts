@@ -13,6 +13,8 @@ class FactTablesDirectoryStub:
                 "facts": [{"id": "f1"}],
                 "size": 10,
                 "number_of_donors": 8,
+                "order_of_magnitude": 2,
+                "order_of_magnitude_donors": 1,
             },
             {
                 "id": "col2",
@@ -49,7 +51,25 @@ class FactTablesDirectoryStub:
                     "disease": "*",
                     "number_of_samples": 9,
                     "number_of_donors": 7,
-                }
+                },
+                {
+                    "id": "f1-female-1",
+                    "sex": "FEMALE",
+                    "age_range": "*",
+                    "sample_type": "*",
+                    "disease": "*",
+                    "number_of_samples": 10,
+                    "number_of_donors": 8,
+                },
+                {
+                    "id": "f1-female-2",
+                    "sex": "FEMALE",
+                    "age_range": "*",
+                    "sample_type": "*",
+                    "disease": "*",
+                    "number_of_samples": 5,
+                    "number_of_donors": 4,
+                },
             ],
             "col2": [
                 {
@@ -110,6 +130,27 @@ class FactTablesDirectoryStub:
 
     def getCollectionContact(self, collection_id):
         return self.contact
+
+
+class FactTablesZeroOnlyDirectoryStub(FactTablesDirectoryStub):
+    """Fact sheet with no positive counts still requiring structural QC."""
+
+    def __init__(self):
+        super().__init__()
+        self.collections = [self.collections[1]]
+        self.facts_by_collection = {
+            "col2": [
+                {
+                    "id": "zero-detail",
+                    "sex": "FEMALE",
+                    "age_range": "Adult",
+                    "sample_type": "PLASMA",
+                    "disease": "C50",
+                    "number_of_samples": 0,
+                    "number_of_donors": 0,
+                }
+            ]
+        }
 
 
 class FactTablesAgeRangeBroadStub:
@@ -267,6 +308,19 @@ def test_facttables_check_reports_all_star_consistency_warnings():
     assert "FT:AllStarSizeGap" in warning_ids
     assert "FT:AllStarDonorGap" in warning_ids
     assert "FT:AllStarMissing" in warning_ids
+    assert "FT:AllStarSamplesOoMGap" in warning_ids
+    assert "FT:AllStarDonorsOoMGap" in warning_ids
+    assert "FT:OneStarDuplicate" in warning_ids
+    assert "FT:OneStarSamplesAboveAllStar" in warning_ids
+    assert "FT:OneStarDonorsAboveAllStar" in warning_ids
+
+
+def test_facttables_check_runs_structure_checks_without_positive_counts():
+    warnings = FactTables().check(FactTablesZeroOnlyDirectoryStub(), args=None)
+    warning_ids = {warning.dataCheckID for warning in warnings}
+
+    assert "FT:AllStarMissing" in warning_ids
+    assert "FT:OneStarMissing" in warning_ids
 
 
 def test_facttables_check_ignores_star_rows_and_non_authoritative_nav_material():

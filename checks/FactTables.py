@@ -4,11 +4,7 @@ import re
 import logging as log
 import collections as py_collections
 from fact_sheet_utils import (
-	FACT_DIMENSION_KEYS,
 	analyze_collection_fact_sheet,
-	count_star_dimensions,
-	get_dimension_values,
-	get_matching_one_star_rows,
 )
 from fact_descriptor_sync import (
 	collect_fact_descriptor_values,
@@ -98,50 +94,30 @@ CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
                                                       '(number of samples) not '
                                                       'provided'},
  'FT:OneStarMissing': {'entity': 'COLLECTION',
-                                               'fields': ['donors_present',
-                                                          'facts',
-                                                          'id'],
-                                               'severity': 'WARNING',
-                                               'summary': 'missing all-but-one-star '
-                                                          'aggregate: {aggregates[3]}'},
+                       'fields': ['facts'],
+                       'fix': 'Add all-but-one-star rows for the represented values of each fact-sheet dimension.',
+                       'severity': 'WARNING',
+                       'summary': 'The fact sheet has no all-but-one-star marginal rows.'},
  'FT:OneStarValue': {'entity': 'COLLECTION',
-                                            'fields': ['donors_present', 'facts', 'id'],
-                                            'severity': 'INFO',
-                                            'summary': 'missing all-but-one-star '
-                                                       'aggregate for {fk} value '
-                                                       '{value}: {aggregates[3]}'},
+                     'fields': ['facts'],
+                     'fix': 'Add one all-but-one-star row for the reported dimension value.',
+                     'severity': 'INFO',
+                     'summary': 'A represented fact-sheet dimension value has no all-but-one-star row.'},
  'FT:AllStarMissing': {'entity': 'COLLECTION',
-                                            'fields': ['all_star_rows',
-                                                       'donors_present',
-                                                       'facts',
-                                                       'id'],
-                                            'severity': 'WARNING',
-                                            'summary': 'Expected exactly one all-star '
-                                                       'aggregate row, found '
-                                                       "{fact_sheet['all_star_rows']}."},
+                       'fields': ['facts'],
+                       'fix': 'Add one all-star row or remove duplicate all-star rows so exactly one remains.',
+                       'severity': 'WARNING',
+                       'summary': 'The fact sheet does not contain exactly one all-star aggregate row.'},
  'FT:AllStarDonorGap': {'entity': 'COLLECTION',
-                                                      'fields': ['code',
-                                                                 'donors_present',
-                                                                 'facts',
-                                                                 'id'],
-                                                      'fix': 'Check the all-star '
-                                                             'aggregate row and '
-                                                             'collection '
-                                                             'number_of_donors.',
-                                                      'severity': 'WARNING',
-                                                      'summary': 'Check '
-                                                                 'FT:AllStarDonorGap'},
+                        'fields': ['facts', 'number_of_donors'],
+                        'fix': 'Correct the all-star donor count or collection number_of_donors so they agree.',
+                        'severity': 'WARNING',
+                        'summary': 'The all-star donor count differs from the collection donor count.'},
  'FT:AllStarSizeGap': {'entity': 'COLLECTION',
-                                                     'fields': ['code',
-                                                                'donors_present',
-                                                                'facts',
-                                                                'id'],
-                                                     'fix': 'Check the all-star '
-                                                            'aggregate row and '
-                                                            'collection size.',
-                                                     'severity': 'WARNING',
-                                                     'summary': 'Check '
-                                                                'FT:AllStarSizeGap'},
+                       'fields': ['facts', 'size'],
+                       'fix': 'Correct the all-star sample count or collection size so they agree.',
+                       'severity': 'WARNING',
+                       'summary': 'The all-star sample count differs from the collection sample count.'},
  'FT:AgeRangeBroad': {'entity': 'COLLECTION',
 	                                              'fields': ['age_high',
 	                                                         'age_low'],
@@ -270,7 +246,90 @@ CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
                                                       '{len(kAnonymityViolatingList)} '
                                                       'records of fact table violates '
                                                       '{kAnonymityLimit}-anonymity: '
-                                                      '{kAnonymityViolatingList}'}}
+                                                      '{kAnonymityViolatingList}'},
+ 'FT:OneStarDuplicate': {
+     'entity': 'COLLECTION',
+     'fields': ['facts'],
+     'severity': 'WARNING',
+     'summary': 'Multiple all-but-one-star rows describe the same dimension value.',
+     'fix': 'Keep one authoritative all-but-one-star row for each dimension value.'},
+ 'FT:OneStarSamplesAboveAllStar': {
+     'entity': 'COLLECTION',
+     'fields': ['facts'],
+     'severity': 'WARNING',
+     'summary': 'An all-but-one-star sample count exceeds the all-star sample count.',
+     'fix': 'Correct the individual marginal or all-star sample count without summing marginal values.'},
+ 'FT:OneStarDonorsAboveAllStar': {
+     'entity': 'COLLECTION',
+     'fields': ['facts'],
+     'severity': 'WARNING',
+     'summary': 'An all-but-one-star donor count exceeds the all-star donor count.',
+     'fix': 'Correct the individual marginal or all-star donor count without summing marginal values.'},
+ 'FT:AllStarSamplesOoMGap': {
+     'entity': 'COLLECTION',
+     'fields': ['facts', 'order_of_magnitude'],
+     'severity': 'WARNING',
+     'summary': 'The all-star sample count is outside the collection sample OoM interval.',
+     'fix': 'Correct the all-star sample count or collection order_of_magnitude.'},
+ 'FT:AllStarDonorsOoMGap': {
+     'entity': 'COLLECTION',
+     'fields': ['facts', 'order_of_magnitude_donors'],
+     'severity': 'WARNING',
+     'summary': 'The all-star donor count is outside the collection donor OoM interval.',
+     'fix': 'Correct the all-star donor count or collection order_of_magnitude_donors.'}}
+
+
+def _append_fact_sheet_analysis_warnings(self, dir, collection, fact_sheet, warnings):
+	"""Translate shared fact-sheet analysis warnings into QC warnings."""
+	contact = dir.getCollectionContact(collection['id'])
+	contact_email = '' if contact is None else contact.get('email', '')
+	for fact_warning in fact_sheet['warnings']:
+		warning_code = fact_warning['code']
+		if warning_code == 'missing_all_but_one_value' and fact_sheet['all_but_one_rows'] == 0:
+			continue
+		if collection.get('facts'):
+			common_args = (
+				"", dir.getCollectionNN(collection['id']), collection['id'],
+				str(collection['withdrawn']),
+				fact_warning['message'],
+				"Review the fact-sheet aggregate rows and collection-level counts; do not add values across aggregation levels.",
+				contact_email,
+			)
+			match warning_code:
+				case 'missing_all_star' | 'multiple_all_star':
+					warnings.append(DataCheckWarning(make_check_id(self, "AllStarMissing"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'missing_all_but_one':
+					warnings.append(DataCheckWarning(make_check_id(self, "OneStarMissing"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'missing_all_but_one_value':
+					warnings.append(DataCheckWarning(make_check_id(self, "OneStarValue"), common_args[0], common_args[1], DataCheckWarningLevel.INFO, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'multiple_all_but_one_value':
+					warnings.append(DataCheckWarning(make_check_id(self, "OneStarDuplicate"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'all_star_samples_mismatch':
+					if collection.get('size') is not None:
+						warnings.append(DataCheckWarning(make_check_id(self, "AllStarSizeGap"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'all_star_donors_mismatch':
+					if collection.get('number_of_donors') is not None:
+						warnings.append(DataCheckWarning(make_check_id(self, "AllStarDonorGap"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'all_star_samples_oom_mismatch':
+					if collection.get('order_of_magnitude') is not None:
+						warnings.append(DataCheckWarning(make_check_id(self, "AllStarSamplesOoMGap"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'all_star_donors_oom_mismatch':
+					if collection.get('order_of_magnitude_donors') is not None:
+						warnings.append(DataCheckWarning(make_check_id(self, "AllStarDonorsOoMGap"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'all_but_one_samples_above_all_star':
+					warnings.append(DataCheckWarning(make_check_id(self, "OneStarSamplesAboveAllStar"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+				case 'all_but_one_donors_above_all_star':
+					warnings.append(DataCheckWarning(make_check_id(self, "OneStarDonorsAboveAllStar"), common_args[0], common_args[1], DataCheckWarningLevel.WARNING, common_args[2], DataCheckEntityType.COLLECTION, common_args[3], common_args[4], common_args[5], common_args[6]))
+
+
+def _has_positive_fact_count(facts, field):
+	"""Return whether any fact row has a positive integer count in a field."""
+	return any(
+		isinstance(fact.get(field), int)
+		and not isinstance(fact.get(field), bool)
+		and fact[field] > 0
+		for fact in facts
+	)
 
 class FactTables(IPlugin):
 	CHECK_ID_PREFIX = "FT"
@@ -281,8 +340,6 @@ class FactTables(IPlugin):
 
 		for collection in dir.getCollections():
 			collectionFacts = []
-			collsFactsSamples = 0
-			collsFactsDonors = 0
 
 			biobankId = dir.getCollectionBiobankId(collection['id'])
 			biobank = dir.getBiobankById(biobankId)
@@ -304,19 +361,25 @@ class FactTables(IPlugin):
 
 			if 'facts' in collection.keys() and collection['facts'] != []:
 				collectionFacts = dir.getCollectionFacts(collection['id'])
-				for fact in collectionFacts:
-					if 'number_of_samples' in fact:
-						collsFactsSamples += fact['number_of_samples']
-					if 'number_of_donors' in fact:
-						collsFactsDonors += fact['number_of_donors']
-
 				fact_sheet = analyze_collection_fact_sheet(collection, collectionFacts)
 				raw_fact_descriptor_values = collect_fact_descriptor_values(collectionFacts)
 				fact_descriptor_values = fact_descriptor_values_for_comparison(collectionFacts, collection)
 				all_star_samples = fact_sheet['all_star_number_of_samples']
 				all_star_donors = fact_sheet['all_star_number_of_donors']
 
-				if collsFactsSamples > 0 or fact_sheet['donors_present']:
+				_append_fact_sheet_analysis_warnings(
+					self,
+					dir,
+					collection,
+					fact_sheet,
+					warnings,
+				)
+
+				samples_present = _has_positive_fact_count(
+					collectionFacts,
+					'number_of_samples',
+				)
+				if samples_present or fact_sheet['donors_present']:
 					log.info(f"Hooooray, we have found BBMRI fact table populated: {collection['id']}")
 
 					if all_star_donors == 0 or (all_star_donors is None and not fact_sheet['donors_present']):
@@ -337,30 +400,6 @@ class FactTables(IPlugin):
 
 					compareFactsColl(self, dir, fact_descriptor_values['sex'], collSex, collection, "Sex of collection and facts table do not match", "Check sex information of the collection description with sex information from the facts table and correct as necessary", warnings)
 					compareFactsColl(self, dir, fact_descriptor_values['materials'], materials, collection, "Material types of collection and facts table do not match", "Check material types of the collection description with material types from the facts table and correct as necessary", warnings)
-
-					fact_values = get_dimension_values(collectionFacts)
-					aggregates = dict(py_collections.Counter(
-						[count_star_dimensions(f, FACT_DIMENSION_KEYS) for f in collectionFacts]
-					))
-					aggregates = {k: 0 if k not in aggregates else aggregates[k] for k in range(0, len(FACT_DIMENSION_KEYS) + 1)}
-					if fact_sheet['all_star_rows'] != 1:
-						warnings.append(DataCheckWarning(make_check_id(self, "AllStarMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"Expected exactly one all-star aggregate row, found {fact_sheet['all_star_rows']}."))
-					if aggregates[3] < 1:
-						warnings.append(DataCheckWarning(make_check_id(self, "OneStarMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"missing all-but-one-star aggregate: {aggregates[3]}"))
-					else:
-						for fk in fact_values:
-							for value in fact_values[fk]:
-								rows = get_matching_one_star_rows(collectionFacts, fk, value)
-								if rows:
-									log.info(f'3-star rows found for {fk} value {value}: {rows}')
-								else:
-									warnings.append(DataCheckWarning(make_check_id(self, "OneStarValue"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), f"missing all-but-one-star aggregate for {fk} value {value}: {aggregates[3]}"))
-
-					for fact_warning in fact_sheet['warnings']:
-						if fact_warning['code'] == 'all_star_samples_mismatch':
-							warnings.append(DataCheckWarning(make_check_id(self, "AllStarSizeGap"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), fact_warning['message'], "Check the all-star aggregate row and collection size."))
-						elif fact_warning['code'] == 'all_star_donors_mismatch':
-							warnings.append(DataCheckWarning(make_check_id(self, "AllStarDonorGap"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), fact_warning['message'], "Check the all-star aggregate row and collection number_of_donors."))
 
 					if 'size' in collection:
 						if not isinstance(collection['size'], int):

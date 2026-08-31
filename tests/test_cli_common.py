@@ -6,6 +6,7 @@ import cli_common
 from cli_common import (
     add_directory_auth_arguments,
     add_directory_schema_argument,
+    add_fact_sheet_summary_arguments,
     add_include_withdrawn_argument,
     add_logging_arguments,
     add_no_stdout_argument,
@@ -18,6 +19,7 @@ from cli_common import (
     build_directory_kwargs,
     build_parser,
     configure_logging,
+    warn_if_no_star_fact_sums_enabled,
 )
 
 
@@ -43,6 +45,20 @@ def test_standard_exporter_arguments_support_normalized_and_legacy_aliases():
     assert args.outputXLSX == ["report.xlsx"]
     assert args.nostdout is True
     assert args.purgeCaches == ["directory"]
+
+
+def test_fact_sheet_summary_argument_is_explicit_opt_in(caplog):
+    parser = build_parser()
+    add_fact_sheet_summary_arguments(parser)
+
+    assert parser.parse_args([]).allow_no_star_fact_sums is False
+    args = parser.parse_args(["--allow-no-star-fact-sums"])
+    assert args.allow_no_star_fact_sums is True
+
+    with caplog.at_level(logging.WARNING):
+        warn_if_no_star_fact_sums_enabled(args)
+
+    assert "may double-count overlapping records or undercount omitted rows" in caplog.text
 
 
 def test_schema_argument_accepts_schema_and_legacy_package_names():

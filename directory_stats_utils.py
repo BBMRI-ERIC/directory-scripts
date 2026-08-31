@@ -194,8 +194,15 @@ def build_directory_stats(
         collections_with_facts = 0
         collections_with_all_star = 0
         collections_missing_valid_all_star = 0
+        collections_with_all_but_one_star = 0
+        collections_with_complete_all_but_one_star = 0
+        collections_missing_complete_all_but_one_star = 0
         collections_all_star_inconsistent_samples = 0
         collections_all_star_inconsistent_donors = 0
+        collections_all_star_inconsistent_samples_oom = 0
+        collections_all_star_inconsistent_donors_oom = 0
+        collections_all_but_one_inconsistent_samples = 0
+        collections_all_but_one_inconsistent_donors = 0
         collection_type_counter: Counter = Counter()
         top_level_collection_type_counter: Counter = Counter()
         subcollection_type_counter: Counter = Counter()
@@ -251,11 +258,29 @@ def build_directory_stats(
                 else:
                     collections_missing_valid_all_star += 1
 
+                if fact_sheet["all_but_one_rows"] > 0:
+                    collections_with_all_but_one_star += 1
+                if fact_sheet["all_but_one_complete"]:
+                    collections_with_complete_all_but_one_star += 1
+                else:
+                    collections_missing_complete_all_but_one_star += 1
+
+                warning_codes = {
+                    warning["code"] for warning in fact_sheet["warnings"]
+                }
+                if "all_star_samples_mismatch" in warning_codes:
+                    collections_all_star_inconsistent_samples += 1
+                if "all_star_donors_mismatch" in warning_codes:
+                    collections_all_star_inconsistent_donors += 1
+                if "all_star_samples_oom_mismatch" in warning_codes:
+                    collections_all_star_inconsistent_samples_oom += 1
+                if "all_star_donors_oom_mismatch" in warning_codes:
+                    collections_all_star_inconsistent_donors_oom += 1
+                if "all_but_one_samples_above_all_star" in warning_codes:
+                    collections_all_but_one_inconsistent_samples += 1
+                if "all_but_one_donors_above_all_star" in warning_codes:
+                    collections_all_but_one_inconsistent_donors += 1
                 for warning in fact_sheet["warnings"]:
-                    if warning["code"] == "all_star_samples_mismatch":
-                        collections_all_star_inconsistent_samples += 1
-                    elif warning["code"] == "all_star_donors_mismatch":
-                        collections_all_star_inconsistent_donors += 1
                     fact_sheet_warning_rows.append(
                         {
                             "biobank_id": biobank_id,
@@ -305,8 +330,15 @@ def build_directory_stats(
                 "collections_with_facts": collections_with_facts,
                 "collections_with_all_star": collections_with_all_star,
                 "collections_missing_valid_all_star": collections_missing_valid_all_star,
+                "collections_with_all_but_one_star": collections_with_all_but_one_star,
+                "collections_with_complete_all_but_one_star": collections_with_complete_all_but_one_star,
+                "collections_missing_complete_all_but_one_star": collections_missing_complete_all_but_one_star,
                 "collections_all_star_inconsistent_samples": collections_all_star_inconsistent_samples,
                 "collections_all_star_inconsistent_donors": collections_all_star_inconsistent_donors,
+                "collections_all_star_inconsistent_samples_oom": collections_all_star_inconsistent_samples_oom,
+                "collections_all_star_inconsistent_donors_oom": collections_all_star_inconsistent_donors_oom,
+                "collections_all_but_one_inconsistent_samples": collections_all_but_one_inconsistent_samples,
+                "collections_all_but_one_inconsistent_donors": collections_all_but_one_inconsistent_donors,
             }
         )
         collection_type_rows.extend(
@@ -412,11 +444,32 @@ def build_stats_summary(rows: list[dict[str, Any]]) -> dict[str, int]:
         "collections_missing_valid_all_star": sum(
             row["collections_missing_valid_all_star"] for row in rows
         ),
+        "collections_with_all_but_one_star": sum(
+            row["collections_with_all_but_one_star"] for row in rows
+        ),
+        "collections_with_complete_all_but_one_star": sum(
+            row["collections_with_complete_all_but_one_star"] for row in rows
+        ),
+        "collections_missing_complete_all_but_one_star": sum(
+            row["collections_missing_complete_all_but_one_star"] for row in rows
+        ),
         "collections_all_star_inconsistent_samples": sum(
             row["collections_all_star_inconsistent_samples"] for row in rows
         ),
         "collections_all_star_inconsistent_donors": sum(
             row["collections_all_star_inconsistent_donors"] for row in rows
+        ),
+        "collections_all_star_inconsistent_samples_oom": sum(
+            row["collections_all_star_inconsistent_samples_oom"] for row in rows
+        ),
+        "collections_all_star_inconsistent_donors_oom": sum(
+            row["collections_all_star_inconsistent_donors_oom"] for row in rows
+        ),
+        "collections_all_but_one_inconsistent_samples": sum(
+            row["collections_all_but_one_inconsistent_samples"] for row in rows
+        ),
+        "collections_all_but_one_inconsistent_donors": sum(
+            row["collections_all_but_one_inconsistent_donors"] for row in rows
         ),
         "top_level_collection_type_breakdown": _format_counter(
             top_level_collection_type_totals

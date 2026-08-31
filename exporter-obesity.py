@@ -11,6 +11,7 @@ import pandas as pd
 
 from cli_common import (
     add_directory_schema_argument,
+    add_fact_sheet_summary_arguments,
     add_logging_arguments,
     add_no_stdout_argument,
     add_purge_cache_arguments,
@@ -19,6 +20,7 @@ from cli_common import (
     build_directory_kwargs,
     build_parser,
     configure_logging,
+    warn_if_no_star_fact_sums_enabled,
 )
 from directory import Directory
 from fact_sheet_summary import build_fact_sheet_xlsx_tables, print_fact_sheet_summary
@@ -44,12 +46,14 @@ parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
 add_no_stdout_argument(parser)
 add_directory_schema_argument(parser, default="ERIC")
+add_fact_sheet_summary_arguments(parser)
 add_withdrawn_scope_arguments(parser)
 add_purge_cache_arguments(parser, cachesList)
 parser.set_defaults(purgeCaches=[])
 args = parser.parse_args()
 
 configure_logging(args)
+warn_if_no_star_fact_sums_enabled(args)
 
 # Main code
 
@@ -268,6 +272,7 @@ if not args.nostdout:
         + collectionsPediatricObesityDiagnosed
         + collectionsObesityDiagnosed,
         dir,
+        allow_no_star_fact_sums=args.allow_no_star_fact_sums,
     )
 
 for df in (pd_collectionsPediatricOnlyObesityDiagnosed, pd_collectionsPediatricObesityDiagnosed, pd_collectionsObesityDiagnosed):
@@ -285,6 +290,7 @@ if args.outputXLSX is not None:
                 + collectionsPediatricObesityDiagnosed
                 + collectionsObesityDiagnosed,
                 dir,
+                allow_no_star_fact_sums=args.allow_no_star_fact_sums,
             ),
         ],
     )
