@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Export pediatric and pediatric-only collections using age metadata."""
+
 import pprint
 import re
 import logging as log

@@ -1,7 +1,16 @@
 # Repository Guidelines
 
+## Documentation Ownership
+- Keep [`README.md`](README.md) as a concise repository landing page: identify the tool families, show only a few first-run commands, and link to detailed documentation. Do not turn it back into a per-script manual.
+- Put user/operator documentation in `docs/`: installation, command examples, inputs, outputs, workflow steps, deployment notes, and safety warnings. Each user-facing topic should have one canonical page rather than duplicated instructions.
+- Treat [`DEVELOPMENT.md`](DEVELOPMENT.md) as the canonical location for detailed functionality specifications, architectural contracts, invariants, and maintainer rationale until a dedicated specification system replaces it.
+- Keep `AGENTS.md` concise and enforceable. It records non-negotiable implementation guardrails and points to `DEVELOPMENT.md` for complete specifications instead of duplicating long explanations.
+- When an interface or behavior changes, update both its operator guide under `docs/` and the corresponding specification in `DEVELOPMENT.md`. Update `AGENTS.md` only when the change creates or modifies a repository-wide implementation guardrail.
+- User documentation describes how to operate the implementation; it must not silently become the only definition of internal behavior.
+
 ## Project Structure & Module Organization
 - Top-level Python scripts drive validation and exports (for example `data-check.py`, `exporter-*.py`, `full-text-search.py`).
+- Every production `.py` file at the repository root, in `checks/`, or in `R-maps/` must have a concise module-level docstring explaining its purpose.
 - `R-maps/` hosts the in-repo `ggplot2` + `sf` replacement for legacy
   Tilemill map renderers.
 - `checks/` contains Yapsy plugin checks (`*.py` + `*.yapsy-plugin`) loaded by `data-check.py`.
@@ -13,7 +22,7 @@
 - `python3 data-check.py --purge-all-caches -X results.xlsx` clears all caches and writes an XLSX report.
 - `python3 data-check.py -v --purge-cache directory -N -X results.xlsx` verbose run, directory cache only, XLSX only.
 - `python3 data-check.py -O en_product1.xml` enables ORPHA-to-ICD checks and conservative ORPHA/ICD diagnosis crosswalk fix proposals in `checks/CollectionContent.py` (requires the XML file).
-- `./full-text-search.py 'term'` performs Whoosh-based directory search; see `README.md` for examples.
+- `./full-text-search.py 'term'` performs Whoosh-based directory search; see [`docs/auxiliary-tools.md`](docs/auxiliary-tools.md) for examples.
 - `python3 -m py_compile <changed-python-files>` performs a fast syntax check for touched Python files.
 - `pytest -q` runs the unit test suite; use `pytest -q tests/test_directory.py` for focused `directory.py` checks.
 
@@ -25,7 +34,7 @@
 
 ## Design Principles
 - `directory.py` is the single abstraction for Directory API access. Keep it lean, well documented, and the sole location for shared API calls.
-- Modularize cross-cutting concerns into focused helpers (for example `warningscontainer.py`, `customwarnings.py`, `star-model.py`, `nncontacts.py`, `orphacodes.py`).
+- Modularize cross-cutting concerns into focused helpers (for example `warningscontainer.py`, `customwarnings.py`, `nncontacts.py`, `orphacodes.py`).
 - Avoid duplicating API logic in scripts; import and reuse the shared modules instead.
 - Use assertive runtime validation for assumptions that depend on input/data/configuration; raise clear exceptions instead of relying on `assert` for runtime safety.
 - Optional plugin-side dependencies must not be imported in a way that prevents the whole plugin from loading; keep local/deterministic checks active and degrade gracefully when optional remote-validation packages are missing.
@@ -54,21 +63,21 @@
 - Be careful with the positional `DataCheckWarning(...)` signature: keep the `directoryEntityWithdrawn` argument in place before `message`/`action`, otherwise warnings silently shift fields; this caused a real bug in `checks/AccessPolicies.py`.
 
 ## Exporters: Development, Deployment & Documentation
-- Exporters are the `exporter-*.py` scripts (for example `exporter-all.py`, `exporter-country.py`, `exporter-diagnosis.py`, `exporter-quality-label.py`).
+- Exporters are the `exporter-*.py` scripts (for example `exporter-all.py`, `exporter-country.py`, and `exporter-quality-label.py`).
+- Every exporter module must also have a matching section in [`docs/exporters.md`](docs/exporters.md). Keep the exporter table to one-line summaries; put behavior, inputs, outputs, options, and runnable examples in the per-exporter sections below it.
 - New exporters should read data via `directory.py`, accept CLI arguments, and keep output schemas stable.
 - `directory.py` now treats `Services` and `Studies` as first-class read entities too; exporters should use `getBiobankServices(...)`, `getServiceBiobankId(...)`, `getStudies()`, `getBiobankStudies(...)`, and the related study/service helpers instead of reconstructing parent biobank or collection relationships manually.
 - Study membership should be derived from the `Collections.studies` field via `directory.py`; do not rebuild study-to-collection mappings from `Studies.collections` directly in exporters or helper tools.
 - When an exporter has already selected a child entity through the configured withdrawn scope, resolve parent/context records with scope-independent loaded lookups such as `getLoadedBiobankById(...)` or `getLoadedCollectionById(...)`; do not use scope-filtered lookups for parent context or ancestor counting, because withdrawn-only views can include children whose parent biobank/collection is outside that same scope.
 - `exporter-all.py` is expected to keep one sheet/stdout section per major entity class it exposes (`Biobanks`, `Collections`, `Services`, `Studies`, `Contacts`, `Networks`); if withdrawn content is appended into the same workbook, keep that as additive `Withdrawn ...` sheets rather than changing the base sheet names.
-- Fact-sheet summaries in exporters must keep marginal rows non-additive. Use `fact_sheet_summary.py` for populated all-star and all-but-one-star observations; never sum multiple sample/donor values from the same collection for the same all-but-one-star value. It is acceptable to sum one populated all-star total per collection across collections, and to report per-value all-but-one-star sample/donor totals only across collections with one row for that value. All collection-based fact-sheet exporters must expose the shared `--allow-no-star-fact-sums` long option as an explicit unsafe fallback. It is disabled by default, must warn in runtime output, and must keep no-star-derived values visibly separate from authoritative distributions. No-star rows can overlap or omit records, so fallback values must never be mixed into all-star totals, all-but-one-star coverage claims, or collection-level consistency comparisons.
-- Fact-sheet statistics and QC must report all-star presence, all-but-one-star presence/completeness, duplicate or missing marginal values, independent marginal bounds, and all-star comparisons with collection sample/donor totals and OoM intervals. Never infer consistency by summing marginal rows.
+- Fact-sheet exporters, statistics, and QC MUST follow the canonical [fact-sheet aggregation specification](DEVELOPMENT.md#fact-sheet-aggregation-specification). Reuse `fact_sheet_summary.py` and `fact_sheet_utils.py`; do not introduce exporter-specific aggregation rules or combine authoritative and unsafe fallback statistics.
 - GeoJSON-capable tooling should reuse `geojsonutils.py` for coordinate normalization and FeatureCollection writing, and for collection/study map exports should fall back to parent-biobank coordinates only when the entity itself has no usable `longitude`/`latitude`.
 - Importer/synchronizer scripts such as `importer-ecrin-mdr.py` and `sync_directory_with_fdp.py` may target external systems and are not normal exporters; keep their authentication optional when the CLI/env input is optional, and preserve their authorship/acknowledgement headers when editing them.
 - Deployment: treat exporters as runnable CLIs; document required credentials, input files, output locations, and expected file formats (CSV/XLSX/XML/JSON).
 - For each exporter, document the exact command line used in production (including flags, package, and cache settings) and where outputs are published or uploaded.
 - If deployed on a schedule, record the trigger (cron/job name), environment (host/container), and any required secrets or config files.
 - When outputs are consumed downstream, document the consumer, schema version, and any stability guarantees.
-- Document each exporter in [`README.md`](README.md) with purpose, required inputs, and example usage/output.
+- Document each exporter in [`docs/exporters.md`](docs/exporters.md) with purpose, required inputs, and example usage/output.
 - Prefer small, composable helpers over copy-pasted query logic; factor common code into modules.
 
 ## Operational Notes
@@ -120,10 +129,10 @@
 - Recommended baseline for public Directory fact data is donor `k=10`; exceptions are possible for documented pre-anonymized collections/pipelines.
 - Data-changing operations in `directory-tables-modifier.py` require interactive confirmation unless `-f/--force` is used; `-n/--dry-run` previews changes without writing; `-q/--quiet` suppresses non-error output.
 - `directory-tables-modifier.py` should normally target node staging areas, not `ERIC`; if `ERIC` is explicitly requested, the script must require an extra confirmation unless `-f/--force` is used.
-- Table tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--id-regex`, `--collection-id`) and should always be documented in `README.md` with examples.
+- Table tooling in `directory-tables-modifier.py` supports export and deletion with filters (`--id-regex`, `--collection-id`) and should always be documented in [`docs/maintenance-tools.md`](docs/maintenance-tools.md) with examples.
 - `directory-tables-modifier.py` sync mode (`-y/--sync-data`) is server-non-atomic (full-table uses truncate+import; filtered scope uses delete+import), but the script must create a temporary full-column backup of the sync scope and attempt rollback automatically when sync import fails.
 - For CLI help consistency, keep standard options first and in stable order: `-h`, `-v`, `-d`, then Directory auth/target options, then tool-specific options.
-- When using shared auth helpers that already reserve `-t/--token`, do not reuse `-t` for unrelated tool-specific options in the same CLI; prefer another short option and keep `README.md` examples aligned.
+- When using shared auth helpers that already reserve `-t/--token`, do not reuse `-t` for unrelated tool-specific options in the same CLI; prefer another short option and keep the relevant `docs/` examples aligned.
 - Negotiator orphans logic: output includes all input rows; `auto_by_biobank` applies only when a biobank has at least two collections with identical representative sets; `auto_by_parent` uses the nearest non-withdrawn parent with reps; withdrawn collections/biobanks in output are logged as warnings. Q-labels use `getQualColl()`/`getQualBB()` only (no `combined_quality` propagation).
 - New code should treat `getQualColl()` / `getQualBB()` as legacy raw-table compatibility accessors only. Prefer the scope-aware `directory.py` quality API (`getCollectionQualityInfo(...)`, `getBiobankQualityInfo(...)`, `getCollectionQualityInfoWide(...)`, `getBiobankQualityInfoWide(...)`, `getQualityStandardsOntology(...)`) so withdrawn filtering, ontology labeling, offline cache reuse, and alternate Directory targets stay consistent across exporters and helper tools.
 - XLSX schema note (`exporter-negotiator-orphans.py`):
@@ -194,14 +203,15 @@
 
 ## Documentation Expectations
 - Maintain and expand documentation alongside code changes; updates are required for new checks, exporters, or API changes.
-- Keep [`README.md`](README.md) accurate and add per-script usage examples as interfaces evolve.
+- Keep [`README.md`](README.md) accurate as an index and add or update per-script usage examples in the relevant `docs/` guide as interfaces evolve.
+- Keep functionality specifications and implementation contracts in [`DEVELOPMENT.md`](DEVELOPMENT.md); do not rely on user-facing examples as the sole behavioral specification.
 - If a change also affects the Directory Data Manager manual tooling, update the corresponding files in `../BBMRI-ERIC-Directory-Data-Manager-Manual/` as a coordinated follow-up; that repo contains the check-documentation generator and is not updated automatically by changes here.
 - When `CHECK_DOCS.fields` differ from AST-extracted fields by design, document the real intended fields explicitly and validate that the manual generator uses the documented fields rather than falling back to `None explicitly detected`.
 - When updating `AGENTS.md` itself: adding new knowledge is allowed directly; removing existing knowledge or merging/consolidating it with older guidance requires explicit human-in-the-loop approval.
 
 ## Security & Configuration Tips
 - Keep credentials out of the repo; prefer CLI flags (`-u`, `-p`) or local config files not committed.
-- For DNS-dependent checks, ensure `/etc/resolv.conf` is available as noted in `README.md`.
+- For DNS-dependent checks, ensure `/etc/resolv.conf` is available as noted in [`docs/setup.md`](docs/setup.md).
 - `directory.py` debug logs may intentionally include username/password for private troubleshooting; never share or commit such logs.
 - In `checks/ContactFields.py`, static placeholder-domain checks (for example `example.org`, `test.com`, `unknown.*`) must remain active even when remote email checks are disabled; `--disable-checks-all-remote` only suppresses MX/reachability validation, not local syntax or placeholder checks.
 - Probabilistic contact-assignment warnings should rely on strong institution evidence (for example a unique biobank-contact email domain in another biobank, or direct biobank-level contact reuse) rather than on contact-ID prefixes or sibling-majority patterns alone; those weaker patterns may appear in messages as context but should not be the primary trigger.

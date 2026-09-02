@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet 
 
+"""Report biobanks that do not contain any collections."""
+
 import logging as log
 
 from yapsy.IPlugin import IPlugin

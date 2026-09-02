@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Report contacts reused by collections from multiple biobanks."""
+
 import logging as log
 
 from yapsy.IPlugin import IPlugin

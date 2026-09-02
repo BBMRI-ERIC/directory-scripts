@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:sts=4:tw=0:et
 
+"""Install the certifi CA bundle as Python's default certificate file."""
+
 # install_certifi.py
 #
 # sample script to install or update a set of default Root Certificates

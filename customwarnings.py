@@ -1,5 +1,7 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Define data-quality warning identifiers, levels, entities, and records."""
+
 from enum import Enum
 
 # Definition of warnings 

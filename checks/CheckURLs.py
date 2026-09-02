@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Validate Directory URLs and report malformed or unreachable targets."""
+
 from typing import List
 import copy
 import re

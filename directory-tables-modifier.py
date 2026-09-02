@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+"""Export, delete, or synchronize filtered Directory staging tables."""
+
 # Imports
 import argparse
 import asyncio

@@ -1,7 +1,5 @@
 #!/usr/bin/python3
-'''
-BBMRI-ERIC Directory Cohorts
-'''
+"""Export BBMRI Cohorts network statistics, fact summaries, and QC workbooks."""
 
 #############
 ## Imports ##

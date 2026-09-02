@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Export Negotiator representative gaps and safe auto-assignment candidates."""
+
 import logging as log
 import os.path
 import pprint

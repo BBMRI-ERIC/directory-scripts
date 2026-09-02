@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Export country-level Directory entity and fact-sheet statistics."""
+
 from typing import List
 
 import pprint

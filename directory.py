@@ -1,4 +1,7 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
+
+"""Provide cache-backed access and graph traversal for Directory entities."""
+
 import copy
 import logging
 import os

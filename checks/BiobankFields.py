@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Check required and constrained fields on Directory biobanks."""
+
 import re
 import urllib.request
 import logging as log

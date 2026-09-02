@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Run plugin-based data-quality checks against a Directory snapshot."""
+
 import pprint
 import re
 import logging as log

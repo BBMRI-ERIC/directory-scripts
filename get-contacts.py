@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:sts=4:tw=0:et
 
-# This is an exporter of contact to collection mapping, to be used for invitations into the Negotiator
+"""Export collection-to-contact mappings for Negotiator invitations."""
 
 from typing import List
 

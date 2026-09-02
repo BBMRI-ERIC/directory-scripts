@@ -1,5 +1,7 @@
 # vim:ts=4:sw=4:sts=4:tw=0:et
 
+"""Parse Orphadata XML and expose ORPHA-to-ICD-10 crosswalk helpers."""
+
 import logging as log
 import re
 import xml.etree.ElementTree as ET

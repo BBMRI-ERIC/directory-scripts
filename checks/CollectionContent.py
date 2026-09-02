@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet 
 
+"""Check collection content metadata, including diagnoses and age ranges."""
+
 import re
 import logging as log
 

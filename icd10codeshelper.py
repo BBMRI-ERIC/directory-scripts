@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:sts=4:tw=0:et
 
+"""Classify and expand ICD-10 codes and ranges used by Directory analyses."""
+
 from builtins import *
 
 import logging as log

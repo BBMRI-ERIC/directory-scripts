@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Validate Directory entity identifiers and national-node prefixes."""
+
 import re
 import logging as log
 

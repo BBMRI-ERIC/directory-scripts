@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Check narrative text against structured collection metadata."""
+
 import logging as log
 
 from yapsy.IPlugin import IPlugin

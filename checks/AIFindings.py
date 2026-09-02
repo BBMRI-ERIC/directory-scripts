@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Expose curated AI-reviewed Directory findings as data-quality warnings."""
+
 import logging as log
 
 from yapsy.IPlugin import IPlugin

@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Check metadata requirements for collections in BBMRI Cohorts networks."""
+
 import re
 import logging as log
 import collections as py_collections

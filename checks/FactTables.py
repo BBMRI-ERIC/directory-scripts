@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Check collection fact sheets and their consistency with collection metadata."""
+
 import re
 import logging as log
 import collections as py_collections

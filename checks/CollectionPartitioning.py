@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Check parent and child collection count partitioning for consistency."""
+
 import logging as log
 
 from fact_sheet_utils import analyze_collection_fact_sheet

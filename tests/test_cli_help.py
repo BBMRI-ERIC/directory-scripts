@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 import subprocess
 import sys
@@ -22,7 +23,6 @@ CLI_SCRIPTS = [
     "exporter-cohorts.py",
     "exporter-country.py",
     "exporter-covid.py",
-    "exporter-diagnosis.py",
     "exporter-ecraid.py",
     "exporter-institutions.py",
     "exporter-mission-cancer.py",
@@ -31,6 +31,15 @@ CLI_SCRIPTS = [
     "exporter-pediatric.py",
     "exporter-quality-label.py",
 ]
+
+EXPORTER_SCRIPTS = sorted(path.name for path in REPO_ROOT.glob("exporter-*.py"))
+PRODUCTION_PYTHON_FILES = sorted(
+    [
+        *REPO_ROOT.glob("*.py"),
+        *REPO_ROOT.glob("checks/*.py"),
+        *REPO_ROOT.glob("R-maps/*.py"),
+    ]
+)
 
 FACT_SHEET_EXPORTERS = [
     "exporter-all.py",
@@ -57,6 +66,28 @@ def test_cli_help_runs(script_name):
     )
     assert result.returncode == 0, result.stderr
     assert "usage:" in result.stdout.lower()
+
+
+@pytest.mark.parametrize(
+    "module_path",
+    PRODUCTION_PYTHON_FILES,
+    ids=lambda path: str(path.relative_to(REPO_ROOT)),
+)
+def test_production_python_file_has_module_purpose_docstring(module_path):
+    source = module_path.read_text(encoding="utf-8")
+
+    assert ast.get_docstring(ast.parse(source)), (
+        f"{module_path.relative_to(REPO_ROOT)} must have a module docstring "
+        "describing its purpose"
+    )
+
+
+def test_each_exporter_has_a_documentation_section():
+    documentation = (REPO_ROOT / "docs" / "exporters.md").read_text(encoding="utf-8")
+
+    for script_name in EXPORTER_SCRIPTS:
+        assert f"| `{script_name}` |" in documentation
+        assert f"### `{script_name}`" in documentation
 
 
 @pytest.mark.parametrize("script_name", FACT_SHEET_EXPORTERS)

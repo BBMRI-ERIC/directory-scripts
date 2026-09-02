@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Export biobank and collection quality assessments with ontology labels."""
+
 import pprint
 import logging as log
 from builtins import str, set

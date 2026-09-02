@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Report collections that are not connected to a parent biobank."""
+
 import logging as log
 
 from yapsy.IPlugin import IPlugin

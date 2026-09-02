@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Export COVID-relevant collections, biobanks, and aggregate counts."""
+
 from typing import List
 
 import pprint

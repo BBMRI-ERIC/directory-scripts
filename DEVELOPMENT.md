@@ -1,14 +1,44 @@
 # Development Notes
 
-This document collects developer-facing architecture, code-organization, style, and testing guidance that does not belong in the user-focused `README.md`.
+This document is the canonical maintainer reference for architecture, detailed
+functionality specifications, invariants, code organization, and testing. It
+also serves as the project's functionality-specification mechanism until a
+dedicated specification system replaces it.
 
-For user-facing usage, installation, and tool examples, see [README.md](README.md).
+## Documentation ownership
+
+- [`README.md`](README.md) is a concise landing page for discovery and first
+  steps. It must link outward rather than accumulate per-script manuals.
+- `docs/` contains user/operator documentation: installation, commands, inputs,
+  outputs, workflow examples, deployment notes, and operational safety.
+- `DEVELOPMENT.md` contains canonical behavioral and architectural contracts,
+  including rationale needed to maintain them correctly.
+- [`AGENTS.md`](AGENTS.md) contains concise, non-negotiable implementation
+  guardrails. It should point here instead of duplicating detailed
+  specifications.
+- Every topic should have one canonical home. Cross-links and short summaries
+  are preferable to copied sections that can drift.
+- An interface or behavior change is incomplete until the relevant operator
+  guide and this specification are both updated. Update `AGENTS.md` when the
+  change also affects an enforceable repository-wide rule.
+- User documentation explains how to operate current behavior; it is not, by
+  itself, the authoritative definition of internal behavior.
+
+Start from [README.md](README.md) for the documentation index and from
+[`docs/setup.md`](docs/setup.md) for user-facing installation and common CLI
+operation.
 
 ## Architecture
 
 ### Repository structure
 
 - Top-level scripts are CLIs for validation, export, search, and maintenance.
+- Every production Python module at the repository root, in `checks/`, or in
+  `R-maps/` must state its purpose in a concise module-level docstring.
+- Every `exporter-*.py` module must have both a summary-table entry and a detailed operator section in
+  `docs/exporters.md`. The table is only an index; inputs, outputs, selection
+  behavior, important options, and runnable examples belong in the detailed
+  section.
 - `checks/` contains Yapsy plugins only. Files there should be warning-producing checks, plus their matching `*.yapsy-plugin` descriptors.
 - Plugin imports must distinguish hard dependencies from optional runtime helpers. Missing optional packages must not prevent the whole plugin from loading; degrade gracefully and keep the deterministic/local part of the check active when possible.
 - Reusable infrastructure belongs outside `checks/` in top-level helper modules.
@@ -202,6 +232,134 @@ After changing check docs metadata, validate with:
 python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs.py
 ```
 
+## Fact-sheet aggregation specification
+
+Status: Normative project specification
+
+Provenance: user request, 2026-08-31
+
+### Row classification
+
+#### FS-ROW-001: Tracked dimensions
+
+Fact-sheet aggregation MUST use the tracked dimensions `sex`, `age_range`,
+`sample_type`, and `disease`.
+
+#### FS-ROW-002: Aggregate row classes
+
+An all-star row MUST contain `*` in every tracked dimension. An
+all-but-one-star row MUST contain exactly one concrete tracked-dimension value
+and `*` in every other tracked dimension. A no-star fallback row MUST contain a
+concrete, non-empty, non-`*` value in every tracked dimension.
+
+Rows with one or more missing tracked-dimension values MUST NOT be treated as
+no-star fallback rows.
+
+### Authoritative reporting
+
+#### FS-AGG-001: Aggregation levels are non-additive
+
+Sample and donor counts from all-star, all-but-one-star, and no-star rows MUST
+NOT be added across aggregation levels. Multiple all-but-one-star values within
+one fact sheet MUST NOT be summed to reconstruct an all-star total because
+values can overlap.
+
+#### FS-AGG-002: Authoritative marginal contribution
+
+For one collection, dimension, and value, exactly one populated
+all-but-one-star row MUST be treated as the authoritative marginal
+contribution. If multiple matching all-but-one-star rows exist, the contribution
+MUST be treated as ambiguous and excluded from aggregate reporting.
+
+#### FS-AGG-003: Cross-collection aggregation
+
+An exporter MAY sum one selected contribution per collection, dimension, and
+value across collections. It MUST retain the number of contributing collections
+and contribution provenance.
+
+Authoritative all-but-one-star contributions and assumption-violating no-star
+fallback contributions MUST be reported as separate statistics. Their counts,
+observations, or contributing-collection totals MUST NOT be combined, even when
+they come from different collections.
+
+### Unsafe no-star fallback
+
+#### FS-FALLBACK-001: Explicit opt-in
+
+No-star fallback MUST be disabled by default. Collection-based exporters that
+expose fact-sheet distributions MUST provide the long option
+`--allow-no-star-fact-sums` to enable it.
+
+Enabling the option MUST produce a visible warning explaining that no-star rows
+are not guaranteed to be disjoint or complete and that derived sums may
+double-count or undercount records.
+
+#### FS-FALLBACK-002: Per-missing-value substitution
+
+When fallback is enabled and a collection has no matching all-but-one-star row
+for a dimension and value, the exporter MAY sum populated fully concrete
+no-star rows matching that value as an assumption-violating substitute.
+
+Fallback MUST NOT be used when an authoritative all-but-one-star row exists or
+when multiple matching all-but-one-star rows make the contribution ambiguous. A
+collection MUST NOT contribute both authoritative and fallback counts to the
+same dimension and value. Fallback contributions MUST NOT be added to
+authoritative cross-collection distribution totals.
+
+#### FS-FALLBACK-003: No synthetic all-star totals
+
+No-star fallback MUST NOT contribute to all-star sample totals, all-star donor
+totals, collection-level aggregate comparisons, or statistics claiming
+authoritative all-but-one-star coverage.
+
+#### FS-FALLBACK-004: Provenance
+
+Stdout and XLSX distribution output MUST place authoritative all-but-one-star
+contributions and no-star fallback contributions in separate sections or
+tables. Summary output MUST state whether fallback was enabled and how many
+collections, values, and rows used it. When fallback is enabled, both stdout and
+XLSX output MUST contain a visible warning that no-star sums violate aggregation
+assumptions.
+
+### Quality and consistency
+
+#### FS-QC-001: Aggregate-row presence
+
+Fact-sheet statistics and QC MUST report whether a fact sheet containing at
+least one row has exactly one all-star row and whether it has all-but-one-star
+rows covering each concrete dimension value represented by any fact row,
+including a value represented only by no-star rows. A fact row is populated for
+count reporting when at least one sample or donor count is a non-boolean integer;
+zero is a populated count.
+
+Missing and duplicate all-but-one-star rows MUST remain distinguishable.
+
+#### FS-QC-002: Individual marginal bounds
+
+When exactly one all-star row is available, each individual all-but-one-star
+sample or donor count MUST NOT exceed the corresponding all-star count. Values
+within a dimension MUST NOT be summed for this comparison.
+
+#### FS-QC-003: Exact collection aggregates
+
+When collection `size` or `number_of_donors` is an integer and the corresponding
+all-star count is an integer, QC MUST compare them for equality.
+
+#### FS-QC-004: Order-of-magnitude aggregates
+
+When sample or donor order-of-magnitude metadata and the corresponding all-star
+count are available, QC MUST verify that the exact all-star count lies in the
+interval represented by the order of magnitude. This consistency check MUST use
+the interval itself, not the configurable point-estimate coefficient used for
+exporter totals.
+
+### Verification
+
+The implementation MUST have automated tests for row classification, fallback
+selection and exclusion, provenance, warning output, all-but-one presence and
+duplicate detection, individual marginal bounds, exact aggregate comparison,
+OoM interval comparison, directory statistics, and common exporter CLI wiring.
+
 ## Coding Style
 
 - Python 3, 4-space indentation, keep existing vim modelines intact.
@@ -209,7 +367,7 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 - Keep exporters thin: CLI + orchestration only.
 - Keep shared Directory logic in `directory.py`.
 - When code needs parent/context data for an entity already selected by the current withdrawn scope, use scope-independent loaded lookups (`getLoadedBiobankById(...)`, `getLoadedCollectionById(...)`) rather than user-facing scope-filtered lookups. This keeps withdrawn-only exports and ancestor counting from dropping active parents or double-counting children.
-- Keep fact-sheet export summaries non-additive for marginal rows. `fact_sheet_summary.py` reports all-star and all-but-one-star rows as observations and grouped value lists; do not sum multiple all-but-one-star rows from the same collection for the same value. Cross-collection totals may sum one populated all-star total per collection, and per-value all-but-one-star totals may sum only collections with one row for that value. The shared `--allow-no-star-fact-sums` option is opt-in only: it may sum fully concrete no-star rows for missing values, must emit a warning, and must label those results separately as assumption-violating fallback contributions. No-star fallback must not enter all-star totals, aggregate comparisons, or authoritative all-but-one-star coverage statistics because concrete rows may overlap or omit records.
+- Implement fact-sheet summaries through `fact_sheet_summary.py` and follow the [fact-sheet aggregation specification](#fact-sheet-aggregation-specification); exporters must not define alternate aggregation semantics.
 - `exporter-all.py` is the broad entity dump: when its sheet layout changes, keep the workbook tabs and stdout sections aligned across biobanks, collections, services, studies, contacts, and networks, and keep any withdrawn-in-main-workbook option additive rather than replacing the existing separate-workbook path.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.
 - Keep CLI help output consistent across scripts: standard options first (`-h`, `-v`, `-d`, then Directory target/auth options), then tool-specific options.

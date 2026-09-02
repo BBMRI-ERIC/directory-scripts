@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Check consistency of COVID-19 content, capabilities, and network links."""
+
 import re
 import logging as log
 

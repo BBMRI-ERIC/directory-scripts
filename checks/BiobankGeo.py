@@ -1,5 +1,7 @@
 # vim:ts=8:sw=8:tw=0:noet
 
+"""Validate biobank and collection coordinates against addresses."""
+
 import re
 import logging as log
 import os

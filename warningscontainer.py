@@ -1,5 +1,7 @@
 # vim:ts=4:sw=4:tw=0:sts=4:et
 
+"""Collect, filter, print, and export Directory data-quality warnings."""
+
 import logging as log
 from typing import List
 
