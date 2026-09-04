@@ -143,11 +143,11 @@ python3 exporter-ecraid.py -X ecraid.xlsx
 - **Output:** Text output groups candidate families by country and reports
   confidence, migration readiness, source IDs, blockers, and country/biobank
   totals. `-X` writes an XLSX workbook with `Candidate families`,
-  `Source collections`, `Field comparison`, `Proposed facts`,
-  `Unrepresentable data`, `Migration mapping`, `Dimension candidates`, and
-  `Dimension values` sheets. `--advanced-reporting` additionally includes the
-  verbose `Boundary evidence` diagnostic sheet. Entity IDs in the workbook
-  link to the Directory web view.
+  `Source collections`, `Proposed facts`, `Unrepresentable data`,
+  `Migration mapping`, `Dimension candidates`, and `Dimension values` sheets.
+  `--advanced-reporting` additionally includes the verbose `Field comparison`
+  and `Boundary evidence` diagnostic sheets. Entity IDs in the workbook link
+  to the Directory web view.
 - **Selection and options:** `--scope all` (default) considers sibling and
   conservative top-level families; `--scope siblings` or `--scope top-level`
   narrows the analysis. `--min-confidence low|medium|high` filters the

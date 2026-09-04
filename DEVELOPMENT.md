@@ -589,9 +589,10 @@ expected response MUST separately state emulation confidence, migration
 readiness, operational-boundary evidence, unsupported/future dimensions, and
 required follow-up.
 
-The default XLSX report MUST omit the verbose `Boundary evidence` table intended
-for diagnostic processing. `--advanced-reporting` MUST include that worksheet;
-JSON and Markdown AI-review packets MUST retain the same boundary evidence
+The default XLSX report MUST omit the verbose `Field comparison` and
+`Boundary evidence` tables intended for diagnostic processing.
+`--advanced-reporting` MUST include both worksheets. JSON and Markdown
+AI-review packets MUST retain the same field comparisons and boundary evidence
 regardless of the XLSX setting.
 
 ### FS-EMU-009: Privacy and expert review

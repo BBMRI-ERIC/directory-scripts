@@ -46,7 +46,7 @@ SHEET_LAYOUT = (
     ("dimension_candidates", "Dimension candidates"),
     ("dimension_values", "Dimension values"),
 )
-ADVANCED_XLSX_TABLES = frozenset({"boundary_evidence"})
+ADVANCED_XLSX_TABLES = frozenset({"field_comparisons", "boundary_evidence"})
 
 TABLE_COLUMNS = {
     "candidate_families": [
@@ -491,7 +491,7 @@ def build_argument_parser():
     parser.add_argument(
         "--advanced-reporting",
         action="store_true",
-        help="include advanced diagnostic worksheets such as Boundary evidence",
+        help="include Field comparison and Boundary evidence diagnostic worksheets",
     )
     parser.set_defaults(purgeCaches=[], countries=[])
     return parser

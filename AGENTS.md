@@ -82,6 +82,9 @@
   only into independently valid all-but-one-star marginals. Never emit no-star
   intersections from those aggregates, never sum duplicate or incomplete
   source mappings, and never add marginal rows within or across dimensions.
+- Keep verbose fact-sheet-emulation diagnostic tables out of the default XLSX;
+  expose `Field comparison` and `Boundary evidence` only through
+  `--advanced-reporting`, while retaining them in machine-review packets.
 - GeoJSON-capable tooling should reuse `geojsonutils.py` for coordinate normalization and FeatureCollection writing, and for collection/study map exports should fall back to parent-biobank coordinates only when the entity itself has no usable `longitude`/`latitude`.
 - Importer/synchronizer scripts such as `importer-ecrin-mdr.py` and `sync_directory_with_fdp.py` may target external systems and are not normal exporters; keep their authentication optional when the CLI/env input is optional, and preserve their authorship/acknowledgement headers when editing them.
 - `xlsxutils.py` must disable automatic URL conversion and respect Excel

@@ -1000,42 +1000,20 @@ def test_fact_sheet_emulation_exporter_writes_complete_hyperlinked_workbook(
     assert wb.sheetnames == [
         "Candidate families",
         "Source collections",
-        "Field comparison",
         "Proposed facts",
         "Unrepresentable data",
         "Migration mapping",
         "Dimension candidates",
         "Dimension values",
     ]
+    assert "Field comparison" not in wb.sheetnames
+    assert "Boundary evidence" not in wb.sheetnames
+
     source_sheet = wb["Source collections"]
     headers = [cell.value for cell in source_sheet[1]]
     collection_column = headers.index("collection_id") + 1
     assert source_sheet.cell(2, collection_column).value.startswith('=HYPERLINK("')
-    comparison_headers = [cell.value for cell in wb["Field comparison"][1]]
-    assert "distinct_value_count" in comparison_headers
-    assert "distinct_values" not in comparison_headers
-    assert "missing_collection_count" in comparison_headers
-    assert "missing_collection_ids" not in comparison_headers
-    comparison_rows = [
-        dict(zip(comparison_headers, row))
-        for row in wb["Field comparison"].iter_rows(min_row=2, values_only=True)
-    ]
-    material_rows = [
-        row
-        for row in comparison_rows
-        if row["field"] == "materials" and row["role"] == "characterization"
-    ]
-    assert len(material_rows) == 2
-    assert {row["distinct_value_count"] for row in material_rows} == {2}
-    assert {row["missing_collection_count"] for row in material_rows} == {0}
-    purpose_rows = [
-        row
-        for row in comparison_rows
-        if row["field"] == "purpose" and row["role"] == "operational"
-    ]
-    assert len(purpose_rows) == 2
-    assert {row["distinct_value_count"] for row in purpose_rows} == {0}
-    assert {row["missing_collection_count"] for row in purpose_rows} == {2}
+
     proposed_sheet = wb["Proposed facts"]
     proposed_headers = [cell.value for cell in proposed_sheet[1]]
     proposed_rows = [
@@ -1062,13 +1040,13 @@ def test_fact_sheet_emulation_exporter_writes_complete_hyperlinked_workbook(
         cell.value for cell in wb["Candidate families"][1]
     ]
     assert "Per-country summary:" in stdout
-    assert "Boundary evidence" not in wb.sheetnames
     assert "- CZ: families = 1, source collections = 2" in stdout
     assert "Per-biobank summary:" in stdout
     assert "- CZ / bbmri-eric:ID:CZ_BB1: families = 1, source collections = 2" in stdout
     assert "ready_current_fact_schema = 1" in stdout
 
-def test_fact_sheet_emulation_exporter_adds_boundary_evidence_only_to_advanced_workbook(
+
+def test_fact_sheet_emulation_exporter_adds_diagnostics_only_to_advanced_workbook(
     monkeypatch,
     tmp_path,
 ):
@@ -1084,10 +1062,37 @@ def test_fact_sheet_emulation_exporter_adds_boundary_evidence_only_to_advanced_w
     from openpyxl import load_workbook
 
     wb = load_workbook(workbook, data_only=False)
+    assert "Field comparison" in wb.sheetnames
     assert "Boundary evidence" in wb.sheetnames
 
-def test_fact_sheet_emulation_exporter_writes_matching_external_review_packets(
+    comparison_headers = [cell.value for cell in wb["Field comparison"][1]]
+    assert "distinct_value_count" in comparison_headers
+    assert "distinct_values" not in comparison_headers
+    assert "missing_collection_count" in comparison_headers
+    assert "missing_collection_ids" not in comparison_headers
+    comparison_rows = [
+        dict(zip(comparison_headers, row))
+        for row in wb["Field comparison"].iter_rows(min_row=2, values_only=True)
+    ]
+    material_rows = [
+        row
+        for row in comparison_rows
+        if row["field"] == "materials" and row["role"] == "characterization"
+    ]
+    assert len(material_rows) == 2
+    assert {row["distinct_value_count"] for row in material_rows} == {2}
+    assert {row["missing_collection_count"] for row in material_rows} == {0}
+    purpose_rows = [
+        row
+        for row in comparison_rows
+        if row["field"] == "purpose" and row["role"] == "operational"
+    ]
+    assert len(purpose_rows) == 2
+    assert {row["distinct_value_count"] for row in purpose_rows} == {0}
+    assert {row["missing_collection_count"] for row in purpose_rows} == {2}
 
+
+def test_fact_sheet_emulation_exporter_writes_matching_external_review_packets(
     monkeypatch,
     tmp_path,
 ):
