@@ -78,3 +78,44 @@ def test_write_xlsx_tables_truncates_long_object_values(tmp_path, caplog):
     assert dataframe.loc[0, "collections"] == long_values
     assert "collections=1" in caplog.text
     assert "Truncated XLSX cell detail: sheet=LongObject" in caplog.text
+
+
+def test_write_xlsx_tables_caps_hyperlinks_with_plain_text_fallback(
+    monkeypatch,
+    tmp_path,
+    caplog,
+):
+    monkeypatch.setattr("xlsxutils.EXCEL_MAX_HYPERLINKS_PER_SHEET", 2)
+    dataframe = pd.DataFrame(
+        {
+            "id": ["first", "second", "third"],
+            "url": [
+                "https://example.test/first",
+                "https://example.test/second",
+                "https://example.test/third",
+            ],
+        }
+    )
+    output_file = tmp_path / "hyperlinks.xlsx"
+
+    write_xlsx_tables(
+        str(output_file),
+        [
+            (
+                dataframe,
+                "Entities",
+                False,
+                {
+                    "hyperlink_columns": [("id", "url")],
+                    "hide_columns": ["url"],
+                },
+            )
+        ],
+    )
+
+    worksheet = load_workbook(output_file, data_only=False)["Entities"]
+    assert worksheet["A2"].value.startswith('=HYPERLINK("https://example.test/first"')
+    assert worksheet["A3"].value.startswith('=HYPERLINK("https://example.test/second"')
+    assert worksheet["A4"].value == "third"
+    assert worksheet["B2"].hyperlink is None
+    assert "omitted 1 additional hyperlink" in caplog.text

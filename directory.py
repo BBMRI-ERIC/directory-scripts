@@ -1148,6 +1148,15 @@ class Directory:
             if self._matches_withdrawn_scope(self.isCollectionWithdrawn(collection['id']))
         ]
 
+    def getLoadedCollections(self) -> list[dict[str, Any]]:
+        """Return a shallow list copy of collections without scope filtering.
+
+        Returns:
+            All loaded collection mappings. The mappings remain shared with
+            the Directory instance and callers must treat them as read-only.
+        """
+        return list(self.collections)
+
     def getCollectionById(self, collectionId: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
         """Return a collection by id.
 

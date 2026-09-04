@@ -74,6 +74,9 @@ operation.
 - `checks/CollectionContent.py` now owns conservative ORPHA/ICD diagnosis crosswalk completion too when an `OrphaCodes` mapper is loaded: keep exact mappings highest-confidence, allow narrower-to-broader crosswalk fixes only in the accepted direction, and suppress duplicate legacy informational warnings when a newer concrete append fix already covers the same source diagnosis.
 - `warningscontainer.py` should write XLSX cells by actual value type; withdrawn flags may be real booleans in warning/entity listings and must not be forced through string-only worksheet APIs.
   - own reusable logic that can be consumed by multiple scripts or plugins
+- `xlsxutils.py` must disable automatic URL conversion and enforce Excel
+  worksheet hyperlink limits: write explicit links only up to the limit, retain
+  plain display values thereafter, and report omitted links once per sheet.
 
 ### Directory cache scope
 
@@ -360,13 +363,278 @@ selection and exclusion, provenance, warning output, all-but-one presence and
 duplicate detection, individual marginal bounds, exact aggregate comparison,
 OoM interval comparison, directory statistics, and common exporter CLI wiring.
 
+## Fact-sheet emulation analysis specification
+
+`exporter-fact-sheet-emulation.py` and `fact_sheet_emulation.py` provide a
+read-only analysis of collection families that may have been created
+historically to characterize samples, donors, or data before CollectionFacts
+were available. This analysis is a migration aid, not a migration mechanism.
+
+### FS-EMU-001: Operational identity versus characterization
+
+A collection MUST be treated as operationally distinct when evidence shows a
+different purpose, SOP, storage lifecycle, quality requirement, access or
+governance regime, study relationship, network role, location, or responsible
+organization. Differences that primarily describe the contents of a holding,
+such as sex, material, diagnosis, age, anatomical site, imaging modality, or
+data category, are characterization evidence and may indicate fact-sheet
+emulation. A varying field MUST NOT be classified as characterization merely
+because it is convenient for a proposed migration.
+When a structured `purpose` field is present it is operational evidence.
+Conflicting populated descriptions MUST block automatic readiness and be sent
+for expert review because they may reveal different purposes or protocols.
+
+The detector MUST distinguish required equality from contextual evidence. The
+following fields MUST be excluded from the non-dimension equality signature:
+collection `id`, `name`, descriptive text, sample/donor counts,
+order-of-magnitude counts, and administrative timestamps or audit fields. Their
+differences MUST NOT by themselves establish operational independence. Names,
+IDs, and descriptions MUST nevertheless be retained as contextual evidence for
+conceptual identity and operational-boundary markers. All other compared fields
+MUST preserve missingness and be classified as same, unknown, or conflicting
+under FS-EMU-003. Recorded metadata equality is evidence, not proof, when
+fields are missing, copied, generic, or boilerplate.
+
+### FS-EMU-002: Candidate-family boundaries
+
+The detector MUST identify direct sibling families under the same parent when
+they share a plausible conceptual identity. Top-level families MUST be formed
+conservatively within one biobank, using exact non-dimension equivalence plus
+variation in at least one current fact-sheet dimension (`age`, `diagnosis`,
+`sample_type`/material, or `sex`). This exact-equivalence path is the primary
+deterministic discovery rule and MUST require at least two members and at
+least two distinct populated dimension values. Exact equivalence MUST be
+calculated without treating names, IDs, descriptions, counts, or audit fields
+as required equal fields.
+
+Differently named top-level diagnosis partitions MAY be discovered only with a
+strong additional anchor: an identical informative description, a specific
+delimited ID/name series, or a sufficiently long shared description frame with
+a diagnosis-derived difference. Generic names, generic materials, a shared
+biobank, or a placeholder description MUST NOT be an anchor. Diagnosis-family
+anchors MUST corroborate, not override, conflicting operational evidence.
+
+A biobank MUST NOT, by itself, be a reason to group all of its collections.
+Families MUST NOT cross biobanks or cross unrelated parent collections. A
+top-level family without an existing umbrella collection is a candidate for
+one new target collection, not a request to select an arbitrary source as the
+target.
+
+Name and ID evidence MUST be compared contextually, including differences
+around phase, wave, round, visit, baseline, follow-up, re-examination, pilot,
+eligibility/inclusion/exclusion criteria, site/centre, recruitment or collection
+period, prospective/retrospective, autopsy/post-mortem, intervention, and
+acquisition terms. A marker is operational-boundary evidence only when the
+member-specific qualifier or surrounding text differs in a way that indicates
+a separate protocol, acquisition round, lifecycle, governance arrangement, or
+operational cohort.
+
+Marker presence in shared study background is neutral. Ambiguous uses such as
+disease stage, laboratory phase, anatomical "part", or publication language
+MUST be sent to review rather than treated as a boundary or removed during
+normalization.
+
+The detector MUST NOT merge transitively through a weak intermediate match.
+Each proposed family boundary requires auditable identity evidence and a
+comparison of operational fields for the actual members.
+
+Sibling families without either an umbrella-name/dimension-suffix relationship
+or varying structured characterization evidence MUST remain unresolved and
+MUST NOT receive fact-row migration previews. Before an existing parent or
+top-level umbrella is recommended as a target, its operational metadata MUST
+also be compared with the source members; conflicts or material unknowns block
+target reuse.
+
+### FS-EMU-003: Field comparison states
+
+For every compared field, the detector MUST distinguish:
+
+- **same:** all populated values agree after documented normalization;
+- **unknown:** one or more values are missing, while no populated values
+  conflict; and
+- **conflicting:** two or more populated values differ.
+
+Missing values are not evidence of equality. Conflicting operational fields
+MUST lower emulation confidence and block automatic migration readiness.
+Characterization conflicts SHOULD increase the evidence for a virtual
+partition, but MUST NOT override an operational conflict.
+
+Complete absence is reported as unknown. A partially populated operational
+field blocks readiness because the members cannot be compared. Complete
+absence of critical collection identity fields (`contact`, `license`,
+`storage_temperatures`, or `type`) also blocks readiness; complete absence of
+other optional fields remains visible for expert review but is not by itself a
+hard blocker. `network` and `networks` input shapes MUST be compared as one
+canonical network-membership field.
+
+Descriptions MUST additionally have one of these evidence states:
+
+- **informative-equal:** normalized informative descriptions agree;
+- **dimension-derived difference:** the differing bounded text is a current
+  fact-sheet value such as diagnosis, age, material/sample type, or sex;
+- **operational-boundary difference:** the differing text identifies a phase,
+  lifecycle, protocol, recruitment/acquisition period, site, intervention, or
+  other operational separation;
+- **placeholder/uninformative:** the text is empty, generic, or boilerplate
+  such as a missing-description response; or
+- **ambiguous:** the difference cannot be assigned safely to a dimension or an
+  operational boundary.
+
+The original descriptions and bounded differing sentence or snippet MUST be
+retained for audit. Description markers MUST be evaluated from differences
+between members, not from keyword presence alone. Shared background language
+MUST NOT be treated as a boundary, and a dimension-derived description
+difference MUST NOT override an operational conflict.
+
+### FS-EMU-004: Schema-coupled type exception
+
+The Directory schema may require collection type `IMAGE` when
+`body_part_examined` is populated. A type difference that is explained solely
+by this schema coupling MUST be reported as a mechanical exception and MUST
+NOT be treated as an operational distinction. Any other type difference
+remains operational evidence and requires review.
+
+### FS-EMU-005: Separate confidence and readiness
+
+The report MUST expose two independent assessments:
+
+- **emulation confidence:** how strongly the available records support the
+  interpretation that a family is a historical fact-sheet substitute; and
+- **migration readiness:** whether the evidence is sufficient to represent the
+  family safely using the current fact-sheet schema.
+
+A family can have high emulation confidence but low migration readiness, for
+example when its varying attribute is anatomical site and the current schema
+has no such fact dimension, or when exact counts are unavailable. Operational
+conflicts, blocking unknown fields, incompatible target metadata, unsupported
+dimensions, ambiguous multi-valued attributes, insufficient conceptual
+identity, and missing source mappings are migration blockers.
+
+Diagnosis-based fact previews MUST also be blocked when source diagnoses are
+multi-valued, incomplete, duplicated across collection strata, represented only
+as coarse ranges, or paired with negation/control language that cannot be
+represented as an unambiguous disease marginal.
+
+Anatomical-site, organ, imaging-modality, image-dataset, timepoint,
+recruitment-site, data-category, and similar partitions are unsupported or
+future dimensions unless the current schema explicitly represents them. A
+strongly patterned anatomy or imaging family MAY be emitted as `review-only`;
+it MUST NOT be counted as current fact-sheet emulation or receive a fact
+preview when acquisition, SOP, lifecycle, or operational identity is unknown
+or conflicting. Scientific-question, data-element, or variable catalogues
+MUST be excluded from positive fact-sheet classification when their members
+represent different research questions rather than a supported distribution
+dimension.
+
+### FS-EMU-006: Counts and fact-row construction
+
+Only exact integer sample and donor counts MAY be used in a proposed fact-row
+preview. Order-of-magnitude values MUST remain explicitly marked as estimates
+and MUST NOT be converted into exact counts. For every complete, single-valued
+current fact-sheet dimension whose values are unique across the source members,
+the exporter MUST copy each source collection's exact aggregate counts unchanged
+into an independent all-but-one-star row for the target: that dimension is fixed
+and every other fact dimension is `*`. If several dimensions independently meet
+these requirements, each dimension receives its own marginal rows. Proposed
+marginals MUST NOT be added, either within one dimension or across dimensions.
+
+The exporter MUST NOT emit no-star intersection previews from collection-level
+aggregates. Incomplete, multi-valued, or duplicate source mappings MUST NOT be
+summed to manufacture a missing marginal. An absent target collection ID MAY
+block migration readiness, but MUST NOT suppress an otherwise unambiguous
+advisory marginal preview. Existing target all-star rows or collection-level
+totals MAY be cited as provenance evidence, but MUST NOT be emitted as proposed
+facts. Every proposed fact row MUST retain its source collection ID.
+
+### FS-EMU-007: Current and future dimensions
+
+The detector MUST distinguish dimensions representable by the current
+fact-sheet schema from dimensions that are only candidates for future
+extension. Current dimensions include the supported sex, material/sample-type,
+and diagnosis mappings. Existing Directory attributes such as
+`body_part_examined`, imaging modality, image dataset type, data category, and
+collection category MAY be reported as future-dimension candidates with their
+source field, values, ontology, coverage, representability, and provenance.
+The report MUST NOT relabel an anatomical or organ partition as a disease
+partition without disease-specific evidence. Candidate dimensions should be
+assessed for generalizability across sample, image, and data modalities and
+for whether they describe contents rather than operations.
+
+### FS-EMU-008: Advisory AI packets
+
+For unresolved or migration-blocked cases, the exporter MUST be able to emit
+JSON and Markdown review packets from the same structured analysis. Each packet
+MUST include instructions, expected outputs, suspect family and collection
+IDs, field-level comparisons, dimension candidates, blockers, provenance, and
+the rules against summing counts or converting OoM values. AI output is
+advisory only: it MUST be returned for expert review and MUST NOT be treated
+as a qcheck update or executable Directory mutation. Deterministic comparison
+and ontology matching MUST precede any optional AI interpretation.
+
+Prompt packet values MUST be bounded: strings longer than 1,000 characters
+retain beginning and ending evidence plus original length and a checksum, and
+long sequences retain bounded edge items plus their count and checksum. Full
+source values remain available through the Directory and workbook traceability
+references rather than being duplicated into an unbounded model prompt.
+Identical fields and fields unknown for every member MUST be represented as
+compact per-role summaries; detailed comparison rows remain required for
+variation, conflict, and partial missingness.
+
+
+Review instructions MUST tell the reviewer to distinguish collection-boundary
+language from shared study background, to treat phase/re-examination and
+acquisition markers as possible operational boundaries, and not to interpret
+scientific questions or data-element catalogues as fact-sheet strata. The
+expected response MUST separately state emulation confidence, migration
+readiness, operational-boundary evidence, unsupported/future dimensions, and
+required follow-up.
+
+The default XLSX report MUST omit the verbose `Boundary evidence` table intended
+for diagnostic processing. `--advanced-reporting` MUST include that worksheet;
+JSON and Markdown AI-review packets MUST retain the same boundary evidence
+regardless of the XLSX setting.
+
+### FS-EMU-009: Privacy and expert review
+
+Reports MUST contain only the minimum Directory evidence needed to assess a
+family. Proposed dimensions and counts require expert review for semantic
+validity, privacy or re-identification risk, k-anonymity implications, and
+source completeness. A high-confidence family is not automatically safe to
+publish or collapse.
+
+Every family report MUST expose, at minimum, the discovery rule, parent and
+biobank boundary, member IDs, identity anchor, varied current dimensions,
+field-level equality states, description evidence state, marker category and
+qualifier where present, bounded evidence snippet, operational conflicts and
+unknowns, unsupported-dimension candidates, abstention reason, emulation
+confidence, migration readiness, and source/provenance references. These
+fields are evidence for review and MUST NOT be interpreted as a recommendation
+to collapse without expert sign-off.
+
+### FS-EMU-010: No writes or updater payloads
+
+The exporter and helper MUST be read-only with respect to Directory entities.
+They MUST NOT modify Directory tables, cached entity records, source
+collections, or CollectionFacts, and MUST NOT emit payloads intended for direct
+consumption by `qcheck-updater.py`. The shared Directory loader MAY perform its
+normal cache refresh or an explicitly requested cache purge. Any later collapse,
+target creation, fact-sheet generation, or source-ID redirect MUST be
+implemented as a separately approved workflow with its own validation and
+human sign-off.
+
 ## Coding Style
 
 - Python 3, 4-space indentation, keep existing vim modelines intact.
 - Prefer `snake_case` names and small reusable helpers.
 - Keep exporters thin: CLI + orchestration only.
 - Keep shared Directory logic in `directory.py`.
-- When code needs parent/context data for an entity already selected by the current withdrawn scope, use scope-independent loaded lookups (`getLoadedBiobankById(...)`, `getLoadedCollectionById(...)`) rather than user-facing scope-filtered lookups. This keeps withdrawn-only exports and ancestor counting from dropping active parents or double-counting children.
+- When code needs parent/context data for an entity already selected by the
+  current withdrawn scope, use scope-independent loaded lookups
+  (`getLoadedBiobankById(...)`, `getLoadedCollectionById(...)`) rather than
+  user-facing scope-filtered lookups. Whole-snapshot analysis may use
+  `getLoadedCollections()` but must treat its shared record mappings as
+  read-only. This prevents withdrawn-only exports and ancestor counting from
+  dropping active parents or double-counting children.
 - Implement fact-sheet summaries through `fact_sheet_summary.py` and follow the [fact-sheet aggregation specification](#fact-sheet-aggregation-specification); exporters must not define alternate aggregation semantics.
 - `exporter-all.py` is the broad entity dump: when its sheet layout changes, keep the workbook tabs and stdout sections aligned across biobanks, collections, services, studies, contacts, and networks, and keep any withdrawn-in-main-workbook option additive rather than replacing the existing separate-workbook path.
 - Put cross-cutting reusable logic in helper modules, not duplicated across scripts.

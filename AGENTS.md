@@ -68,11 +68,25 @@
 - New exporters should read data via `directory.py`, accept CLI arguments, and keep output schemas stable.
 - `directory.py` now treats `Services` and `Studies` as first-class read entities too; exporters should use `getBiobankServices(...)`, `getServiceBiobankId(...)`, `getStudies()`, `getBiobankStudies(...)`, and the related study/service helpers instead of reconstructing parent biobank or collection relationships manually.
 - Study membership should be derived from the `Collections.studies` field via `directory.py`; do not rebuild study-to-collection mappings from `Studies.collections` directly in exporters or helper tools.
-- When an exporter has already selected a child entity through the configured withdrawn scope, resolve parent/context records with scope-independent loaded lookups such as `getLoadedBiobankById(...)` or `getLoadedCollectionById(...)`; do not use scope-filtered lookups for parent context or ancestor counting, because withdrawn-only views can include children whose parent biobank/collection is outside that same scope.
+- When an exporter has already selected a child entity through the configured
+  withdrawn scope, resolve parent/context records with scope-independent loaded
+  lookups such as `getLoadedBiobankById(...)` or
+  `getLoadedCollectionById(...)`; do not use scope-filtered lookups for parent
+  context or ancestor counting, because withdrawn-only views can include
+  children whose parent biobank or collection is outside that same scope.
+  Whole-snapshot analysis may use `getLoadedCollections()`, but callers must
+  treat its shared record mappings as read-only.
 - `exporter-all.py` is expected to keep one sheet/stdout section per major entity class it exposes (`Biobanks`, `Collections`, `Services`, `Studies`, `Contacts`, `Networks`); if withdrawn content is appended into the same workbook, keep that as additive `Withdrawn ...` sheets rather than changing the base sheet names.
 - Fact-sheet exporters, statistics, and QC MUST follow the canonical [fact-sheet aggregation specification](DEVELOPMENT.md#fact-sheet-aggregation-specification). Reuse `fact_sheet_summary.py` and `fact_sheet_utils.py`; do not introduce exporter-specific aggregation rules or combine authoritative and unsafe fallback statistics.
+- Fact-sheet emulation previews must copy exact source collection aggregates
+  only into independently valid all-but-one-star marginals. Never emit no-star
+  intersections from those aggregates, never sum duplicate or incomplete
+  source mappings, and never add marginal rows within or across dimensions.
 - GeoJSON-capable tooling should reuse `geojsonutils.py` for coordinate normalization and FeatureCollection writing, and for collection/study map exports should fall back to parent-biobank coordinates only when the entity itself has no usable `longitude`/`latitude`.
 - Importer/synchronizer scripts such as `importer-ecrin-mdr.py` and `sync_directory_with_fdp.py` may target external systems and are not normal exporters; keep their authentication optional when the CLI/env input is optional, and preserve their authorship/acknowledgement headers when editing them.
+- `xlsxutils.py` must disable automatic URL conversion and respect Excel
+  worksheet hyperlink limits: preserve explicit links up to the limit, leave
+  excess display cells as plain text, and emit one summary warning.
 - Deployment: treat exporters as runnable CLIs; document required credentials, input files, output locations, and expected file formats (CSV/XLSX/XML/JSON).
 - For each exporter, document the exact command line used in production (including flags, package, and cache settings) and where outputs are published or uploaded.
 - If deployed on a schedule, record the trigger (cron/job name), environment (host/container), and any required secrets or config files.

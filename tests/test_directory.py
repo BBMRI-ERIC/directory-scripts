@@ -583,6 +583,20 @@ def test_get_loaded_biobank_by_id_ignores_withdrawn_scope():
     assert directory.getLoadedBiobankById("bb2") == directory.biobanks[1]
 
 
+def test_get_loaded_collections_ignores_withdrawn_scope():
+    directory = _make_directory_stub()
+    directory.include_withdrawn_entities = False
+    directory.only_withdrawn_entities = False
+
+    assert [collection["id"] for collection in directory.getCollections()] == [
+        "col1",
+        "col2",
+        "bbmri-eric:ID:EXT_demo:collection:col5",
+    ]
+    assert directory.getLoadedCollections() == directory.collections
+    assert directory.getLoadedCollections() is not directory.collections
+
+
 def test_is_countable_collection_checks_ancestors_outside_withdrawn_scope():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False

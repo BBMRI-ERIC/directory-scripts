@@ -8,6 +8,7 @@ import pandas as pd
 
 
 EXCEL_MAX_CELL_CHARS = 32767
+EXCEL_MAX_HYPERLINKS_PER_SHEET = 65530
 EXCEL_TRUNCATION_MARKER = "... [truncated to fit Excel cell limit]"
 MAX_TRUNCATION_DETAILS = 50
 
@@ -133,12 +134,19 @@ def write_xlsx_tables(filename: str, sheets) -> None:
             `hide_columns=[column_name, ...]`.
             Cell values exceeding Excel's 32,767-character text limit are
             truncated in the workbook output only.
+            Automatic URL conversion is disabled; requested hyperlinks are
+            capped at Excel's per-worksheet limit and excess display cells
+            remain plain text.
 
     Raises:
         ValueError: If any sheet specification has an unsupported shape.
     """
     log.info("Writing XLSX export to %s", filename)
-    with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
+    with pd.ExcelWriter(
+        filename,
+        engine="xlsxwriter",
+        engine_kwargs={"options": {"strings_to_urls": False}},
+    ) as writer:
         for sheet in sheets:
             if len(sheet) == 2:
                 dataframe, sheet_name = sheet
@@ -156,6 +164,8 @@ def write_xlsx_tables(filename: str, sheets) -> None:
             excel_dataframe = _truncate_long_text_cells(dataframe, sheet_name)
             excel_dataframe.to_excel(writer, sheet_name=sheet_name, index=index)
             hyperlink_columns = options.get("hyperlink_columns", [])
+            hyperlinks_written = 0
+            hyperlinks_omitted = 0
             if hyperlink_columns:
                 worksheet = writer.sheets[sheet_name]
                 hyperlink_format = writer.book.get_default_url_format()
@@ -180,8 +190,11 @@ def write_xlsx_tables(filename: str, sheets) -> None:
                             continue
                         if str(url_value).strip() == "":
                             continue
-                        escaped_url = str(url_value).replace('"', '""')
-                        escaped_display_value = str(display_value).replace('"', '""')
+                        if hyperlinks_written >= EXCEL_MAX_HYPERLINKS_PER_SHEET:
+                            hyperlinks_omitted += 1
+                            continue
+                        escaped_url = str(url_value).replace("\"", "\"\"")
+                        escaped_display_value = str(display_value).replace("\"", "\"\"")
                         worksheet.write_formula(
                             row_index,
                             display_column_index,
@@ -189,6 +202,16 @@ def write_xlsx_tables(filename: str, sheets) -> None:
                             hyperlink_format,
                             str(display_value),
                         )
+                        hyperlinks_written += 1
+            if hyperlinks_omitted:
+                log.warning(
+                    "Excel limits sheet %s to %d hyperlinks; omitted %d "
+                    "additional hyperlink%s and kept those display cells as plain text.",
+                    sheet_name,
+                    EXCEL_MAX_HYPERLINKS_PER_SHEET,
+                    hyperlinks_omitted,
+                    "s" if hyperlinks_omitted != 1 else "",
+                )
             hidden_columns = options.get("hide_columns", [])
             if hidden_columns:
                 worksheet = writer.sheets[sheet_name]

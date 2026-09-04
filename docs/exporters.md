@@ -16,6 +16,7 @@ withdrawn-scope, and logging conventions documented in
 | `exporter-country.py` | Report biobank and collection counts by country. |
 | `exporter-covid.py` | Export COVID-relevant collections and biobanks. |
 | `exporter-ecraid.py` | Export collections and institutions relevant to ECRAID. |
+| `exporter-fact-sheet-emulation.py` | Identify collection families that may historically emulate fact sheets and report migration candidates. |
 | `exporter-institutions.py` | Export juridical persons grouped by country. |
 | `exporter-mission-cancer.py` | Export cancer and pediatric-cancer collections. |
 | `exporter-negotiator-orphans.py` | Analyze Negotiator representative coverage and assignment candidates. |
@@ -45,6 +46,11 @@ python3 exporter-all.py -w --include-withdrawn-sheets-in-output -X all.xlsx
 Excel limits a cell to 32,767 characters. Long values are truncated by the
 shared XLSX writer; verbose mode identifies affected cells and debug mode shows
 the original and resulting values.
+
+Excel also limits each worksheet to 65,530 hyperlinks. The shared writer
+creates explicit links up to that limit, leaves additional display cells as
+plain text, and emits one summary warning instead of thousands of per-cell
+warnings.
 
 ### `exporter-bbmri-cohorts.py`
 
@@ -125,6 +131,122 @@ python3 exporter-covid.py -X covid.xlsx
 
 ```bash
 python3 exporter-ecraid.py -X ecraid.xlsx
+```
+
+### `exporter-fact-sheet-emulation.py`
+
+- **Purpose:** Find sibling or conservatively grouped top-level collection
+  families that may be historical substitutes for fact-sheet dimensions rather
+  than genuinely different operational collections. The analysis is
+  deterministic and read-only; it does not collapse collections or create
+  updater payloads.
+- **Output:** Text output groups candidate families by country and reports
+  confidence, migration readiness, source IDs, blockers, and country/biobank
+  totals. `-X` writes an XLSX workbook with `Candidate families`,
+  `Source collections`, `Field comparison`, `Proposed facts`,
+  `Unrepresentable data`, `Migration mapping`, `Dimension candidates`, and
+  `Dimension values` sheets. `--advanced-reporting` additionally includes the
+  verbose `Boundary evidence` diagnostic sheet. Entity IDs in the workbook
+  link to the Directory web view.
+- **Selection and options:** `--scope all` (default) considers sibling and
+  conservative top-level families; `--scope siblings` or `--scope top-level`
+  narrows the analysis. `--min-confidence low|medium|high` filters the
+  deterministic result. `-c`/`--country` accepts one or more country codes.
+  Shared authentication, schema, withdrawn-scope, cache, logging, `-X`, and
+  `-N` options work as described in [Setup and common operation](setup.md).
+- **Read-only and statistical warnings:** The exporter reports possible
+  migration targets, but never edits Directory data and never invokes
+  `qcheck-updater.py`. Exact source counts are evidence only. It does not sum
+  source collections, fact rows, marginal rows, or order-of-magnitude values
+  to manufacture totals. Missing values reduce confidence; conflicting
+  operational values and conflicting populated descriptions block automatic
+  migration. A schema-coupled `IMAGE` type difference caused only by
+  `body_part_examined` is reported as an exception, not treated as proof of
+  operational independence.
+- **Proposed fact semantics:** Each eligible source collection aggregate is
+  copied unchanged into an all-but-one-star row of the target collection. The
+  split dimension is fixed and every other fact dimension is `*`. If multiple
+  dimensions each form a complete one-to-one mapping, each gets an independent
+  set of marginal rows. Never add proposed rows within or across dimensions.
+  Incomplete, multi-valued, or duplicate mappings are not summed, and the
+  exporter does not propose no-star intersections or target all-star totals.
+  A missing target ID remains a migration blocker but does not hide an
+  otherwise unambiguous advisory marginal preview.
+- **How families are discovered:** The primary deterministic rule finds at
+  least two collections within the same parent or biobank whose non-dimension
+  metadata is exactly equivalent while current fact-sheet dimensions vary.
+  IDs, names, descriptions, counts, order-of-magnitude values, and
+  administrative timestamps are excluded from required equality, but names,
+  IDs, and descriptions remain important contextual evidence. Differently
+  named diagnosis partitions require an additional informative anchor, such as
+  a specific ID series or a description that differs only around diagnosis.
+  A shared biobank, generic material, or placeholder description is not enough.
+- **Description and boundary evidence:** Descriptions are classified as
+  informative-equal, dimension-derived difference,
+  operational-boundary difference, placeholder/uninformative, or ambiguous.
+  The analysis compares the differing sentence or bounded snippet, not merely
+  keyword presence. Phase, wave, round, visit, baseline, follow-up,
+  re-examination, eligibility/inclusion/exclusion criteria, pilot/site,
+  recruitment or collection period, prospective/retrospective,
+  autopsy/post-mortem, intervention, and acquisition language can indicate
+  separate operational collections when their member-specific qualifiers
+  differ. Shared study background is neutral; ambiguous uses such as disease
+  stage, laboratory phase, or anatomical “part” are sent for review.
+- **Review-only and exclusions:** Anatomy, organ, imaging modality,
+  timepoint, recruitment site, data category, and similar partitions are
+  reported as future-dimension candidates or `review-only` families unless the
+  current schema and operational evidence support them. Scientific-question,
+  data-element, and variable catalogues are not fact-sheet families merely
+  because their collections look systematically named. Operational conflicts,
+  missing comparison fields, unsupported dimensions, ambiguous values, and
+  missing source mappings block migration readiness even when emulation
+  confidence is high. Diagnosis previews are additionally blocked for
+  multi-valued, incomplete, duplicated, or coarse-range mappings and for
+  negated/control descriptions.
+- **Audit and interpretation:** Results expose the discovery rule, family
+  boundary, identity anchor, varied dimensions, field comparison states,
+  description state, marker/qualifier and bounded evidence snippet, conflicts,
+  unknowns, unsupported dimensions, abstention reason, confidence, readiness,
+  and provenance. Treat these as review evidence, not an automatic instruction
+  to collapse collections. A family may be a strong historical fact-sheet
+  substitute while still being unsafe to migrate.
+- **AI review workflow:** `--ai-review-prefix PREFIX` writes
+  `PREFIX-ai-review.json` and `PREFIX-ai-review.md`. Both contain the same
+  bounded suspect cases, field-level evidence, unresolved data, explicit
+  review questions, and the expected JSON response schema. Feed either packet
+  to a chatbot, Codex, or an API as an advisory review task. The AI must
+  classify each family, explain the evidence, identify future dimensions, and
+  list required follow-up; its response must be reviewed by an expert and is
+  not an executable Directory update. Individual prompt strings longer than
+  1,000 characters retain bounded leading and trailing evidence together with
+  their original length and checksum; long sequences are similarly bounded so
+  packets remain practical to review.
+  Identical and universally unknown fields are summarized by role; detailed
+  rows are retained for variation, conflict, and partial missingness.
+  For direct model input, prefer country-scoped packets via `-c`; an unfiltered
+  all-country packet is an archival review dataset and may exceed a model
+  upload or context limit even though individual evidence values are bounded.
+
+```bash
+# Report all candidate families using the shared Directory cache when possible.
+python3 exporter-fact-sheet-emulation.py -v
+
+# Produce the analysis workbook and prompt-ready JSON/Markdown review packets.
+python3 exporter-fact-sheet-emulation.py \
+  -c AT UK \
+  -X fact-sheet-emulation.xlsx \
+  --ai-review-prefix fact-sheet-emulation
+
+# Run offline against an already populated cache and suppress normal stdout.
+python3 exporter-fact-sheet-emulation.py \
+  --no-stdout \
+  -X fact-sheet-emulation.xlsx
+
+# Add the verbose boundary-evidence worksheet for diagnostic review.
+python3 exporter-fact-sheet-emulation.py \
+  --no-stdout \
+  --advanced-reporting \
+  -X fact-sheet-emulation-advanced.xlsx
 ```
 
 ### `exporter-institutions.py`

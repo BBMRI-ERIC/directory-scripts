@@ -324,6 +324,9 @@ class SharedDirectoryStub:
             raise KeyError(collection_id)
         return None
 
+    def getLoadedCollections(self):
+        return list(self.collections)
+
     def getCollectionFacts(self, collection_id):
         return self.collectionFactMap.get(collection_id, [])
 
@@ -495,6 +498,72 @@ class CohortNoStarFallbackDirectoryStub(CohortTotalsDirectoryStub):
             "number_of_donors": 8,
         }
     )
+
+
+class FactSheetEmulationDirectoryStub(SharedDirectoryStub):
+    """Directory fixture with one material-partitioned sibling family."""
+
+    PARENT_ID = "bbmri-eric:ID:CZ_BB1:collection:legacy"
+    BASE_COLLECTIONS = [
+        {
+            "id": PARENT_ID,
+            "name": "Legacy collection",
+            "biobank": {"id": "bbmri-eric:ID:CZ_BB1"},
+            "country": "CZ",
+            "contact": {"id": "ct1"},
+            "storage_temperatures": ["temperatureRoom"],
+            "license": "https://example.test/license",
+            "type": ["SAMPLE"],
+            "materials": ["SERUM", "DNA"],
+            "size": 100,
+            "withdrawn": False,
+        },
+        {
+            "id": f"{PARENT_ID}:serum",
+            "name": "Legacy collection - Serum",
+            "biobank": {"id": "bbmri-eric:ID:CZ_BB1"},
+            "parent_collection": {"id": PARENT_ID},
+            "country": "CZ",
+            "contact": {"id": "ct1"},
+            "storage_temperatures": ["temperatureRoom"],
+            "license": "https://example.test/license",
+            "type": ["SAMPLE"],
+            "materials": ["SERUM"],
+            "size": 60,
+            "number_of_donors": 40,
+            "withdrawn": False,
+        },
+        {
+            "id": f"{PARENT_ID}:dna",
+            "name": "Legacy collection - DNA",
+            "biobank": {"id": "bbmri-eric:ID:CZ_BB1"},
+            "parent_collection": {"id": PARENT_ID},
+            "country": "CZ",
+            "contact": {"id": "ct1"},
+            "storage_temperatures": ["temperatureRoom"],
+            "license": "https://example.test/license",
+            "type": ["SAMPLE"],
+            "materials": ["DNA"],
+            "size": 40,
+            "number_of_donors": 30,
+            "withdrawn": False,
+        },
+    ]
+    BASE_FACTS = {
+        PARENT_ID: [],
+        f"{PARENT_ID}:serum": [],
+        f"{PARENT_ID}:dna": [],
+    }
+
+
+class FactSheetEmulationReviewDirectoryStub(FactSheetEmulationDirectoryStub):
+    """Emulation fixture with anatomy evidence needing external review."""
+
+    BASE_COLLECTIONS = copy.deepcopy(FactSheetEmulationDirectoryStub.BASE_COLLECTIONS)
+    BASE_COLLECTIONS[1]["body_part_examined"] = ["T-28000"]
+    BASE_COLLECTIONS[1]["type"].append("IMAGE")
+    BASE_COLLECTIONS[2]["body_part_examined"] = ["T-04000"]
+    BASE_COLLECTIONS[2]["type"].append("IMAGE")
 
 
 def test_directory_stats_matches_exporter_all_active_totals(monkeypatch):
@@ -910,3 +979,136 @@ def test_directory_stats_script_supports_comma_delimited_filters_and_collection_
     assert summary["country_filter"] == "CZ,DE"
     assert summary["collection_type_filter"] == "CASE_CONTROL,POPULATION"
     assert summary["collection_records_total"] == 2
+
+
+def test_fact_sheet_emulation_exporter_writes_complete_hyperlinked_workbook(
+    monkeypatch,
+    tmp_path,
+):
+    workbook = tmp_path / "emulation.xlsx"
+
+    _, stdout, _ = _run_script(
+        monkeypatch,
+        "exporter-fact-sheet-emulation.py",
+        ["-X", str(workbook)],
+        directory_class=FactSheetEmulationDirectoryStub,
+    )
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(workbook, data_only=False)
+    assert wb.sheetnames == [
+        "Candidate families",
+        "Source collections",
+        "Field comparison",
+        "Proposed facts",
+        "Unrepresentable data",
+        "Migration mapping",
+        "Dimension candidates",
+        "Dimension values",
+    ]
+    source_sheet = wb["Source collections"]
+    headers = [cell.value for cell in source_sheet[1]]
+    collection_column = headers.index("collection_id") + 1
+    assert source_sheet.cell(2, collection_column).value.startswith('=HYPERLINK("')
+    comparison_headers = [cell.value for cell in wb["Field comparison"][1]]
+    assert "distinct_value_count" in comparison_headers
+    assert "distinct_values" not in comparison_headers
+    assert "missing_collection_count" in comparison_headers
+    assert "missing_collection_ids" not in comparison_headers
+    comparison_rows = [
+        dict(zip(comparison_headers, row))
+        for row in wb["Field comparison"].iter_rows(min_row=2, values_only=True)
+    ]
+    material_rows = [
+        row
+        for row in comparison_rows
+        if row["field"] == "materials" and row["role"] == "characterization"
+    ]
+    assert len(material_rows) == 2
+    assert {row["distinct_value_count"] for row in material_rows} == {2}
+    assert {row["missing_collection_count"] for row in material_rows} == {0}
+    purpose_rows = [
+        row
+        for row in comparison_rows
+        if row["field"] == "purpose" and row["role"] == "operational"
+    ]
+    assert len(purpose_rows) == 2
+    assert {row["distinct_value_count"] for row in purpose_rows} == {0}
+    assert {row["missing_collection_count"] for row in purpose_rows} == {2}
+    proposed_sheet = wb["Proposed facts"]
+    proposed_headers = [cell.value for cell in proposed_sheet[1]]
+    proposed_rows = [
+        dict(zip(proposed_headers, row))
+        for row in proposed_sheet.iter_rows(min_row=2, values_only=True)
+    ]
+    assert len(proposed_rows) == 2
+    assert {row["row_kind"] for row in proposed_rows} == {"all_but_one_star"}
+    assert {row["sample_type"] for row in proposed_rows} == {"SERUM", "DNA"}
+    assert {row["sex"] for row in proposed_rows} == {"*"}
+    assert {row["age_range"] for row in proposed_rows} == {"*"}
+    assert {row["disease"] for row in proposed_rows} == {"*"}
+    assert {row["number_of_samples"] for row in proposed_rows} == {60, 40}
+    assert {row["number_of_donors"] for row in proposed_rows} == {40, 30}
+
+    candidate_headers = [cell.value for cell in wb["Candidate families"][1]]
+    assert {
+        "discovery_rule",
+        "description_classification",
+        "operational_boundary_categories",
+        "abstention_reason",
+    }.issubset(candidate_headers)
+    assert "source_collection_ids" not in [
+        cell.value for cell in wb["Candidate families"][1]
+    ]
+    assert "Per-country summary:" in stdout
+    assert "Boundary evidence" not in wb.sheetnames
+    assert "- CZ: families = 1, source collections = 2" in stdout
+    assert "Per-biobank summary:" in stdout
+    assert "- CZ / bbmri-eric:ID:CZ_BB1: families = 1, source collections = 2" in stdout
+    assert "ready_current_fact_schema = 1" in stdout
+
+def test_fact_sheet_emulation_exporter_adds_boundary_evidence_only_to_advanced_workbook(
+    monkeypatch,
+    tmp_path,
+):
+    workbook = tmp_path / "emulation-advanced.xlsx"
+
+    _run_script(
+        monkeypatch,
+        "exporter-fact-sheet-emulation.py",
+        ["-N", "--advanced-reporting", "-X", str(workbook)],
+        directory_class=FactSheetEmulationDirectoryStub,
+    )
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(workbook, data_only=False)
+    assert "Boundary evidence" in wb.sheetnames
+
+def test_fact_sheet_emulation_exporter_writes_matching_external_review_packets(
+
+    monkeypatch,
+    tmp_path,
+):
+    prefix = tmp_path / "emulation"
+
+    _run_script(
+        monkeypatch,
+        "exporter-fact-sheet-emulation.py",
+        ["-N", "--ai-review-prefix", str(prefix)],
+        directory_class=FactSheetEmulationReviewDirectoryStub,
+    )
+
+    json_path = tmp_path / "emulation-ai-review.json"
+    markdown_path = tmp_path / "emulation-ai-review.md"
+    packet = json.loads(json_path.read_text(encoding="utf-8"))
+    markdown = markdown_path.read_text(encoding="utf-8")
+
+    assert packet["schema_version"] == "1.2"
+    assert len(packet["cases"]) == 1
+    assert packet["cases"][0]["family"]["country"] == "CZ"
+    assert "boundary_evidence" in packet["cases"][0]
+    assert "field_summary" in packet["cases"][0]
+    assert "anatomical_site" in markdown
+    assert "Do not sum" in markdown

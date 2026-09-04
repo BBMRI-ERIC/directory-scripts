@@ -24,6 +24,7 @@ CLI_SCRIPTS = [
     "exporter-country.py",
     "exporter-covid.py",
     "exporter-ecraid.py",
+    "exporter-fact-sheet-emulation.py",
     "exporter-institutions.py",
     "exporter-mission-cancer.py",
     "exporter-negotiator-orphans.py",
