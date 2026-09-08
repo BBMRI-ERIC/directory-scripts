@@ -28,7 +28,7 @@ line options, see [Setup and common operation](docs/setup.md).
 | Exports and reports | `exporter-*.py` | [Exporters](docs/exporters.md) |
 | Maps and geospatial output | `geocoding_2022.py`, `R-maps/` | [Maps](docs/maps.md) |
 | Data maintenance and synchronization | `directory-tables-modifier.py`, updater/importer/sync tools | [Maintenance tools](docs/maintenance-tools.md) |
-| Auxiliary analyses and utilities | `survey-so2-directory.py`, search, statistics, conversion helpers | [Auxiliary tools](docs/auxiliary-tools.md) |
+| Auxiliary analyses and utilities | `survey-so2-directory.py`, `eosc-organisation-matcher.py`, search and statistics | [Auxiliary tools](docs/auxiliary-tools.md) |
 | Reusable Python modules | `directory.py` and focused helper modules | [Libraries](docs/libraries.md) |
 
 ## Common Examples

@@ -853,3 +853,144 @@ Node/staging-area scope and reported country must stay distinct:
 - `Directory.get*NN(...)` is for BBMRI node / staging-area routing and workbook grouping, derived from entity IDs via `nncontacts.py`
 - `Directory.get*Country(...)` is for actual reported country values
 - non-member biobanks hosted in countries such as `US` or `VN` must still route/group under `EXT`, not under country-specific tabs
+
+
+## EOSC organisation matching specification
+
+### EOSC-001: Boundaries and source identity
+`eosc-organisation-matcher.py` is an auxiliary read-only Directory consumer.
+`eosc_organisation_matching.py` owns pure identity grouping, review coverage,
+packet generation, imports, approval and export selection.
+`eosc_membership_xlsx.py` owns workbook parsing and fresh XLSX output.
+The CLI MUST reuse Directory and shared logging/authentication/schema/cache helpers.
+It MUST NOT expose withdrawn-scope flags or make runtime AI/translation/web-search
+calls. Directory withdrawal is checked before grouping; active IDs are recomputed
+on every operation, never taken from frozen mapping provenance.
+
+The registry MUST be scoped to Directory target and schema. Source country and
+node/staging prefix MUST remain distinct. Identity normalization is conservative
+NFC/case/whitespace plus a documented known-country alias table; it MUST NOT drop
+hospital/department qualifiers, accents or affiliation terms. Raw name variants
+retain their own exported ID lists. Unknown country values MUST NOT establish
+deterministic compatibility. Missing/placeholder/email juridical persons cannot be
+approved or imported as positive matches.
+
+### EOSC-002: Membership and XLSX
+The reader MUST support the first, named or one-based selected worksheet; a unique
+column-A organisation-ID heading; text IDs with leading zeros; repeated contributor
+headings; and rows beyond autofilter bounds. Missing required identity fields
+other than country, uncached formula identities and duplicate IDs fail with
+actionable errors. The country heading is required; blank country values are
+warned about and retained as unknown, never supporting automatic compatibility.
+Blank/external-ID rows are not membership records but remain in the source copy.
+
+Normal stdout MUST contain exactly Organisation ID, EOSC-A Name, BBMRI-ERIC Name,
+List of biobankIDs, followed by distinct Member and Observer totals. Mandated
+Organisations count as Members. Membership is read from the workbook and remains
+separate from identity evidence. Exact Active is the default eligible status;
+other literal statuses require explicit operator selection. No mixed-status
+eligibility decision is inferred from AI identity approval. Sort by EOSC country,
+name/ID and original Directory name; diagnostics are stderr only.
+
+Optional XLSX MUST have exactly two sheets: four-column matches, and the complete
+selected source tab as literal cached values. Fill the first empty contributor
+slot with EOSC Node BBMRI-ERIC, or append a contributor column when necessary.
+Do not overwrite another contributor, duplicate existing tags, or treat a formula
+with no cached result as an empty slot. Do not copy other worksheets or formulas.
+Input workbooks and existing output paths MUST never be overwritten.
+
+### EOSC-003: Persistent evidence and review coverage
+Version-1 registries store append-only review decisions and explicit approvals.
+Decision outcomes are match, rejected_pair, no_match, and unresolved. A rejected
+pair excludes only recorded target comparisons. No-match coverage is limited to
+explicitly reviewed EOSC IDs and their identity fingerprints; it is never global
+proof of non-membership. Unresolved decisions may block further default research
+only when missing information/human clarification prevents matching.
+
+Each decision MUST carry stable review/subject IDs, Directory identity fingerprint,
+per-target EOSC identity fingerprints, rationale, relation, evidence, caveats and
+follow-up where relevant. Approval is independent and defaults to proposed.
+Evidence-context dependencies explicitly name biobanks whose name/description/URL
+were used. Inventory IDs alone MUST NOT invalidate institutional identity; changes
+to declared context dependencies MUST invalidate the dependent review.
+
+### EOSC-004: Incremental scheduling
+Identical inputs and existing review coverage MUST NOT repeat AI research.
+Unchanged match proposals waiting for approval are reused, not re-investigated.
+New Directory identities queue uncovered comparisons. New/changed EOSC identity
+records reopen only uncovered comparisons for unmapped identities; unchanged
+rejected pairs remain covered. For mapped identities, new conservative exact-name
+conflicts are queued and prevent ambiguous normal export; unrelated new members
+do not trigger reanalysis. Status, source row, workbook formatting and irrelevant
+metadata changes MUST NOT invalidate institutional identity.
+
+Explicit unresolved/all scopes and case selection may reopen investigations.
+A positive batch limit bounds case count, reports deferred work, and MUST NOT
+mark omitted cases completed. Registry history remains available when an entity
+is inactive; it is not counted merely because it previously matched.
+
+The latest assessment for each target governs scheduling, including when stale;
+older negative findings MUST NOT silently revive after a later match loses its
+context validity. A later assessment clears an earlier resolved subject blocker.
+An empty-coverage unresolved attempt is remembered separately from actual reviewed
+comparisons, avoiding repeat research without inventing negative evidence.
+Merely examining an alternative during a positive match is not a rejected pair.
+
+### EOSC-005: Codex packets
+Markdown and JSON packets MUST derive from one structured packet, include a
+content fingerprint and source scope, stable cases, reason for inclusion,
+previous decisions, target IDs, a deduplicated reference catalogue, current active
+context and an explicit response template. Source text MUST be identified as
+untrusted data, rendered without allowing embedded Markdown to become instructions.
+Long context strings are explicitly excerpted with length and checksum evidence.
+The reviewer must consult full Directory data if omitted context is material.
+Do not include contact records or credentials.
+
+Packet creation is read-only with respect to review coverage and approvals.
+Instructions MUST restrict research to listed cases/targets, require primary
+institutional/legal sources, distinguish affiliation from legal identity and
+biobank responsibility, require explicit actual review coverage and context
+dependencies, and forbid AI approval or direct Directory/registry modification.
+Zero-case packets MUST explicitly instruct the reviewer not to repeat research.
+
+### EOSC-006: Imports and approvals
+Imports accept partial case results, validate packet integrity/scope, case IDs,
+per-case prior-decision fingerprints and current identity/context evidence.
+Unknown/duplicate cases, out-of-scope targets, stale evidence, invalid evidence
+URLs/dates, missing positive evidence, approval fields and conflicting positive
+targets MUST be rejected without mutating the input registry. Identical result
+imports are idempotent. Unrelated case updates do not invalidate a packet's other
+cases. Different results after the same case changed require a regenerated packet.
+
+AI imports MUST remain proposals and preserve all prior evidence and approvals.
+Only an explicit human approval operation with reviewer identity can approve
+selected current matches. This operation MUST preserve caveats and provenance.
+Conflicting targets require explicit curator resolution, never silent replacement.
+Approved or conservative unique exact full-name matches may be exported; existing
+reviews, including negative/stale records, MUST NOT be bypassed by automatic matching.
+Non-current approved mappings are excluded and diagnosed.
+
+### EOSC-007: Legacy migration and local artifacts
+Migration of the local 1.0-proposal MUST preserve the complete original entries,
+including all complex-case justifications and identifiers, as provenance. It
+creates proposed, not implicitly approved, decisions. Only specific reviewed pairs
+become coverage; the earlier broad screening must not fabricate comprehensive
+negative findings. Inactive entries remain audit data. Context-dependent
+abbreviated-name evidence retains its active biobank dependencies.
+
+Normal operations write only explicitly requested new paths. Migration, import
+and approval support validation-only dry runs and new registry destinations;
+the operator chooses the latest version on subsequent runs. Local workbooks,
+generated packets, cached snapshots, proposals and superpowers plans MUST NOT be
+staged merely because this tool consumes them. A curated registry may be shared
+only as an explicitly reviewed artifact without sensitive source data.
+The Data Manager Manual is not an operator manual for this unrelated auxiliary tool.
+
+### EOSC-008: Verification
+Synthetic regression tests MUST cover source parsing/output integrity, unchanged
+review reuse, scoped negatives, EOSC deltas, declared-context staleness, membership
+vs identity, active inventory refresh, original variants and unique counts,
+partial/idempotent/stale imports, approval separation, invalid identities,
+case limits, literal output, no-overwrite paths and offline help.
+Real-workbook smoke checks may use the existing local cache without forced refresh;
+they MUST NOT modify source workbooks or grant production approvals.

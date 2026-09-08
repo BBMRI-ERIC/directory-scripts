@@ -3,6 +3,14 @@
 These commands support analysis, search, conversions, and one-off workflows but
 are not part of the main exporter family.
 
+## EOSC organisation matching
+
+`eosc-organisation-matcher.py` matches active Directory juridical persons to an
+EOSC-A membership XLSX and prepares incremental Codex research packets. Existing
+decisions and reviewed negative comparisons are reused rather than researched
+again. See the [EOSC matcher guide](eosc-organisation-matcher.md) for exports,
+registry migration, focused AI packets, partial imports and explicit approval.
+
 ## Directory statistics
 
 `directory-stats.py` reports per-biobank collection, sample, donor, service,

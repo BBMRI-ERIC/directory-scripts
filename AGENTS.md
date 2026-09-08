@@ -232,3 +232,18 @@
 - `directory.py` debug logs may intentionally include username/password for private troubleshooting; never share or commit such logs.
 - In `checks/ContactFields.py`, static placeholder-domain checks (for example `example.org`, `test.com`, `unknown.*`) must remain active even when remote email checks are disabled; `--disable-checks-all-remote` only suppresses MX/reachability validation, not local syntax or placeholder checks.
 - Probabilistic contact-assignment warnings should rely on strong institution evidence (for example a unique biobank-contact email domain in another biobank, or direct biobank-level contact reuse) rather than on contact-ID prefixes or sibling-majority patterns alone; those weaker patterns may appear in messages as context but should not be the primary trigger.
+
+## EOSC Identity Review Guardrails
+- The EOSC matcher must remain active-biobank-only and read Directory exclusively
+  through its shared API; frozen mapping IDs are provenance, never live inventory.
+- Follow the [EOSC matching specification](DEVELOPMENT.md#eosc-organisation-matching-specification):
+  separate identity evidence, scoped negative coverage, membership eligibility and
+  human approval. AI results cannot approve themselves or overwrite reviewed evidence.
+- Reuse unchanged decisions and only queue uncovered or changed identity comparisons;
+  packet preparation must not mark cases reviewed. Preserve complex-case caveats
+  and explicit biobank-context dependencies when importing or migrating mappings.
+- Keep generated EOSC workbooks, packets, local proposals and cache snapshots out of
+  commits; only deliberately reviewed institutional registries may become shared data.
+- Review-history coverage must use the latest assessment per target, even when
+  it is stale; do not revive older negative coverage or resolved blockers. Keep
+  inconclusive attempts distinct from reviewed negative comparisons.

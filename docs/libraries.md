@@ -62,6 +62,16 @@ The detailed fact-sheet contract is in
   and hyperlinks
 - `geojsonutils.py`: coordinate parsing and GeoJSON FeatureCollection writing
 
+## EOSC identity matching
+
+- `eosc_organisation_matching.py`: pure active-institution grouping, identity
+  decisions, scoped review coverage, Codex packets, imports and approval
+- `eosc_membership_xlsx.py`: membership-sheet parsing and safe two-sheet XLSX output
+
+See the [EOSC matcher guide](eosc-organisation-matcher.md) for the incremental
+operator workflow. Registry decisions and human approval are separate from
+membership eligibility and the current biobank inventory.
+
 ## Module contracts
 
 Public APIs and behavioral constraints are maintained in
