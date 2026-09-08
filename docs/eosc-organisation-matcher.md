@@ -56,7 +56,16 @@ Omit `--mapping-file` to start with an empty registry. Conservative unique full-
 matches with a known compatible country need no AI. All other matching requires
 reviewed evidence, and imported match proposals require explicit human approval.
 
-Preserve the existing local proposal and its detailed legal-identity evidence:
+The shared [proposal JSON](../eosc-matching-proposal.json) preserves the initial
+identity review, including complex-case evidence and unresolved questions, for
+future consistency checks of Directory EOSC fields against EOSC-A workbooks.
+It is not an approved runtime registry, and no such QC check is implemented yet.
+Future checks must validate current identities, recalculate active-only biobank
+inventory and read membership from the supplied workbook, not frozen proposal
+counts. Local source paths/checksums are provenance; the source XLSX and exploratory
+dump are not bundled with the proposal.
+
+Migrate the proposal while preserving its detailed legal-identity evidence:
 
 ```bash
 python3 eosc-organisation-matcher.py \

@@ -1,0 +1,1280 @@
+{
+  "schema_version": "1.0-proposal",
+  "proposal_only": true,
+  "review_date": "2026-09-08",
+  "purpose": "Proposed translation of Directory juridical-person identities to EOSC-A organisation IDs; not an approved runtime configuration.",
+  "future_qc_reuse": {
+    "purpose": "Shared identity-review evidence for future consistency checks between Directory EOSC-related fields and an EOSC-A membership workbook, once those Directory fields and checks are specified.",
+    "authority": "Committing this proposal does not approve any mapping. Preserve unresolved cases, rejected-pair scope, source evidence and legal-responsibility caveats; require human approval before using a proposed match as authoritative QC reference data.",
+    "freshness": "Use the supplied current EOSC-A workbook for membership and validate current Directory identities. Recompute biobank IDs and withdrawal state, excluding withdrawn institutions; stored membership values, counts and biobank lists describe only the reviewed snapshot.",
+    "provenance_files": "The source workbook, local dump and exploratory outputs are not bundled. Their paths and checksums document provenance, not runtime dependencies of this JSON; comparison or migration requires an explicitly supplied membership workbook and Directory snapshot.",
+    "scope": "This reference does not implement QC checks or authorize automated Directory updates."
+  },
+  "source": {
+    "workbook": "20260819_EOSC-A_Membership_2_PP.xlsx",
+    "workbook_sha256": "771436e3d7126ead9d690bcf8820b2827354991b5910f2c20b31afd50f22805c",
+    "worksheet": "20260819_EOSC-A_Members & Nodes",
+    "directory_source": "Existing ERIC cache; all network requests disabled; no refresh",
+    "dag_checks_skipped": false
+  },
+  "directory_scope": "non-withdrawn biobanks only, all staging/node prefixes; no withdrawn biobank IDs may be exported or counted",
+  "eosc_status_policy_for_preview": "Exact Active only. Goettingen (5329), Observer / Active, Downgrading, is held pending user clarification.",
+  "counting_policy": {
+    "unit": "unique EOSC organisation ID",
+    "member_types": [
+      "Member",
+      "Mandated Organisation"
+    ],
+    "observer_types": [
+      "Observer"
+    ],
+    "source": {
+      "url": "https://eosc.eu/eosc-association/mandated-organisations",
+      "supports": "A mandated organisation is a Member, not a separate membership class."
+    }
+  },
+  "coverage_note": "AI screened all active juridical-person names against all supplied EOSC ID rows. Positive nontrivial mappings were checked against primary sources. No-match entries are not independently verified proof of non-membership. Source metadata can be incomplete or stale.",
+  "active_juridical_person_dump": "superpowers/eosc-review/active-juridical-persons.json",
+  "active_dump_sha256": "68af4397c3a73349c6c8774b9e84fb5f08afefebdae673b98a7188e83212dc67",
+  "counts": {
+    "active_directory_biobanks_screened": 436,
+    "active_directory_name_country_groups_screened": 322,
+    "eosc_id_rows_screened": 255,
+    "proposed_matched_institutions": 25,
+    "proposed_matched_members": 20,
+    "proposed_matched_observers": 5,
+    "mandated_organisations_in_member_count": 2,
+    "matched_name_rows": 27,
+    "matched_non_withdrawn_biobanks": 63,
+    "review_candidate_pairs_not_counted": 4,
+    "active_name_groups_without_positive_proposal": 295
+  },
+  "proposed_matches": [
+    {
+      "state": "proposed_match",
+      "organisation_id": "5162",
+      "eosc_name": "Biobanking and BioMolecular resources Research Infrastructure - European Research Infrastructure Consortium",
+      "eosc_acronym": "BBMRI-ERIC",
+      "eosc_country": "Austria",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 14,
+      "directory_country": "EU",
+      "directory_juridical_person": "BBMRI-ERIC",
+      "biobank_ids": [
+        "bbmri-eric:ID:EU_BBMRI-ERIC"
+      ],
+      "relation": "official_acronym",
+      "rationale": "BBMRI-ERIC is the workbook's exact organisation acronym. Directory's EU country/staging value is not a country conflict with its Austrian seat.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/bbmri-eric",
+          "supports": "EOSC has an institutional profile for BBMRI-ERIC. The workbook supplies the ID and membership type used in this proposal."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5332",
+      "eosc_name": "Ghent University",
+      "eosc_acronym": "UGent",
+      "eosc_country": "Belgium",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 157,
+      "directory_country": "BE",
+      "directory_juridical_person": "University Hospital Ghent",
+      "biobank_ids": [
+        "bbmri-eric:ID:BE_71067049"
+      ],
+      "relation": "same_legal_entity",
+      "rationale": "UZ Gent is a hospital component of the Universiteit Gent legal person, not merely an affiliated hospital. Article 2 of the Flemish special decree explicitly defines that legal person as comprising the university and UZ Gent; the relevant wording is effective from 1 January 2018. The hospital's supplier information corroborates this relationship.",
+      "evidence_sources": [
+        {
+          "url": "https://www.uzgent.be/nl/over-uz-gent/informatie-voor-leveranciers",
+          "supports": "UZ Gent identifies itself as an entity of the legal person Universiteit Gent.",
+          "access": "primary-site search extract; direct fetch returned HTTP 502"
+        },
+        {
+          "url": "https://codex.vlaanderen.be/Portals/Codex/documenten/1002753.html",
+          "title": "Flemish Codex: special decree concerning Universiteit Gent",
+          "supports": "Article 2 establishes Universiteit Gent as a public institution with legal personality and specifies its two components: the university and Universitair Ziekenhuis Gent.",
+          "locator": "Article 2, version effective from 2018-01-01.",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "This institution-specific statutory relationship is the basis for the match. Hospital branding, shared staff or affiliation alone would not suffice; do not infer the same relationship for other Belgian hospitals."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5267",
+      "eosc_name": "Katholieke Universiteit Leuven",
+      "eosc_acronym": "KU Leuven",
+      "eosc_country": "Belgium",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 100,
+      "directory_country": "BE",
+      "directory_juridical_person": "University Hospitals Leuven (B0383)",
+      "biobank_ids": [
+        "bbmri-eric:ID:BE_B0383"
+      ],
+      "relation": "same_legal_entity",
+      "rationale": "University Hospitals Leuven (UZ Leuven) and the university are operationally distinct components of the same KU Leuven juridical person. The hospital identification sheet explicitly places UZ Leuven inside that legal entity and reports the same enterprise number and LEI as KU Leuven's Legal Department. This is a legal-entity match, not an affiliation-only inference. Preserve the Directory qualifier B0383 as source text.",
+      "evidence_sources": [
+        {
+          "url": "https://admin.kuleuven.be/sab/vz/en/public-liability",
+          "supports": "The KU Leuven legal entity includes its university hospitals."
+        },
+        {
+          "url": "https://www.uzleuven.be/nl/media/cfb3bdce-1bef-4067-9317-99228af8eb52/identificatiefiche_uz_leuven_internet_-_2024.09.01_eng.pdf",
+          "title": "UZ Leuven identification sheet",
+          "supports": "The legal-entity section identifies UZ Leuven as a component of KU Leuven. Company number 0419.052.173 and LEI 5299001MN2MYAHLGXD65 match the university's own legal identification.",
+          "locator": "PDF page 1: Context, Registered office, Company number, Legal entity; PDF page 2: Legal Entity Identifier.",
+          "access": "PDF text inspected",
+          "accessed_on": "2026-09-08"
+        },
+        {
+          "url": "https://admin.kuleuven.be/sab/jd/en/id-sheet",
+          "title": "KU Leuven Legal Department: Basic info legal entity KU Leuven",
+          "supports": "Official legal name Katholieke Universiteit Leuven, enterprise number 0419.052.173 and LEI 5299001MN2MYAHLGXD65 corroborate the hospital identification sheet. The page also explains representation for UZ Leuven matters.",
+          "locator": "Official legal name(s), Enterprise number, Representation and power of attorney, Legal Entity Identifier.",
+          "source_updated_on": "2026-07-16",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "verified_identifiers": [
+        {
+          "scheme": "Belgian enterprise number",
+          "value": "0419.052.173",
+          "scope": "Reported for both UZ Leuven and the legal entity Katholieke Universiteit Leuven."
+        },
+        {
+          "scheme": "LEI",
+          "value": "5299001MN2MYAHLGXD65",
+          "scope": "Reported in both the hospital identification sheet and university legal-entity page."
+        }
+      ],
+      "caveats": [
+        "This does not make the hospital and university the same operational unit and must not be generalized to other university hospitals.",
+        "B0383 is retained as the Directory biobank qualifier; it is not the legal-entity registration identifier used as evidence."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5378",
+      "eosc_name": "Vrije Universiteit Brussel",
+      "eosc_acronym": "VUB",
+      "eosc_country": "Belgium",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 198,
+      "directory_country": "BE",
+      "directory_juridical_person": "Vrije Universiteit Brussel",
+      "biobank_ids": [
+        "bbmri-eric:ID:BE_71014391000"
+      ],
+      "relation": "exact_name",
+      "rationale": "Identical full institutional name and compatible country in the two input datasets.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5215",
+      "eosc_name": "Eidgenössische Technische Hochschule Zürich (ETH)",
+      "eosc_acronym": "ETH Zürich",
+      "eosc_country": "Switzerland",
+      "eosc_membership_type": "Mandated Organisation",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 61,
+      "directory_country": "CH",
+      "directory_juridical_person": "Eidgenössisch Technische Hochschule",
+      "biobank_ids": [
+        "bbmri-eric:ID:CH_ETH"
+      ],
+      "relation": "abbreviated_name",
+      "rationale": "Directory ID CH_ETH and acronym ETH corroborate its abbreviated German juridical-person name against the EOSC ETH Zurich entry; this is not a mapping of EPFL.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/eth-zurich/",
+          "supports": "EOSC identifies the Swiss ETH organisation as ETH Zurich."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "The truncated German juridical-person name alone is insufficient. This curated match also uses the source biobank's ETH acronym and CH_ETH identifier as corroboration, not as a replacement for institution identity.",
+        "Do not generalize this alias to EPFL or other institutions in the ETH Domain."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5279",
+      "eosc_name": "Masarykova univerzita",
+      "eosc_acronym": "MU",
+      "eosc_country": "Tsjechië",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 111,
+      "directory_country": "CZ",
+      "directory_juridical_person": "Masaryk University",
+      "biobank_ids": [
+        "bbmri-eric:ID:CZ_CELSPAC",
+        "bbmri-eric:ID:CZ_MU_ICS"
+      ],
+      "relation": "translated_name",
+      "rationale": "Masaryk University is the English name of Masarykova univerzita. Do not include Masaryk Memorial Cancer Institute.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/masaryk-university",
+          "supports": "EOSC identifies MU in Czechia as Masaryk University, matching the Directory English name."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5705",
+      "eosc_name": "Charité Universitätsmedizin Berlin",
+      "eosc_acronym": "Charité",
+      "eosc_country": "Germany",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 204,
+      "directory_country": "DE",
+      "directory_juridical_person": "Charité - University Hospital Berlin",
+      "biobank_ids": [
+        "bbmri-eric:ID:DE_ZeBanC"
+      ],
+      "relation": "translated_name",
+      "rationale": "English university-hospital wording retains the distinctive Charite and Berlin identity.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/news/wrap-eosc-association-general-assembly4",
+          "supports": "EOSC names Charite University Medicine Berlin as an admitted member; the two Directory variants name the same Berlin institution."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5705",
+      "eosc_name": "Charité Universitätsmedizin Berlin",
+      "eosc_acronym": "Charité",
+      "eosc_country": "Germany",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 204,
+      "directory_country": "DE",
+      "directory_juridical_person": "Charité – Universitätsmedizin Berlin",
+      "biobank_ids": [
+        "bbmri-eric:ID:DE_NAPKON"
+      ],
+      "relation": "punctuation_variant",
+      "rationale": "Punctuation-only variation of the same complete Charite Berlin institutional name.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/news/wrap-eosc-association-general-assembly4",
+          "supports": "EOSC names Charite University Medicine Berlin as an admitted member; the two Directory variants name the same Berlin institution."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5371",
+      "eosc_name": "Tartu Ülikool",
+      "eosc_acronym": "UT",
+      "eosc_country": "Estonia",
+      "eosc_membership_type": "Mandated Organisation",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 191,
+      "directory_country": "EE",
+      "directory_juridical_person": "University of Tartu",
+      "biobank_ids": [
+        "bbmri-eric:ID:EE_EGCUT"
+      ],
+      "relation": "translated_name",
+      "rationale": "University of Tartu is the English name of Tartu Ulikool; the EOSC institutional profile corroborates it.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/university-of-tartu",
+          "supports": "EOSC identifies UT as the University of Tartu in Estonia."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "6179",
+      "eosc_name": "Fundació Institut d'Investigació Sanitària Illes Balears",
+      "eosc_acronym": "IdISBa",
+      "eosc_country": "Spanje",
+      "eosc_membership_type": "Observer",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 234,
+      "directory_country": "ES",
+      "directory_juridical_person": "Fundació Institut d'Investigació Sanitària Illes Balears",
+      "biobank_ids": [
+        "bbmri-eric:ID:ES_IdISBa"
+      ],
+      "relation": "exact_name",
+      "rationale": "Identical full IdISBa foundation name and compatible Spanish country value in both inputs.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5343",
+      "eosc_name": "Alma Mater Studiorum - Università di Bologna",
+      "eosc_acronym": "UNIBO",
+      "eosc_country": "Italy",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 168,
+      "directory_country": "IT",
+      "directory_juridical_person": "Alma Mater Studiorum - Universita'  di Bologna",
+      "biobank_ids": [
+        "bbmri-eric:ID:IT_1617288158446137"
+      ],
+      "relation": "orthographic_variant",
+      "rationale": "Full Alma Mater Studiorum University of Bologna name differs only by the apostrophe rendering of the accent and whitespace.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5178",
+      "eosc_name": "Consiglio Nazionale delle Ricerche",
+      "eosc_acronym": "CNR",
+      "eosc_country": "Italy",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 28,
+      "directory_country": "IT",
+      "directory_juridical_person": "Dipartimento di Scienze Biomediche del CNR",
+      "biobank_ids": [
+        "bbmri-eric:ID:IT_1539241927435687"
+      ],
+      "relation": "verified_internal_department",
+      "rationale": "The Directory value explicitly names Dipartimento di Scienze Biomediche del CNR. CNR's departmental page identifies that exact department within Consiglio Nazionale delle Ricerche, the EOSC workbook organisation. The inference is internal-unit-to-parent normalization, not similarity between biomedical institutions.",
+      "evidence_sources": [
+        {
+          "url": "https://www.cnr.it/en/department/512/biomedical-sciences",
+          "supports": "CNR identifies its Department of Biomedical Sciences as part of CNR.",
+          "title": "CNR: Department of Biomedical Sciences",
+          "locator": "Department heading, Objectives, and institutional footer.",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "This evidence verifies the named department's parent institution, not separate legal ownership of every resource hosted by or collaborating with CNR."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5348",
+      "eosc_name": "Università degli Studi di Ferrara",
+      "eosc_acronym": "UNIFE",
+      "eosc_country": "Italy",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 173,
+      "directory_country": "IT",
+      "directory_juridical_person": "Università di Ferrara",
+      "biobank_ids": [
+        "bbmri-eric:ID:IT_1407499906472780"
+      ],
+      "relation": "name_variant",
+      "rationale": "Short and full official forms of the same named University of Ferrara; not a separate university hospital.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/universita-degli-studi-di-ferrara",
+          "supports": "EOSC's UNIFE entry is the University of Ferrara."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5354",
+      "eosc_name": "Università degli Studi di Padova",
+      "eosc_acronym": "UNIPD",
+      "eosc_country": "Italy",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 176,
+      "directory_country": "IT",
+      "directory_juridical_person": "Dip. Salute della Donna e del Bambino",
+      "biobank_ids": [
+        "bbmri-eric:ID:IT_1382783556249610"
+      ],
+      "relation": "verified_internal_department",
+      "rationale": "The recorded Dip. Salute della Donna e del Bambino maps to the University of Padova's SDB department. The university's official administrative register assigns both SDB and the university tax identifier 80006480281. Its 2019-2021 departmental plan also names BBOP, corroborating the specific pediatric oncology biobank. This verifies normalization of the recorded department to its university, but not independently the biobank's current legal responsibility.",
+      "evidence_sources": [
+        {
+          "url": "https://www.unipd.it/sdb",
+          "supports": "Padua University identifies the Department of Women's and Children's Health named in Directory."
+        },
+        {
+          "url": "https://www.sdb.unipd.it/sites/sdb.unipd.it/files/PTSTM%202019-21_1.pdf",
+          "supports": "The cover names the university and Dip. Salute della Donna e del Bambino - SDB; section 6(c) describes Biobanca Oncologica Pediatrica (BBOP). This is historical evidence linking the named department and biobank, not a current legal-ownership declaration.",
+          "title": "University of Padova SDB: 2019-2021 third-mission development plan",
+          "locator": "PDF page 1: university and department heading; PDF page 5: section 6(c), Strutture a supporto.",
+          "accessed_on": "2026-09-08",
+          "access": "PDF text inspected"
+        },
+        {
+          "url": "https://www.unipd.it/sites/unipd.it/files/2024/Elenco%20Codici%20fiscali%20in%20IPA%20al%208.10.2024.pdf",
+          "title": "University of Padova: official administrative tax-code and office-code list, 2024-10-08",
+          "supports": "The SDB department row and university AMM row both have tax identifier 80006480281. SDB's H1ZOKI value is an office code, not a different legal-person tax identifier.",
+          "locator": "Single-page PDF: SFE Dipartimento di salute della donna e del bambino - SDB; final AMM Universita' degli Studi di Padova row.",
+          "access": "PDF text inspected",
+          "accessed_on": "2026-09-08"
+        },
+        {
+          "url": "https://www.irpcds.org/facilities/biobank/",
+          "title": "Pediatric Research Institute: BBOP biobank facility",
+          "supports": "The page describes BBOP at IRP and its development within the Azienda Ospedale-Universita Padova Unified Research Biobank initiative (PIAO 2024-2026). This adds current institutional context involving the research institute and hospital; it does not identify a definitive current legal custodian.",
+          "locator": "Our portfolio: paragraph beginning As part of the strategic plan.",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "verified_identifiers": [
+        {
+          "scheme": "Italian codice fiscale",
+          "value": "80006480281",
+          "scope": "Shared by the SDB department and University of Padova in the official administrative register; not independently verified as the current biobank operator's identifier."
+        }
+      ],
+      "caveats": [
+        "The department-to-university relationship is verified; current legal responsibility for bbmri-eric:ID:IT_1382783556249610 (BBOP) remains unconfirmed.",
+        "The historical departmental plan is not sufficient evidence of present-day biobank ownership. Hosting at IRP or participation in a hospital biobank initiative also does not settle that question.",
+        "Retained as a proposed match of the recorded juridical_person only, not an unqualified independently verified biobank-ownership match."
+      ],
+      "follow_up": [
+        "Ask the BBOP custodian or Italian Directory node to confirm the current legal entity responsible for this biobank and its registration or tax identifier; correct juridical_person if it no longer names that entity."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5355",
+      "eosc_name": "Università degli studi di Torino",
+      "eosc_acronym": "Unito",
+      "eosc_country": "Italy",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 177,
+      "directory_country": "IT",
+      "directory_juridical_person": "Dipartimento di Scienze Mediche, Università degli studi di Torino",
+      "biobank_ids": [
+        "bbmri-eric:ID:IT_135556878636422"
+      ],
+      "relation": "verified_internal_department",
+      "rationale": "The Directory value includes both the Department of Medical Sciences and the full University of Turin name. The university's School of Medicine lists that exact department. This is explicit unit-to-university normalization, not a university-hospital match inferred from a clinical name.",
+      "evidence_sources": [
+        {
+          "url": "https://en.unito.it/university/organization-and-locations/departments",
+          "supports": "The University of Turin lists its Department of Medical Sciences."
+        },
+        {
+          "url": "https://www.medicina.unito.it/it/dipartimenti",
+          "title": "University of Turin School of Medicine: Departments",
+          "supports": "The university lists Dipartimento di Scienze mediche within its School of Medicine.",
+          "locator": "Department list and University of Turin footer.",
+          "access": "Primary-site search extract; separate English department-list URL returned HTTP 403 during this follow-up.",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "The departmental listing confirms the parent university of the recorded juridical_person. It is not an independent legal-ownership certificate for the biobank and does not map partner hospitals to the university."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5366",
+      "eosc_name": "Università del Piemonte Orientale",
+      "eosc_acronym": "UPO",
+      "eosc_country": "Italy",
+      "eosc_membership_type": "Observer",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 187,
+      "directory_country": "IT",
+      "directory_juridical_person": "Università del Piemonte Orientale",
+      "biobank_ids": [
+        "bbmri-eric:ID:IT_1611942116226242"
+      ],
+      "relation": "exact_name",
+      "rationale": "Identical University of Eastern Piedmont name and Italian country in both inputs.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "6119",
+      "eosc_name": "Vilniaus universitetas",
+      "eosc_acronym": "VU",
+      "eosc_country": "Lithuania",
+      "eosc_membership_type": "Observer",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 227,
+      "directory_country": "LT",
+      "directory_juridical_person": "Vilnius university",
+      "biobank_ids": [
+        "bbmri-eric:ID:LT_VU_Biobank"
+      ],
+      "relation": "translated_name",
+      "rationale": "Vilnius university is the English rendering of Vilniaus universitetas. Excludes the separately named university hospital.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/vilnius-university-vu",
+          "supports": "EOSC identifies VU in Lithuania as Vilnius University."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "6177",
+      "eosc_name": "Norges teknisk-naturvitenskapelige universitet (NTNU)",
+      "eosc_acronym": "NTNU",
+      "eosc_country": "Noorwegen",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 232,
+      "directory_country": "NO",
+      "directory_juridical_person": "Norwegian University of Science and Technology",
+      "biobank_ids": [
+        "bbmri-eric:ID:NO_HUNT"
+      ],
+      "relation": "translated_name",
+      "rationale": "EOSC's NTNU profile gives exactly the English name used as the Directory juridical person.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/norwegian-university-of-science-and-technology-ntnu",
+          "supports": "EOSC expands NTNU to the same English name used in Directory."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "6089",
+      "eosc_name": "The University of Tromsø – The Arctic University of Norway",
+      "eosc_acronym": "UiT",
+      "eosc_country": "Noorwegen",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 224,
+      "directory_country": "NO",
+      "directory_juridical_person": "UiT The Arctic University of Norway",
+      "biobank_ids": [
+        "bbmri-eric:ID:NO_UiT"
+      ],
+      "relation": "official_name_variant",
+      "rationale": "The UiT acronym and Arctic University name identify the same Tromso institution in the EOSC profile.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/the-university-of-tromso-the-arctic-university-of-norway-uit",
+          "supports": "EOSC identifies the University of Tromso and UiT - The Arctic University of Norway as the same university."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5264",
+      "eosc_name": "Karolinska Institutet",
+      "eosc_acronym": "Karolinska Institutet",
+      "eosc_country": "Zweden",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 98,
+      "directory_country": "SE",
+      "directory_juridical_person": "Karolinska Institutet",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_1692",
+        "bbmri-eric:ID:SE_1705",
+        "bbmri-eric:ID:SE_1711",
+        "bbmri-eric:ID:SE_1714",
+        "bbmri-eric:ID:SE_1716",
+        "bbmri-eric:ID:SE_1737",
+        "bbmri-eric:ID:SE_1746",
+        "bbmri-eric:ID:SE_1756",
+        "bbmri-eric:ID:SE_1760",
+        "bbmri-eric:ID:SE_1775",
+        "bbmri-eric:ID:SE_1783",
+        "bbmri-eric:ID:SE_1789",
+        "bbmri-eric:ID:SE_1802",
+        "bbmri-eric:ID:SE_1803",
+        "bbmri-eric:ID:SE_2188",
+        "bbmri-eric:ID:SE_2245",
+        "bbmri-eric:ID:SE_2254",
+        "bbmri-eric:ID:SE_2385",
+        "bbmri-eric:ID:SE_2388",
+        "bbmri-eric:ID:SE_2398",
+        "bbmri-eric:ID:SE_KI_Biobank"
+      ],
+      "relation": "exact_name",
+      "rationale": "Identical Karolinska Institutet name and compatible Swedish country in both inputs; not Karolinska University Hospital.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5698",
+      "eosc_name": "Lund University",
+      "eosc_acronym": "LU",
+      "eosc_country": "Zweden",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 203,
+      "directory_country": "SE",
+      "directory_juridical_person": "Lund University",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_1771",
+        "bbmri-eric:ID:SE_1773",
+        "bbmri-eric:ID:SE_1774"
+      ],
+      "relation": "exact_name",
+      "rationale": "Identical Lund University name and compatible Swedish country in both inputs.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5698",
+      "eosc_name": "Lund University",
+      "eosc_acronym": "LU",
+      "eosc_country": "Zweden",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 203,
+      "directory_country": "SE",
+      "directory_juridical_person": "Lunds Universitet",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_1750",
+        "bbmri-eric:ID:SE_1752",
+        "bbmri-eric:ID:SE_1753",
+        "bbmri-eric:ID:SE_1768",
+        "bbmri-eric:ID:SE_1770",
+        "bbmri-eric:ID:SE_1777",
+        "bbmri-eric:ID:SE_1780",
+        "bbmri-eric:ID:SE_1786",
+        "bbmri-eric:ID:SE_2326",
+        "bbmri-eric:ID:SE_2328",
+        "bbmri-eric:ID:SE_2331"
+      ],
+      "relation": "translated_name",
+      "rationale": "Lunds Universitet and Lund University are the Swedish and English names of the same university. Its two Directory variants must count as one EOSC institution.",
+      "evidence_sources": [
+        {
+          "url": "https://www.lu.se/om-universitetet/universitetet-i-korthet",
+          "supports": "The university's own overview uses Lunds universitet and Lund University for the same institution."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5340",
+      "eosc_name": "Umeå University",
+      "eosc_acronym": "UmU",
+      "eosc_country": "Zweden",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 165,
+      "directory_country": "SE",
+      "directory_juridical_person": "Umeå Universitet",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_1723",
+        "bbmri-eric:ID:SE_1809"
+      ],
+      "relation": "translated_name",
+      "rationale": "Swedish and English names of the same Umea university.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/umea-university",
+          "supports": "EOSC's English Umea University corresponds to the Directory Swedish university name."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5330",
+      "eosc_name": "University of Gothenburg / host university for the Swedish National Data Service (SND)",
+      "eosc_acronym": "UGOT - SND",
+      "eosc_country": "Zweden",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 155,
+      "directory_country": "SE",
+      "directory_juridical_person": "Göteborgs Universitet",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_2269"
+      ],
+      "relation": "translated_name",
+      "rationale": "The Directory Swedish university name and EOSC English university name identify Gothenburg. The workbook additionally describes it as host university for SND; SND's own funding page confirms Gothenburg as its host and financial administrator. The host qualifier is contextual wording attached to the named university, not evidence that every SND participant is the same legal person.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/university-of-gothenburg",
+          "supports": "EOSC identifies UGOT as University of Gothenburg, the English rendering of the Directory Swedish name."
+        },
+        {
+          "url": "https://snd.se/en/about-us/snds-organization/funding",
+          "title": "Swedish National Data Service: Funding",
+          "supports": "SND identifies the University of Gothenburg as its host university and financial administrator and describes contributions by other consortium universities separately.",
+          "locator": "Co-funding from the consortium universities.",
+          "source_updated_on": "2025-03-20",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "Match the named university only. Do not assign this EOSC organisation ID to other SND consortium or network participants on the basis of their participation."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5368",
+      "eosc_name": "Uppsala University",
+      "eosc_acronym": "Uppsala University",
+      "eosc_country": "Zweden",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 189,
+      "directory_country": "SE",
+      "directory_juridical_person": "Uppsala Universitet",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_1812",
+        "bbmri-eric:ID:SE_2362",
+        "bbmri-eric:ID:SE_2383"
+      ],
+      "relation": "translated_name",
+      "rationale": "Swedish and English names of the same Uppsala university.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/uppsala-university",
+          "supports": "EOSC's English Uppsala University corresponds to the Directory Swedish university name."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5278",
+      "eosc_name": "Biotehnološko stičišče Nacionalnega inštituta za biologijo (BTS-NIB)",
+      "eosc_acronym": "NIB",
+      "eosc_country": "Slovenia",
+      "eosc_membership_type": "Observer",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 110,
+      "directory_country": "SI",
+      "directory_juridical_person": "National Institute of Biology",
+      "biobank_ids": [
+        "bbmri-eric:ID:SI_NIB-LJ"
+      ],
+      "relation": "official_institutional_identity",
+      "rationale": "The workbook's BTS-NIB wording denotes the biotechnology hub of the National Institute of Biology. EOSC's institutional profile explicitly identifies National Institute of Biology in Slovenia and links to nib.si. Together with the institute's hub material, this supports the curated workbook-name-to-institute interpretation rather than a generic deletion of a facility name.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/national-institute-of-biology",
+          "supports": "EOSC's official institutional profile identifies National Institute of Biology as its Slovenian Observer.",
+          "title": "EOSC Association: National Institute of Biology",
+          "locator": "Organisation, Website and Country fields.",
+          "accessed_on": "2026-09-08"
+        },
+        {
+          "url": "https://www.nib.si/bts-nib",
+          "supports": "The institute describes BTS-NIB as its biotechnology hub; it is not a different institute to infer from the workbook's longer name.",
+          "access": "Retained from the original primary-source review; direct refetch returned HTTP 502 on 2026-09-08. The EOSC institutional profile was successfully rechecked."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "EOSC's organisation ID still comes from the supplied workbook; the public profile corroborates institutional identity but does not itself display or independently verify that numeric ID.",
+        "The facility-name normalization is specific to this reviewed BTS-NIB entry and must not be used to equate arbitrary research hubs or consortium partners with their hosts."
+      ]
+    },
+    {
+      "state": "proposed_match",
+      "organisation_id": "5339",
+      "eosc_name": "Univerza v Mariboru",
+      "eosc_acronym": "UM.SI",
+      "eosc_country": "Slovenia",
+      "eosc_membership_type": "Observer",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 164,
+      "directory_country": "SI",
+      "directory_juridical_person": "University of Maribor",
+      "biobank_ids": [
+        "bbmri-eric:ID:SI_MF-UM"
+      ],
+      "relation": "translated_name",
+      "rationale": "The workbook's Univerza v Mariboru and Directory's University of Maribor are the Slovenian and English names of the university. EOSC's profile names the University of Maribor acting on behalf of the HPC RIVR Consortium and links to the university's website. That representative role explains the longer profile name but does not extend this university identity to its consortium partners.",
+      "evidence_sources": [
+        {
+          "url": "https://eosc.eu/members/university-of-maribor-on-behalf-of-the-hpc-rivr-consortium",
+          "supports": "EOSC's named organisation is the University of Maribor, represented on behalf of the consortium.",
+          "locator": "Organisation and Website fields, followed by the paragraph describing HPC RIVR collaboration.",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "Do not map other HPC RIVR partners to the University of Maribor solely because the university represents the consortium in EOSC."
+      ]
+    }
+  ],
+  "needs_review": [
+    {
+      "state": "needs_review",
+      "organisation_id": "5329",
+      "eosc_name": "Georg-August-Universität Göttingen Stiftung Öffentlichen Rechts",
+      "eosc_acronym": "UGOE",
+      "eosc_country": "Germany",
+      "eosc_membership_type": "Observer",
+      "eosc_membership_status": "Active, Downgrading",
+      "eosc_source_row": 154,
+      "directory_country": "DE",
+      "directory_juridical_person": "University Medical Center Göttingen",
+      "biobank_ids": [
+        "bbmri-eric:ID:DE_UMGB"
+      ],
+      "relation": "same_legal_entity_status_pending",
+      "rationale": "Legal identity is corroborated, but the EOSC workbook says Observer / Active, Downgrading. Held outside the primary counts until the user decides how this status is treated.",
+      "evidence_sources": [
+        {
+          "url": "https://www.umg.eu/en/imprint/",
+          "supports": "The UMG imprint names Georg-August-Universitat Gottingen Public Law Foundation followed by Universitatsmedizin Gottingen as the website author. This supports the institutional relationship; the separate membership-status issue comes from the supplied workbook, not this imprint.",
+          "locator": "Website author and representation sections.",
+          "accessed_on": "2026-09-08"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "Identity evidence and membership eligibility are separate questions. The legal imprint does not resolve how the workbook's Active, Downgrading status should be counted."
+      ],
+      "follow_up": [
+        "Obtain a decision on whether the workbook status Active, Downgrading is eligible before including organisation 5329. Keep it outside the current preview counts until then."
+      ]
+    },
+    {
+      "state": "needs_review",
+      "organisation_id": "5371",
+      "eosc_name": "Tartu Ülikool",
+      "eosc_acronym": "UT",
+      "eosc_country": "Estonia",
+      "eosc_membership_type": "Mandated Organisation",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 191,
+      "directory_country": "EE",
+      "directory_juridical_person": "Estonian Biocentre",
+      "biobank_ids": [
+        "bbmri-eric:ID:EE_EBC"
+      ],
+      "relation": "historical_predecessor",
+      "rationale": "The Estonian Biocentre merged into Tartu University in 2018. Directory still names the old juridical person; confirm current custodianship before mapping its biobank to the successor.",
+      "evidence_sources": [
+        {
+          "url": "https://ut.ee/sites/default/files/inline-files/ut_annual_report_2018.pdf",
+          "supports": "The university's 2018 financial statements record the Estonian Biocentre merger effective 1 January 2018, including acquisition of assets and liabilities and formation of the Institute of Genomics. This is evidence of institutional succession, not an explicit current assignment of the named Directory biobank.",
+          "locator": "PDF page 50 (printed page 51), note 1.2.6: Mergers with Tartu Observatory and Estonian Biocentre.",
+          "accessed_on": "2026-09-08",
+          "access": "PDF text inspected"
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "A historical legal succession is stronger than a name resemblance, but it does not independently confirm the current custodian or continued identity of this particular biobank.",
+        "The existing University of Tartu match is already counted once; any approved successor mapping would add its eligible biobank IDs, not a second EOSC institution."
+      ],
+      "follow_up": [
+        "Confirm that bbmri-eric:ID:EE_EBC is currently legally operated by the University of Tartu and update or explicitly approve the historical juridical_person alias before counting its biobank."
+      ]
+    },
+    {
+      "state": "needs_review",
+      "organisation_id": "5371",
+      "eosc_name": "Tartu Ülikool",
+      "eosc_acronym": "UT",
+      "eosc_country": "Estonia",
+      "eosc_membership_type": "Mandated Organisation",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 191,
+      "directory_country": "EE",
+      "directory_juridical_person": "University of Tartu, Department of Pediatrics",
+      "biobank_ids": [
+        "bbmri-eric:ID:EE_UTDP"
+      ],
+      "relation": "conflicting_institutional_context",
+      "rationale": "The named university department exists, but the Directory biobank URL is on the separately constituted hospital's site. Verify the legal owner of this biobank rather than resolve that conflict from the name alone.",
+      "evidence_sources": [
+        {
+          "url": "https://haridus.ut.ee/en/contact/institute-clinical-medicine",
+          "supports": "The university lists a Department of Pediatrics, but the Directory biobank points to a hospital website; ownership needs confirmation."
+        },
+        {
+          "url": "https://www.kliinikum.ee/en/for-the-patient/general-terms-and-conditions-for-the-provision-of-health-care-services/",
+          "supports": "The hospital operates as the Tartu University Hospital Foundation, so a hospital link cannot prove university legal ownership."
+        }
+      ],
+      "evidence_basis": "source_datasets_and_primary_web_sources",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "The department name can identify a university unit while the biobank's hospital website indicates a different institutional context. Neither alone establishes the biobank's current legal responsibility.",
+        "This differs from the Leuven and Ghent matches: their evidence explicitly establishes a shared legal person, whereas the Tartu hospital is described as a foundation."
+      ],
+      "follow_up": [
+        "Confirm whether bbmri-eric:ID:EE_UTDP is legally the responsibility of the university or the hospital foundation, using the custodian's statement or a biobank governance document before accepting the proposed university mapping."
+      ]
+    },
+    {
+      "state": "needs_review",
+      "organisation_id": "6214",
+      "eosc_name": "Stichting Health-RI",
+      "eosc_acronym": "HRI",
+      "eosc_country": "Netherlands",
+      "eosc_membership_type": "Member",
+      "eosc_membership_status": "Active",
+      "eosc_source_row": 243,
+      "directory_country": "NL",
+      "directory_juridical_person": "servicedesk@health-ri.nl",
+      "biobank_ids": [
+        "bbmri-eric:ID:NL_COPP"
+      ],
+      "relation": "invalid_juridical_person",
+      "rationale": "A Health-RI service-desk email is not a legal entity name or proof that Health-RI owns the COPP biobank. Correct/confirm Directory ownership first.",
+      "evidence_sources": [],
+      "evidence_basis": "direct_identity_comparison_of_source_datasets",
+      "reviewed_on": "2026-09-08",
+      "reviewed_by": "AI-assisted identity review; not user approval",
+      "user_approved": false,
+      "caveats": [
+        "An email domain can identify a support provider, platform operator or contact organisation without identifying the legal entity responsible for the biobank. Domain matching must not turn this invalid juridical_person value into a positive identity match."
+      ],
+      "follow_up": [
+        "Obtain a legal organisation name and identifier for bbmri-eric:ID:NL_COPP from its custodian or national node, correct the Directory field, and then reassess EOSC membership."
+      ]
+    }
+  ],
+  "do_not_match": [
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Medical University of Graz",
+      "directory_country": "AT",
+      "biobank_ids": [
+        "bbmri-eric:ID:AT_MUG"
+      ],
+      "excluded_organisation_ids": [
+        "6178",
+        "5317"
+      ],
+      "reason": "Medical University of Graz is not University of Graz or Graz University of Technology; the workbook itself lists Medical University Graz as external, without an organisation ID.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Medical University of Vienna",
+      "directory_country": "AT",
+      "biobank_ids": [
+        "bbmri-eric:ID:AT_MUW"
+      ],
+      "excluded_organisation_ids": [
+        "5360"
+      ],
+      "reason": "Medical University of Vienna must not become University of Vienna by dropping Medical.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "UCLouvain university",
+      "directory_country": "BE",
+      "biobank_ids": [
+        "bbmri-eric:ID:BE_UCL"
+      ],
+      "excluded_organisation_ids": [
+        "5267"
+      ],
+      "reason": "UCLouvain is not KU Leuven; shared historic naming is not identity.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Universitair Ziekenhuis Antwerpen",
+      "directory_country": "BE",
+      "biobank_ids": [
+        "bbmri-eric:ID:BE_71030031000"
+      ],
+      "excluded_organisation_ids": [
+        "5359"
+      ],
+      "reason": "Do not map a university hospital to Antwerp University without evidence that it is the same legal entity.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "EPFL",
+      "directory_country": "CH",
+      "biobank_ids": [
+        "bbmri-eric:ID:CH_EPFL"
+      ],
+      "excluded_organisation_ids": [
+        "5215"
+      ],
+      "reason": "EPFL is not ETH Zurich.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Masaryk Memorial Cancer Institute",
+      "directory_country": "CZ",
+      "biobank_ids": [
+        "bbmri-eric:ID:CZ_MMCI"
+      ],
+      "excluded_organisation_ids": [
+        "5279"
+      ],
+      "reason": "Masaryk Memorial Cancer Institute is not Masaryk University; the workbook lists the cancer institute as external without an organisation ID.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Helmholtz Center Munich",
+      "directory_country": "DE",
+      "biobank_ids": [
+        "bbmri-eric:ID:DE_Helmholtz-MuenchenBiobank"
+      ],
+      "excluded_organisation_ids": [
+        "5919"
+      ],
+      "reason": "Helmholtz Munich is not Helmholtz-Zentrum Berlin; shared Helmholtz branding does not identify one legal person.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Amsterdam UMC",
+      "directory_country": "NL",
+      "biobank_ids": [
+        "bbmri-eric:ID:NL_AUMC",
+        "bbmri-eric:ID:NL_AUMCBB"
+      ],
+      "excluded_organisation_ids": [
+        "5374"
+      ],
+      "reason": "Amsterdam UMC is not to be equated with University of Amsterdam merely through affiliation.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "UMC Utrecht",
+      "directory_country": "NL",
+      "biobank_ids": [
+        "bbmri-eric:ID:NL_AAAACXPFOKGE6ACQK2ME25QAAE",
+        "bbmri-eric:ID:NL_CBB",
+        "bbmri-eric:ID:NL_capacity"
+      ],
+      "excluded_organisation_ids": [
+        "5372"
+      ],
+      "reason": "UMC Utrecht has its own public-law legal personality; exclude the affiliation-only match to Utrecht University.",
+      "evidence_sources": [
+        {
+          "url": "https://jaarverslag.umcutrecht.nl/jaarverslag-2025/governance/besturing-en-structuur",
+          "supports": "UMC Utrecht describes its own public-law legal personality; do not equate it with Utrecht University."
+        }
+      ]
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Vrije Universiteit",
+      "directory_country": "NL",
+      "biobank_ids": [
+        "bbmri-eric:ID:NL_AAAACXPJXQJHAACQK2ME25QAAE"
+      ],
+      "excluded_organisation_ids": [
+        "5378",
+        "5374"
+      ],
+      "reason": "Vrije Universiteit in the Netherlands is neither Vrije Universiteit Brussel nor Universiteit van Amsterdam.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Medical University of Gdansk",
+      "directory_country": "PL",
+      "biobank_ids": [
+        "bbmri-eric:ID:PL_3THFK"
+      ],
+      "excluded_organisation_ids": [
+        "5238"
+      ],
+      "reason": "Medical University of Gdansk is not Gdansk University of Technology.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Medical University of Warsaw",
+      "directory_country": "PL",
+      "biobank_ids": [
+        "bbmri-eric:ID:PL_LBBK"
+      ],
+      "excluded_organisation_ids": [
+        "5361"
+      ],
+      "reason": "Medical University of Warsaw is not University of Warsaw.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "Karolinska Universitetssjukhuset",
+      "directory_country": "SE",
+      "biobank_ids": [
+        "bbmri-eric:ID:SE_1730",
+        "bbmri-eric:ID:SE_2382"
+      ],
+      "excluded_organisation_ids": [
+        "5264"
+      ],
+      "reason": "Karolinska University Hospital is not Karolinska Institutet; do not merge the two names.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "University Medical Centre Maribor",
+      "directory_country": "SI",
+      "biobank_ids": [
+        "bbmri-eric:ID:SI_UKC_MB"
+      ],
+      "excluded_organisation_ids": [
+        "5339"
+      ],
+      "reason": "A university medical centre is not automatically its affiliated university.",
+      "evidence_sources": []
+    },
+    {
+      "state": "do_not_match",
+      "directory_juridical_person": "MRC Centre for Neuromuscular Diseases BioBank London, Dubowitz Neuromuscular Unit",
+      "directory_country": "UK",
+      "biobank_ids": [
+        "bbmri-eric:ID:EXT_168144"
+      ],
+      "excluded_organisation_ids": [
+        "5865"
+      ],
+      "reason": "An MRC-branded university research centre does not establish UKRI as the biobank's legal owner.",
+      "evidence_sources": []
+    }
+  ],
+  "runtime_safety": [
+    "Require review before promoting proposals to runtime mappings.",
+    "Recompute biobank IDs and withdrawal state from Directory on every run.",
+    "Validate observed source identities; do not match solely by frozen biobank IDs.",
+    "No runtime AI or web requests are needed to apply accepted translations."
+  ],
+  "identity_evidence_policy": {
+    "scope": "Normalize the juridical_person recorded in Directory to the EOSC organisation. Evidence of an internal department or shared legal entity is distinct from independent verification of a particular biobank's current legal responsibility.",
+    "evidence": "For complex cases, retain primary-source URLs and locators, supporting identifiers where verified, the inference connecting the source records, and explicit caveats or follow-up. Institutional affiliation, a website, a shared acronym, or consortium participation alone does not establish legal identity.",
+    "review_status": "This evidence supplement does not approve mappings or change proposal states, membership policy, institution counts, or withdrawal exclusions. Caveats and follow-up must accompany a mapping during human approval.",
+    "provenance": "EOSC organisation IDs and membership fields come from the supplied workbook; web sources support identity interpretation and do not replace the workbook's membership status.",
+    "maintenance": "This JSON contains a manual evidence supplement not present in the original exploratory build_proposal.py inputs. Preserve these annotations if regenerating or promoting this proposal."
+  }
+}

@@ -244,6 +244,10 @@
   and explicit biobank-context dependencies when importing or migrating mappings.
 - Keep generated EOSC workbooks, packets, local proposals and cache snapshots out of
   commits; only deliberately reviewed institutional registries may become shared data.
+- Explicit user-authorized exception: `eosc-matching-proposal.json` is shared
+  proposal evidence for future QC, not an approved runtime registry. Preserve its
+  unapproved states and caveats; committing it does not authorize other artifacts
+  or implementation of future EOSC consistency checks.
 - Review-history coverage must use the latest assessment per target, even when
   it is stale; do not revive older negative coverage or resolved blockers. Keep
   inconclusive attempts distinct from reviewed negative comparisons.
