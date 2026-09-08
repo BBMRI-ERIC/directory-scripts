@@ -1,18 +1,16 @@
 """Offline CLI contracts for EOSC review preparation, import and approval."""
 
-import importlib.util
+from importlib import import_module
 import json
 from pathlib import Path
 import sys
-from types import SimpleNamespace
+import subprocess
 
 import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("eosc_cli", ROOT / "eosc-organisation-matcher.py")
-cli = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(cli)
+cli = import_module("eosc-organisation-matcher")
 
 
 class DirectoryFake:
@@ -40,9 +38,8 @@ def adapter(monkeypatch):
         "organisation_id": "001", "name": "Universiteit Alpha", "acronym": "UA", "country": "Belgium",
         "membership_type": "Member", "membership_status": "Active"}]}
     calls = []
-    monkeypatch.setitem(sys.modules, "eosc_membership_xlsx", SimpleNamespace(
-        read_membership=lambda *a, **kw: data,
-        write_matches_xlsx=lambda *a: calls.append(a)))
+    monkeypatch.setattr(cli, "read_membership", lambda *a, **kw: data)
+    monkeypatch.setattr(cli, "write_matches_xlsx", lambda *a: calls.append(a))
     return data, calls
 
 
@@ -143,3 +140,59 @@ def test_packet_write_failure_removes_only_new_files(tmp_path, monkeypatch):
         cli._write_new_texts([(first, "{}"), (second, "text")])
     assert not first.exists()
     assert not second.exists()
+
+
+def test_real_workbook_export_uses_consolidated_helpers(tmp_path, capsys):
+    from openpyxl import Workbook, load_workbook
+
+    source = tmp_path / "membership.xlsx"
+    output = tmp_path / "matched.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Members"
+    sheet.append(["Organisation ID", "Name", "Acronym", "Country",
+                  "Membership Type", "Membership Status"])
+    sheet.append(["001", "Institute Alpha", "IA", "Belgium", "Member", "Active"])
+    workbook.save(source)
+    workbook.close()
+    original_bytes = source.read_bytes()
+
+    assert cli.main(["-i", str(source), "-X", str(output)],
+                    directory_factory=DirectoryFake) == 0
+
+    assert source.read_bytes() == original_bytes
+    written = load_workbook(output)
+    try:
+        assert written.sheetnames == ["Matched institutions", "Members"]
+        assert list(written.worksheets[0].values)[1] == (
+            "001", "Institute Alpha", "Institute Alpha", "B1")
+        assert written["Members"]["G1"].value == "Node Contributor"
+        assert written["Members"]["G2"].value == cli.CONTRIBUTOR_TAG
+    finally:
+        written.close()
+    assert "EOSC-A Members: 1" in capsys.readouterr().out
+
+
+def test_help_does_not_import_workbook_directory_or_retired_helpers(tmp_path):
+    code = f"""
+import builtins
+import runpy
+import sys
+
+sys.path.insert(0, {str(ROOT)!r})
+original_import = builtins.__import__
+def guarded_import(name, *args, **kwargs):
+    if name.split(".")[0] in {{
+        "openpyxl", "directory", "eosc_membership_xlsx", "eosc_organisation_matching"
+    }}:
+        raise AssertionError("Unexpected eager or retired import: " + name)
+    return original_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+sys.argv = [{str(ROOT / "eosc-organisation-matcher.py")!r}, "--help"]
+runpy.run_path(sys.argv[0], run_name="__main__")
+"""
+    result = subprocess.run([sys.executable, "-c", code], cwd=tmp_path,
+                            text=True, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert "--prepare-ai-review" in result.stdout

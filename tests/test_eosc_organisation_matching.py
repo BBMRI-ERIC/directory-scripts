@@ -1,14 +1,23 @@
 """Exercise incremental EOSC coverage, approval, drift and withdrawal contracts."""
 
 from copy import deepcopy
+from importlib import import_module
 
 import pytest
 
-from eosc_organisation_matching import (
-    approve_reviews, catalogue, country_code, fingerprint, group_biobanks,
-    import_reviews, matched_institutions, migrate_proposal, new_registry,
-    prepare_review, render_review_markdown, validate_registry,
-)
+matcher = import_module("eosc-organisation-matcher")
+approve_reviews = matcher.approve_reviews
+catalogue = matcher.catalogue
+country_code = matcher.country_code
+fingerprint = matcher.fingerprint
+group_biobanks = matcher.group_biobanks
+import_reviews = matcher.import_reviews
+matched_institutions = matcher.matched_institutions
+migrate_proposal = matcher.migrate_proposal
+new_registry = matcher.new_registry
+prepare_review = matcher.prepare_review
+render_review_markdown = matcher.render_review_markdown
+validate_registry = matcher.validate_registry
 
 
 SCOPE = {"directory_target": "https://directory.example", "schema": "ERIC"}

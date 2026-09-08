@@ -3,7 +3,10 @@
 `eosc-organisation-matcher.py` matches the Directory's `juridical_person` to
 organisations in an EOSC Association membership workbook. It runs from the clone,
 using `directory.py`, the shared cache and authentication options. There are no
-runtime AI, translation-service or membership-web-search calls.
+runtime AI, translation-service or membership-web-search calls. All EOSC-specific
+matching, review and XLSX logic lives in this single script; no separate EOSC
+helper modules or installation step are needed. Existing command lines and mapping
+JSON formats are unchanged.
 
 ## Export institutions
 

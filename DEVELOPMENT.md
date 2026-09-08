@@ -858,10 +858,12 @@ Node/staging-area scope and reported country must stay distinct:
 ## EOSC organisation matching specification
 
 ### EOSC-001: Boundaries and source identity
-`eosc-organisation-matcher.py` is an auxiliary read-only Directory consumer.
-`eosc_organisation_matching.py` owns pure identity grouping, review coverage,
-packet generation, imports, approval and export selection.
-`eosc_membership_xlsx.py` owns workbook parsing and fresh XLSX output.
+`eosc-organisation-matcher.py` is a single-purpose auxiliary read-only Directory
+consumer. Keep its identity grouping, review coverage, packet generation, imports,
+approval and export selection, workbook I/O, and CLI orchestration in distinct
+sections of this one script, not separate EOSC-only runtime modules. Pure matching
+functions remain independent of I/O; import workbook and Directory dependencies
+only where needed so CLI help and pure matching do not load them.
 The CLI MUST reuse Directory and shared logging/authentication/schema/cache helpers.
 It MUST NOT expose withdrawn-scope flags or make runtime AI/translation/web-search
 calls. Directory withdrawal is checked before grouping; active IDs are recomputed

@@ -2,22 +2,20 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 import hashlib
 import logging
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import eosc_membership_xlsx as xlsx_adapter
-
 import pytest
 from openpyxl import Workbook, load_workbook
 
-from eosc_membership_xlsx import (
-    CONTRIBUTOR_TAG,
-    read_membership,
-    write_matches_xlsx,
-)
+xlsx_adapter = import_module("eosc-organisation-matcher")
+CONTRIBUTOR_TAG = xlsx_adapter.CONTRIBUTOR_TAG
+read_membership = xlsx_adapter.read_membership
+write_matches_xlsx = xlsx_adapter.write_matches_xlsx
 
 
 def _make_source(path: Path, *, source_name: str = "Membership") -> Path:

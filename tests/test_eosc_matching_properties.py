@@ -1,11 +1,17 @@
 """Property checks for EOSC identity reuse and active inventory refresh."""
 
+from importlib import import_module
+
 import pytest
 
 hypothesis = pytest.importorskip("hypothesis")
 from hypothesis import given, strategies as st
 
-from eosc_organisation_matching import catalogue, group_biobanks, matched_institutions, new_registry
+matcher = import_module("eosc-organisation-matcher")
+catalogue = matcher.catalogue
+group_biobanks = matcher.group_biobanks
+matched_institutions = matcher.matched_institutions
+new_registry = matcher.new_registry
 
 
 @given(st.lists(st.booleans(), min_size=1, max_size=30))
