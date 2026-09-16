@@ -771,7 +771,7 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
   - keep the survey-question to strategic-objective mapping in editable JSON (`survey-mappings/so2_2025_question_to_strategic_objectives.json`) so the report can aggregate findings by BBMRI SO2 objective without baking those assumptions into code
   - generate a machine-readable findings JSON first; treat TeX/PDF rendering as a second step that can render an edited findings JSON without re-reading the survey workbook
   - generate requested XeLaTeX PDF builds in a temporary working directory and write only the designated `.tex` / `.pdf` outputs into the repository or user-selected paths
-  - prefer `latexmk -pdfxe` for PDF builds when available; fall back to direct `xelatex` only when `latexmk` is unavailable
+  - invoke `xelatex` directly for PDF builds; do not route compilation through `latexmk -pdfxe`
 - Resolution logic for survey respondents is intentionally conservative:
   - exact via biobank ID or collection ID when the survey provides them
   - certain via institution-name match when the normalized name, alias/acronym, or ID alias maps uniquely
@@ -890,7 +890,7 @@ above and must not be added as a section of its findings report.
 - TeX-only output writes the report source and does not require a TeX compiler or
   render standalone chart PDFs. PDF and standalone-chart builds must stage every
   generated chart asset in a temporary compilation directory. Those builds must
-  fail clearly if a referenced asset or a XeLaTeX/`latexmk` dependency is
+  fail clearly if a referenced asset or the `xelatex` dependency is
   unavailable; they must not produce partial PDFs.
 - All public or reusable methods in `survey-so2-directory.py` must document their
   purpose, inputs, returns and raised user-facing exceptions. Validate external
