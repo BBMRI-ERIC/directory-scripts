@@ -325,6 +325,36 @@ def test_declared_applicability_separates_skips_unanswered_and_out_of_route_answ
     ]
 
 
+def test_blank_declared_applicability_value_is_unknown_not_inapplicable():
+    """Blank routing metadata is reported as unknown rather than a structural skip."""
+    question = {
+        "question_id": "conditional",
+        "column": "Conditional",
+        "question_type": "single_choice",
+        "label": "Conditional",
+        "categories": ["Yes", "No"],
+        "parent_columns": ["Gate"],
+        "applicability": {"column": "Gate", "values": ["Yes"]},
+    }
+    workbook = descriptive_workbook([
+        {"Name of Institution": "Alpha", "Country": "Austria", "Gate": "  ", "Conditional": ""}
+    ])
+
+    result = payload_question(workbook, descriptive_schema(question))
+
+    assert result["applicability"] == {
+        "status": "evaluated",
+        "column": "Gate",
+        "values": ["Yes"],
+        "applicable_rows": 0,
+        "inapplicable_rows": 0,
+        "eligible_unanswered_rows": 0,
+        "structurally_skipped_rows": 0,
+        "eligibility_unknown_rows": 1,
+        "out_of_route_answered_rows": 0,
+    }
+
+
 def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies():
     """Payload provenance and narrative diagnostics make later rendering self-contained."""
     question = {

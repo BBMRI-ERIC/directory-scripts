@@ -369,18 +369,20 @@ def _applicability_summary(
         )
     if column not in responses.columns:
         raise InputError(f"Schema applicability column is absent: {column!r}.")
-    applicable = responses[column].isin(values)
+    eligibility_unknown = responses[column].map(_is_blank)
+    applicable = responses[column].isin(values) & ~eligibility_unknown
+    inapplicable = ~applicable & ~eligibility_unknown
     answered = ~responses[question.column].map(_is_blank)
     return {
         "status": "evaluated",
         "column": column,
         "values": values,
         "applicable_rows": int(applicable.sum()),
-        "inapplicable_rows": int((~applicable).sum()),
+        "inapplicable_rows": int(inapplicable.sum()),
         "eligible_unanswered_rows": int((applicable & ~answered).sum()),
-        "structurally_skipped_rows": int((~applicable & ~answered).sum()),
-        "eligibility_unknown_rows": 0,
-        "out_of_route_answered_rows": int((~applicable & answered).sum()),
+        "structurally_skipped_rows": int((inapplicable & ~answered).sum()),
+        "eligibility_unknown_rows": int(eligibility_unknown.sum()),
+        "out_of_route_answered_rows": int((inapplicable & answered).sum()),
     }
 
 
