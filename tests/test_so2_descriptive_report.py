@@ -401,6 +401,36 @@ def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies(
     }
 
 
+def test_free_text_parent_diagnostics_parse_multi_choice_parent_answers():
+    """A declared multi-choice parent accepts its delimiter-separated selections."""
+    question = {
+        "question_id": "other_system",
+        "column": "Other system",
+        "question_type": "free_text",
+        "label": "Other system",
+        "categories": [],
+        "parent_columns": ["Systems"],
+    }
+    workbook = descriptive_workbook([
+        {
+            "Name of Institution": "Alpha",
+            "Country": "Austria",
+            "Systems": "A;B",
+            "Other system": "Custom system",
+        }
+    ])
+    schema = descriptive_schema(question)
+    schema["questions"][0].update({
+        "question_type": "multi_choice",
+        "categories": ["A", "B"],
+        "delimiter": ";",
+    })
+
+    result = payload_question(workbook, schema)
+
+    assert result["diagnostics"]["unexpected_parent_answers"] == []
+
+
 def wrong_alias_row(sheet):
     """Break the row-1 alias envelope field."""
     sheet.cell(1, 1, "Wrong label")
@@ -543,6 +573,20 @@ def test_schema_requires_shared_context_and_named_administrative_reasons(field):
     del schema["columns"]["administrative_exclusion_reasons"]["Last update"]
     with pytest.raises(module.InputError, match="Last update"):
         module.validate_descriptive_schema(schema, HEADERS)
+
+
+def test_schema_rejects_free_text_parent_that_is_not_a_question_column():
+    """Free-text parents must resolve to declared question columns."""
+    schema = minimal_schema()
+    schema["questions"][0].update({
+        "question_type": "free_text",
+        "categories": [],
+        "parent_columns": ["Name of Institution"],
+    })
+
+    with pytest.raises(module.InputError, match="free_text parent.*question column"):
+        module.validate_descriptive_schema(schema, HEADERS)
+
 def test_schema_rejects_absent_parent_column():
     """Question parent references must name an existing source column."""
     schema = minimal_schema()

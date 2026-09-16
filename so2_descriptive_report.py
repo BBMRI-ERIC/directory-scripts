@@ -227,6 +227,14 @@ def validate_descriptive_schema(
     if not isinstance(root["questions"], list):
         raise InputError("Schema field questions must be an array.")
     questions = [_validate_question(question, index) for index, question in enumerate(root["questions"])]
+    question_columns = {question.column for question in questions}
+    for question in questions:
+        if question.question_type == "free_text":
+            invalid_parents = sorted(set(question.parent_columns) - question_columns)
+            if invalid_parents:
+                raise InputError(
+                    f"Schema free_text parent column must name a declared question column: {invalid_parents[0]!r}."
+                )
 
     classifications = (
         list(context_columns)
@@ -544,7 +552,10 @@ def _free_text_question_payload(
             answer
             for answer in parent_answers
             if answer["value"] != "Missing"
-            and answer["value"] not in question_by_column[answer["column"]].categories
+            and any(
+                value not in question_by_column[answer["column"]].categories
+                for value in _structured_answers(question_by_column[answer["column"]], response[answer["column"]])[0]
+            )
         ]
         if unexpected_values:
             unexpected_parent_answers.append({"source_row": source_row, "values": unexpected_values})
