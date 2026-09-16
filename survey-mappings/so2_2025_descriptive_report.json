@@ -678,9 +678,14 @@
     {
       "question_id": "q_067_if_there_are_other_legal_barriers_please_specify",
       "column": "If there are other legal barriers, please specify:",
-      "question_type": "free_text",
+      "question_type": "ordinal",
       "label": "If there are other legal barriers, please specify:",
-      "categories": [],
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ],
       "parent_columns": [
         "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)",
         "What types of legal barriers have you faced?: Licensing restrictions",
@@ -739,9 +744,14 @@
     {
       "question_id": "q_072_if_there_are_other_organisational_barriers_please_specify",
       "column": "If there are other organisational barriers, please specify:",
-      "question_type": "free_text",
+      "question_type": "ordinal",
       "label": "If there are other organisational barriers, please specify:",
-      "categories": [],
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ],
       "parent_columns": [
         "What organizational barriers have you encountered? (Select all that apply): Lack of data sharing agreements",
         "What organizational barriers have you encountered? (Select all that apply): Bureaucratic delays",

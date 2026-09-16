@@ -16,6 +16,9 @@ LEGAL_LICENSING = "What types of legal barriers have you faced?: Licensing restr
 LEGAL_OWNERSHIP = "What types of legal barriers have you faced?: Lack of clarity on data ownership"
 LEGAL_CROSS_BORDER = "What types of legal barriers have you faced?: Cross-border data sharing restrictions"
 OTHER_LEGAL = "If there are other legal barriers, please specify:"
+OTHER_ORGANISATIONAL = "If there are other organisational barriers, please specify:"
+RETURNED_DATA_STORAGE = "How much disk space do you currently require storing returned data overall (for all returned data altogether)?"
+ORDINAL_BARRIER_CATEGORIES = ["never", "rarely", "occasionally", "frequently"]
 TRACEABILITY_READINESS = (
     "How would you rate your repository’s technical readiness for integrating full digital "
     "traceability? Please choose what corresponds the most to your current situation. By “digital "
@@ -276,16 +279,45 @@ def test_production_schema_accounts_for_every_header():
     assert len(classified) == len(headers)
 
 
-def test_production_schema_barrier_matrix_is_ordinal_and_other_legal_text_has_all_parents():
-    """Barrier ratings stay ordered and their free text retains its matrix context."""
+def test_production_schema_overlapping_barrier_columns_are_ordinal_with_parents():
+    """Explicit ordinal precedence retains matrix context for both other-barrier columns."""
     questions = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))
 
     assert questions[LEGAL_GDPR]["question_type"] == "ordinal"
+    assert questions[OTHER_LEGAL]["question_type"] == "ordinal"
+    assert questions[OTHER_LEGAL]["categories"] == ORDINAL_BARRIER_CATEGORIES
     assert questions[OTHER_LEGAL]["parent_columns"] == [
         LEGAL_GDPR,
         LEGAL_LICENSING,
         LEGAL_OWNERSHIP,
         LEGAL_CROSS_BORDER,
+    ]
+    assert questions[OTHER_ORGANISATIONAL]["question_type"] == "ordinal"
+    assert questions[OTHER_ORGANISATIONAL]["categories"] == ORDINAL_BARRIER_CATEGORIES
+    assert questions[OTHER_ORGANISATIONAL]["parent_columns"] == [
+        "What organizational barriers have you encountered? (Select all that apply): "
+        "Lack of data sharing agreements",
+        "What organizational barriers have you encountered? (Select all that apply): "
+        "Bureaucratic delays",
+        "What organizational barriers have you encountered? (Select all that apply): "
+        "Lack of contact points or unclear responsibilities",
+        "What organizational barriers have you encountered? (Select all that apply): "
+        "Institutional reluctance to share data",
+    ]
+
+
+def test_production_schema_preserves_declared_zero_count_ordinal_category_order():
+    """Declared ordinal storage bands remain ordered even when no response selects some bands."""
+    question = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))[RETURNED_DATA_STORAGE]
+
+    assert question["question_type"] == "ordinal"
+    assert question["categories"] == [
+        "I don't know",
+        "<1TB",
+        "1TB-10TB",
+        "10TB-100TB",
+        "100TB-1PB",
+        ">1PB",
     ]
 
 
@@ -297,8 +329,8 @@ def test_production_schema_semicolon_inside_declared_ordinal_is_not_split():
     assert question.get("delimiter") is None
 
 
-def test_production_schema_declares_every_observed_structured_value():
-    """All observed structured responses have an explicit declared category."""
+def test_production_schema_declares_every_observed_non_other_structured_value():
+    """Ordinary structured responses have an explicit declared category."""
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
     questions = questions_by_column(schema)
     workbook = openpyxl.load_workbook(PRODUCTION_WORKBOOK, read_only=True, data_only=True)
@@ -314,7 +346,7 @@ def test_production_schema_declares_every_observed_structured_value():
         workbook.close()
     for index, header in enumerate(headers):
         question = questions.get(header)
-        if question is None or question["question_type"] == "free_text":
+        if question is None or question["question_type"] == "free_text" or question.get("parent_columns"):
             continue
         values = observed[index]
         if question["question_type"] == "multi_choice":
