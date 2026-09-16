@@ -92,6 +92,32 @@ def test_describe_rejects_output_alias_to_source(tmp_path):
         module.run_describe(args)
 
 
+def test_describe_rejects_implicit_tex_path_that_aliases_output_json(tmp_path):
+    """A derived TeX target must not replace the descriptive JSON payload."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.tex"
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        module,
+        "_load_descriptive_report_module",
+        lambda: pytest.fail("output collision must be rejected before loading the renderer"),
+    )
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+        "--output-pdf", str(tmp_path / "descriptive.pdf"),
+    ])
+
+    try:
+        with pytest.raises(module.InputError, match="alias each other"):
+            module.run_describe(args)
+    finally:
+        monkeypatch.undo()
+
+    assert not output_json.exists()
+
+
 def test_render_descriptive_rejects_legacy_findings_json(tmp_path):
     module = load_module()
     input_json = tmp_path / "findings.json"

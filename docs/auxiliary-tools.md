@@ -100,9 +100,10 @@ flagged as suspected repeated responses but are never removed. Treat generated
 JSON, TeX, PDFs, and chart directories as sensitive because they can contain
 institution names and free text.
 
+TeX-only output requires no compiler and does not render standalone chart PDFs.
 PDF rendering requires XeLaTeX, preferably through `latexmk -pdfxe`; a missing
-compiler fails the render rather than producing a partial PDF. With
-`--output-chart-dir`, the directory must be new or empty and receives optional
+compiler fails PDF or standalone-chart rendering rather than producing a partial
+PDF. With `--output-chart-dir`, the directory must be new or empty and receives
 standalone vector-PDF charts generated from the same PGF/TikZ fragments as the
 report. Output paths must be distinct from all inputs and from one another.
 

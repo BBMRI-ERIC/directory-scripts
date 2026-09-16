@@ -770,7 +770,7 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
   - keep the survey-to-Directory mapping in editable JSON (`survey-mappings/so2_2025_directory_mapping.json`) so humans can correct Codex-produced assumptions
   - keep the survey-question to strategic-objective mapping in editable JSON (`survey-mappings/so2_2025_question_to_strategic_objectives.json`) so the report can aggregate findings by BBMRI SO2 objective without baking those assumptions into code
   - generate a machine-readable findings JSON first; treat TeX/PDF rendering as a second step that can render an edited findings JSON without re-reading the survey workbook
-  - generate XeLaTeX builds in a temporary working directory and write only the designated `.tex` / `.pdf` outputs into the repository or user-selected paths
+  - generate requested XeLaTeX PDF builds in a temporary working directory and write only the designated `.tex` / `.pdf` outputs into the repository or user-selected paths
   - prefer `latexmk -pdfxe` for PDF builds when available; fall back to direct `xelatex` only when `latexmk` is unavailable
 - Resolution logic for survey respondents is intentionally conservative:
   - exact via biobank ID or collection ID when the survey provides them
@@ -887,9 +887,11 @@ above and must not be added as a section of its findings report.
   the full question identifier, denominator, unit and missingness note. The
   descriptive payload records those filenames; no PNG export is required
   initially.
-- TeX builds must stage every generated chart asset in the temporary compilation
-  directory. Rendering must fail clearly if a referenced asset or a XeLaTeX/
-  `latexmk` dependency is unavailable; it must not produce a partial PDF.
+- TeX-only output writes the report source and does not require a TeX compiler or
+  render standalone chart PDFs. PDF and standalone-chart builds must stage every
+  generated chart asset in a temporary compilation directory. Those builds must
+  fail clearly if a referenced asset or a XeLaTeX/`latexmk` dependency is
+  unavailable; they must not produce partial PDFs.
 - All public or reusable methods in `survey-so2-directory.py` must document their
   purpose, inputs, returns and raised user-facing exceptions. Validate external
   workbook/schema/report-payload assumptions with actionable `InputError`s; use

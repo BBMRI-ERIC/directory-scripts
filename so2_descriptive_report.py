@@ -961,21 +961,28 @@ def render_descriptive_pdf(
             tempfile.TemporaryDirectory(prefix="so2-charts-") as chart_temporary:
         report_stage = Path(report_temporary)
         chart_stage = Path(chart_temporary)
-        for stage in (report_stage, chart_stage):
-            fragments_dir = stage / "fragments"
+        if target_pdf is not None:
+            fragments_dir = report_stage / "fragments"
             fragments_dir.mkdir()
             for key, fragment in rendered.chart_fragments.items():
                 (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
 
         chart_pdfs: dict[str, Path] = {}
-        for key in rendered.chart_fragments:
-            source = chart_stage / f"{key}.tex"
-            source.write_text(_standalone_tex(key), encoding="utf-8")
-            chart_pdfs[key] = _run_xelatex(source, chart_stage)
+        if target_charts is not None:
+            fragments_dir = chart_stage / "fragments"
+            fragments_dir.mkdir()
+            for key, fragment in rendered.chart_fragments.items():
+                (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
+            for key in rendered.chart_fragments:
+                source = chart_stage / f"{key}.tex"
+                source.write_text(_standalone_tex(key), encoding="utf-8")
+                chart_pdfs[key] = _run_xelatex(source, chart_stage)
 
-        report_source = report_stage / "report.tex"
-        report_source.write_text(rendered.tex, encoding="utf-8")
-        report_pdf = _run_xelatex(report_source, report_stage) if target_pdf is not None else None
+        report_pdf = None
+        if target_pdf is not None:
+            report_source = report_stage / "report.tex"
+            report_source.write_text(rendered.tex, encoding="utf-8")
+            report_pdf = _run_xelatex(report_source, report_stage)
         staged_tex = report_stage / "published-report.tex"
         staged_tex.write_text(rendered.tex, encoding="utf-8")
 

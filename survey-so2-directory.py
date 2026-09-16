@@ -3301,9 +3301,14 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
 
 def run_describe(args: argparse.Namespace) -> int:
     """Create a standalone descriptive payload and optionally render it."""
+    render_requested = bool(args.output_tex or args.output_pdf or args.output_chart_dir)
+    derived_tex_path = (
+        args.output_tex or str(Path(args.output_json).with_suffix(".tex"))
+        if render_requested else None
+    )
     _require_distinct_descriptive_outputs(
         [args.survey_file, args.descriptive_schema],
-        [args.output_json, args.output_tex, args.output_pdf, args.output_chart_dir],
+        [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
     )
     _require_new_or_empty_chart_dir(args.output_chart_dir)
     descriptive = _load_descriptive_report_module()
@@ -3314,7 +3319,7 @@ def run_describe(args: argparse.Namespace) -> int:
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
     write_json(args.output_json, payload)
-    if args.output_tex or args.output_pdf or args.output_chart_dir:
+    if render_requested:
         render_args = argparse.Namespace(
             input_json=args.output_json,
             output_tex=args.output_tex,

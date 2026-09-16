@@ -894,6 +894,21 @@ def test_chart_dir_must_be_new_or_empty(tmp_path):
         module.render_descriptive_pdf(rendered_payload(), tmp_path / "report.tex", None, target)
 
 
+def test_tex_only_render_does_not_require_a_compiler_or_render_chart_pdfs(tmp_path, monkeypatch):
+    """Publishing TeX alone leaves PDF and standalone-chart compilation to explicit requests."""
+    monkeypatch.setattr(
+        module,
+        "_run_xelatex",
+        lambda *_args, **_kwargs: pytest.fail("TeX-only rendering must not invoke XeLaTeX"),
+    )
+    rendered = rendered_payload()
+    report_tex = tmp_path / "report.tex"
+
+    module.render_descriptive_pdf(rendered, report_tex, None, None)
+
+    assert report_tex.read_text(encoding="utf-8") == rendered.tex
+
+
 def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkeypatch):
     """Successful staged compiler outputs are atomically published to requested targets."""
     def fake_xelatex(command, **_kwargs):
