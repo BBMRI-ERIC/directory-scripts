@@ -1,4 +1,5 @@
 from argparse import Namespace
+import ast
 from datetime import datetime
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -64,6 +65,31 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
 
     assert module.run_describe(args) == module.EXIT_OK
     assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
+
+
+def test_every_top_level_survey_function_has_a_docstring():
+    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+
+    undocumented = [
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not ast.get_docstring(node)
+    ]
+
+    assert undocumented == []
+
+
+def test_describe_rejects_output_alias_to_source(tmp_path):
+    module = load_module()
+    source = write_descriptive_workbook(tmp_path)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(source),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(source),
+    ])
+
+    with pytest.raises(module.InputError, match="must not overwrite input"):
+        module.run_describe(args)
 
 
 def test_render_descriptive_rejects_legacy_findings_json(tmp_path):

@@ -69,6 +69,43 @@ The survey workflow analyzes respondents only; it does not interpret every
 Directory biobank missing from the survey as a finding. Review and edit mapping
 JSON rather than hard-coding uncertain respondent matches.
 
+## SO2 descriptive statistics
+
+`survey-so2-directory.py describe` and `render-descriptive-report` are a
+standalone, Directory-free workflow. They do not load Directory data, request
+credentials, resolve institutions, or create update proposals. `describe` reads
+the versioned survey schema and workbook, while `render-descriptive-report`
+renders an existing descriptive-statistics JSON payload without reopening the
+workbook.
+
+```bash
+python3 survey-so2-directory.py describe \
+  -i Content_Export_SO2_2025_20260313.xlsx \
+  --descriptive-schema survey-mappings/so2_2025_descriptive_report.json \
+  -o so2-descriptive.json \
+  --output-tex so2-descriptive.tex \
+  --output-pdf so2-descriptive.pdf \
+  --output-chart-dir so2-descriptive-charts
+
+python3 survey-so2-directory.py render-descriptive-report \
+  -i so2-descriptive.json \
+  --output-pdf so2-descriptive-rerendered.pdf
+```
+
+The observation unit is every nonblank submitted worksheet row. Counts are
+unweighted and are not deduplicated to institutions, biobanks, or countries.
+Contribution tables retain the reported country, institution, source row, and
+free-text answers; repeated normalized country/institution combinations are
+flagged as suspected repeated responses but are never removed. Treat generated
+JSON, TeX, PDFs, and chart directories as sensitive because they can contain
+institution names and free text.
+
+PDF rendering requires XeLaTeX, preferably through `latexmk -pdfxe`; a missing
+compiler fails the render rather than producing a partial PDF. With
+`--output-chart-dir`, the directory must be new or empty and receives optional
+standalone vector-PDF charts generated from the same PGF/TikZ fragments as the
+report. Output paths must be distinct from all inputs and from one another.
+
 ## Other utilities
 
 | Script | Purpose | Example |

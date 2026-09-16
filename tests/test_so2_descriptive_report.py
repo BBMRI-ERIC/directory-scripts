@@ -862,6 +862,19 @@ def test_pie_eligible_single_choice_with_missing_has_two_variants():
     }
 
 
+def test_chart_key_bounds_long_sanitized_question_labels():
+    """Staged TeX fragment filenames remain below filesystem component limits."""
+    question = {
+        "question_id": "q_018_long_question",
+        "label": "One " + ("very long descriptive question label " * 20),
+    }
+
+    chart_key = module._chart_key(question)
+
+    assert chart_key.startswith("18-")
+    assert len(f"{chart_key}.tex".encode("utf-8")) <= 120
+
+
 def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
     """Evidence tables keep repeat warnings, row provenance, and free-text parent answers."""
     tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None).tex

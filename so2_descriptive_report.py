@@ -714,6 +714,8 @@ def _chart_key(question: Mapping[str, Any], answered_only: bool = False) -> str:
     if not stem:
         raise InputError(f"Question label cannot form a chart filename: {question['label']!r}.")
     suffix = "-answered-only" if answered_only else ""
+    max_stem_length = 120 - len(f"{number:02d}-{suffix}.tex")
+    stem = stem[:max_stem_length].rstrip("-")
     return f"{number:02d}-{stem}{suffix}"
 
 
