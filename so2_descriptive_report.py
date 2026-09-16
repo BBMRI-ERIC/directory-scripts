@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from hashlib import sha256
 import json
-import re
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence
@@ -189,7 +189,10 @@ def validate_descriptive_schema(
         raise InputError("Schema input.header_row must be 4.")
 
     column_schema = _required_mapping(root["columns"], "columns")
-    for field in ("respondent_context", "administrative_exclusions"):
+    for field in (
+        "respondent_context", "institution_column", "country_column",
+        "administrative_exclusions", "administrative_exclusion_reasons",
+    ):
         if field not in column_schema:
             raise InputError(f"Schema columns is missing required field {field}.")
     context_columns = _text_sequence(
@@ -198,6 +201,29 @@ def validate_descriptive_schema(
     administrative_columns = _text_sequence(
         column_schema["administrative_exclusions"], "columns.administrative_exclusions"
     )
+    institution_column = _required_text(
+        column_schema["institution_column"], "columns.institution_column"
+    )
+    country_column = _required_text(
+        column_schema["country_column"], "columns.country_column"
+    )
+    if institution_column not in context_columns:
+        raise InputError("Schema columns.institution_column must be respondent context.")
+    if country_column not in context_columns:
+        raise InputError("Schema columns.country_column must be respondent context.")
+    reasons = _required_mapping(
+        column_schema["administrative_exclusion_reasons"],
+        "columns.administrative_exclusion_reasons",
+    )
+    if set(reasons) != set(administrative_columns):
+        missing = sorted(set(administrative_columns) - set(reasons))
+        unexpected = sorted(set(reasons) - set(administrative_columns))
+        column = missing[0] if missing else unexpected[0]
+        raise InputError(
+            f"Schema administrative exclusion reasons do not match administrative exclusion {column!r}."
+        )
+    for column in administrative_columns:
+        _required_text(reasons[column], f"columns.administrative_exclusion_reasons.{column}")
     if not isinstance(root["questions"], list):
         raise InputError("Schema field questions must be an array.")
     questions = [_validate_question(question, index) for index, question in enumerate(root["questions"])]
@@ -261,14 +287,12 @@ def read_descriptive_workbook(
         if worksheet_name not in workbook.sheetnames:
             raise InputError(f"Workbook has wrong worksheet: expected {worksheet_name!r}.")
         sheet = workbook[worksheet_name]
-        if sheet.cell(1, 1).value != expected_alias:
+        if sheet.cell(1, 1).value != "Alias" or sheet.cell(1, 2).value != expected_alias:
             raise InputError("Workbook row 1 alias does not match the descriptive schema.")
-        export_date = sheet.cell(2, 1).value
-        if not isinstance(export_date, str) or not re.fullmatch(
-            r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?",
-            export_date,
-        ):
-            raise InputError("Workbook row 2 export date must be an ISO-like string.")
+        export_date = sheet.cell(2, 2).value
+        if sheet.cell(2, 1).value != "Export Date" or not isinstance(export_date, datetime):
+            raise InputError("Workbook row 2 export date must be a labeled datetime.")
+        export_date = export_date.isoformat()
         if any(cell.value is not None and str(cell.value).strip() for cell in sheet[3]):
             raise InputError("Workbook row 3 must be fully blank.")
 
@@ -285,8 +309,9 @@ def read_descriptive_workbook(
         source_row_column = _required_text(output.get("source_row_column"), "output.source_row_column")
 
         records = []
-        for source_row in range(5, sheet.max_row + 1):
-            values = [sheet.cell(source_row, column).value for column in range(1, len(headers) + 1)]
+        for source_row, values in enumerate(
+            sheet.iter_rows(min_row=5, max_col=len(headers), values_only=True), start=5
+        ):
             record = dict(zip(headers, values, strict=True))
             record[source_row_column] = source_row
             records.append(record)

@@ -1,6 +1,7 @@
 """Tests for the self-contained SO2 descriptive-workbook reader."""
 
 import importlib
+from datetime import datetime
 from pathlib import Path
 
 import openpyxl
@@ -50,7 +51,13 @@ def minimal_schema():
         },
         "columns": {
             "respondent_context": ["Name of Institution", "Country"],
+            "institution_column": "Name of Institution",
+            "country_column": "Country",
             "administrative_exclusions": ["Creation date", "Last update"],
+            "administrative_exclusion_reasons": {
+                "Creation date": "Administrative export metadata.",
+                "Last update": "Administrative export metadata.",
+            },
         },
         "questions": [
             {
@@ -70,8 +77,10 @@ def write_descriptive_workbook(tmp_path, rows=(), mutator=None):
     workbook = openpyxl.Workbook()
     sheet = workbook.active
     sheet.title = "Survey responses"
-    sheet.cell(1, 1, "SO2_2025")
-    sheet.cell(2, 1, "2026-03-13T07:22:45")
+    sheet.cell(1, 1, "Alias")
+    sheet.cell(1, 2, "SO2_2025")
+    sheet.cell(2, 1, "Export Date")
+    sheet.cell(2, 2, datetime(2026, 3, 13, 7, 22, 45))
     for column_number, header in enumerate(HEADERS, start=1):
         sheet.cell(4, column_number, header)
     for row_number, row in enumerate(rows, start=5):
@@ -86,17 +95,17 @@ def write_descriptive_workbook(tmp_path, rows=(), mutator=None):
 
 def wrong_alias_row(sheet):
     """Break the row-1 alias envelope field."""
-    sheet.cell(1, 1, "WRONG")
+    sheet.cell(1, 1, "Wrong label")
 
 
 def missing_export_date(sheet):
     """Break the row-2 export-date envelope field."""
-    sheet.cell(2, 1).value = None
+    sheet.cell(2, 2).value = None
 
 
 def invalid_export_date(sheet):
-    """Break the ISO-like row-2 export-date envelope field."""
-    sheet.cell(2, 1, "not-a-date")
+    """Break the datetime row-2 export-date envelope field."""
+    sheet.cell(2, 2, "not-a-date")
 
 
 def nonblank_separator(sheet):
@@ -133,6 +142,21 @@ def test_reader_preserves_service_metadata_and_only_response_rows(tmp_path):
     assert len(result.source_sha256) == 64
 
 
+
+@pytest.mark.skipif(
+    not PRODUCTION_WORKBOOK.exists(),
+    reason=f"Production SO2 workbook is unavailable at {PRODUCTION_WORKBOOK}",
+)
+def test_reader_reads_actual_production_workbook_envelope():
+    """Reader accepts the service's labeled production envelope without Directory access."""
+    result = module.read_descriptive_workbook(
+        PRODUCTION_WORKBOOK, module.load_descriptive_schema(PRODUCTION_SCHEMA)
+    )
+
+    assert result.alias == "SO2_2025"
+    assert result.export_date == "2026-03-13T07:22:45"
+    assert result.header_row == 4
+    assert result.worksheet == "Content"
 @pytest.mark.parametrize(
     ("mutator", "message"),
     [
@@ -194,6 +218,23 @@ def test_schema_rejects_duplicate_classification_and_invalid_question_values():
         module.validate_descriptive_schema(schema, HEADERS)
 
 
+
+@pytest.mark.parametrize(
+    "field",
+    ["institution_column", "country_column", "administrative_exclusion_reasons"],
+)
+def test_schema_requires_shared_context_and_named_administrative_reasons(field):
+    """Schema names report-wide context columns and every administrative exclusion reason."""
+    schema = minimal_schema()
+    del schema["columns"][field]
+
+    with pytest.raises(module.InputError, match=field):
+        module.validate_descriptive_schema(schema, HEADERS)
+
+    schema = minimal_schema()
+    del schema["columns"]["administrative_exclusion_reasons"]["Last update"]
+    with pytest.raises(module.InputError, match="Last update"):
+        module.validate_descriptive_schema(schema, HEADERS)
 def test_schema_rejects_absent_parent_column():
     """Question parent references must name an existing source column."""
     schema = minimal_schema()
@@ -279,21 +320,21 @@ def test_production_schema_accounts_for_every_header():
     assert len(classified) == len(headers)
 
 
-def test_production_schema_overlapping_barrier_columns_are_ordinal_with_parents():
-    """Explicit ordinal precedence retains matrix context for both other-barrier columns."""
+def test_production_schema_narrative_barrier_columns_are_free_text_with_parents():
+    """Other-barrier narrative answers remain text while retaining their matrix context."""
     questions = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))
 
     assert questions[LEGAL_GDPR]["question_type"] == "ordinal"
-    assert questions[OTHER_LEGAL]["question_type"] == "ordinal"
-    assert questions[OTHER_LEGAL]["categories"] == ORDINAL_BARRIER_CATEGORIES
+    assert questions[OTHER_LEGAL]["question_type"] == "free_text"
+    assert questions[OTHER_LEGAL]["categories"] == []
     assert questions[OTHER_LEGAL]["parent_columns"] == [
         LEGAL_GDPR,
         LEGAL_LICENSING,
         LEGAL_OWNERSHIP,
         LEGAL_CROSS_BORDER,
     ]
-    assert questions[OTHER_ORGANISATIONAL]["question_type"] == "ordinal"
-    assert questions[OTHER_ORGANISATIONAL]["categories"] == ORDINAL_BARRIER_CATEGORIES
+    assert questions[OTHER_ORGANISATIONAL]["question_type"] == "free_text"
+    assert questions[OTHER_ORGANISATIONAL]["categories"] == []
     assert questions[OTHER_ORGANISATIONAL]["parent_columns"] == [
         "What organizational barriers have you encountered? (Select all that apply): "
         "Lack of data sharing agreements",
