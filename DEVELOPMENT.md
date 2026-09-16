@@ -800,10 +800,15 @@ above and must not be added as a section of its findings report.
   re-reading the survey workbook. It must not load `directory.py`, request
   credentials, require the entity-resolution mapping, or create findings/update
   JSON.
-- The population is exactly one observation for every nonblank worksheet row.
-  No Directory-resolution status, biobank deduplication, or collection expansion
-  may affect descriptive counts. Report total, nonblank and excluded-blank row
-  counts, workbook hash, worksheet, header row and descriptive-schema version.
+- The observation unit is one submitted, institution-attributed response for every
+  nonblank worksheet row. The survey does not distinguish whether that respondent
+  represents a biobank, its parent institution, or another organisational unit.
+  These are unweighted row-level descriptive statistics, not estimates of unique
+  institutions, biobanks, countries, BBMRI-wide prevalence, response rates, or
+  representativeness. No Directory-resolution status, deduplication, or
+  collection expansion may affect descriptive counts. Report total, nonblank and
+  excluded-blank row counts, workbook hash, worksheet, header row and
+  descriptive-schema version.
 - The current SO2 XLSX envelope has service metadata in row 1 (`Alias` /
   `SO2_2025`), export metadata in row 2 (`Export Date` / timestamp), a blank
   row 3, and column headers in row 4. The reader must validate this envelope and
@@ -811,45 +816,77 @@ above and must not be added as a section of its findings report.
   provenance; never count service rows as questionnaire responses. A later survey
   version may declare a different validated envelope in its descriptive schema.
 - A versioned descriptive-report schema declares source worksheet/header, every
-  question's source column(s), question type, display label/order, category rules,
-  optional multi-select delimiter, and optional parent question for free-text
-  follow-ups. Do not infer multi-select semantics solely from question wording or
-  semicolons in an answer. A declared parent value must be read from the same row,
-  never inferred from column adjacency.
+  question's source column(s), question type, display label/order, allowed and
+  canonical categories, optional multi-select delimiter, optional applicability
+  rule, and optional parent question for free-text follow-ups. Account for every
+  source column as a reportable question/subquestion, respondent-context field,
+  or explicitly excluded administrative field with a stated reason; reject an
+  unclassified source column. Do not infer multi-select semantics solely from
+  question wording or semicolons in an answer. A declared parent value must be
+  read from the same row, never inferred from column adjacency. Retain
+  zero-count declared categories and entirely unanswered questions. Unexpected
+  values or contradictory declared selections must stay traceable as diagnostics,
+  not silently become missing or disappear.
 - Support at least `single_choice`, `multi_choice`, `ordinal`, and `free_text`
-  question types. For every structured question report answered denominator and
-  missing count. Single-choice counts must reconcile exactly with its answered
-  denominator. Multi-choice values are deduplicated within a response and use the
-  answered-question denominator; their percentages may exceed 100 percent. Keep
-  blank, `No`, `Don't know`, `Not applicable` and `Planned` distinct. Numeric
-  bands are frequency categories, not data to average.
-- Every structured-question chart is followed by a contribution table with
-  `Value`, `Country`, and `Institution` columns, ordered by value, then
-  country, then institution. The descriptive schema declares the shared country
-  and institution source columns. A multi-choice response appears once for each
-  selected value; a non-answer appears once under `Missing`. Keep missing
-  country/institution cells visible as `Missing` rather than dropping their
-  response. The table is respondent-level evidence, not an additional aggregate:
-  it must reconcile with the chart's value counts but must never be summed across
+  question types. For every structured question report total included rows
+  (`N`), answered rows (`A`), and blank cells (`M = N - A`). A blank means
+  only blank, not necessarily an eligible nonresponse. Where a verified
+  applicability rule exists, report eligible-unanswered, structurally skipped,
+  eligibility-unknown, and out-of-route answered rows separately; otherwise
+  state that applicability is unknown. Never infer routing from observed counts
+  or discard out-of-route answers. Single-choice counts must reconcile exactly
+  with `A`. Multi-choice values are deduplicated within a response: every
+  selection label is `n (n/A percent of answering rows)`, while Missing is
+  `M (M/N percent of all included rows)`. State both bases, render an undefined
+  percentage as `N/A`, and never divide by total selections. Individual
+  selection percentages cannot exceed 100 percent, though their sum can. Keep
+  blank, `No`, `Don't know`, `Not applicable` and `Planned` distinct.
+  Numeric bands are frequency categories, not data to average. Matrix
+  subquestions with ordered frequency answers are `ordinal`, even if a nearby
+  heading says “select all”.
+- Every structured-question chart is followed by a literal respondent-level
+  contribution table with `Value`, `Country`, `Institution`, `Source row`,
+  and `Repeated response` columns, ordered by declared value order, then
+  country, institution and source row. The descriptive schema declares the
+  shared country and institution source columns. A multi-choice response appears
+  once for each selected value; a non-answer appears once under `Missing`.
+  Keep missing country/institution cells visible as `Missing` rather than
+  dropping their response. Preserve repeated display rows literally and mark each
+  row when its normalised country/institution appears in multiple submissions;
+  these are suspected repeated responses, not a basis for deduplication. For an
+  answered-only pie variant, retain the Missing contribution block and mark it
+  as excluded from that chart. Contribution tables are respondent-level evidence:
+  they reconcile with the chart's value counts but must never be summed across
   questions.
-- Free-text tables list the reported institution, its declared parent answer when
-  applicable, and the unmodified answer text. Do not incidentally copy emails or
-  other identifying values into unrelated tables; a field is listed only when it
-  is the answer being reported.
+- Free-text tables list every nonblank unmodified answer with the reported
+  institution and same-row declared parent answer, including a missing or
+  unexpected parent value. Flag inconsistencies without suppressing text. Report
+  answered and blank counts and render an explicit `No text responses` section
+  when empty. Do not deduplicate identical text, infer parent answers, or treat
+  volunteered comments as prevalence estimates. Do not incidentally copy emails
+  or other identifying values into unrelated tables; a field is listed only when
+  it is the answer being reported.
 - Use native TeX PGF/TikZ, primarily `pgfplots`, for report charts. Python computes
   statistics and emits reusable chart fragments; TeX renders them in the report.
-  Use pie charts only for readable non-overlapping single-choice distributions,
-  horizontal bars for high-cardinality or multi-choice distributions, and ordered
-  bars for ordinal questions. When a pie-eligible single-choice question has
-  missing responses, render two side-by-side pies: one including `Missing`, and
-  one using only answered responses with its denominator labelled. Multi-choice
-  data must never use pie charts.
+  Horizontal zero-based count bars are the default for category comparison and
+  are mandatory for multi-choice questions: each selected value has a bar with
+  its `n (percent)` label, and `Missing` is a visually distinct separate bar
+  even when zero. Use pie charts only for small, readable, non-overlapping
+  single-choice distributions. When such a pie-eligible question has missing
+  responses, render two side-by-side pies: one including `Missing`, and one
+  using only answered responses with its denominator labelled. Use ordered bars
+  for ordinal questions; retain unobserved declared levels and place `Not
+  applicable`, `Don't know`, and `Missing` outside the ordered scale.
+  Multi-choice data must never use pie charts. Related question panels use
+  consistent category order and scales.
 - `describe --output-chart-dir DIR` additionally renders each report chart from
   the same PGF/TikZ fragment as a standalone vector PDF. The report displays the
   relative output path below its corresponding embedded chart. The directory must
   be new or empty, and chart filenames must use a stable question ordinal,
-  sanitized identifier and variant suffix. The descriptive payload records those
-  filenames; no PNG export is required initially.
+  sanitized identifier and variant suffix. Every standalone chart PDF retains
+  the full question identifier, denominator, unit and missingness note. The
+  descriptive payload records those filenames; no PNG export is required
+  initially.
 - TeX builds must stage every generated chart asset in the temporary compilation
   directory. Rendering must fail clearly if a referenced asset or a XeLaTeX/
   `latexmk` dependency is unavailable; it must not produce a partial PDF.
@@ -858,11 +895,13 @@ above and must not be added as a section of its findings report.
   workbook/schema/report-payload assumptions with actionable `InputError`s; use
   assertions only for already-validated internal invariants.
 - Tests must cover all-row inclusion without Directory access, blank rows,
-  question-type semantics, parent/free-text rows, duplicate selections, embedded
-  delimiter text, missing/invalid schema columns, output collisions, Unicode/TeX
-  escaping, legacy descriptive payloads and chart-asset staging. A real XeLaTeX
-  rendering/layout check is conditional on the compiler being installed; otherwise
-  validate generated TeX and report the missing dependency explicitly.
+  question-type semantics, explicit/unknown applicability, parent/free-text rows,
+  repeated institution submissions, duplicate selections, embedded delimiter
+  text, unexpected/contradictory categories, unclassified/missing schema columns,
+  output collisions, Unicode/TeX escaping, legacy descriptive payloads,
+  denominator labels and chart-asset staging. A real XeLaTeX rendering/layout
+  check is conditional on the compiler being installed; otherwise validate
+  generated TeX and report the missing dependency explicitly.
 
 ### Current fix-producing module labels
 
