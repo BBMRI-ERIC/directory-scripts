@@ -933,7 +933,9 @@ def _run_xelatex(source: Path, output_dir: Path) -> Path:
 
 
 def _require_new_or_empty_chart_dir(chart_dir: Path) -> None:
-    """Reject chart output directories that could contain unrelated artifacts."""
+    """Reject unsafe chart output paths and directories with existing artifacts."""
+    if chart_dir.is_symlink():
+        raise InputError(f"Chart directory must not be a symbolic link: {chart_dir}")
     if chart_dir.exists() and (not chart_dir.is_dir() or any(chart_dir.iterdir())):
         raise InputError(f"Chart directory must be new or empty: {chart_dir}")
 
@@ -1013,17 +1015,40 @@ def render_descriptive_pdf(
                 os.replace(publish_charts, target_charts)
                 published.append(target_charts)
         except OSError as exc:
+            rollback_failures: list[OSError] = []
             for target in reversed(published):
-                if target.is_dir():
-                    shutil.rmtree(target, ignore_errors=True)
-                else:
-                    target.unlink(missing_ok=True)
+                try:
+                    if target.is_dir():
+                        shutil.rmtree(target)
+                    else:
+                        target.unlink(missing_ok=True)
+                except OSError as rollback_exc:
+                    rollback_failures.append(rollback_exc)
             for target, backup in backups.items():
-                os.replace(backup, target)
+                try:
+                    os.replace(backup, target)
+                except OSError as rollback_exc:
+                    rollback_failures.append(rollback_exc)
             if chart_dir_was_empty and target_charts is not None:
-                target_charts.mkdir()
+                try:
+                    if not target_charts.exists():
+                        target_charts.mkdir()
+                    elif not target_charts.is_dir() or any(target_charts.iterdir()):
+                        raise OSError(f"chart directory has unexpected contents: {target_charts}")
+                except OSError as rollback_exc:
+                    rollback_failures.append(rollback_exc)
             if publish_charts is not None:
-                shutil.rmtree(publish_charts, ignore_errors=True)
+                try:
+                    if publish_charts.exists():
+                        shutil.rmtree(publish_charts)
+                except OSError as rollback_exc:
+                    rollback_failures.append(rollback_exc)
+            if rollback_failures:
+                details = "; ".join(str(rollback_exc) for rollback_exc in rollback_failures)
+                raise InputError(
+                    "Could not publish descriptive report outputs: "
+                    f"{exc}; rollback could not establish a clean state: {details}"
+                ) from exc
             raise InputError(f"Could not publish descriptive report outputs: {exc}") from exc
         for backup in backups.values():
             backup.unlink(missing_ok=True)

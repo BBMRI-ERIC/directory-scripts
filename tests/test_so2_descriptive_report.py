@@ -999,6 +999,61 @@ def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
     assert report_pdf.read_bytes() == b"previous PDF"
 
 
+def test_pdf_render_reports_chart_publication_and_restoration_failures(
+    tmp_path, monkeypatch,
+):
+    """A failed chart rollback keeps the publication failure visible and actionable."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    real_replace = module.os.replace
+    real_mkdir = Path.mkdir
+
+    def fail_chart_publication(source, destination):
+        if Path(destination).name == "charts" and Path(source).name.startswith(".so2-charts-"):
+            raise OSError("simulated chart publication failure")
+        return real_replace(source, destination)
+
+    def fail_chart_directory_restoration(path, *args, **kwargs):
+        if path == chart_dir:
+            raise OSError("simulated chart restoration failure")
+        return real_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    monkeypatch.setattr(module.os, "replace", fail_chart_publication)
+    report_tex = tmp_path / "report.tex"
+    chart_dir = tmp_path / "charts"
+    chart_dir.mkdir()
+    monkeypatch.setattr(Path, "mkdir", fail_chart_directory_restoration)
+
+    with pytest.raises(
+        module.InputError,
+        match="simulated chart publication failure.*rollback could not establish a clean state.*simulated chart restoration failure",
+    ):
+        module.render_descriptive_pdf(rendered_payload(), report_tex, None, chart_dir)
+
+
+def test_pdf_render_rejects_empty_symlink_chart_output_directory(tmp_path, monkeypatch):
+    """An empty symlink must not redirect chart publication outside the requested path."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    charts_target = tmp_path / "actual-charts"
+    charts_target.mkdir()
+    chart_link = tmp_path / "charts"
+    chart_link.symlink_to(charts_target, target_is_directory=True)
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+
+    with pytest.raises(module.InputError, match="must not be a symbolic link"):
+        module.render_descriptive_pdf(rendered_payload(), tmp_path / "report.tex", None, chart_link)
+
+
 @pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
 def test_real_xelatex_renders_minimal_descriptive_report(tmp_path):
     """A minimal real report compiles to a vector PDF when XeLaTeX is available."""
