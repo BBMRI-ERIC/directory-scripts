@@ -823,6 +823,15 @@ above and must not be added as a section of its findings report.
   answered-question denominator; their percentages may exceed 100 percent. Keep
   blank, `No`, `Don't know`, `Not applicable` and `Planned` distinct. Numeric
   bands are frequency categories, not data to average.
+- Every structured-question chart is followed by a contribution table with
+  `Value`, `Country`, and `Institution` columns, ordered by value, then
+  country, then institution. The descriptive schema declares the shared country
+  and institution source columns. A multi-choice response appears once for each
+  selected value; a non-answer appears once under `Missing`. Keep missing
+  country/institution cells visible as `Missing` rather than dropping their
+  response. The table is respondent-level evidence, not an additional aggregate:
+  it must reconcile with the chart's value counts but must never be summed across
+  questions.
 - Free-text tables list the reported institution, its declared parent answer when
   applicable, and the unmodified answer text. Do not incidentally copy emails or
   other identifying values into unrelated tables; a field is listed only when it
