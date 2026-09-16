@@ -994,9 +994,21 @@ def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
     tex = module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts").tex
 
     assert r"\begin{axis}[xbar" in tex
-    assert "PACS: 2 (100.0\\% of answering rows)" in tex
-    assert "Missing: 1 (33.3\\% of all included rows)" in tex
+    assert "2 (100.0\\% of answering rows)" in tex
+    assert "1 (33.3\\% of all included rows)" in tex
     assert "charts/09-institution-type.pdf" in tex
+
+
+def test_bar_tex_locks_every_bar_to_its_category_row_and_reserves_label_space():
+    """Separate colour plots must not be shifted away from their y-axis labels."""
+    fragment = module.render_descriptive_tex(multi_choice_payload(), chart_dir=None).chart_fragments[
+        "09-institution-type"
+    ]
+
+    assert "bar shift=0pt" in fragment
+    assert "scale only axis" in fragment
+    assert "yticklabel style={text width=" in fragment
+    assert "anchor=west,font=\\scriptsize" in fragment
 
 
 def test_report_tex_is_self_contained_and_displays_required_semantics():
@@ -1017,6 +1029,9 @@ def test_report_tex_is_self_contained_and_displays_required_semantics():
     assert "Descriptive schema version: 2026-09-16" in tex
     assert "N/A/M: 3 / 2 / 1" in tex
     assert "Applicability: unknown" in tex
+    assert r"\usepackage{relsize}" in tex
+    assert r"\tableofcontents" in tex
+    assert "\n\\clearpage\n\\section{" in tex
 
 
 def test_empty_free_text_question_is_explicitly_reported():
@@ -1107,9 +1122,36 @@ def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
     """Evidence tables keep repeat warnings, row provenance, and free-text parent answers."""
     tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None).tex
 
-    assert "Suspected repeated response" in tex
+    assert "suspected repeated response" in tex
     assert "Source row" in tex
     assert "Barrier A = frequently" in tex
+
+
+def test_structured_evidence_table_groups_institutions_and_uses_compact_type():
+    """Structured evidence has one row per value/country with literal institution entries."""
+    question = structured_report_question(contributions=[
+        {"value": "PACS", "country": "Austria", "institution": "Alpha", "source_row": 5,
+         "repeated_response": True},
+        {"value": "PACS", "country": "Austria", "institution": "Beta", "source_row": 6,
+         "repeated_response": False},
+    ])
+
+    tex = module.render_descriptive_tex(report_payload(question), chart_dir=None).tex
+
+    assert r"\smaller[3]" in tex
+    assert "Value & Country & Institutions" in tex
+    assert r"{\raggedright Alpha [suspected repeated response]; Beta\par}" in tex
+    assert "Source row" not in tex
+
+
+def test_free_text_evidence_table_uses_less_aggressive_compact_type():
+    """Narrative evidence remains row-level but has a readable compact table size."""
+    narrative = payload_with_repeated_and_free_text()["questions"][1]
+
+    tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
+
+    assert r"\smaller[1]" in tex
+    assert "Source row" in tex
 
 
 def test_chart_dir_must_be_new_or_empty(tmp_path):

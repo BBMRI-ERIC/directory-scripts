@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 import json
+from math import ceil
 import os
 from pathlib import Path
 import re
@@ -840,6 +841,16 @@ def _category_label(category: Mapping[str, Any]) -> str:
     return f"{value}: {count} ({float(percentage):.1f}\\% of {basis})"
 
 
+def _bar_end_label(category: Mapping[str, Any]) -> str:
+    """Return a short, denominator-aware label for the end of one bar."""
+    count = int(category["count"])
+    percentage = category.get("percent")
+    if percentage is None:
+        return f"{count} (no percentage base)"
+    basis = "all included rows" if category["value"] == "Missing" else "answering rows"
+    return f"{count} ({float(percentage):.1f}\\% of {basis})"
+
+
 _ORDINAL_EXCEPTIONS = frozenset({
     "missing", "not applicable", "n/a", "don't know", "i don't know", "i don’t know",
 })
@@ -851,7 +862,14 @@ def _bar_axis(categories: Sequence[Mapping[str, Any]]) -> str:
         return r"\emph{No categories in this group.}"
     rows = []
     labels = []
-    for index, category in enumerate(categories, start=1):
+    ticks = []
+    cursor = 0.0
+    for category in categories:
+        # The y-tick labels occupy a fixed left column. Allocate a chart row
+        # for every wrapped line so adjacent labels cannot overlap.
+        row_height = max(1, ceil(len(str(category["value"])) / 34))
+        position = cursor + row_height / 2
+        cursor += row_height
         count = int(category["count"])
         normalized = str(category["value"]).strip().casefold()
         color = (
@@ -859,20 +877,28 @@ def _bar_axis(categories: Sequence[Mapping[str, Any]]) -> str:
             else "bbmriGray" if normalized in _ORDINAL_EXCEPTIONS
             else "bbmriBlue"
         )
-        rows.append(f"\\addplot+[fill={color}] coordinates {{({count},{index})}};")
-        labels.append(
-            f"\\node[anchor=west,font=\\scriptsize] at (axis cs:{count + 0.08},{index}) "
-            f"{{{_category_label(category)}}};"
+        rows.append(
+            f"\\addplot+[fill={color},bar shift=0pt] coordinates "
+            f"{{({count},{position:.2f})}};"
         )
-    ticks = ",".join(str(index) for index in range(1, len(categories) + 1))
-    tick_labels = ",".join(f"{{{_tex(category['value'])}}}" for category in categories)
+        labels.append(
+            f"\\node[anchor=west,font=\\scriptsize,text width=0.14\\linewidth,align=left] "
+            f"at (axis cs:{count + 0.08},{position:.2f}) "
+            f"{{{_bar_end_label(category)}}};"
+        )
+        ticks.append(f"{position:.2f}")
+    tick_labels = ",".join(
+        rf"{{\parbox{{0.32\linewidth}}{{\raggedleft {_tex(category['value'])}}}}}"
+        for category in categories
+    )
     return "\n".join([
         r"\begin{tikzpicture}",
-        r"\begin{axis}[xbar, xmin=0, width=\linewidth, height="
-        + f"{max(3.0, 0.65 * len(categories) + 1):.1f}cm,",
-        f"ytick={{{ticks}}}, yticklabels={{{tick_labels}}},",
+        r"\begin{axis}[xbar, xmin=0, width=0.50\linewidth, xshift=0.37\linewidth, "
+        r"scale only axis, height=" + f"{max(3.0, 0.48 * cursor + 1):.1f}cm,",
+        f"ytick={{{','.join(ticks)}}}, yticklabels={{{tick_labels}}},",
         r"xlabel={Count}, y dir=reverse, axis x line*=bottom, axis y line=none,",
-        r"enlarge y limits=0.15, clip=false]",
+        r"yticklabel style={text width=0.32\linewidth,align=right,font=\scriptsize},",
+        r"enlarge x limits={upper,value=0.18}, enlarge y limits={upper,value=0.08,lower,value=0.08}, clip=false]",
         *rows,
         *labels,
         r"\end{axis}",
@@ -967,22 +993,35 @@ def _question_tables(question: Mapping[str, Any]) -> str:
                 _tex(item["country"]), _tex(item["institution"]), str(item["source_row"]),
                 _tex(parents), _tex(item["text"]),
             ])
-        return _table(rows, r"p{0.12\linewidth}p{0.16\linewidth}r"
-                      r"p{0.27\linewidth}p{0.27\linewidth}")
-    rows = [[r"Value", r"Country", r"Institution", r"Source row", r"Note"]]
-    for item in question["contributions"]:
-        rows.append([
-            _tex(item["value"]), _tex(item["country"]), _tex(item["institution"]),
-            str(item["source_row"]),
-            r"\textbf{Suspected repeated response}" if item["repeated_response"] else "",
+        return "\n".join([
+            r"\smaller[1]",
+            _table(rows, r"p{0.12\linewidth}p{0.16\linewidth}r"
+                         r"p{0.27\linewidth}p{0.27\linewidth}"),
+            r"\normalsize",
         ])
-    return _table(rows, r"p{0.18\linewidth}p{0.16\linewidth}p{0.22\linewidth}rp{0.22\linewidth}")
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for item in question["contributions"]:
+        entry = _tex(item["institution"])
+        if item["repeated_response"]:
+            entry += " [suspected repeated response]"
+        grouped.setdefault((str(item["value"]), str(item["country"])), []).append(entry)
+    rows = [[r"Value", r"Country", r"Institutions"]]
+    for (value, country), institutions in grouped.items():
+        rows.append([
+            _tex(value), _tex(country), r"{\raggedright " + "; ".join(institutions) + r"\par}",
+        ])
+    return "\n".join([
+        r"\smaller[3]",
+        _table(rows, r"p{0.22\linewidth}p{0.18\linewidth}p{0.52\linewidth}"),
+        r"\normalsize",
+    ])
 
 
 def _preamble() -> str:
     """Return the shared XeLaTeX preamble for reports and standalone charts."""
     return r"""\documentclass[11pt]{article}
 \usepackage{fontspec}
+\usepackage{relsize}
 \usepackage{longtable}
 \usepackage{booktabs}
 \usepackage{xcolor}
@@ -1275,12 +1314,13 @@ def render_descriptive_tex(
     report.append(
         rf"Descriptive schema version: {_tex(provenance.get('schema_version', 'Unknown'))}\\"
     )
+    report.extend([r"\tableofcontents", r"\clearpage"])
     for question in questions:
         for field in ("question_id", "label", "question_type", "categories", "population",
                       "contributions", "free_text_rows", "applicability"):
             if field not in question:
                 raise InputError(f"Descriptive statistics question lacks {field}: {question!r}.")
-        report.append(rf"\section*{{{_tex(question['label'])}}}")
+        report.extend([r"\clearpage", rf"\section{{{_tex(question['label'])}}}"])
         population = question["population"]
         report.append(rf"\noindent Question identifier: \texttt{{{_tex(question['question_id'])}}}\\")
         report.append(rf"N/A/M: {population['N']} / {population['A']} / {population['M']}\\")
