@@ -1446,6 +1446,7 @@ def render_descriptive_pdf(
                     shutil.copy2(source_pdf, publish_charts / f"{key}.pdf")
             except OSError as exc:
                 shutil.rmtree(publish_charts, ignore_errors=True)
+                _discard_publication_stages(publication_stages)
                 raise InputError(f"Could not stage chart PDFs for publication: {exc}") from exc
 
         published: list[Path] = []

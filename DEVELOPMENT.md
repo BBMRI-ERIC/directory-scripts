@@ -818,7 +818,10 @@ above and must not be added as a section of its findings report.
 - A versioned descriptive-report schema declares source worksheet/header, every
   question's source column(s), question type, display label/order, allowed and
   canonical categories, optional multi-select delimiter, optional applicability
-  rule, and optional parent question for free-text follow-ups. Account for every
+  rule, optional mutually exclusive categories, and optional parent question for
+  free-text follow-ups. Applicability values must belong to the referenced
+  structured parent question; exclusive selections must belong to the question
+  that declares them. Account for every
   source column as a reportable question/subquestion, respondent-context field,
   or explicitly excluded administrative field with a stated reason; reject an
   unclassified source column. Do not infer multi-select semantics solely from
@@ -866,6 +869,10 @@ above and must not be added as a section of its findings report.
   volunteered comments as prevalence estimates. Do not incidentally copy emails
   or other identifying values into unrelated tables; a field is listed only when
   it is the answer being reported.
+- The rendered report repeats the full source provenance and shows the question
+  identifier, `N`, `A`, `M`, and applicability status or counts for every
+  question. Standalone chart documents repeat the question, denominator, unit,
+  and missingness context so they remain interpretable outside the report.
 - Use native TeX PGF/TikZ, primarily `pgfplots`, for report charts. Python computes
   statistics and emits reusable chart fragments; TeX renders them in the report.
   Horizontal zero-based count bars are the default for category comparison and
@@ -885,11 +892,16 @@ above and must not be added as a section of its findings report.
   be new or empty, and chart filenames must use a stable question ordinal,
   sanitized identifier and variant suffix. Every standalone chart PDF retains
   the full question identifier, denominator, unit and missingness note. The
-  descriptive payload records those filenames; no PNG export is required
+  descriptive payload records report-relative chart paths; no PNG export is required
   initially.
-- TeX-only output writes the report source and does not require a TeX compiler or
-  render standalone chart PDFs. PDF and standalone-chart builds must stage every
-  generated chart asset in a temporary compilation directory. Those builds must
+- TeX-only output writes a self-contained report source with embedded chart TeX
+  and does not require a TeX compiler or render standalone chart PDFs. PDF and
+  standalone-chart builds must stage every generated chart asset in a temporary
+  compilation directory, then publish from hidden sibling paths on each target
+  filesystem so cross-device publication cannot fail with `EXDEV`. Descriptive
+  file outputs must be new and the chart directory must be new or empty. Any
+  write, compile, or publication failure must roll back all outputs from that
+  invocation. Those builds must
   fail clearly if a referenced asset or the `xelatex` dependency is
   unavailable; they must not produce partial PDFs.
 - All public or reusable methods in `survey-so2-directory.py` must document their

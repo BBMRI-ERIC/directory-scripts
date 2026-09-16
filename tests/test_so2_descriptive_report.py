@@ -1187,6 +1187,34 @@ def test_pdf_publication_never_replaces_across_filesystems(tmp_path, monkeypatch
     assert (tmp_path / "charts" / "09-institution-type.pdf").is_file()
 
 
+def test_chart_staging_failure_removes_target_filesystem_stages(tmp_path, monkeypatch):
+    """A chart-copy failure removes every hidden target-side staging artifact."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    real_copy2 = module.shutil.copy2
+
+    def fail_chart_stage_copy(source, destination):
+        if Path(destination).parent.name.startswith(".so2-charts-"):
+            raise OSError("simulated chart staging failure")
+        return real_copy2(source, destination)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    monkeypatch.setattr(module.shutil, "copy2", fail_chart_stage_copy)
+    report_tex = tmp_path / "report.tex"
+    chart_dir = tmp_path / "charts"
+
+    with pytest.raises(module.InputError, match="stage chart PDFs"):
+        module.render_descriptive_pdf(rendered_payload(), report_tex, None, chart_dir)
+
+    assert not report_tex.exists()
+    assert not chart_dir.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_pdf_render_keeps_final_outputs_absent_when_report_compilation_fails(
     tmp_path, monkeypatch,
 ):

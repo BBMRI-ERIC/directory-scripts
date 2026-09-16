@@ -101,11 +101,18 @@ JSON, TeX, PDFs, and chart directories as sensitive because they can contain
 institution names and free text.
 
 TeX-only output requires no compiler and does not render standalone chart PDFs.
-PDF rendering invokes `xelatex` directly; a missing
-compiler fails PDF or standalone-chart rendering rather than producing a partial
-PDF. With `--output-chart-dir`, the directory must be new or empty and receives
-standalone vector-PDF charts generated from the same PGF/TikZ fragments as the
-report. Output paths must be distinct from all inputs and from one another.
+The published TeX is self-contained and can be compiled without a fragments
+directory. PDF rendering invokes `xelatex` directly; a missing compiler fails PDF
+or standalone-chart rendering rather than producing a partial PDF. With
+`--output-chart-dir`, the directory must be new or empty and receives standalone
+vector-PDF charts generated from the same PGF/TikZ source as the report. Each
+chart includes its question, denominator, unit, and missingness context, while the
+JSON payload records its report-relative path. The report includes full source
+provenance and per-question `N`, `A`, `M`, and applicability information; empty
+free-text questions explicitly state `No text responses.` File outputs must be
+new, and all output paths must be distinct from inputs and from one another.
+Publication uses target-directory sibling stages and rolls back the invocation on
+write, compile, or publication failure.
 
 ## Other utilities
 
