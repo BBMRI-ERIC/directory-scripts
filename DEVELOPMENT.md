@@ -804,6 +804,12 @@ above and must not be added as a section of its findings report.
   No Directory-resolution status, biobank deduplication, or collection expansion
   may affect descriptive counts. Report total, nonblank and excluded-blank row
   counts, workbook hash, worksheet, header row and descriptive-schema version.
+- The current SO2 XLSX envelope has service metadata in row 1 (`Alias` /
+  `SO2_2025`), export metadata in row 2 (`Export Date` / timestamp), a blank
+  row 3, and column headers in row 4. The reader must validate this envelope and
+  configure its header row explicitly. Preserve alias and export date as payload
+  provenance; never count service rows as questionnaire responses. A later survey
+  version may declare a different validated envelope in its descriptive schema.
 - A versioned descriptive-report schema declares source worksheet/header, every
   question's source column(s), question type, display label/order, category rules,
   optional multi-select delimiter, and optional parent question for free-text
