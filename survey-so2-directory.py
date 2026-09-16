@@ -28,7 +28,7 @@ from cli_common import (
     build_parser,
     configure_logging,
 )
-from directory import Directory
+Directory: Any = None
 from duo_terms import normalize_duo_term_ids
 from fix_proposals import EntityFixProposal, compute_checksum
 from oomutils import estimate_count_from_oom_or_none
@@ -318,6 +318,21 @@ def build_cli() -> argparse.ArgumentParser:
         ),
     )
 
+    describe = subparsers.add_parser("describe", help="Build descriptive statistics without Directory access.")
+    add_logging_arguments(describe)
+    describe.add_argument("-i", "--survey-file", required=True, help="Path to the SO2 survey XLSX export.")
+    describe.add_argument("--descriptive-schema", required=True, help="Path to the descriptive-workbook schema JSON.")
+    describe.add_argument("-o", "--output-json", required=True, help="Write descriptive-statistics payload JSON to this path.")
+    describe.add_argument("--output-tex", help="Optional path for the rendered TeX report.")
+    describe.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
+    describe.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
+
+    render_descriptive = subparsers.add_parser("render-descriptive-report", help="Render TeX/PDF from a descriptive-statistics payload.")
+    add_logging_arguments(render_descriptive)
+    render_descriptive.add_argument("-i", "--input-json", required=True, help="Descriptive-statistics payload JSON produced by describe.")
+    render_descriptive.add_argument("--output-tex", help="Optional path for the rendered TeX report; defaults next to the input JSON when rendering PDF or charts.")
+    render_descriptive.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
+    render_descriptive.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
     export = subparsers.add_parser("export-update-plan", help="Export qcheck-updater-compatible JSON from findings.")
     add_logging_arguments(export)
     export.add_argument("-i", "--input-json", required=True, help="Findings JSON produced by analyze.")
@@ -372,7 +387,11 @@ def load_survey(mapping: dict[str, Any], survey_file: str | Path) -> pd.DataFram
     return pd.read_excel(survey_path, sheet_name=mapping["survey"]["sheet"], header=header_row)
 
 
-def build_directory(args: argparse.Namespace) -> Directory:
+def build_directory(args: argparse.Namespace) -> Any:
+    global Directory
+    if Directory is None:
+        from directory import Directory as directory_class
+        Directory = directory_class
     if args.schema != "ERIC" and not args.token and not (args.username and args.password):
         raise InputError(
             "Reading a non-ERIC schema requires -t/--token or -u/--username and -p/--password."
@@ -3166,6 +3185,86 @@ def export_update_plan_from_report(report: dict[str, Any], output_json: str | Pa
     return payload
 
 
+
+def _require_distinct_descriptive_outputs(input_paths: list[str | Path], output_paths: list[str | Path | None]) -> None:
+    """Reject descriptive outputs that would overwrite an input artifact."""
+    resolved_inputs = {Path(path).resolve() for path in input_paths}
+    resolved_outputs = [Path(path).resolve() for path in output_paths if path is not None]
+    if any(path in resolved_inputs for path in resolved_outputs):
+        raise InputError("Descriptive output path must not alias an input XLSX or JSON file.")
+    if len(set(resolved_outputs)) != len(resolved_outputs):
+        raise InputError("Descriptive output paths must not alias each other.")
+
+
+def _require_new_or_empty_chart_dir(chart_dir: str | Path | None) -> None:
+    """Reject chart output directories that could mix old and new artifacts."""
+    if chart_dir is None:
+        return
+    target = Path(chart_dir)
+    if target.is_symlink():
+        raise InputError(f"Chart directory must not be a symbolic link: {target}")
+    if target.exists() and (not target.is_dir() or any(target.iterdir())):
+        raise InputError(f"Chart directory must be new or empty: {target}")
+
+
+def _load_descriptive_report_module() -> Any:
+    """Import the independent descriptive implementation only when requested."""
+    import so2_descriptive_report
+    return so2_descriptive_report
+
+
+def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespace, input_paths: list[str | Path]) -> None:
+    """Render descriptive outputs after validating all target paths."""
+    if not (args.output_tex or args.output_pdf or args.output_chart_dir):
+        raise InputError("render-descriptive-report requires at least one of --output-tex, --output-pdf, or --output-chart-dir.")
+    tex_path = args.output_tex or str(Path(args.input_json).with_suffix(".tex"))
+    _require_distinct_descriptive_outputs(input_paths, [tex_path, args.output_pdf, args.output_chart_dir])
+    _require_new_or_empty_chart_dir(args.output_chart_dir)
+    descriptive = _load_descriptive_report_module()
+    try:
+        rendered = descriptive.render_descriptive_tex(payload, args.output_chart_dir)
+        descriptive.render_descriptive_pdf(rendered, tex_path, args.output_pdf, args.output_chart_dir)
+    except descriptive.InputError as exc:
+        raise InputError(str(exc)) from exc
+
+
+def run_describe(args: argparse.Namespace) -> int:
+    """Create a standalone descriptive payload and optionally render it."""
+    _require_distinct_descriptive_outputs(
+        [args.survey_file, args.descriptive_schema],
+        [args.output_json, args.output_tex, args.output_pdf, args.output_chart_dir],
+    )
+    _require_new_or_empty_chart_dir(args.output_chart_dir)
+    descriptive = _load_descriptive_report_module()
+    try:
+        schema = descriptive.load_descriptive_schema(args.descriptive_schema)
+        workbook = descriptive.read_descriptive_workbook(args.survey_file, schema)
+        payload = descriptive.build_descriptive_payload(workbook, schema)
+    except descriptive.InputError as exc:
+        raise InputError(str(exc)) from exc
+    write_json(args.output_json, payload)
+    if args.output_tex or args.output_pdf or args.output_chart_dir:
+        render_args = argparse.Namespace(
+            input_json=args.output_json,
+            output_tex=args.output_tex,
+            output_pdf=args.output_pdf,
+            output_chart_dir=args.output_chart_dir,
+        )
+        _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema])
+    return EXIT_OK
+
+
+def run_render_descriptive_report(args: argparse.Namespace) -> int:
+    """Render an existing standalone descriptive-statistics payload."""
+    try:
+        payload = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InputError(f"Could not read descriptive-statistics payload {args.input_json}: {exc}") from exc
+    if payload.get("payload_type") != "so2_descriptive_statistics":
+        raise InputError("Expected a descriptive-statistics payload.")
+    _render_descriptive_payload(payload, args, [args.input_json])
+    return EXIT_OK
+
 def run_analyze(args: argparse.Namespace) -> int:
     report = analyze_survey(args)
     write_json(args.output_json, report)
@@ -3206,6 +3305,10 @@ def main() -> int:
             return run_render(args)
         if args.command == "export-update-plan":
             return run_export_update_plan(args)
+        if args.command == "describe":
+            return run_describe(args)
+        if args.command == "render-descriptive-report":
+            return run_render_descriptive_report(args)
         raise InputError(f"Unsupported command {args.command!r}.")
     except InputError as exc:
         logging.error("%s", exc)

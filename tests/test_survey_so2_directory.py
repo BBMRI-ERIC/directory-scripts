@@ -1,7 +1,91 @@
 from argparse import Namespace
+from datetime import datetime
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import json
+
+import pytest
+
+
+def write_descriptive_schema(tmp_path: Path) -> Path:
+    payload = {
+        "schema_version": "1",
+        "input": {
+            "worksheet": "Survey responses",
+            "alias": "SO2_2025",
+            "header_row": 4,
+        },
+        "columns": {
+            "respondent_context": ["Name of Institution", "Country"],
+            "institution_column": "Name of Institution",
+            "country_column": "Country",
+            "administrative_exclusions": [],
+            "administrative_exclusion_reasons": {},
+        },
+        "questions": [
+            {
+                "question_id": "digital_maturity",
+                "column": "Digital maturity",
+                "question_type": "ordinal",
+                "label": "Digital maturity",
+                "categories": ["Low", "High"],
+            }
+        ],
+        "output": {"source_row_column": "source_row"},
+    }
+    path = tmp_path / "descriptive-schema.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def write_descriptive_workbook(tmp_path: Path) -> Path:
+    path = tmp_path / "descriptive.xlsx"
+    workbook = __import__("openpyxl").Workbook()
+    sheet = workbook.active
+    sheet.title = "Survey responses"
+    sheet.append(["Alias", "SO2_2025"])
+    sheet.append(["Export Date", datetime(2026, 3, 13, 7, 22, 45)])
+    sheet.append([])
+    sheet.append(["Name of Institution", "Country", "Digital maturity"])
+    sheet.append(["Demo Biobank", "Czech Republic", "High"])
+    workbook.save(path)
+    return path
+
+
+def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
+    module = load_module()
+    monkeypatch.setattr(module, "Directory", lambda *args, **kwargs: pytest.fail("Directory must not be used"))
+    output_json = tmp_path / "descriptive.json"
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+    ])
+
+    assert module.run_describe(args) == module.EXIT_OK
+    assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
+
+
+def test_render_descriptive_rejects_legacy_findings_json(tmp_path):
+    module = load_module()
+    input_json = tmp_path / "findings.json"
+    input_json.write_text(json.dumps({"summary": {}}), encoding="utf-8")
+    args = Namespace(
+        input_json=str(input_json),
+        output_tex=str(tmp_path / "out.tex"),
+        output_pdf=None,
+        output_chart_dir=None,
+    )
+
+    with pytest.raises(module.InputError, match="descriptive-statistics payload"):
+        module.run_render_descriptive_report(args)
+
+
+def test_current_commands_keep_existing_parser_contract():
+    parser = load_module().build_cli()
+
+    assert parser.parse_args(["analyze", "-i", "survey.xlsx", "-o", "findings.json"]).command == "analyze"
+    assert parser.parse_args(["render-report", "-i", "findings.json", "--output-pdf", "report.pdf"]).command == "render-report"
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "survey-so2-directory.py"
