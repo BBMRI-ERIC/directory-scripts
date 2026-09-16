@@ -1,12 +1,30 @@
 """Tests for the self-contained SO2 descriptive-workbook reader."""
 
 import importlib
+from pathlib import Path
 
 import openpyxl
 import pytest
 
 
 module = importlib.import_module("so2_descriptive_report")
+WORKTREE = Path(__file__).resolve().parents[1]
+PRODUCTION_SCHEMA = WORKTREE / "survey-mappings" / "so2_2025_descriptive_report.json"
+PRODUCTION_WORKBOOK = Path("/storage/emulated/0/BBMRI-ERIC/directory-scripts/Content_Export_SO2_2025_20260313.xlsx")
+LEGAL_GDPR = "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)"
+LEGAL_LICENSING = "What types of legal barriers have you faced?: Licensing restrictions"
+LEGAL_OWNERSHIP = "What types of legal barriers have you faced?: Lack of clarity on data ownership"
+LEGAL_CROSS_BORDER = "What types of legal barriers have you faced?: Cross-border data sharing restrictions"
+OTHER_LEGAL = "If there are other legal barriers, please specify:"
+TRACEABILITY_READINESS = (
+    "How would you rate your repository’s technical readiness for integrating full digital "
+    "traceability? Please choose what corresponds the most to your current situation. By “digital "
+    "traceability,” we mean the structured, automated, and system-supported capture and linkage of "
+    "associated data (e.g. preanalytical, clinical, research-derived), enabling traceability of a "
+    "sample across its full lifecycle, from collection through processing, storage, use, and data "
+    "generation. This includes the use of dedicated software (e.g. BIMS/LIMS), digital metadata "
+    "standards, audit trails, and secure linkage to clinical data or research data."
+)
 
 
 HEADERS = [
@@ -229,3 +247,76 @@ def test_nonblank_response_row_ignores_administrative_values():
     assert not module.is_nonblank_response_row(
         row, ["Name of Institution", "Country", "Digital maturity"]
     )
+
+
+def read_row_four_headers(workbook_path):
+    """Return the exact production workbook row-4 headers."""
+    workbook = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
+    try:
+        return [cell.value for cell in workbook.active[4]]
+    finally:
+        workbook.close()
+
+
+def questions_by_column(schema):
+    """Index raw schema questions by their explicit source header."""
+    return {question["column"]: question for question in schema["questions"]}
+
+
+def test_production_schema_accounts_for_every_header():
+    """The production registry classifies each current source header exactly once."""
+    schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
+    headers = read_row_four_headers(PRODUCTION_WORKBOOK)
+    module.validate_descriptive_schema(schema, headers)
+    classified = set(schema["columns"]["respondent_context"])
+    classified |= set(schema["columns"]["administrative_exclusions"])
+    classified |= {item["column"] for item in schema["questions"]}
+
+    assert classified == set(headers)
+    assert len(classified) == len(headers)
+
+
+def test_production_schema_barrier_matrix_is_ordinal_and_other_legal_text_has_all_parents():
+    """Barrier ratings stay ordered and their free text retains its matrix context."""
+    questions = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))
+
+    assert questions[LEGAL_GDPR]["question_type"] == "ordinal"
+    assert questions[OTHER_LEGAL]["parent_columns"] == [
+        LEGAL_GDPR,
+        LEGAL_LICENSING,
+        LEGAL_OWNERSHIP,
+        LEGAL_CROSS_BORDER,
+    ]
+
+
+def test_production_schema_semicolon_inside_declared_ordinal_is_not_split():
+    """An ordinal label containing semicolons is not treated as a multi-choice answer."""
+    question = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))[TRACEABILITY_READINESS]
+
+    assert question["question_type"] == "ordinal"
+    assert question.get("delimiter") is None
+
+
+def test_production_schema_declares_every_observed_structured_value():
+    """All observed structured responses have an explicit declared category."""
+    schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
+    questions = questions_by_column(schema)
+    workbook = openpyxl.load_workbook(PRODUCTION_WORKBOOK, read_only=True, data_only=True)
+    try:
+        rows = workbook.active.iter_rows(min_row=4, values_only=True)
+        headers = list(next(rows))
+        observed = [set() for _ in headers]
+        for row in rows:
+            for index, value in enumerate(row):
+                if value not in (None, ""):
+                    observed[index].add(value)
+    finally:
+        workbook.close()
+    for index, header in enumerate(headers):
+        question = questions.get(header)
+        if question is None or question["question_type"] == "free_text":
+            continue
+        values = observed[index]
+        if question["question_type"] == "multi_choice":
+            values = {choice for value in values for choice in value.split(question["delimiter"])}
+        assert values <= set(question["categories"]), header

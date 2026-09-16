@@ -1,0 +1,1190 @@
+{
+  "schema_version": "1",
+  "input": {
+    "worksheet": "Content",
+    "alias": "SO2_2025",
+    "header_row": 4
+  },
+  "columns": {
+    "respondent_context": [
+      "Name",
+      "Role",
+      "E-Mail address",
+      "Name of Institution",
+      "BiobankID in the Directory (if available)",
+      "List of CollectionID in the Directory (if you only represent a part of a biobank; please use \";\" as separator in case of more than 1 ID)",
+      "Country"
+    ],
+    "administrative_exclusions": [
+      "Creation date",
+      "Last update"
+    ],
+    "administrative_exclusion_reasons": {
+      "Creation date": "Administrative export metadata.",
+      "Last update": "Administrative export metadata."
+    }
+  },
+  "questions": [
+    {
+      "question_id": "q_008_how_many_years_of_experience_do_you_have_in_the_field",
+      "column": "How many years of experience do you have in the field?",
+      "question_type": "ordinal",
+      "label": "How many years of experience do you have in the field?",
+      "categories": [
+        "Junior (<5 years in the domain and no team leadership)",
+        "Medior (<10 years or team leadership)",
+        "Senior (>=10 years or expert with international recognition)"
+      ]
+    },
+    {
+      "question_id": "q_009_what_type_of_institution_do_you_work_for_select_all_that_apply",
+      "column": "What type of institution do you work for? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What type of institution do you work for? (Select all that apply)",
+      "categories": [
+        "University",
+        "Hospital/Healthcare Provider",
+        "Research Institute",
+        "Government Agency",
+        "Other (please specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_010_type_of_institution",
+      "column": "Type of Institution",
+      "question_type": "free_text",
+      "label": "Type of Institution",
+      "categories": []
+    },
+    {
+      "question_id": "q_011_is_this_the_institution_hosting_a_bbmri_eric_national_or_organisational_",
+      "column": "Is this the institution hosting a BBMRI-ERIC National or Organisational Node?",
+      "question_type": "single_choice",
+      "label": "Is this the institution hosting a BBMRI-ERIC National or Organisational Node?",
+      "categories": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_012_what_field_of_research_does_your_biobank_or_biomolecular_resource_suppor",
+      "column": "What field of research does your biobank or biomolecular resource support? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What field of research does your biobank or biomolecular resource support? (Select all that apply)",
+      "categories": [
+        "Biomedical",
+        "Medical",
+        "Public Health",
+        "Health Informatics",
+        "Not involved in research",
+        "Other (please specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_013_research_field",
+      "column": "Research field",
+      "question_type": "free_text",
+      "label": "Research field",
+      "categories": []
+    },
+    {
+      "question_id": "q_014_are_you_interested_in_promoting_your_biobank_resources_to_new_partners",
+      "column": "Are you interested in promoting your biobank resources to new partners?",
+      "question_type": "single_choice",
+      "label": "Are you interested in promoting your biobank resources to new partners?",
+      "categories": [
+        "Yes - academic",
+        "Yes - industrial and academic",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_015_does_the_organization_where_the_biobank_is_located_as_a_service_unit_hav",
+      "column": "Does the organization where the Biobank is located as a service unit have dedicated personnel for biobank activities?",
+      "question_type": "single_choice",
+      "label": "Does the organization where the Biobank is located as a service unit have dedicated personnel for biobank activities?",
+      "categories": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_016_please_indicate_which_of_the_following_activities_are_carried_out_by_the",
+      "column": "Please indicate which of the following activities are carried out by the dedicated biobank personnel. (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Please indicate which of the following activities are carried out by the dedicated biobank personnel. (Select all that apply)",
+      "categories": [
+        "Laboratory technicians",
+        "IT professionals",
+        "Data engineer",
+        "Data scientist",
+        "Quality expert",
+        "Biotechnologists",
+        "Bioinformaticians",
+        "Molecular biology",
+        "Bioethicist",
+        "Data privacy expert",
+        "Other (please specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_017_activities",
+      "column": "Activities",
+      "question_type": "free_text",
+      "label": "Activities",
+      "categories": []
+    },
+    {
+      "question_id": "q_018_does_the_staff_dedicated_or_not_managing_the_repository_have_experience_",
+      "column": "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:",
+      "question_type": "multi_choice",
+      "label": "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:",
+      "categories": [
+        "MIABIS",
+        "SNOMED CT (terminology only)",
+        "ICD-10",
+        "No experience",
+        "I don’t know",
+        "ICD-9",
+        "ORPHA codes Ontologies:",
+        "ICD-10 with national modifications",
+        "SNOMED CT (full use of ontology)",
+        "OMOP Exchange Formats:",
+        "HPO",
+        "SPREC",
+        "HL7 FHIR",
+        "ICD-11 LOINC UMLS",
+        "ORDO Common data models:",
+        "DICOM",
+        "ICD-9 with national modifications",
+        "Other standards (any other terminologies, ontologies, common data models, or exchange formats) (please specify):",
+        "National Cancer Institute thesaurus (NCIt)",
+        "HL v2"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_019_standards",
+      "column": "Standards",
+      "question_type": "free_text",
+      "label": "Standards",
+      "categories": []
+    },
+    {
+      "question_id": "q_020_if_you_support_hl7_fhir_does_your_repository_support_the_national_or_int",
+      "column": "If you support HL7 FHIR, does your repository support the national or international exchange of data in HL7 FHIR? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "If you support HL7 FHIR, does your repository support the national or international exchange of data in HL7 FHIR? (Select all that apply)",
+      "categories": [
+        "I don’t know",
+        "No",
+        "Yes – national exchange",
+        "Yes – local exchange",
+        "Yes – international exchange"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_021_what_type_of_information_system_is_used_to_run_the_biobank_select_all_th",
+      "column": "What type of information system is used to run the biobank? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What type of information system is used to run the biobank? (Select all that apply)",
+      "categories": [
+        "Electronic – standalone biobank system (BIMS or LIMS) managed by the biobank",
+        "Electronic – integrated into a larger system of a organization (hospital, university etc.)",
+        "Spreadsheet based (e.g. EXCEL)",
+        "Paper based",
+        "Electronic – standalone biobank system (BIMS or LIMS) managed by a third party",
+        "Separate system for storing or linking research data derived from samples (e.g., sequencing database, imaging repository) managed by the biobank",
+        "I don’t know",
+        "Separate system for storing or linking research data derived from samples (e.g., sequencing database, imaging repository) managed by a third party"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_022_if_there_is_a_dedicated_it_system_provide_us_with_the_product_name_vendo",
+      "column": "If there is a dedicated IT system, provide us with the product name, vendor name, and indicate if any of these products is open source.",
+      "question_type": "free_text",
+      "label": "If there is a dedicated IT system, provide us with the product name, vendor name, and indicate if any of these products is open source.",
+      "categories": []
+    },
+    {
+      "question_id": "q_023_what_other_systems_is_the_repository_electronically_connected_to_and_can",
+      "column": "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)",
+      "categories": [
+        "Clinical information system of a hospital",
+        "PACS system of a hospital",
+        "Other (please specify list of other data sources):",
+        "I don’t know",
+        "National health registry (please specify list of registries)",
+        "National death registry",
+        "National civic (non-health) registries",
+        "International registries (please specify list of registries)"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_024_national_health_registries_please_separate_with_if_more_than_1",
+      "column": "National health registries (please separate with \";\" if more than 1)",
+      "question_type": "free_text",
+      "label": "National health registries (please separate with \";\" if more than 1)",
+      "categories": []
+    },
+    {
+      "question_id": "q_025_international_registries_please_separate_with_if_more_than_1",
+      "column": "International registries (please separate with \";\" if more than 1)",
+      "question_type": "free_text",
+      "label": "International registries (please separate with \";\" if more than 1)",
+      "categories": []
+    },
+    {
+      "question_id": "q_026_other_data_sources_please_separate_with_if_more_than_1",
+      "column": "Other data sources (please separate with \";\" if more than 1)",
+      "question_type": "free_text",
+      "label": "Other data sources (please separate with \";\" if more than 1)",
+      "categories": []
+    },
+    {
+      "question_id": "q_027_do_you_have_an_it_infrastructure_for_the_repository_and_if_yes_how_is_it",
+      "column": "Do you have an IT infrastructure for the repository and if yes, how is it provided and managed? (Select all that apply - e.g. you can have infrastructure provided by your institution, but you have to pay per use still)",
+      "question_type": "multi_choice",
+      "label": "Do you have an IT infrastructure for the repository and if yes, how is it provided and managed? (Select all that apply - e.g. you can have infrastructure provided by your institution, but you have to pay per use still)",
+      "categories": [
+        "IT infrastructure managed by biobank personnel",
+        "IT infrastructure managed by dedicated group within the institution (e.g. Data Processing Centre, IT Center of the University)",
+        "IT infrastructure provided by an external commercial provider (e.g. AWS, Azure etc.)",
+        "I don’t know",
+        "No infrastructure",
+        "IT infrastructure provided by an external non-commercial provider (e.g. national academic eInfrastructure)",
+        "IT infrastructure provided as a capital investment and not paid per use",
+        "IT infrastructure requiring pay-per-use",
+        "Other (please specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_028_it_infrastructure",
+      "column": "IT infrastructure",
+      "question_type": "free_text",
+      "label": "IT infrastructure",
+      "categories": []
+    },
+    {
+      "question_id": "q_029_what_type_of_data_storage_systems_does_your_repository_have_select_all_t",
+      "column": "What type of data storage systems does your repository have? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What type of data storage systems does your repository have? (Select all that apply)",
+      "categories": [
+        "Externally-provided cloud-based storage systems – if yes, provide capacity S3 object storage systems",
+        "I don’t know",
+        "Large-scale storage system for large volume research data (>10 TB) – if yes, provide capacity",
+        "On-site backup systems",
+        "Large-scale storage system for large volume healthcare data (>10 TB) – if yes, provide capacity",
+        "Off-site backup systems",
+        "Other (specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_030_capacity_of_large_scale_storage_for_research_data",
+      "column": "Capacity of large-scale storage for research data",
+      "question_type": "free_text",
+      "label": "Capacity of large-scale storage for research data",
+      "categories": []
+    },
+    {
+      "question_id": "q_031_capacity_of_large_scale_storage_for_healthcare_data",
+      "column": "Capacity of large-scale storage for healthcare data",
+      "question_type": "free_text",
+      "label": "Capacity of large-scale storage for healthcare data",
+      "categories": []
+    },
+    {
+      "question_id": "q_032_capacity_of_s3_storage",
+      "column": "Capacity of S3 storage",
+      "question_type": "free_text",
+      "label": "Capacity of S3 storage",
+      "categories": []
+    },
+    {
+      "question_id": "q_033_type_of_storage_system",
+      "column": "Type of storage system",
+      "question_type": "free_text",
+      "label": "Type of storage system",
+      "categories": []
+    },
+    {
+      "question_id": "q_034_can_the_repository_allocate_computational_and_data_storage_resources_to_",
+      "column": "Can the repository allocate computational and data storage resources to implement additional BBMRI services? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Can the repository allocate computational and data storage resources to implement additional BBMRI services? (Select all that apply)",
+      "categories": [
+        "No",
+        "I don’t know",
+        "Yes – using available physical hardware",
+        "Yes – using virtual/cloud capacities",
+        "Yes – but need to procure new hardware"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_035_does_the_repository_have_a_direct_access_to_data_from_any_of_the_followi",
+      "column": "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)",
+      "categories": [
+        "Other (please specify):",
+        "I don’t know",
+        "Next-gen sequencing (if yes, specify technology/vendor)",
+        "Radiology imaging (if yes, specify technology/vendor)",
+        "Pathology imaging (if yes, specify technology/vendor)",
+        "Proteomics (if yes, specify technology/vendor)",
+        "Metabolomics (if yes, specify technology/vendor)"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_036_next_gen_sequencing_technology_vendor",
+      "column": "Next-gen sequencing technology/vendor",
+      "question_type": "free_text",
+      "label": "Next-gen sequencing technology/vendor",
+      "categories": []
+    },
+    {
+      "question_id": "q_037_radiology_imaging_technology_vendor",
+      "column": "Radiology imaging technology/vendor",
+      "question_type": "free_text",
+      "label": "Radiology imaging technology/vendor",
+      "categories": []
+    },
+    {
+      "question_id": "q_038_pathology_imaging_technology_vendor",
+      "column": "Pathology imaging technology/vendor",
+      "question_type": "free_text",
+      "label": "Pathology imaging technology/vendor",
+      "categories": []
+    },
+    {
+      "question_id": "q_039_proteomics_technology_vendor",
+      "column": "Proteomics technology/vendor",
+      "question_type": "free_text",
+      "label": "Proteomics technology/vendor",
+      "categories": []
+    },
+    {
+      "question_id": "q_040_metabolomics_technology_vendor",
+      "column": "Metabolomics technology/vendor",
+      "question_type": "free_text",
+      "label": "Metabolomics technology/vendor",
+      "categories": []
+    },
+    {
+      "question_id": "q_041_technologies",
+      "column": "Technologies",
+      "question_type": "free_text",
+      "label": "Technologies",
+      "categories": []
+    },
+    {
+      "question_id": "q_042_are_you_contributing_or_depositing_data_to_some_bigger_national_or_inter",
+      "column": "Are you contributing or depositing data to some bigger national or international databases? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Are you contributing or depositing data to some bigger national or international databases? (Select all that apply)",
+      "categories": [
+        "No",
+        "I don’t know",
+        "Other (please specify):",
+        "UniProt PDB",
+        "ENA (by EBI)",
+        "European Genome-Phenome Archive (EGA – by EBI)",
+        "TCGA",
+        "dbSNP"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_043_database",
+      "column": "Database",
+      "question_type": "free_text",
+      "label": "Database",
+      "categories": []
+    },
+    {
+      "question_id": "q_044_are_you_connected_to_or_providing_data_to_international_or_major_nationa",
+      "column": "Are you connected to or providing data to international or major national initiatives? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Are you connected to or providing data to international or major national initiatives? (Select all that apply)",
+      "categories": [
+        "I don’t know",
+        "Other (please specify):",
+        "ERDERA (formerly RD-Connect and EJP RD)",
+        "Medical Informatics Initiative (DE)"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_045_initiative",
+      "column": "Initiative",
+      "question_type": "free_text",
+      "label": "Initiative",
+      "categories": []
+    },
+    {
+      "question_id": "q_046_what_is_the_origin_of_the_samples_stored_at_your_biobank_select_all_that",
+      "column": "What is the origin of the samples stored at your biobank? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What is the origin of the samples stored at your biobank? (Select all that apply)",
+      "categories": [
+        "Human",
+        "Animal",
+        "Microorganisms"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_047_origin_of_samples",
+      "column": "Origin of samples",
+      "question_type": "free_text",
+      "label": "Origin of samples",
+      "categories": []
+    },
+    {
+      "question_id": "q_048_do_the_collections_in_the_directory_reflect_representatively_the_size_of",
+      "column": "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)",
+      "question_type": "single_choice",
+      "label": "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)",
+      "categories": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_049_why_are_the_collections_not_representative",
+      "column": "Why are the collections not representative?",
+      "question_type": "free_text",
+      "label": "Why are the collections not representative?",
+      "categories": [],
+      "parent_columns": [
+        "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)"
+      ]
+    },
+    {
+      "question_id": "q_050_which_types_of_samples_do_you_manage",
+      "column": "Which types of samples do you manage?",
+      "question_type": "multi_choice",
+      "label": "Which types of samples do you manage?",
+      "categories": [
+        "Whole Blood",
+        "Blood derivatives",
+        "Fresh Frozen Tissue",
+        "DNA/RNA",
+        "PBMC",
+        "FFPE Tissue",
+        "Urine",
+        "Faeces",
+        "Other (please specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_051_sample_types",
+      "column": "Sample types",
+      "question_type": "free_text",
+      "label": "Sample types",
+      "categories": []
+    },
+    {
+      "question_id": "q_052_what_is_the_approximate_size_of_your_biobank_number_of_samples_aliquots",
+      "column": "What is the approximate size of your biobank (number of samples aliquots)?",
+      "question_type": "ordinal",
+      "label": "What is the approximate size of your biobank (number of samples aliquots)?",
+      "categories": [
+        "< 500 aliquots",
+        "500 - 1000 aliquots",
+        "1000 - 10,000 aliquots",
+        "10,000 - 100,000 aliquots",
+        "> 100,000 aliquots"
+      ]
+    },
+    {
+      "question_id": "q_053_are_sample_related_data_collected_in_an_automated_way_e_g_directly_from_",
+      "column": "Are sample-related data collected in an automated way (e.g., directly from lab instruments or lab systems, without manual input)? Examples include timestamps, temperatures, processing steps, or QC metrics automatically captured by lab devices or software.",
+      "question_type": "ordinal",
+      "label": "Are sample-related data collected in an automated way (e.g., directly from lab instruments or lab systems, without manual input)? Examples include timestamps, temperatures, processing steps, or QC metrics automatically captured by lab devices or software.",
+      "categories": [
+        "No",
+        "Partially yes",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_054_describe_the_reasons_for_not_collecting_e_g_devices_do_not_provide_the_i",
+      "column": "Describe the reasons for not collecting (e.g. devices do not provide the information or integration is technically difficult).",
+      "question_type": "free_text",
+      "label": "Describe the reasons for not collecting (e.g. devices do not provide the information or integration is technically difficult).",
+      "categories": [],
+      "parent_columns": [
+        "Are sample-related data collected in an automated way (e.g., directly from lab instruments or lab systems, without manual input)? Examples include timestamps, temperatures, processing steps, or QC metrics automatically captured by lab devices or software."
+      ]
+    },
+    {
+      "question_id": "q_055_do_you_track_the_full_chain_of_custody_of_each_sample_and_associated_dat",
+      "column": "Do you track the full chain of custody of each sample and associated data (from collection to analysis for research)? (Select all that apply) This includes documenting the departments, organizations, and individuals (e.g. using coded identifiers) involved at each step, along with time points, locations, and processing or transfer events.",
+      "question_type": "multi_choice",
+      "label": "Do you track the full chain of custody of each sample and associated data (from collection to analysis for research)? (Select all that apply) This includes documenting the departments, organizations, and individuals (e.g. using coded identifiers) involved at each step, along with time points, locations, and processing or transfer events.",
+      "categories": [
+        "Partially - Some steps are tracked, but not comprehensively.",
+        "We track only departments/organizations.",
+        "We track both individuals and departments/organizations throughout the sample lifecycle.",
+        "We do not systematically track this information.",
+        "We track only individual handlers.",
+        "I don’t know"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_056_are_sample_related_data_linked_to_donor_data_in_your_system_or_on_the_le",
+      "column": "Are sample-related data linked to donor data in your system or on the level of your organisation?",
+      "question_type": "ordinal",
+      "label": "Are sample-related data linked to donor data in your system or on the level of your organisation?",
+      "categories": [
+        "The data are not linkable",
+        "Can be linked with effort and limitations (technical or legal)",
+        "Routinely"
+      ]
+    },
+    {
+      "question_id": "q_057_does_your_system_automatically_track_changes_made_to_traceability_or_pro",
+      "column": "Does your system automatically track changes made to traceability or provenance-related data (e.g. processing, handling, storage, transfers)? This refers to audit trails or version logs typically managed by a BIMS or database system",
+      "question_type": "ordinal",
+      "label": "Does your system automatically track changes made to traceability or provenance-related data (e.g. processing, handling, storage, transfers)? This refers to audit trails or version logs typically managed by a BIMS or database system",
+      "categories": [
+        "Changes are not systematically tracked",
+        "Changes are tracked manually (e.g. logbooks, EXCEL notes)",
+        "Changes are tracked automatically (e.g. by a BIMS or LIMS audit trail)"
+      ]
+    },
+    {
+      "question_id": "q_058_how_would_you_rate_your_repository_s_technical_readiness_for_integrating",
+      "column": "How would you rate your repository’s technical readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. By “digital traceability,” we mean the structured, automated, and system-supported capture and linkage of associated data (e.g. preanalytical, clinical, research-derived), enabling traceability of a sample across its full lifecycle, from collection through processing, storage, use, and data generation. This includes the use of dedicated software (e.g. BIMS/LIMS), digital metadata standards, audit trails, and secure linkage to clinical data or research data.",
+      "question_type": "ordinal",
+      "label": "How would you rate your repository’s technical readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. By “digital traceability,” we mean the structured, automated, and system-supported capture and linkage of associated data (e.g. preanalytical, clinical, research-derived), enabling traceability of a sample across its full lifecycle, from collection through processing, storage, use, and data generation. This includes the use of dedicated software (e.g. BIMS/LIMS), digital metadata standards, audit trails, and secure linkage to clinical data or research data.",
+      "categories": [
+        "Not started or fully manual: No digital traceability systems in place; tracking and data linkage are done manually or not at all.",
+        "Basic digital tools in use: Processes rely on spreadsheets or limited tools; traceability is possible but unstructured or inconsistent.",
+        "Partially digital, some key limitations: A digital system is in place (e.g., LIMS or custom DB), but linkage across data types is incomplete or metadata is not standardized.",
+        "Mostly digital with minor gaps: Most traceability processes are digital; structured data is used for key steps, and linkage to clinical/research data is possible with little effort.",
+        "Fully digital and interoperable: All associated data are managed through integrated, structured systems (e.g. BIMS), with routine linkage to clinical and research data; metadata standards (e.g. SPREC, MIABIS) and data protection compliant workflows are in place."
+      ]
+    },
+    {
+      "question_id": "q_059_if_you_require_guidance_or_support_to_implement_advanced_digital_traceab",
+      "column": "If you require guidance or support to implement advanced digital traceability, please briefly describe what kind (e.g., technical, legal, funding, training):",
+      "question_type": "free_text",
+      "label": "If you require guidance or support to implement advanced digital traceability, please briefly describe what kind (e.g., technical, legal, funding, training):",
+      "categories": [],
+      "parent_columns": [
+        "How would you rate your repository’s technical readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. By “digital traceability,” we mean the structured, automated, and system-supported capture and linkage of associated data (e.g. preanalytical, clinical, research-derived), enabling traceability of a sample across its full lifecycle, from collection through processing, storage, use, and data generation. This includes the use of dedicated software (e.g. BIMS/LIMS), digital metadata standards, audit trails, and secure linkage to clinical data or research data."
+      ]
+    },
+    {
+      "question_id": "q_060_does_your_qms_track_processing_handling_storage_transfers_of_biological_",
+      "column": "Does your QMS track processing, handling, storage, transfers of biological material and generated data?",
+      "question_type": "ordinal",
+      "label": "Does your QMS track processing, handling, storage, transfers of biological material and generated data?",
+      "categories": [
+        "Not systematically tracked",
+        "Tracked manually on the paper",
+        "Tracked manually and still digital (e.g. logbooks, EXCEL notes)",
+        "Tracked automatically (e.g. by a BIMS or LIMS audit trail)"
+      ]
+    },
+    {
+      "question_id": "q_061_how_would_you_rate_your_biobank_s_quality_management_system_qms_readines",
+      "column": "How would you rate your biobank’s Quality Management System (QMS) readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. This refers to the extent to which your QMS includes procedures, documentation, responsibilities, and controls that enable structured, auditable, and reproducible management of associated data across the sample lifecycle.",
+      "question_type": "ordinal",
+      "label": "How would you rate your biobank’s Quality Management System (QMS) readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. This refers to the extent to which your QMS includes procedures, documentation, responsibilities, and controls that enable structured, auditable, and reproducible management of associated data across the sample lifecycle.",
+      "categories": [
+        "Our QMS does not currently address traceability of samples and associated data in a structured or digital way.",
+        "Limited alignment between QMS and digital traceability requirements.",
+        "Our QMS includes some relevant procedures, but coverage is partial or outdated.",
+        "Most processes are covered, with minor gaps or updates needed.",
+        "Our QMS fully supports digital traceability, including SOPs, documentation practices, data quality controls and audit mechanisms across the full data lifecycle."
+      ]
+    },
+    {
+      "question_id": "q_062_if_you_require_guidance_or_support_to_strengthen_your_qms_alignment_with",
+      "column": "If you require guidance or support to strengthen your QMS alignment with digital traceability, please briefly describe what kind (e.g. SOP development, audits, training, templates, funding):",
+      "question_type": "free_text",
+      "label": "If you require guidance or support to strengthen your QMS alignment with digital traceability, please briefly describe what kind (e.g. SOP development, audits, training, templates, funding):",
+      "categories": [],
+      "parent_columns": [
+        "How would you rate your biobank’s Quality Management System (QMS) readiness for integrating full digital traceability? Please choose what corresponds the most to your current situation. This refers to the extent to which your QMS includes procedures, documentation, responsibilities, and controls that enable structured, auditable, and reproducible management of associated data across the sample lifecycle."
+      ]
+    },
+    {
+      "question_id": "q_063_what_types_of_legal_barriers_have_you_faced_data_protection_regulations_",
+      "column": "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)",
+      "question_type": "ordinal",
+      "label": "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_064_what_types_of_legal_barriers_have_you_faced_licensing_restrictions",
+      "column": "What types of legal barriers have you faced?: Licensing restrictions",
+      "question_type": "ordinal",
+      "label": "What types of legal barriers have you faced?: Licensing restrictions",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_065_what_types_of_legal_barriers_have_you_faced_lack_of_clarity_on_data_owne",
+      "column": "What types of legal barriers have you faced?: Lack of clarity on data ownership",
+      "question_type": "ordinal",
+      "label": "What types of legal barriers have you faced?: Lack of clarity on data ownership",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_066_what_types_of_legal_barriers_have_you_faced_cross_border_data_sharing_re",
+      "column": "What types of legal barriers have you faced?: Cross-border data sharing restrictions",
+      "question_type": "ordinal",
+      "label": "What types of legal barriers have you faced?: Cross-border data sharing restrictions",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_067_if_there_are_other_legal_barriers_please_specify",
+      "column": "If there are other legal barriers, please specify:",
+      "question_type": "free_text",
+      "label": "If there are other legal barriers, please specify:",
+      "categories": [],
+      "parent_columns": [
+        "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)",
+        "What types of legal barriers have you faced?: Licensing restrictions",
+        "What types of legal barriers have you faced?: Lack of clarity on data ownership",
+        "What types of legal barriers have you faced?: Cross-border data sharing restrictions"
+      ]
+    },
+    {
+      "question_id": "q_068_what_organizational_barriers_have_you_encountered_select_all_that_apply_",
+      "column": "What organizational barriers have you encountered? (Select all that apply): Lack of data sharing agreements",
+      "question_type": "ordinal",
+      "label": "What organizational barriers have you encountered? (Select all that apply): Lack of data sharing agreements",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_069_what_organizational_barriers_have_you_encountered_select_all_that_apply_",
+      "column": "What organizational barriers have you encountered? (Select all that apply): Bureaucratic delays",
+      "question_type": "ordinal",
+      "label": "What organizational barriers have you encountered? (Select all that apply): Bureaucratic delays",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_070_what_organizational_barriers_have_you_encountered_select_all_that_apply_",
+      "column": "What organizational barriers have you encountered? (Select all that apply): Lack of contact points or unclear responsibilities",
+      "question_type": "ordinal",
+      "label": "What organizational barriers have you encountered? (Select all that apply): Lack of contact points or unclear responsibilities",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_071_what_organizational_barriers_have_you_encountered_select_all_that_apply_",
+      "column": "What organizational barriers have you encountered? (Select all that apply): Institutional reluctance to share data",
+      "question_type": "ordinal",
+      "label": "What organizational barriers have you encountered? (Select all that apply): Institutional reluctance to share data",
+      "categories": [
+        "never",
+        "rarely",
+        "occasionally",
+        "frequently"
+      ]
+    },
+    {
+      "question_id": "q_072_if_there_are_other_organisational_barriers_please_specify",
+      "column": "If there are other organisational barriers, please specify:",
+      "question_type": "free_text",
+      "label": "If there are other organisational barriers, please specify:",
+      "categories": [],
+      "parent_columns": [
+        "What organizational barriers have you encountered? (Select all that apply): Lack of data sharing agreements",
+        "What organizational barriers have you encountered? (Select all that apply): Bureaucratic delays",
+        "What organizational barriers have you encountered? (Select all that apply): Lack of contact points or unclear responsibilities",
+        "What organizational barriers have you encountered? (Select all that apply): Institutional reluctance to share data"
+      ]
+    },
+    {
+      "question_id": "q_073_how_would_you_rate_the_collaboration_between_local_national_internationa",
+      "column": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Local",
+      "question_type": "ordinal",
+      "label": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Local",
+      "categories": [
+        "excellent",
+        "good",
+        "fair",
+        "poor",
+        "very poor",
+        "not applicable"
+      ]
+    },
+    {
+      "question_id": "q_074_how_would_you_rate_the_collaboration_between_local_national_internationa",
+      "column": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: National",
+      "question_type": "ordinal",
+      "label": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: National",
+      "categories": [
+        "excellent",
+        "good",
+        "fair",
+        "poor",
+        "very poor",
+        "not applicable"
+      ]
+    },
+    {
+      "question_id": "q_075_how_would_you_rate_the_collaboration_between_local_national_internationa",
+      "column": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Europewide",
+      "question_type": "ordinal",
+      "label": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Europewide",
+      "categories": [
+        "excellent",
+        "good",
+        "fair",
+        "poor",
+        "very poor",
+        "not applicable"
+      ]
+    },
+    {
+      "question_id": "q_076_how_would_you_rate_the_collaboration_between_local_national_internationa",
+      "column": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Outside Europe",
+      "question_type": "ordinal",
+      "label": "How would you rate the collaboration between local/national/international institutions for data sharing in your field?: Outside Europe",
+      "categories": [
+        "excellent",
+        "good",
+        "fair",
+        "poor",
+        "very poor",
+        "not applicable"
+      ]
+    },
+    {
+      "question_id": "q_077_which_of_the_following_semantic_issues_have_you_experienced_select_all_t",
+      "column": "Which of the following semantic issues have you experienced? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Which of the following semantic issues have you experienced? (Select all that apply)",
+      "categories": [
+        "Inconsistencies across coding systems or inconsistent application of them (e.g., ICD, SNOMED)",
+        "Ambiguous or undefined data elements",
+        "Difficulty integrating data from multiple sources",
+        "Lack of metadata or documentation",
+        "Other (please specify):",
+        "Not applicable"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_078_other_semantic_issues",
+      "column": "Other semantic issues",
+      "question_type": "free_text",
+      "label": "Other semantic issues",
+      "categories": []
+    },
+    {
+      "question_id": "q_079_what_technical_challenges_have_you_faced_select_all_that_apply",
+      "column": "What technical challenges have you faced? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "What technical challenges have you faced? (Select all that apply)",
+      "categories": [
+        "Poor data quality or completeness",
+        "Limited IT support or infrastructure",
+        "Incompatible data systems",
+        "Lack of APIs or data access tools",
+        "Have not experienced such challenges",
+        "Other (please specify)"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_080_other_technical_challenges",
+      "column": "Other technical challenges",
+      "question_type": "free_text",
+      "label": "Other technical challenges",
+      "categories": []
+    },
+    {
+      "question_id": "q_081_what_tools_do_you_currently_use_to_collect_edit_health_data_e_g_hospital",
+      "column": "What tools do you currently use to collect/edit health data? (e.g. hospital information systems, REDCap, MS-EXCEL, SPSS etc.) Please specify:",
+      "question_type": "free_text",
+      "label": "What tools do you currently use to collect/edit health data? (e.g. hospital information systems, REDCap, MS-EXCEL, SPSS etc.) Please specify:",
+      "categories": []
+    },
+    {
+      "question_id": "q_082_do_you_know_about_the_bbmri_eric_federated_platform",
+      "column": "Do you know about the BBMRI-ERIC Federated Platform?",
+      "question_type": "single_choice",
+      "label": "Do you know about the BBMRI-ERIC Federated Platform?",
+      "categories": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_083_please_specify_from_where",
+      "column": "Please specify from where:",
+      "question_type": "free_text",
+      "label": "Please specify from where:",
+      "categories": [],
+      "parent_columns": [
+        "Do you know about the BBMRI-ERIC Federated Platform?"
+      ]
+    },
+    {
+      "question_id": "q_084_are_you_interested_in_promoting_your_biobank_resources_to_new_research_o",
+      "column": "Are you interested in promoting your biobank resources to new research or industry partners?",
+      "question_type": "single_choice",
+      "label": "Are you interested in promoting your biobank resources to new research or industry partners?",
+      "categories": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_085_do_you_currently_have_sufficient_it_personnel_e_g_0_2_fte_of_a_data_expe",
+      "column": "Do you currently have sufficient IT personnel (e.g., ~0.2 FTE of a data expert or DevOps specialist) to support integration with the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more necessities)",
+      "question_type": "single_choice",
+      "label": "Do you currently have sufficient IT personnel (e.g., ~0.2 FTE of a data expert or DevOps specialist) to support integration with the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more necessities)",
+      "categories": [
+        "I would need a consultation to better understand the requirements",
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_086_does_your_organisation_have_the_necessary_infrastructure_to_host_and_mai",
+      "column": "Does your organisation have the necessary infrastructure to host and maintain a local component of the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more technical details)",
+      "question_type": "single_choice",
+      "label": "Does your organisation have the necessary infrastructure to host and maintain a local component of the BBMRI-ERIC Federated Platform? (see Join the BBMRI-ERIC Federated Platform - BBMRI-ERIC for more technical details)",
+      "categories": [
+        "I need a consultation to really understand the requirements and to answer",
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "question_id": "q_087_do_you_understand_the_potential_advantages_of_being_part_of_the_bbmri_er",
+      "column": "Do you understand the potential advantages of being part of the BBMRI-ERIC Federated Platform?",
+      "question_type": "single_choice",
+      "label": "Do you understand the potential advantages of being part of the BBMRI-ERIC Federated Platform?",
+      "categories": [
+        "Yes",
+        "Not fully - more information would be helpful",
+        "Yes, but I do not plan to make use of them",
+        "Not at all and we/I don't care"
+      ]
+    },
+    {
+      "question_id": "q_088_does_your_biobank_provide_access_to_whole_slide_image_wsi_histopathology",
+      "column": "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?",
+      "question_type": "single_choice",
+      "label": "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?",
+      "categories": [
+        "No",
+        "In planning / preparation",
+        "Yes — access to internally generated WSI data collections",
+        "Yes — access to WSI data collections received via partners / consortia"
+      ]
+    },
+    {
+      "question_id": "q_089_you_can_provide_more_information_about_available_digital_pathology_imagi",
+      "column": "You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+      "question_type": "free_text",
+      "label": "You can provide more information about available digital pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+      "categories": [],
+      "parent_columns": [
+        "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?"
+      ]
+    },
+    {
+      "question_id": "q_090_does_your_biobank_provide_access_to_radiology_datasets",
+      "column": "Does your biobank provide access to radiology datasets?",
+      "question_type": "single_choice",
+      "label": "Does your biobank provide access to radiology datasets?",
+      "categories": [
+        "No",
+        "In planning / preparation",
+        "Yes — access to radiology data collections received via partners / consortia",
+        "Yes — access to internally generated radiology data collections (e.g., directly connected to a PACS system)"
+      ]
+    },
+    {
+      "question_id": "q_091_you_can_provide_more_information_about_available_radiology_pathology_ima",
+      "column": "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+      "question_type": "free_text",
+      "label": "You can provide more information about available radiology pathology imaging data here (e.g., focus of the collections, more details on modalities):",
+      "categories": [],
+      "parent_columns": [
+        "Does your biobank provide access to radiology datasets?"
+      ]
+    },
+    {
+      "question_id": "q_092_does_your_biobank_provide_access_to_other_imaging_datasets",
+      "column": "Does your biobank provide access to other imaging datasets?",
+      "question_type": "single_choice",
+      "label": "Does your biobank provide access to other imaging datasets?",
+      "categories": [
+        "Other human imaging data",
+        "Other imaging data",
+        "Animal imaging data"
+      ]
+    },
+    {
+      "question_id": "q_093_you_can_provide_more_information_about_other_available_imaging_data_here",
+      "column": "You can provide more information about other available imaging data here (e.g., focus of the collections, more details on modalities):",
+      "question_type": "free_text",
+      "label": "You can provide more information about other available imaging data here (e.g., focus of the collections, more details on modalities):",
+      "categories": []
+    },
+    {
+      "question_id": "q_094_have_data_been_previously_returned_to_you",
+      "column": "Have data been previously returned to you?",
+      "question_type": "single_choice",
+      "label": "Have data been previously returned to you?",
+      "categories": [
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_095_please_describe_the_data_you_have_received_as_returned_data_already",
+      "column": "Please, describe the data you have received as returned data already.",
+      "question_type": "free_text",
+      "label": "Please, describe the data you have received as returned data already.",
+      "categories": [],
+      "parent_columns": [
+        "Have data been previously returned to you?"
+      ]
+    },
+    {
+      "question_id": "q_096_have_you_linked_the_returned_data_with_the_samples_from_which_they_were_",
+      "column": "Have you linked the returned data with the samples from which they were derived?",
+      "question_type": "single_choice",
+      "label": "Have you linked the returned data with the samples from which they were derived?",
+      "categories": [
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin",
+      "column": "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?",
+      "question_type": "single_choice",
+      "label": "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?",
+      "categories": [
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_098_please_describe_your_policy_or_workflow_for_returned_data_provide_a_link",
+      "column": "Please describe your policy or workflow for returned data provide a link:",
+      "question_type": "free_text",
+      "label": "Please describe your policy or workflow for returned data provide a link:",
+      "categories": [],
+      "parent_columns": [
+        "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?"
+      ]
+    },
+    {
+      "question_id": "q_099_how_do_you_expect_to_be_notified_about_the_existence_of_data_to_be_retur",
+      "column": "How do you expect to be notified about the existence of data to be returned?",
+      "question_type": "single_choice",
+      "label": "How do you expect to be notified about the existence of data to be returned?",
+      "categories": [
+        "The researcher is obliged to return data.",
+        "I expect the researcher to contact me as soon as data to be returned is available.",
+        "I will proactively contact the researcher to whom samples were provided."
+      ]
+    },
+    {
+      "question_id": "q_100_do_you_store_returned_data_select_all_that_apply",
+      "column": "Do you store returned data? (Select all that apply)",
+      "question_type": "multi_choice",
+      "label": "Do you store returned data? (Select all that apply)",
+      "categories": [
+        "We store them at the biobank.",
+        "We store them at the institutional level.",
+        "We don’t store returned data.",
+        "We store them in database(s) operated by third parties.",
+        "We have institutional strategy on storing the data. (please specify)",
+        "We are part of a network which has a common strategy on storing the data. (please specify)",
+        "We have biobank-level strategy on storing the data. (please specify)",
+        "Other (please specify):"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_101_biobank_network",
+      "column": "Biobank network",
+      "question_type": "free_text",
+      "label": "Biobank network",
+      "categories": [],
+      "parent_columns": [
+        "Do you store returned data? (Select all that apply)"
+      ]
+    },
+    {
+      "question_id": "q_102_biobank_level_strategy",
+      "column": "Biobank-level strategy",
+      "question_type": "free_text",
+      "label": "Biobank-level strategy",
+      "categories": [],
+      "parent_columns": [
+        "Do you store returned data? (Select all that apply)"
+      ]
+    },
+    {
+      "question_id": "q_103_institutional_strategy",
+      "column": "Institutional strategy",
+      "question_type": "free_text",
+      "label": "Institutional strategy",
+      "categories": [],
+      "parent_columns": [
+        "Do you store returned data? (Select all that apply)"
+      ]
+    },
+    {
+      "question_id": "q_104_network_strategy",
+      "column": "Network strategy",
+      "question_type": "free_text",
+      "label": "Network strategy",
+      "categories": [],
+      "parent_columns": [
+        "Do you store returned data? (Select all that apply)"
+      ]
+    },
+    {
+      "question_id": "q_105_how_do_you_store_data",
+      "column": "How do you store data?",
+      "question_type": "free_text",
+      "label": "How do you store data?",
+      "categories": [],
+      "parent_columns": [
+        "Do you store returned data? (Select all that apply)"
+      ]
+    },
+    {
+      "question_id": "q_106_how_much_disk_space_do_you_currently_require_storing_returned_data_overa",
+      "column": "How much disk space do you currently require storing returned data overall (for all returned data altogether)?",
+      "question_type": "ordinal",
+      "label": "How much disk space do you currently require storing returned data overall (for all returned data altogether)?",
+      "categories": [
+        "I don't know",
+        "<1TB",
+        "1TB-10TB",
+        "10TB-100TB",
+        "100TB-1PB",
+        ">1PB"
+      ]
+    },
+    {
+      "question_id": "q_107_do_you_monitor_the_quality_of_the_returned_data",
+      "column": "Do you monitor the quality of the returned data?",
+      "question_type": "single_choice",
+      "label": "Do you monitor the quality of the returned data?",
+      "categories": [
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_108_how_do_you_monitor_the_quality_of_the_returned_data",
+      "column": "How do you monitor the quality of the returned data?",
+      "question_type": "free_text",
+      "label": "How do you monitor the quality of the returned data?",
+      "categories": [],
+      "parent_columns": [
+        "Do you monitor the quality of the returned data?"
+      ]
+    },
+    {
+      "question_id": "q_109_what_do_you_see_as_the_main_hurdles_in_hosting_returned_data",
+      "column": "What do you see as the main hurdles in hosting returned data?",
+      "question_type": "multi_choice",
+      "label": "What do you see as the main hurdles in hosting returned data?",
+      "categories": [
+        "Lack of expertise in the data modalities returned",
+        "Other (please specify):",
+        "Lack of human capacities",
+        "Undefined quality of data",
+        "Large volumes of data we are unable to host",
+        "Legal/ethical issues"
+      ],
+      "delimiter": ";"
+    },
+    {
+      "question_id": "q_110_other_hurdles",
+      "column": "Other hurdles",
+      "question_type": "free_text",
+      "label": "Other hurdles",
+      "categories": [],
+      "parent_columns": [
+        "What do you see as the main hurdles in hosting returned data?"
+      ]
+    },
+    {
+      "question_id": "q_111_we_may_wish_to_follow_up_with_some_participants_to_learn_more_about_spec",
+      "column": "We may wish to follow up with some participants to learn more about specific practices or challenges. Would you or a colleague be open to a short follow-up interview to share your experience in more detail? If yes, please provide name and email address (optional):",
+      "question_type": "free_text",
+      "label": "We may wish to follow up with some participants to learn more about specific practices or challenges. Would you or a colleague be open to a short follow-up interview to share your experience in more detail? If yes, please provide name and email address (optional):",
+      "categories": []
+    },
+    {
+      "question_id": "q_112_if_you_have_any_additional_comments_suggestions_or_questions_related_to_",
+      "column": "If you have any additional comments, suggestions, or questions related to the survey topics, please feel free to leave them here:",
+      "question_type": "free_text",
+      "label": "If you have any additional comments, suggestions, or questions related to the survey topics, please feel free to leave them here:",
+      "categories": []
+    }
+  ],
+  "output": {
+    "source_row_column": "source_row"
+  }
+}
