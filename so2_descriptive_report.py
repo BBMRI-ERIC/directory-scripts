@@ -6,9 +6,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
+import re
+import shutil
+import subprocess
+import tempfile
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence
+from unicodedata import normalize
 from zipfile import BadZipFile
 
 import openpyxl
@@ -661,3 +667,321 @@ def build_descriptive_payload(
         "diagnostics": {"duplicate_respondent_groups": duplicate_groups},
         "questions": question_payloads,
     }
+
+
+@dataclass(frozen=True)
+class RenderedDescriptiveReport:
+    """Rendered report TeX and shared standalone-chart fragments."""
+
+    tex: str
+    chart_fragments: Mapping[str, str]
+    chart_paths: Mapping[str, str]
+
+
+_TEX_ESCAPE = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+
+
+def _tex(value: Any) -> str:
+    """Escape a literal value for ordinary TeX text."""
+    return "".join(_TEX_ESCAPE.get(character, character) for character in str(value))
+
+
+def _slug(value: str) -> str:
+    """Return an ASCII filename stem derived from presentation metadata."""
+    ascii_value = normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", ascii_value.lower())).strip("-")
+
+
+def _chart_key(question: Mapping[str, Any], answered_only: bool = False) -> str:
+    """Return a stable chart filename key from the question identifier and label."""
+    match = re.search(r"(?:^|_)q?0*(\d{1,3})(?:_|$)", str(question["question_id"]))
+    if match is None:
+        raise InputError(f"Question id lacks a numeric chart prefix: {question['question_id']!r}.")
+    number = int(match.group(1))
+    compact_names = {8: "experience", 9: "institution-type"}
+    stem = compact_names.get(number, _slug(str(question["label"])))
+    if not stem:
+        raise InputError(f"Question label cannot form a chart filename: {question['label']!r}.")
+    suffix = "-answered-only" if answered_only else ""
+    return f"{number:02d}-{stem}{suffix}"
+
+
+def _category_label(category: Mapping[str, Any]) -> str:
+    """Return an explicit count and denominator-aware percentage label."""
+    value = _tex(category["value"])
+    count = int(category["count"])
+    percentage = category.get("percent")
+    if percentage is None:
+        return f"{value}: {count} (no percentage base)"
+    basis = "all included rows" if category["value"] == "Missing" else "answering rows"
+    return f"{value}: {count} ({float(percentage):.1f}\\% of {basis})"
+
+
+def _bar_fragment(question: Mapping[str, Any]) -> str:
+    """Render a horizontal count bar chart, including its distinct Missing bar."""
+    categories = question["categories"]
+    rows = []
+    labels = []
+    for index, category in enumerate(categories, start=1):
+        count = int(category["count"])
+        rows.append(f"\\addplot+[fill=bbmriBlue] coordinates {{({count},{index})}};")
+        labels.append(
+            f"\\node[anchor=west,font=\\scriptsize] at (axis cs:{count + 0.08},{index}) "
+            f"{{{_category_label(category)}}};"
+        )
+    ticks = ",".join(str(index) for index in range(1, len(categories) + 1))
+    tick_labels = ",".join(f"{{{_tex(category['value'])}}}" for category in categories)
+    return "\n".join([
+        r"\begin{tikzpicture}",
+        r"\begin{axis}[xbar, xmin=0, width=\linewidth, height="
+        + f"{max(3.0, 0.65 * len(categories) + 1):.1f}cm,",
+        f"ytick={{{ticks}}}, yticklabels={{{tick_labels}}},",
+        r"xlabel={Count}, y dir=reverse, axis x line*=bottom, axis y line=none,",
+        r"enlarge y limits=0.15, clip=false]",
+        *rows,
+        *labels,
+        r"\end{axis}",
+        r"\end{tikzpicture}",
+    ])
+
+
+def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
+    """Render a small categorical pie from the same payload category data."""
+    categories = [
+        category for category in question["pie_categories"]
+        if not (answered_only and category.get("excluded_from_chart"))
+    ]
+    total = sum(int(category["count"]) for category in categories)
+    title = "answered rows only" if answered_only else "including Missing"
+    if total == 0:
+        return "\n".join([
+            r"\begin{tikzpicture}",
+            rf"\node {{No responses ({title})}};",
+            r"\end{tikzpicture}",
+        ])
+    start = 0.0
+    colors = ("bbmriBlue", "bbmriTeal", "bbmriGold", "bbmriGray", "bbmriRed")
+    slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
+    for index, category in enumerate(categories):
+        end = start + 360 * int(category["count"]) / total
+        slices.append(
+            rf"\path[fill={colors[index % len(colors)]},draw=white] (0,0) -- ({start:.3f}:1.5)"
+            rf" arc ({start:.3f}:{end:.3f}:1.5) -- cycle;"
+        )
+        start = end
+    legend = r" \\ ".join(_category_label(category) for category in categories)
+    slices.extend([rf"\node[align=left,text width=0.9\linewidth] at (0,-2.2) {{{legend}}};",
+                   r"\end{tikzpicture}"])
+    return "\n".join(slices)
+
+
+def _table(rows: Sequence[Sequence[str]], columns: str) -> str:
+    """Render a longtable with a repeated header and literal rows."""
+    if not rows:
+        return ""
+    header, *body = rows
+    return "\n".join([
+        rf"\begin{{longtable}}{{{columns}}}",
+        r"\toprule",
+        " & ".join(header) + r" \\",
+        r"\midrule",
+        r"\endfirsthead",
+        r"\toprule",
+        " & ".join(header) + r" \\",
+        r"\midrule",
+        r"\endhead",
+        *[" & ".join(row) + r" \\" for row in body],
+        r"\bottomrule",
+        r"\end{longtable}",
+    ])
+
+
+def _question_tables(question: Mapping[str, Any]) -> str:
+    """Render contribution or free-text evidence tables for a question."""
+    if question["question_type"] == "free_text":
+        rows = [[r"Country", r"Institution", r"Source row", r"Parent context", r"Response"]]
+        for item in question["free_text_rows"]:
+            parents = "; ".join(
+                f"{parent['column']} = {parent['value']}" for parent in item["parent_answers"]
+            ) or "None"
+            rows.append([
+                _tex(item["country"]), _tex(item["institution"]), str(item["source_row"]),
+                _tex(parents), _tex(item["text"]),
+            ])
+        return _table(rows, r"p{0.12\linewidth}p{0.16\linewidth}r"
+                      r"p{0.27\linewidth}p{0.27\linewidth}")
+    rows = [[r"Value", r"Country", r"Institution", r"Source row", r"Note"]]
+    for item in question["contributions"]:
+        rows.append([
+            _tex(item["value"]), _tex(item["country"]), _tex(item["institution"]),
+            str(item["source_row"]),
+            r"\textbf{Suspected repeated response}" if item["repeated_response"] else "",
+        ])
+    return _table(rows, r"p{0.18\linewidth}p{0.16\linewidth}p{0.22\linewidth}rp{0.22\linewidth}")
+
+
+def _preamble() -> str:
+    """Return the shared XeLaTeX preamble for reports and standalone charts."""
+    return r"""\documentclass[11pt]{article}
+\usepackage{fontspec}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{xurl}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\definecolor{bbmriBlue}{HTML}{005A9C}
+\definecolor{bbmriTeal}{HTML}{008C95}
+\definecolor{bbmriGold}{HTML}{D8A000}
+\definecolor{bbmriGray}{HTML}{7A7A7A}
+\definecolor{bbmriRed}{HTML}{B63A3A}
+"""
+
+
+def _standalone_tex(fragment_key: str) -> str:
+    """Return a standalone vector-chart document that inputs one shared fragment."""
+    return _preamble() + "\n\\begin{document}\n\\input{fragments/" + fragment_key + ".tex}\n\\end{document}\n"
+
+
+def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
+    """Validate the minimal immutable payload contract consumed by the renderer."""
+    if payload.get("payload_type") != "so2_descriptive_statistics":
+        raise InputError("Expected a so2_descriptive_statistics payload.")
+    if payload.get("payload_version") != "1":
+        raise InputError("Unsupported descriptive statistics payload version.")
+    questions = payload.get("questions")
+    if not isinstance(questions, list) or not all(isinstance(item, Mapping) for item in questions):
+        raise InputError("Descriptive statistics payload questions must be an array of objects.")
+    return questions
+
+
+def render_descriptive_tex(
+    payload: Mapping[str, Any], chart_dir: str | Path | None
+) -> RenderedDescriptiveReport:
+    """Render report TeX and reusable chart fragments from a descriptive payload."""
+    questions = _validate_render_payload(payload)
+    fragments: dict[str, str] = {}
+    chart_paths: dict[str, str] = {}
+    report = [_preamble(), r"\begin{document}", r"\section*{SO2 descriptive statistics}"]
+    provenance = payload.get("provenance", {})
+    report.append(rf"Alias: {_tex(provenance.get('alias', 'Unknown'))}\\")
+    report.append(rf"Export date: {_tex(provenance.get('export_date', 'Unknown'))}\\")
+    for question in questions:
+        for field in ("question_id", "label", "question_type", "categories", "population",
+                      "contributions", "free_text_rows"):
+            if field not in question:
+                raise InputError(f"Descriptive statistics question lacks {field}: {question!r}.")
+        report.append(rf"\section*{{{_tex(question['label'])}}}")
+        if question["question_type"] == "free_text":
+            report.append(_question_tables(question) or r"\emph{No free-text responses.}")
+            continue
+        use_pie = question["question_type"] == "single_choice" and question.get("chart") == "pie"
+        variants = (False, True) if use_pie and question["population"]["M"] else (False,)
+        for answered_only in variants:
+            key = _chart_key(question, answered_only)
+            fragments[key] = _pie_fragment(question, answered_only) if use_pie else _bar_fragment(question)
+            chart_paths[key] = (
+                f"{Path(chart_dir).as_posix()}/{key}.pdf" if chart_dir is not None else ""
+            )
+            report.append(rf"\input{{fragments/{key}.tex}}")
+            if chart_dir is not None:
+                report.append(rf"\noindent\texttt{{{_tex(chart_paths[key])}}}\\")
+        tables = _question_tables(question)
+        if tables:
+            report.append(tables)
+    report.extend([r"\end{document}", ""])
+    return RenderedDescriptiveReport(
+        tex="\n".join([
+            report[0],
+            r"\iffalse",
+            *fragments.values(),
+            r"\fi",
+            *report[1:],
+        ]),
+        chart_fragments=MappingProxyType(fragments),
+        chart_paths=MappingProxyType(chart_paths),
+    )
+
+
+def _run_xelatex(source: Path, output_dir: Path) -> Path:
+    """Compile one staged XeLaTeX source and return its completed PDF."""
+    compiler = shutil.which("xelatex")
+    if compiler is None:
+        raise InputError("XeLaTeX is required to render descriptive report PDFs.")
+    result = subprocess.run(
+        [compiler, "-interaction=nonstopmode", "-halt-on-error", "-output-directory", str(output_dir), str(source)],
+        cwd=source.parent, capture_output=True, text=True, check=False,
+    )
+    pdf = output_dir / f"{source.stem}.pdf"
+    if result.returncode != 0 or not pdf.is_file():
+        details = (result.stderr or result.stdout).strip()
+        raise InputError(f"XeLaTeX failed for {source.name}: {details or 'no PDF was produced'}")
+    return pdf
+
+
+def _require_new_or_empty_chart_dir(chart_dir: Path) -> None:
+    """Reject chart output directories that could contain unrelated artifacts."""
+    if chart_dir.exists() and (not chart_dir.is_dir() or any(chart_dir.iterdir())):
+        raise InputError(f"Chart directory must be new or empty: {chart_dir}")
+
+
+def render_descriptive_pdf(
+    rendered: RenderedDescriptiveReport,
+    tex_path: str | Path,
+    pdf_path: str | Path | None,
+    chart_dir: str | Path | None,
+) -> None:
+    """Compile staged report and charts, publishing outputs only after all succeed."""
+    target_tex = Path(tex_path)
+    target_pdf = Path(pdf_path) if pdf_path is not None else None
+    target_charts = Path(chart_dir) if chart_dir is not None else None
+    if target_charts is not None:
+        _require_new_or_empty_chart_dir(target_charts)
+    targets = [target_tex, *(path for path in (target_pdf, target_charts) if path is not None)]
+    if any(not target.parent.exists() for target in targets):
+        raise InputError("Output parent directory does not exist.")
+    with tempfile.TemporaryDirectory(prefix="so2-report-") as temporary:
+        stage = Path(temporary)
+        fragments_dir = stage / "fragments"
+        fragments_dir.mkdir()
+        for key, fragment in rendered.chart_fragments.items():
+            (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
+        chart_pdfs: dict[str, Path] = {}
+        for key in rendered.chart_fragments:
+            source = stage / f"{key}.tex"
+            source.write_text(_standalone_tex(key), encoding="utf-8")
+            chart_pdfs[key] = _run_xelatex(source, stage)
+        report_source = stage / "report.tex"
+        report_source.write_text(rendered.tex, encoding="utf-8")
+        report_pdf = _run_xelatex(report_source, stage) if target_pdf is not None else None
+
+        if target_charts is not None:
+            _require_new_or_empty_chart_dir(target_charts)
+            publish_charts = Path(tempfile.mkdtemp(prefix=".so2-charts-", dir=target_charts.parent))
+            try:
+                for key, source_pdf in chart_pdfs.items():
+                    shutil.copy2(source_pdf, publish_charts / f"{key}.pdf")
+                if target_charts.exists():
+                    target_charts.rmdir()
+                os.replace(publish_charts, target_charts)
+            except OSError as exc:
+                shutil.rmtree(publish_charts, ignore_errors=True)
+                raise InputError(f"Could not publish chart PDFs: {exc}") from exc
+        staged_tex = stage / "published-report.tex"
+        staged_tex.write_text(rendered.tex, encoding="utf-8")
+        os.replace(staged_tex, target_tex)
+        if target_pdf is not None and report_pdf is not None:
+            os.replace(report_pdf, target_pdf)

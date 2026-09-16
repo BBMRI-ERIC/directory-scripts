@@ -3,6 +3,7 @@
 import importlib
 from datetime import datetime
 from pathlib import Path
+import shutil
 
 import openpyxl
 import pandas as pd
@@ -745,3 +746,167 @@ def test_production_schema_declares_every_observed_non_other_structured_value():
         if question["question_type"] == "multi_choice":
             values = {choice for value in values for choice in value.split(question["delimiter"])}
         assert values <= set(question["categories"]), header
+
+
+def report_payload(*questions):
+    """Return a minimal accepted payload for renderer contract tests."""
+    return {
+        "payload_type": "so2_descriptive_statistics",
+        "payload_version": "1",
+        "provenance": {
+            "alias": "SO2_2025",
+            "export_date": "2026-03-13T07:22:45",
+            "included_response_rows": 3,
+        },
+        "diagnostics": {"duplicate_respondent_groups": []},
+        "questions": list(questions),
+    }
+
+
+def structured_report_question(**overrides):
+    """Return a small structured question with intentionally different denominators."""
+    question = {
+        "question_id": "q_009_institution_type",
+        "column": "Institution type",
+        "label": "Institution type",
+        "question_type": "multi_choice",
+        "population": {"N": 3, "A": 2, "M": 1, "blank_rows": 1},
+        "categories": [
+            {"value": "LIMS", "count": 1, "percent_base": 2, "percent": 50.0},
+            {"value": "PACS", "count": 2, "percent_base": 2, "percent": 100.0},
+            {"value": "Missing", "count": 1, "percent_base": 3, "percent": 33.3333},
+        ],
+        "pie_categories": [
+            {"value": "LIMS", "count": 1, "percent_base": 2, "percent": 50.0,
+             "excluded_from_chart": False},
+            {"value": "PACS", "count": 2, "percent_base": 2, "percent": 100.0,
+             "excluded_from_chart": False},
+            {"value": "Missing", "count": 1, "percent_base": 3, "percent": 33.3333,
+             "excluded_from_chart": True},
+        ],
+        "contributions": [],
+        "free_text_rows": [],
+        "diagnostics": {"duplicate_selections": [], "unexpected_selections": []},
+        "applicability": {"status": "unknown"},
+    }
+    question.update(overrides)
+    return question
+
+
+def multi_choice_payload():
+    """Return the count-bar payload used by renderer tests."""
+    return report_payload(structured_report_question())
+
+
+def single_choice_payload_with_missing():
+    """Return a schema-designated pie payload that has missing rows."""
+    return report_payload(structured_report_question(
+        question_id="q_011_hosting_organisation",
+        column="Hosting organisation",
+        label="Hosting organisation",
+        question_type="single_choice",
+        chart="pie",
+    ))
+
+
+def payload_with_repeated_and_free_text():
+    """Return literal contribution and narrative rows for table rendering."""
+    structured = structured_report_question(contributions=[{
+        "value": "PACS", "country": "Austria", "institution": "Alpha",
+        "source_row": 5, "repeated_response": True,
+    }])
+    narrative = {
+        "question_id": "q_010_other_barrier",
+        "column": "Other barrier",
+        "label": "Other barrier",
+        "question_type": "free_text",
+        "population": {"N": 3, "A": 1, "M": 2, "blank_rows": 2},
+        "categories": [], "pie_categories": [], "contributions": [],
+        "free_text_rows": [{
+            "country": "Austria", "institution": "Alpha", "source_row": 5,
+            "text": "Need legal support",
+            "parent_answers": [{"column": "Barrier A", "value": "frequently"}],
+        }],
+        "diagnostics": {
+            "duplicate_selections": [], "unexpected_selections": [],
+            "missing_parent_answers": [], "unexpected_parent_answers": [],
+        },
+        "applicability": {"status": "unknown"},
+    }
+    return report_payload(structured, narrative)
+
+
+def rendered_payload():
+    """Render one bar chart for filesystem publication tests."""
+    return module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts")
+
+
+def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
+    """Multi-choice charts retain selection counts and separate missing-row bases."""
+    tex = module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts").tex
+
+    assert r"\begin{axis}[xbar" in tex
+    assert "PACS: 2 (100.0\\% of answering rows)" in tex
+    assert "Missing: 1 (33.3\\% of all included rows)" in tex
+    assert "charts/09-institution-type.pdf" in tex
+
+
+def test_pie_eligible_single_choice_with_missing_has_two_variants():
+    """A schema-designated pie exposes both missing-inclusive and answered-only views."""
+    rendered = module.render_descriptive_tex(single_choice_payload_with_missing(), chart_dir=None)
+
+    assert "including Missing" in rendered.tex
+    assert "answered rows only" in rendered.tex
+    assert set(rendered.chart_fragments) == {
+        "11-hosting-organisation", "11-hosting-organisation-answered-only"
+    }
+
+
+def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
+    """Evidence tables keep repeat warnings, row provenance, and free-text parent answers."""
+    tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None).tex
+
+    assert "Suspected repeated response" in tex
+    assert "Source row" in tex
+    assert "Barrier A = frequently" in tex
+
+
+def test_chart_dir_must_be_new_or_empty(tmp_path):
+    """Renderer refuses to mix generated chart PDFs with pre-existing files."""
+    target = tmp_path / "charts"
+    target.mkdir()
+    (target / "old.pdf").write_bytes(b"old")
+
+    with pytest.raises(module.InputError, match="new or empty"):
+        module.render_descriptive_pdf(rendered_payload(), tmp_path / "report.tex", None, target)
+
+
+def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkeypatch):
+    """Successful staged compiler outputs are atomically published to requested targets."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    rendered = rendered_payload()
+    report_tex = tmp_path / "report.tex"
+    report_pdf = tmp_path / "report.pdf"
+    chart_dir = tmp_path / "charts"
+
+    module.render_descriptive_pdf(rendered, report_tex, report_pdf, chart_dir)
+
+    assert report_tex.read_text(encoding="utf-8") == rendered.tex
+    assert report_pdf.read_bytes().startswith(b"%PDF")
+    assert (chart_dir / "09-institution-type.pdf").read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
+def test_real_xelatex_renders_minimal_descriptive_report(tmp_path):
+    """A minimal real report compiles to a vector PDF when XeLaTeX is available."""
+    rendered = module.render_descriptive_tex(multi_choice_payload(), chart_dir=None)
+
+    module.render_descriptive_pdf(rendered, tmp_path / "report.tex", tmp_path / "report.pdf", None)
+
+    assert (tmp_path / "report.pdf").read_bytes().startswith(b"%PDF")
