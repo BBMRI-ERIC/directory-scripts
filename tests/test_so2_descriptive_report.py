@@ -1120,7 +1120,7 @@ def test_chart_key_bounds_long_sanitized_question_labels():
 
 def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
     """Evidence tables keep repeat warnings, row provenance, and free-text parent answers."""
-    tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None).tex
+    tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None, include_contribution_tables=True).tex
 
     assert "suspected repeated response" in tex
     assert "Source row" in tex
@@ -1129,6 +1129,12 @@ def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
 
 def test_structured_evidence_table_groups_institutions_and_uses_compact_type():
     """Structured evidence has one row per value/country with literal institution entries."""
+def test_short_report_omits_structured_contribution_tables():
+    """Short reports retain charts while omitting verbose structured evidence."""
+    tex = module.render_descriptive_tex(multi_choice_payload(), chart_dir=None).tex
+
+    assert "Value & Country & Institutions" not in tex
+
     question = structured_report_question(contributions=[
         {"value": "PACS", "country": "Austria", "institution": "Alpha", "source_row": 5,
          "repeated_response": True},
@@ -1136,7 +1142,7 @@ def test_structured_evidence_table_groups_institutions_and_uses_compact_type():
          "repeated_response": False},
     ])
 
-    tex = module.render_descriptive_tex(report_payload(question), chart_dir=None).tex
+    tex = module.render_descriptive_tex(report_payload(question), chart_dir=None, include_contribution_tables=True).tex
 
     assert r"\smaller[3]" in tex
     assert "Value & Country & Institutions" in tex

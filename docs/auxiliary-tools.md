@@ -95,6 +95,7 @@ python3 survey-so2-directory.py render-descriptive-report \
 The observation unit is every nonblank submitted worksheet row. Counts are
 unweighted and are not deduplicated to institutions, biobanks, or countries.
 Contribution tables retain the reported country, institution, source row, and
+They are omitted from the normal report; pass `--long-report` to either descriptive command to include the grouped `Value | Country | Institutions` tables. Free-text response tables remain in both report forms.
 free-text answers; repeated normalized country/institution combinations are
 flagged as suspected repeated responses but are never removed. Treat generated
 JSON, TeX, PDFs, and chart directories as sensitive because they can contain

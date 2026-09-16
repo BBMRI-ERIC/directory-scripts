@@ -1277,6 +1277,7 @@ def render_descriptive_tex(
     payload: Mapping[str, Any],
     chart_dir: str | Path | None,
     report_path: str | Path | None = None,
+    include_contribution_tables: bool = False,
 ) -> RenderedDescriptiveReport:
     """Render a self-contained report and reusable standalone chart documents.
 
@@ -1345,7 +1346,9 @@ def render_descriptive_tex(
                 report.append(rf"\noindent\texttt{{{_tex(chart_paths[key])}}}\\")
         if chart_dir is not None and isinstance(question, dict):
             question["chart_paths"] = question_paths
-        tables = _question_tables(question)
+        tables = _question_tables(question) if (
+            question["question_type"] == "free_text" or include_contribution_tables
+        ) else ""
         if tables:
             report.append(tables)
     report.extend([r"\end{document}", ""])

@@ -327,6 +327,7 @@ def build_cli() -> argparse.ArgumentParser:
     describe.add_argument("--output-tex", help="Optional path for the rendered TeX report.")
     describe.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
     describe.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
+    describe.add_argument("--long-report", action="store_true", help="Include grouped structured-response contribution tables.")
 
     render_descriptive = subparsers.add_parser("render-descriptive-report", help="Render TeX/PDF from a descriptive-statistics payload.")
     add_logging_arguments(render_descriptive)
@@ -334,6 +335,7 @@ def build_cli() -> argparse.ArgumentParser:
     render_descriptive.add_argument("--output-tex", help="Optional path for the rendered TeX report; defaults next to the input JSON when rendering PDF or charts.")
     render_descriptive.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
     render_descriptive.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
+    render_descriptive.add_argument("--long-report", action="store_true", help="Include grouped structured-response contribution tables.")
     export = subparsers.add_parser("export-update-plan", help="Export qcheck-updater-compatible JSON from findings.")
     add_logging_arguments(export)
     export.add_argument("-i", "--input-json", required=True, help="Findings JSON produced by analyze.")
@@ -3326,9 +3328,14 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
     _require_new_descriptive_file_outputs([tex_path, args.output_pdf])
     descriptive = _load_descriptive_report_module()
     try:
-        rendered = descriptive.render_descriptive_tex(
-            payload, args.output_chart_dir, report_path=tex_path,
-        )
+        if getattr(args, "long_report", False):
+            rendered = descriptive.render_descriptive_tex(
+                payload, args.output_chart_dir, report_path=tex_path, include_contribution_tables=True,
+            )
+        else:
+            rendered = descriptive.render_descriptive_tex(
+                payload, args.output_chart_dir, report_path=tex_path,
+            )
         descriptive.render_descriptive_pdf(rendered, tex_path, args.output_pdf, args.output_chart_dir)
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
@@ -3375,6 +3382,7 @@ def run_describe(args: argparse.Namespace) -> int:
             output_tex=args.output_tex,
             output_pdf=args.output_pdf,
             output_chart_dir=args.output_chart_dir,
+            long_report=args.long_report,
         )
         _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema])
     try:
