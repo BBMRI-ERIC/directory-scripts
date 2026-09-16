@@ -130,6 +130,15 @@ def test_reader_rejects_invalid_service_envelope(tmp_path, mutator, message):
         )
 
 
+def test_reader_converts_corrupt_xlsx_to_input_error(tmp_path):
+    """Reader reports a non-ZIP XLSX file as a user-facing input error."""
+    workbook = tmp_path / "corrupt.xlsx"
+    workbook.write_bytes(b"not a ZIP workbook")
+
+    with pytest.raises(module.InputError, match="Could not open descriptive workbook"):
+        module.read_descriptive_workbook(workbook, minimal_schema())
+
+
 def test_reader_rejects_missing_schema_fields(tmp_path):
     """Reader reports incomplete schemas as actionable input errors."""
     schema = minimal_schema()

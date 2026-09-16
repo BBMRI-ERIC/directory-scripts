@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence
+from zipfile import BadZipFile
 
 import openpyxl
 import pandas as pd
@@ -240,7 +241,12 @@ def read_descriptive_workbook(
 
     try:
         workbook = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
-    except (OSError, ValueError, openpyxl.utils.exceptions.InvalidFileException) as exc:
+    except (
+        OSError,
+        ValueError,
+        BadZipFile,
+        openpyxl.utils.exceptions.InvalidFileException,
+    ) as exc:
         raise InputError(f"Could not open descriptive workbook {source_path}: {exc}") from exc
     try:
         root = _required_mapping(schema, "schema")
