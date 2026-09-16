@@ -902,6 +902,103 @@ def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkey
     assert (chart_dir / "09-institution-type.pdf").read_bytes().startswith(b"%PDF")
 
 
+def test_pdf_render_keeps_final_outputs_absent_when_report_compilation_fails(
+    tmp_path, monkeypatch,
+):
+    """A report compiler failure leaves no report or chart publication behind."""
+    compilation_dirs = []
+
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        compilation_dirs.append(output_dir)
+        if source.stem == "report":
+            return __import__("subprocess").CompletedProcess(command, 1, "report failed", "")
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    report_tex = tmp_path / "report.tex"
+    report_pdf = tmp_path / "report.pdf"
+    chart_dir = tmp_path / "charts"
+
+    with pytest.raises(module.InputError, match="report.tex"):
+        module.render_descriptive_pdf(rendered_payload(), report_tex, report_pdf, chart_dir)
+
+    assert not report_tex.exists()
+    assert not report_pdf.exists()
+    assert not chart_dir.exists()
+    assert len(set(compilation_dirs)) == 2
+
+
+def test_pdf_render_rolls_back_all_outputs_when_publication_fails(tmp_path, monkeypatch):
+    """A publication error removes every final artifact already promoted."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    real_replace = module.os.replace
+
+    fail_once = True
+
+    def fail_report_pdf_publication(source, destination):
+        nonlocal fail_once
+        if Path(destination).name == "report.pdf" and fail_once:
+            fail_once = False
+            raise OSError("simulated publication failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    monkeypatch.setattr(module.os, "replace", fail_report_pdf_publication)
+    report_tex = tmp_path / "report.tex"
+    report_pdf = tmp_path / "report.pdf"
+    chart_dir = tmp_path / "charts"
+
+    with pytest.raises(module.InputError, match="publish"):
+        module.render_descriptive_pdf(rendered_payload(), report_tex, report_pdf, chart_dir)
+
+    assert not report_tex.exists()
+    assert not report_pdf.exists()
+    assert not chart_dir.exists()
+
+
+def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
+    tmp_path, monkeypatch,
+):
+    """Rollback preserves report files that existed before publication began."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    real_replace = module.os.replace
+
+    fail_once = True
+
+    def fail_report_pdf_publication(source, destination):
+        nonlocal fail_once
+        if Path(destination).name == "report.pdf" and fail_once:
+            fail_once = False
+            raise OSError("simulated publication failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    monkeypatch.setattr(module.os, "replace", fail_report_pdf_publication)
+    report_tex = tmp_path / "report.tex"
+    report_pdf = tmp_path / "report.pdf"
+    report_tex.write_text("previous report", encoding="utf-8")
+    report_pdf.write_bytes(b"previous PDF")
+
+    with pytest.raises(module.InputError, match="publish"):
+        module.render_descriptive_pdf(rendered_payload(), report_tex, report_pdf, None)
+
+    assert report_tex.read_text(encoding="utf-8") == "previous report"
+    assert report_pdf.read_bytes() == b"previous PDF"
+
+
 @pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
 def test_real_xelatex_renders_minimal_descriptive_report(tmp_path):
     """A minimal real report compiles to a vector PDF when XeLaTeX is available."""

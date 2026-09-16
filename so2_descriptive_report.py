@@ -953,35 +953,77 @@ def render_descriptive_pdf(
     targets = [target_tex, *(path for path in (target_pdf, target_charts) if path is not None)]
     if any(not target.parent.exists() for target in targets):
         raise InputError("Output parent directory does not exist.")
-    with tempfile.TemporaryDirectory(prefix="so2-report-") as temporary:
-        stage = Path(temporary)
-        fragments_dir = stage / "fragments"
-        fragments_dir.mkdir()
-        for key, fragment in rendered.chart_fragments.items():
-            (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
+    with tempfile.TemporaryDirectory(prefix="so2-report-") as report_temporary, \
+            tempfile.TemporaryDirectory(prefix="so2-charts-") as chart_temporary:
+        report_stage = Path(report_temporary)
+        chart_stage = Path(chart_temporary)
+        for stage in (report_stage, chart_stage):
+            fragments_dir = stage / "fragments"
+            fragments_dir.mkdir()
+            for key, fragment in rendered.chart_fragments.items():
+                (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
+
         chart_pdfs: dict[str, Path] = {}
         for key in rendered.chart_fragments:
-            source = stage / f"{key}.tex"
+            source = chart_stage / f"{key}.tex"
             source.write_text(_standalone_tex(key), encoding="utf-8")
-            chart_pdfs[key] = _run_xelatex(source, stage)
-        report_source = stage / "report.tex"
-        report_source.write_text(rendered.tex, encoding="utf-8")
-        report_pdf = _run_xelatex(report_source, stage) if target_pdf is not None else None
+            chart_pdfs[key] = _run_xelatex(source, chart_stage)
 
+        report_source = report_stage / "report.tex"
+        report_source.write_text(rendered.tex, encoding="utf-8")
+        report_pdf = _run_xelatex(report_source, report_stage) if target_pdf is not None else None
+        staged_tex = report_stage / "published-report.tex"
+        staged_tex.write_text(rendered.tex, encoding="utf-8")
+
+        publish_charts = None
         if target_charts is not None:
             _require_new_or_empty_chart_dir(target_charts)
             publish_charts = Path(tempfile.mkdtemp(prefix=".so2-charts-", dir=target_charts.parent))
             try:
                 for key, source_pdf in chart_pdfs.items():
                     shutil.copy2(source_pdf, publish_charts / f"{key}.pdf")
+            except OSError as exc:
+                shutil.rmtree(publish_charts, ignore_errors=True)
+                raise InputError(f"Could not stage chart PDFs for publication: {exc}") from exc
+
+        published: list[Path] = []
+        backups: dict[Path, Path] = {}
+        chart_dir_was_empty = target_charts is not None and target_charts.exists()
+
+        def replace_file(source: Path, target: Path) -> None:
+            """Publish one file while retaining its prior value for rollback."""
+            if target.exists():
+                descriptor, backup_name = tempfile.mkstemp(
+                    prefix=".so2-report-backup-", dir=target.parent,
+                )
+                os.close(descriptor)
+                backup = Path(backup_name)
+                os.replace(target, backup)
+                backups[target] = backup
+            os.replace(source, target)
+            published.append(target)
+
+        try:
+            replace_file(staged_tex, target_tex)
+            if target_pdf is not None and report_pdf is not None:
+                replace_file(report_pdf, target_pdf)
+            if target_charts is not None and publish_charts is not None:
                 if target_charts.exists():
                     target_charts.rmdir()
                 os.replace(publish_charts, target_charts)
-            except OSError as exc:
+                published.append(target_charts)
+        except OSError as exc:
+            for target in reversed(published):
+                if target.is_dir():
+                    shutil.rmtree(target, ignore_errors=True)
+                else:
+                    target.unlink(missing_ok=True)
+            for target, backup in backups.items():
+                os.replace(backup, target)
+            if chart_dir_was_empty and target_charts is not None:
+                target_charts.mkdir()
+            if publish_charts is not None:
                 shutil.rmtree(publish_charts, ignore_errors=True)
-                raise InputError(f"Could not publish chart PDFs: {exc}") from exc
-        staged_tex = stage / "published-report.tex"
-        staged_tex.write_text(rendered.tex, encoding="utf-8")
-        os.replace(staged_tex, target_tex)
-        if target_pdf is not None and report_pdf is not None:
-            os.replace(report_pdf, target_pdf)
+            raise InputError(f"Could not publish descriptive report outputs: {exc}") from exc
+        for backup in backups.values():
+            backup.unlink(missing_ok=True)
