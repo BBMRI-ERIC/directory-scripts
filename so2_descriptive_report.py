@@ -41,6 +41,7 @@ class QuestionDefinition:
     delimiter: str | None
     parent_columns: tuple[str, ...]
     applicability: Mapping[str, Any] | None
+    exclusive_categories: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,18 @@ def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def load_descriptive_schema(path: str | Path) -> dict[str, Any]:
-    """Load a descriptive-workbook schema while rejecting duplicate JSON keys."""
+    """Load a descriptive-workbook schema while rejecting duplicate JSON keys.
+
+    Args:
+        path: JSON schema path.
+
+    Returns:
+        Parsed object-shaped schema.
+
+    Raises:
+        InputError: If the file cannot be read, is malformed JSON, contains
+            duplicate keys, or does not have an object root.
+    """
     schema_path = Path(path)
     try:
         with schema_path.open(encoding="utf-8") as schema_file:
@@ -117,7 +129,15 @@ def _is_blank(value: Any) -> bool:
 
 
 def is_nonblank_response_row(row: pd.Series, classified_columns: Sequence[str]) -> bool:
-    """Return whether context or question cells contain a nonblank response value."""
+    """Return whether context or question cells contain a nonblank response value.
+
+    Args:
+        row: One workbook data row.
+        classified_columns: Context and question columns that define a response.
+
+    Returns:
+        True when at least one classified cell is nonblank.
+    """
     return any(not _is_blank(row[column]) for column in classified_columns)
 
 
@@ -151,6 +171,18 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
     parent_columns = _text_sequence(
         item.get("parent_columns", []), f"questions[{position}].parent_columns"
     )
+    exclusive_categories = _text_sequence(
+        item.get("exclusive_categories", []),
+        f"questions[{position}].exclusive_categories",
+    )
+    if exclusive_categories and question_type != "multi_choice":
+        raise InputError(
+            f"Schema question {position} may define exclusive categories only for multi_choice."
+        )
+    unknown_exclusive = sorted(set(exclusive_categories) - set(categories))
+    if unknown_exclusive:
+        raise InputError(
+            f"Schema question {position} has unknown exclusive category {unknown_exclusive[0]!r}.")
     applicability = item.get("applicability")
     if applicability is not None:
         applicability = MappingProxyType(dict(_required_mapping(
@@ -165,13 +197,25 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
         delimiter=delimiter,
         parent_columns=parent_columns,
         applicability=applicability,
+        exclusive_categories=exclusive_categories,
     )
 
 
 def validate_descriptive_schema(
     schema: Mapping[str, Any], columns: Sequence[str]
 ) -> list[QuestionDefinition]:
-    """Validate the schema against source headers and return question definitions."""
+    """Validate the schema against source headers.
+
+    Args:
+        schema: Parsed descriptive schema.
+        columns: Exact workbook headers.
+
+    Returns:
+        Immutable question definitions in report order.
+
+    Raises:
+        InputError: If the schema, classifications, routing, or references are invalid.
+    """
     root = _required_mapping(schema, "schema")
     for field in ("schema_version", "input", "columns", "questions", "output"):
         if field not in root:
@@ -234,6 +278,36 @@ def validate_descriptive_schema(
         raise InputError("Schema field questions must be an array.")
     questions = [_validate_question(question, index) for index, question in enumerate(root["questions"])]
     question_columns = {question.column for question in questions}
+    question_by_column = {question.column: question for question in questions}
+    for question in questions:
+        if question.applicability is None:
+            continue
+        applicability_column = question.applicability.get("column")
+        applicability_values = question.applicability.get("values")
+        if not isinstance(applicability_column, str) or not applicability_column.strip():
+            raise InputError(
+                f"Schema applicability for {question.column!r} must declare a nonblank column."
+            )
+        if applicability_column not in question_by_column:
+            raise InputError(
+                "Schema applicability column must name a declared question: "
+                f"{applicability_column!r}."
+            )
+        values = _text_sequence(
+            applicability_values, f"applicability values for {question.column!r}"
+        )
+        if not values:
+            raise InputError(
+                f"Schema applicability for {question.column!r} requires at least one value."
+            )
+        invalid_values = sorted(
+            set(values) - set(question_by_column[applicability_column].categories)
+        )
+        if invalid_values:
+            raise InputError(
+                f"Schema applicability value {invalid_values[0]!r} is not declared "
+                f"for {applicability_column!r}."
+            )
     for question in questions:
         if question.question_type == "free_text":
             invalid_parents = sorted(set(question.parent_columns) - question_columns)
@@ -272,7 +346,18 @@ def validate_descriptive_schema(
 def read_descriptive_workbook(
     path: str | Path, schema: Mapping[str, Any]
 ) -> SurveyWorkbook:
-    """Read a validated SO2 workbook and retain only meaningful response rows."""
+    """Read an SO2 workbook and retain only meaningful response rows.
+
+    Args:
+        path: Source XLSX path.
+        schema: Parsed descriptive schema for the workbook.
+
+    Returns:
+        Validated workbook provenance and retained response rows.
+
+    Raises:
+        InputError: If the workbook, envelope, headers, or schema relationship is invalid.
+    """
     source_path = Path(path)
     try:
         source_bytes = source_path.read_bytes()
@@ -368,7 +453,9 @@ def _percentage(count: int, base: int) -> float | None:
 
 
 def _applicability_summary(
-    question: QuestionDefinition, responses: pd.DataFrame
+    question: QuestionDefinition,
+    responses: pd.DataFrame,
+    question_by_column: Mapping[str, QuestionDefinition],
 ) -> dict[str, Any]:
     """Evaluate an explicitly declared routing rule, never infer one from blanks."""
     if question.applicability is None:
@@ -383,8 +470,14 @@ def _applicability_summary(
         )
     if column not in responses.columns:
         raise InputError(f"Schema applicability column is absent: {column!r}.")
+    parent_question = question_by_column[column]
+    applicable_values = frozenset(values)
     eligibility_unknown = responses[column].map(_is_blank)
-    applicable = responses[column].isin(values) & ~eligibility_unknown
+    applicable = responses[column].map(
+        lambda value: bool(
+            applicable_values.intersection(_structured_answers(parent_question, value)[0])
+        )
+    ) & ~eligibility_unknown
     inapplicable = ~applicable & ~eligibility_unknown
     answered = ~responses[question.column].map(_is_blank)
     return {
@@ -460,6 +553,7 @@ def _structured_question_payload(
     contributions: list[dict[str, Any]] = []
     duplicate_selections: list[dict[str, Any]] = []
     unexpected_selections: list[dict[str, Any]] = []
+    contradictory_selections: list[dict[str, Any]] = []
     answered_rows = 0
     for _, row in responses.iterrows():
         source_row = int(row[source_row_column])
@@ -473,6 +567,17 @@ def _structured_question_payload(
             unexpected_selections.append({"source_row": source_row, "values": unexpected})
             for answer in unexpected:
                 counts.setdefault(answer, 0)
+        exclusive_values = [
+            answer for answer in answers if answer in question.exclusive_categories
+        ]
+        if exclusive_values and len(answers) > 1:
+            contradictory_selections.append(
+                {
+                    "source_row": source_row,
+                    "exclusive_values": exclusive_values,
+                    "values": answers,
+                }
+            )
         selected = answers
         if not selected:
             selected = ["Missing"]
@@ -527,6 +632,7 @@ def _structured_question_payload(
         "diagnostics": {
             "duplicate_selections": duplicate_selections,
             "unexpected_selections": unexpected_selections,
+            "contradictory_selections": contradictory_selections,
         },
     }
 
@@ -586,6 +692,7 @@ def _free_text_question_payload(
         "diagnostics": {
             "duplicate_selections": [],
             "unexpected_selections": [],
+            "contradictory_selections": [],
             "missing_parent_answers": missing_parent_answers,
             "unexpected_parent_answers": unexpected_parent_answers,
         },
@@ -645,7 +752,9 @@ def build_descriptive_payload(
                 "column": question.column,
                 "label": question.label,
                 "question_type": question.question_type,
-                "applicability": _applicability_summary(question, workbook.responses),
+                "applicability": _applicability_summary(
+                    question, workbook.responses, question_by_column
+                ),
                 **detail,
             }
         )
@@ -675,6 +784,7 @@ class RenderedDescriptiveReport:
 
     tex: str
     chart_fragments: Mapping[str, str]
+    chart_documents: Mapping[str, str]
     chart_paths: Mapping[str, str]
 
 
@@ -730,14 +840,26 @@ def _category_label(category: Mapping[str, Any]) -> str:
     return f"{value}: {count} ({float(percentage):.1f}\\% of {basis})"
 
 
-def _bar_fragment(question: Mapping[str, Any]) -> str:
-    """Render a horizontal count bar chart, including its distinct Missing bar."""
-    categories = question["categories"]
+_ORDINAL_EXCEPTIONS = frozenset({
+    "missing", "not applicable", "n/a", "don't know", "i don't know", "i don’t know",
+})
+
+
+def _bar_axis(categories: Sequence[Mapping[str, Any]]) -> str:
+    """Render one horizontal count-bar axis with semantic category colours."""
+    if not categories:
+        return r"\emph{No categories in this group.}"
     rows = []
     labels = []
     for index, category in enumerate(categories, start=1):
         count = int(category["count"])
-        rows.append(f"\\addplot+[fill=bbmriBlue] coordinates {{({count},{index})}};")
+        normalized = str(category["value"]).strip().casefold()
+        color = (
+            "bbmriRed" if normalized == "missing"
+            else "bbmriGray" if normalized in _ORDINAL_EXCEPTIONS
+            else "bbmriBlue"
+        )
+        rows.append(f"\\addplot+[fill={color}] coordinates {{({count},{index})}};")
         labels.append(
             f"\\node[anchor=west,font=\\scriptsize] at (axis cs:{count + 0.08},{index}) "
             f"{{{_category_label(category)}}};"
@@ -755,6 +877,24 @@ def _bar_fragment(question: Mapping[str, Any]) -> str:
         *labels,
         r"\end{axis}",
         r"\end{tikzpicture}",
+    ])
+
+
+def _bar_fragment(question: Mapping[str, Any]) -> str:
+    """Render bars, separating exceptional answers from an ordinal scale."""
+    categories = question["categories"]
+    if question["question_type"] != "ordinal":
+        return _bar_axis(categories)
+    ordered = [
+        category for category in categories
+        if str(category["value"]).strip().casefold() not in _ORDINAL_EXCEPTIONS
+    ]
+    exceptional = [category for category in categories if category not in ordered]
+    return "\n".join([
+        r"\noindent\textit{Ordered scale}\par",
+        _bar_axis(ordered),
+        r"\noindent\textit{Exceptional categories}\par",
+        _bar_axis(exceptional),
     ])
 
 
@@ -777,8 +917,12 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
     slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
     for index, category in enumerate(categories):
         end = start + 360 * int(category["count"]) / total
+        color = (
+            "bbmriRed" if str(category["value"]).strip().casefold() == "missing"
+            else colors[index % len(colors)]
+        )
         slices.append(
-            rf"\path[fill={colors[index % len(colors)]},draw=white] (0,0) -- ({start:.3f}:1.5)"
+            rf"\path[fill={color},draw=white] (0,0) -- ({start:.3f}:1.5)"
             rf" arc ({start:.3f}:{end:.3f}:1.5) -- cycle;"
         )
         start = end
@@ -812,6 +956,8 @@ def _table(rows: Sequence[Sequence[str]], columns: str) -> str:
 def _question_tables(question: Mapping[str, Any]) -> str:
     """Render contribution or free-text evidence tables for a question."""
     if question["question_type"] == "free_text":
+        if not question["free_text_rows"]:
+            return ""
         rows = [[r"Country", r"Institution", r"Source row", r"Parent context", r"Response"]]
         for item in question["free_text_rows"]:
             parents = "; ".join(
@@ -853,67 +999,322 @@ def _preamble() -> str:
 """
 
 
-def _standalone_tex(fragment_key: str) -> str:
-    """Return a standalone vector-chart document that inputs one shared fragment."""
-    return _preamble() + "\n\\begin{document}\n\\input{fragments/" + fragment_key + ".tex}\n\\end{document}\n"
+def _applicability_text(question: Mapping[str, Any]) -> str:
+    """Return a compact literal rendering of declared applicability results."""
+    applicability = question["applicability"]
+    if applicability.get("status") != "evaluated":
+        return "Applicability: unknown (no verified routing rule)"
+    values = ", ".join(str(value) for value in applicability["values"])
+    return (
+        f"Applicability: evaluated from {applicability['column']} = {values}; "
+        f"applicable {applicability['applicable_rows']}; "
+        f"inapplicable {applicability['inapplicable_rows']}; "
+        f"eligible unanswered {applicability['eligible_unanswered_rows']}; "
+        f"structurally skipped {applicability['structurally_skipped_rows']}; "
+        f"eligibility unknown {applicability['eligibility_unknown_rows']}; "
+        f"out-of-route answered {applicability['out_of_route_answered_rows']}"
+    )
+
+
+def _chart_unit(question: Mapping[str, Any]) -> str:
+    """Return the observation unit represented by one chart bar or slice."""
+    if question["question_type"] == "multi_choice":
+        return "submitted response rows selecting each value"
+    return "submitted response rows"
+
+
+def _standalone_tex(
+    question: Mapping[str, Any], fragment: str, answered_only: bool,
+) -> str:
+    """Return a self-contained chart document with interpretation metadata."""
+    population = question["population"]
+    variant = " (answered rows only)" if answered_only else ""
+    note = (
+        f"Missing: {population['M']} of {population['N']} included rows. "
+        "Blank means blank; applicability is reported separately."
+    )
+    return "\n".join([
+        _preamble(),
+        r"\begin{document}",
+        rf"\section*{{{_tex(question['label'])}{_tex(variant)}}}",
+        rf"\noindent Question identifier: \texttt{{{_tex(question['question_id'])}}}\\",
+        rf"Denominator: {population['A']} answering rows; Missing uses "
+        rf"{population['N']} included rows\\",
+        rf"Unit: {_tex(_chart_unit(question))}\\",
+        rf"\emph{{{_tex(note)}}}",
+        fragment,
+        r"\end{document}",
+        "",
+    ])
+
+
+def _payload_mapping(value: Any, path: str) -> Mapping[str, Any]:
+    """Return one object-shaped payload value or raise a contextual input error."""
+    if not isinstance(value, Mapping):
+        raise InputError(f"Descriptive statistics payload {path} must be an object.")
+    return value
+
+
+def _payload_array(value: Any, path: str) -> list[Any]:
+    """Return one array-shaped payload value or raise a contextual input error."""
+    if not isinstance(value, list):
+        raise InputError(f"Descriptive statistics payload {path} must be an array.")
+    return value
+
+
+def _payload_text(value: Any, path: str) -> str:
+    """Return one nonblank payload string or raise a contextual input error."""
+    if not isinstance(value, str) or not value.strip():
+        raise InputError(f"Descriptive statistics payload {path} must be a nonblank string.")
+    return value
+
+
+def _payload_count(value: Any, path: str) -> int:
+    """Return one nonnegative integer payload count."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise InputError(
+            f"Descriptive statistics payload {path} must be a nonnegative integer."
+        )
+    return value
 
 
 def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
-    """Validate the minimal immutable payload contract consumed by the renderer."""
+    """Validate the nested immutable payload contract consumed by the renderer."""
+    if not isinstance(payload, Mapping):
+        raise InputError("Descriptive statistics payload root must be a JSON object.")
     if payload.get("payload_type") != "so2_descriptive_statistics":
         raise InputError("Expected a so2_descriptive_statistics payload.")
     if payload.get("payload_version") != "1":
         raise InputError("Unsupported descriptive statistics payload version.")
-    questions = payload.get("questions")
-    if not isinstance(questions, list) or not all(isinstance(item, Mapping) for item in questions):
-        raise InputError("Descriptive statistics payload questions must be an array of objects.")
-    return questions
+    provenance = _payload_mapping(payload.get("provenance"), "provenance")
+    for field in ("source_path", "source_sha256", "worksheet", "alias", "export_date"):
+        _payload_text(provenance.get(field), f"provenance.{field}")
+    for field in (
+        "header_row", "total_data_rows", "excluded_blank_rows", "included_response_rows",
+    ):
+        _payload_count(provenance.get(field), f"provenance.{field}")
+    if not isinstance(provenance.get("schema_version"), (str, int)):
+        raise InputError(
+            "Descriptive statistics payload provenance.schema_version must be text or an integer."
+        )
+    _payload_mapping(payload.get("diagnostics"), "diagnostics")
+    questions = _payload_array(payload.get("questions"), "questions")
+    validated_questions: list[Mapping[str, Any]] = []
+    for index, value in enumerate(questions):
+        path = f"questions[{index}]"
+        question = _payload_mapping(value, path)
+        for field in ("question_id", "column", "label"):
+            _payload_text(question.get(field), f"{path}.{field}")
+        question_type = question.get("question_type")
+        if question_type not in _QUESTION_TYPES:
+            raise InputError(
+                f"Descriptive statistics payload {path}.question_type is invalid: "
+                f"{question_type!r}."
+            )
+        population = _payload_mapping(question.get("population"), f"{path}.population")
+        population_counts = {
+            field: _payload_count(population.get(field), f"{path}.population.{field}")
+            for field in ("N", "A", "M")
+        }
+        if population_counts["N"] != population_counts["A"] + population_counts["M"]:
+            raise InputError(
+                f"Descriptive statistics payload {path}.population must satisfy N = A + M."
+            )
+        if "blank_rows" in population:
+            blank_rows = _payload_count(
+                population["blank_rows"], f"{path}.population.blank_rows"
+            )
+            if blank_rows != population_counts["M"]:
+                raise InputError(
+                    f"Descriptive statistics payload {path}.population.blank_rows must equal M."
+                )
+        categories = _payload_array(question.get("categories"), f"{path}.categories")
+        for category_index, category_value in enumerate(categories):
+            category_path = f"{path}.categories[{category_index}]"
+            category = _payload_mapping(category_value, category_path)
+            _payload_text(category.get("value"), f"{category_path}.value")
+            _payload_count(category.get("count"), f"{category_path}.count")
+            _payload_count(category.get("percent_base"), f"{category_path}.percent_base")
+            percentage = category.get("percent")
+            if percentage is not None and (
+                isinstance(percentage, bool) or not isinstance(percentage, (int, float))
+            ):
+                raise InputError(
+                    f"Descriptive statistics payload {category_path}.percent "
+                    "must be numeric or null."
+                )
+        for field in ("contributions", "free_text_rows"):
+            rows = _payload_array(question.get(field), f"{path}.{field}")
+            if not all(isinstance(row, Mapping) for row in rows):
+                raise InputError(
+                    f"Descriptive statistics payload {path}.{field} must contain objects."
+                )
+            for row_index, row in enumerate(rows):
+                row_path = f"{path}.{field}[{row_index}]"
+                for text_field in ("country", "institution"):
+                    _payload_text(row.get(text_field), f"{row_path}.{text_field}")
+                _payload_count(row.get("source_row"), f"{row_path}.source_row")
+                if field == "contributions":
+                    _payload_text(row.get("value"), f"{row_path}.value")
+                    if not isinstance(row.get("repeated_response"), bool):
+                        raise InputError(
+                            f"Descriptive statistics payload "
+                            f"{row_path}.repeated_response must be boolean."
+                        )
+                else:
+                    _payload_text(row.get("text"), f"{row_path}.text")
+                    parent_answers = _payload_array(
+                        row.get("parent_answers"), f"{row_path}.parent_answers"
+                    )
+                    for parent_index, parent_value in enumerate(parent_answers):
+                        parent_path = f"{row_path}.parent_answers[{parent_index}]"
+                        parent = _payload_mapping(parent_value, parent_path)
+                        _payload_text(parent.get("column"), f"{parent_path}.column")
+                        _payload_text(parent.get("value"), f"{parent_path}.value")
+        _payload_mapping(question.get("diagnostics"), f"{path}.diagnostics")
+        applicability = _payload_mapping(
+            question.get("applicability"), f"{path}.applicability"
+        )
+        status = applicability.get("status")
+        if status not in {"unknown", "evaluated"}:
+            raise InputError(
+                f"Descriptive statistics payload {path}.applicability.status is invalid."
+            )
+        if status == "evaluated":
+            _payload_text(applicability.get("column"), f"{path}.applicability.column")
+            applicability_values = _payload_array(
+                applicability.get("values"), f"{path}.applicability.values"
+            )
+            if not applicability_values or not all(
+                isinstance(item, str) and item.strip() for item in applicability_values
+            ):
+                raise InputError(
+                    f"Descriptive statistics payload {path}.applicability.values "
+                    "must contain nonblank strings."
+                )
+            for field in (
+                "applicable_rows", "inapplicable_rows", "eligible_unanswered_rows",
+                "structurally_skipped_rows", "eligibility_unknown_rows",
+                "out_of_route_answered_rows",
+            ):
+                _payload_count(
+                    applicability.get(field), f"{path}.applicability.{field}"
+                )
+        if question_type == "free_text" and categories:
+            raise InputError(
+                f"Descriptive statistics payload {path}.categories must be empty for free_text."
+            )
+        if question_type != "free_text":
+            pie_categories = _payload_array(
+                question.get("pie_categories"), f"{path}.pie_categories"
+            )
+            for category_index, category_value in enumerate(pie_categories):
+                category_path = f"{path}.pie_categories[{category_index}]"
+                category = _payload_mapping(category_value, category_path)
+                _payload_text(category.get("value"), f"{category_path}.value")
+                _payload_count(category.get("count"), f"{category_path}.count")
+                _payload_count(
+                    category.get("percent_base"), f"{category_path}.percent_base"
+                )
+                percentage = category.get("percent")
+                if percentage is not None and (
+                    isinstance(percentage, bool)
+                    or not isinstance(percentage, (int, float))
+                ):
+                    raise InputError(
+                        f"Descriptive statistics payload {category_path}.percent "
+                        "must be numeric or null."
+                    )
+                if not isinstance(category.get("excluded_from_chart"), bool):
+                    raise InputError(
+                        f"Descriptive statistics payload "
+                        f"{category_path}.excluded_from_chart must be boolean."
+                    )
+        validated_questions.append(question)
+    return validated_questions
 
 
 def render_descriptive_tex(
-    payload: Mapping[str, Any], chart_dir: str | Path | None
+    payload: Mapping[str, Any],
+    chart_dir: str | Path | None,
+    report_path: str | Path | None = None,
 ) -> RenderedDescriptiveReport:
-    """Render report TeX and reusable chart fragments from a descriptive payload."""
+    """Render a self-contained report and reusable standalone chart documents.
+
+    Args:
+        payload: Validated descriptive-statistics payload.
+        chart_dir: Optional target directory used to derive printable chart paths.
+        report_path: Optional report path used as the base for relative chart paths.
+
+    Returns:
+        Report TeX, shared chart fragments, standalone documents, and chart paths.
+
+    Raises:
+        InputError: If the payload is malformed or chart metadata cannot be
+            converted into stable filenames.
+    """
     questions = _validate_render_payload(payload)
     fragments: dict[str, str] = {}
+    chart_documents: dict[str, str] = {}
     chart_paths: dict[str, str] = {}
     report = [_preamble(), r"\begin{document}", r"\section*{SO2 descriptive statistics}"]
     provenance = payload.get("provenance", {})
+    report.append(rf"Source path: {_tex(provenance['source_path'])}\\")
     report.append(rf"Alias: {_tex(provenance.get('alias', 'Unknown'))}\\")
     report.append(rf"Export date: {_tex(provenance.get('export_date', 'Unknown'))}\\")
+    report.append(rf"Source SHA-256: {_tex(provenance.get('source_sha256', 'Unknown'))}\\")
+    report.append(rf"Worksheet: {_tex(provenance.get('worksheet', 'Unknown'))}\\")
+    report.append(rf"Header row: {_tex(provenance['header_row'])}\\")
+    report.append(rf"Total data rows: {_tex(provenance['total_data_rows'])}\\")
+    report.append(
+        rf"Included response rows: {_tex(provenance.get('included_response_rows', 'Unknown'))}\\"
+    )
+    report.append(
+        rf"Excluded blank rows: {_tex(provenance.get('excluded_blank_rows', 'Unknown'))}\\"
+    )
+    report.append(
+        rf"Descriptive schema version: {_tex(provenance.get('schema_version', 'Unknown'))}\\"
+    )
     for question in questions:
         for field in ("question_id", "label", "question_type", "categories", "population",
-                      "contributions", "free_text_rows"):
+                      "contributions", "free_text_rows", "applicability"):
             if field not in question:
                 raise InputError(f"Descriptive statistics question lacks {field}: {question!r}.")
         report.append(rf"\section*{{{_tex(question['label'])}}}")
+        population = question["population"]
+        report.append(rf"\noindent Question identifier: \texttt{{{_tex(question['question_id'])}}}\\")
+        report.append(rf"N/A/M: {population['N']} / {population['A']} / {population['M']}\\")
+        report.append(rf"{_tex(_applicability_text(question))}\\")
         if question["question_type"] == "free_text":
-            report.append(_question_tables(question) or r"\emph{No free-text responses.}")
+            report.append(_question_tables(question) or r"\emph{No text responses.}")
             continue
         use_pie = question["question_type"] == "single_choice" and question.get("chart") == "pie"
-        variants = (False, True) if use_pie and question["population"]["M"] else (False,)
+        variants = (False, True) if use_pie and population["M"] else (False,)
+        question_paths: list[str] = []
         for answered_only in variants:
             key = _chart_key(question, answered_only)
-            fragments[key] = _pie_fragment(question, answered_only) if use_pie else _bar_fragment(question)
-            chart_paths[key] = (
-                f"{Path(chart_dir).as_posix()}/{key}.pdf" if chart_dir is not None else ""
-            )
-            report.append(rf"\input{{fragments/{key}.tex}}")
+            fragment = _pie_fragment(question, answered_only) if use_pie else _bar_fragment(question)
+            fragments[key] = fragment
+            chart_documents[key] = _standalone_tex(question, fragment, answered_only)
+            report.append(fragment)
             if chart_dir is not None:
+                chart_pdf = Path(chart_dir) / f"{key}.pdf"
+                base = Path(report_path).parent if report_path is not None else Path.cwd()
+                chart_paths[key] = Path(os.path.relpath(chart_pdf, start=base)).as_posix()
+                question_paths.append(chart_paths[key])
                 report.append(rf"\noindent\texttt{{{_tex(chart_paths[key])}}}\\")
+        if chart_dir is not None and isinstance(question, dict):
+            question["chart_paths"] = question_paths
         tables = _question_tables(question)
         if tables:
             report.append(tables)
     report.extend([r"\end{document}", ""])
+    if chart_dir is not None and isinstance(payload, dict):
+        payload["chart_paths"] = dict(chart_paths)
     return RenderedDescriptiveReport(
-        tex="\n".join([
-            report[0],
-            r"\iffalse",
-            *fragments.values(),
-            r"\fi",
-            *report[1:],
-        ]),
+        tex="\n".join(report),
         chart_fragments=MappingProxyType(fragments),
+        chart_documents=MappingProxyType(chart_documents),
         chart_paths=MappingProxyType(chart_paths),
     )
 
@@ -942,13 +1343,63 @@ def _require_new_or_empty_chart_dir(chart_dir: Path) -> None:
         raise InputError(f"Chart directory must be new or empty: {chart_dir}")
 
 
+def _write_compilation_source(path: Path, content: str, description: str) -> None:
+    """Write a temporary TeX source through the user-facing input error boundary."""
+    try:
+        path.write_text(content, encoding="utf-8")
+    except OSError as exc:
+        raise InputError(f"Could not write {description} {path.name}: {exc}") from exc
+
+
+def _stage_publication_file(
+    target: Path, *, text: str | None = None, source: Path | None = None,
+) -> Path:
+    """Create a complete hidden staging file on the target filesystem."""
+    if (text is None) == (source is None):
+        raise AssertionError("Exactly one publication source must be provided.")
+    descriptor, stage_name = tempfile.mkstemp(
+        prefix=f".{target.name}.so2-stage-", dir=target.parent,
+    )
+    os.close(descriptor)
+    stage = Path(stage_name)
+    try:
+        if text is not None:
+            stage.write_text(text, encoding="utf-8")
+        else:
+            shutil.copy2(source, stage)
+    except OSError:
+        stage.unlink(missing_ok=True)
+        raise
+    return stage
+
+
+def _discard_publication_stages(stages: Sequence[Path]) -> None:
+    """Remove target-filesystem staging files that were not promoted."""
+    for stage in stages:
+        stage.unlink(missing_ok=True)
+
+
 def render_descriptive_pdf(
     rendered: RenderedDescriptiveReport,
     tex_path: str | Path,
     pdf_path: str | Path | None,
     chart_dir: str | Path | None,
 ) -> None:
-    """Compile staged report and charts, publishing outputs only after all succeed."""
+    """Compile and transactionally publish a descriptive report and charts.
+
+    Args:
+        rendered: Self-contained TeX and standalone chart documents.
+        tex_path: Target for the published report source.
+        pdf_path: Optional target for the compiled report PDF.
+        chart_dir: Optional new or empty directory for standalone chart PDFs.
+
+    Returns:
+        None.
+
+    Raises:
+        InputError: If targets are unsafe, staging or compilation fails, or
+            publication cannot complete without partial output.
+    """
     target_tex = Path(tex_path)
     target_pdf = Path(pdf_path) if pdf_path is not None else None
     target_charts = Path(chart_dir) if chart_dir is not None else None
@@ -961,30 +1412,30 @@ def render_descriptive_pdf(
             tempfile.TemporaryDirectory(prefix="so2-charts-") as chart_temporary:
         report_stage = Path(report_temporary)
         chart_stage = Path(chart_temporary)
-        if target_pdf is not None:
-            fragments_dir = report_stage / "fragments"
-            fragments_dir.mkdir()
-            for key, fragment in rendered.chart_fragments.items():
-                (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
 
         chart_pdfs: dict[str, Path] = {}
         if target_charts is not None:
-            fragments_dir = chart_stage / "fragments"
-            fragments_dir.mkdir()
-            for key, fragment in rendered.chart_fragments.items():
-                (fragments_dir / f"{key}.tex").write_text(fragment, encoding="utf-8")
-            for key in rendered.chart_fragments:
+            for key, document in rendered.chart_documents.items():
                 source = chart_stage / f"{key}.tex"
-                source.write_text(_standalone_tex(key), encoding="utf-8")
+                _write_compilation_source(source, document, "chart source")
                 chart_pdfs[key] = _run_xelatex(source, chart_stage)
 
         report_pdf = None
         if target_pdf is not None:
             report_source = report_stage / "report.tex"
-            report_source.write_text(rendered.tex, encoding="utf-8")
+            _write_compilation_source(report_source, rendered.tex, "report source")
             report_pdf = _run_xelatex(report_source, report_stage)
-        staged_tex = report_stage / "published-report.tex"
-        staged_tex.write_text(rendered.tex, encoding="utf-8")
+        publication_stages: list[Path] = []
+        try:
+            staged_tex = _stage_publication_file(target_tex, text=rendered.tex)
+            publication_stages.append(staged_tex)
+            staged_pdf = None
+            if target_pdf is not None and report_pdf is not None:
+                staged_pdf = _stage_publication_file(target_pdf, source=report_pdf)
+                publication_stages.append(staged_pdf)
+        except OSError as exc:
+            _discard_publication_stages(publication_stages)
+            raise InputError(f"Could not stage descriptive report outputs: {exc}") from exc
 
         publish_charts = None
         if target_charts is not None:
@@ -1016,8 +1467,8 @@ def render_descriptive_pdf(
 
         try:
             replace_file(staged_tex, target_tex)
-            if target_pdf is not None and report_pdf is not None:
-                replace_file(report_pdf, target_pdf)
+            if target_pdf is not None and staged_pdf is not None:
+                replace_file(staged_pdf, target_pdf)
             if target_charts is not None and publish_charts is not None:
                 if target_charts.exists():
                     target_charts.rmdir()
@@ -1052,6 +1503,7 @@ def render_descriptive_pdf(
                         shutil.rmtree(publish_charts)
                 except OSError as rollback_exc:
                     rollback_failures.append(rollback_exc)
+            _discard_publication_stages(publication_stages)
             if rollback_failures:
                 details = "; ".join(str(rollback_exc) for rollback_exc in rollback_failures)
                 raise InputError(
@@ -1059,5 +1511,6 @@ def render_descriptive_pdf(
                     f"{exc}; rollback could not establish a clean state: {details}"
                 ) from exc
             raise InputError(f"Could not publish descriptive report outputs: {exc}") from exc
+        _discard_publication_stages(publication_stages)
         for backup in backups.values():
             backup.unlink(missing_ok=True)

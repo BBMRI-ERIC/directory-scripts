@@ -67,6 +67,120 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
     assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
 
 
+def test_describe_refuses_to_overwrite_existing_payload(tmp_path):
+    """The primary descriptive JSON is a new output, not an overwrite target."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.json"
+    output_json.write_text("keep me", encoding="utf-8")
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+    ])
+
+    with pytest.raises(module.InputError, match="must be a new file"):
+        module.run_describe(args)
+
+    assert output_json.read_text(encoding="utf-8") == "keep me"
+
+
+def test_describe_records_report_relative_chart_paths_before_writing_payload(
+    tmp_path, monkeypatch,
+):
+    """Chart filenames added by rendering are persisted in the JSON payload."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.json"
+    output_tex = tmp_path / "publication" / "report.tex"
+    output_tex.parent.mkdir()
+    chart_dir = output_tex.parent / "charts"
+
+    class DescriptiveStub:
+        class InputError(Exception):
+            pass
+
+        @staticmethod
+        def load_descriptive_schema(_path):
+            return {}
+
+        @staticmethod
+        def read_descriptive_workbook(_path, _schema):
+            return object()
+
+        @staticmethod
+        def build_descriptive_payload(_workbook, _schema):
+            return {
+                "payload_type": "so2_descriptive_statistics",
+                "payload_version": "1",
+                "questions": [{}],
+            }
+
+        @staticmethod
+        def render_descriptive_tex(payload, chart_path, report_path=None):
+            assert Path(report_path) == output_tex
+            relative = Path(__import__("os").path.relpath(
+                Path(chart_path) / "q.pdf", output_tex.parent
+            )).as_posix()
+            payload["questions"][0]["chart_paths"] = [relative]
+            payload["chart_paths"] = {"q": relative}
+            return object()
+
+        @staticmethod
+        def render_descriptive_pdf(_rendered, tex_path, _pdf_path, _chart_dir):
+            Path(tex_path).write_text("report", encoding="utf-8")
+
+    monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+        "--output-tex", str(output_tex),
+        "--output-chart-dir", str(chart_dir),
+    ])
+
+    assert module.run_describe(args) == module.EXIT_OK
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    assert payload["chart_paths"] == {"q": "charts/q.pdf"}
+    assert payload["questions"][0]["chart_paths"] == ["charts/q.pdf"]
+
+
+def test_describe_wraps_payload_write_failure_as_input_error(tmp_path, monkeypatch):
+    """Filesystem errors while writing the requested JSON are actionable."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.json"
+    real_write_text = Path.write_text
+
+    def fail_output(path, *args, **kwargs):
+        if path == output_json:
+            raise OSError("simulated JSON write failure")
+        return real_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_output)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+    ])
+
+    with pytest.raises(module.InputError, match="Could not write JSON.*simulated JSON write failure"):
+        module.run_describe(args)
+
+
+def test_render_descriptive_rejects_nonobject_json_root(tmp_path):
+    """A JSON array cannot escape as an incidental attribute error."""
+    module = load_module()
+    input_json = tmp_path / "payload.json"
+    input_json.write_text("[]", encoding="utf-8")
+    args = Namespace(
+        input_json=str(input_json),
+        output_tex=str(tmp_path / "out.tex"),
+        output_pdf=None,
+        output_chart_dir=None,
+    )
+
+    with pytest.raises(module.InputError, match="root must be an object"):
+        module.run_render_descriptive_report(args)
+
+
 def test_every_top_level_survey_function_has_a_docstring():
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
 
@@ -131,6 +245,138 @@ def test_render_descriptive_rejects_legacy_findings_json(tmp_path):
 
     with pytest.raises(module.InputError, match="descriptive-statistics payload"):
         module.run_render_descriptive_report(args)
+
+
+def test_render_descriptive_rejects_non_object_json_as_input_error(tmp_path):
+    """A syntactically valid but malformed payload has a user-facing failure."""
+    module = load_module()
+    input_json = tmp_path / "payload.json"
+    input_json.write_text("[]", encoding="utf-8")
+    args = Namespace(
+        input_json=str(input_json),
+        output_tex=str(tmp_path / "out.tex"),
+        output_pdf=None,
+        output_chart_dir=None,
+    )
+
+    with pytest.raises(module.InputError, match="JSON object"):
+        module.run_render_descriptive_report(args)
+
+
+def test_descriptive_commands_require_new_file_outputs(tmp_path, monkeypatch):
+    """Descriptive CLI commands do not silently replace prior report artifacts."""
+    module = load_module()
+    source = write_descriptive_workbook(tmp_path)
+    schema = write_descriptive_schema(tmp_path)
+    output_json = tmp_path / "descriptive.json"
+    output_json.write_text("existing", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "_load_descriptive_report_module",
+        lambda: pytest.fail("existing outputs must be rejected before work starts"),
+    )
+    describe_args = module.build_cli().parse_args([
+        "describe", "-i", str(source), "--descriptive-schema", str(schema),
+        "-o", str(output_json),
+    ])
+
+    with pytest.raises(module.InputError, match="must be a new file"):
+        module.run_describe(describe_args)
+
+    payload_path = tmp_path / "payload.json"
+    payload_path.write_text(
+        json.dumps({"payload_type": "so2_descriptive_statistics"}),
+        encoding="utf-8",
+    )
+    output_tex = tmp_path / "report.tex"
+    output_tex.write_text("existing", encoding="utf-8")
+    render_args = Namespace(
+        input_json=str(payload_path),
+        output_tex=str(output_tex),
+        output_pdf=None,
+        output_chart_dir=None,
+    )
+
+    with pytest.raises(module.InputError, match="must be a new file"):
+        module.run_render_descriptive_report(render_args)
+
+
+def test_write_json_translates_output_failure_to_input_error(tmp_path, monkeypatch):
+    """Filesystem write errors are reported through the CLI's user-facing error type."""
+    module = load_module()
+
+    def fail_write(*_args, **_kwargs):
+        raise OSError("simulated JSON write failure")
+
+    monkeypatch.setattr(Path, "write_text", fail_write)
+
+    with pytest.raises(module.InputError, match="Could not write JSON.*simulated JSON write"):
+        module.write_json(tmp_path / "output.json", {"ok": True})
+
+
+def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
+    """A failed multi-output describe operation leaves no payload-only partial result."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.json"
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+        "--output-tex", str(tmp_path / "descriptive.tex"),
+    ])
+
+    def fail_render(*_args, **_kwargs):
+        raise module.InputError("simulated rendering failure")
+
+    monkeypatch.setattr(module, "_render_descriptive_payload", fail_render)
+
+    with pytest.raises(module.InputError, match="simulated rendering failure"):
+        module.run_describe(args)
+
+    assert not output_json.exists()
+
+
+def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monkeypatch):
+    """A final payload-write error rolls back every newly rendered artifact."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.json"
+    output_tex = tmp_path / "descriptive.tex"
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json),
+        "--output-tex", str(output_tex),
+    ])
+
+    def fake_render(_payload, render_args, _input_paths):
+        Path(render_args.output_tex).write_text("rendered", encoding="utf-8")
+
+    def fail_json(*_args, **_kwargs):
+        raise module.InputError("simulated payload write failure")
+
+    monkeypatch.setattr(module, "_render_descriptive_payload", fake_render)
+    monkeypatch.setattr(module, "write_json", fail_json)
+
+    with pytest.raises(module.InputError, match="simulated payload write failure"):
+        module.run_describe(args)
+
+    assert not output_json.exists()
+    assert not output_tex.exists()
+
+
+def test_public_descriptive_cli_apis_document_contracts():
+    """Public descriptive orchestration APIs document inputs, results, and failures."""
+    module = load_module()
+
+    for function in (
+        module.write_json,
+        module.run_describe,
+        module.run_render_descriptive_report,
+    ):
+        docstring = __import__("inspect").getdoc(function) or ""
+        assert "Args:" in docstring, function.__name__
+        assert "Returns:" in docstring, function.__name__
+        assert "Raises:" in docstring, function.__name__
 
 
 def test_current_commands_keep_existing_parser_contract():

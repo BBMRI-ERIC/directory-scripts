@@ -2712,8 +2712,24 @@ def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def write_json(path: str | Path, payload: dict[str, Any]) -> None:
-    """Write a JSON payload with stable indentation and UTF-8 encoding."""
-    Path(path).write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    """Write a JSON payload with stable indentation and UTF-8 encoding.
+
+    Args:
+        path: Destination JSON path.
+        payload: JSON-serializable object to write.
+
+    Returns:
+        None.
+
+    Raises:
+        InputError: If serialization or writing fails.
+    """
+    target = Path(path)
+    try:
+        content = json.dumps(payload, indent=2, ensure_ascii=True) + "\n"
+        target.write_text(content, encoding="utf-8")
+    except (OSError, TypeError, ValueError) as exc:
+        raise InputError(f"Could not write JSON {target}: {exc}") from exc
 
 
 def build_biobank_summary(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -3267,6 +3283,22 @@ def _require_distinct_descriptive_outputs(input_paths: list[str | Path], output_
         raise InputError("Descriptive output paths must not alias each other.")
 
 
+def _require_new_descriptive_file_outputs(
+    output_paths: list[str | Path | None],
+) -> None:
+    """Require report file targets to be new and to have writable-shaped parents."""
+    for output_path in output_paths:
+        if output_path is None:
+            continue
+        target = Path(output_path)
+        if target.is_symlink() or target.exists():
+            raise InputError(f"Descriptive output must be a new file: {target}")
+        if not target.parent.is_dir():
+            raise InputError(
+                f"Descriptive output parent directory does not exist: {target.parent}"
+            )
+
+
 def _require_new_or_empty_chart_dir(chart_dir: str | Path | None) -> None:
     """Reject chart output directories that could mix old and new artifacts."""
     if chart_dir is None:
@@ -3291,16 +3323,30 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
     tex_path = args.output_tex or str(Path(args.input_json).with_suffix(".tex"))
     _require_distinct_descriptive_outputs(input_paths, [tex_path, args.output_pdf, args.output_chart_dir])
     _require_new_or_empty_chart_dir(args.output_chart_dir)
+    _require_new_descriptive_file_outputs([tex_path, args.output_pdf])
     descriptive = _load_descriptive_report_module()
     try:
-        rendered = descriptive.render_descriptive_tex(payload, args.output_chart_dir)
+        rendered = descriptive.render_descriptive_tex(
+            payload, args.output_chart_dir, report_path=tex_path,
+        )
         descriptive.render_descriptive_pdf(rendered, tex_path, args.output_pdf, args.output_chart_dir)
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
 
 
 def run_describe(args: argparse.Namespace) -> int:
-    """Create a standalone descriptive payload and optionally render it."""
+    """Create a standalone descriptive payload and optionally render it.
+
+    Args:
+        args: Parsed describe-command arguments.
+
+    Returns:
+        The successful process status.
+
+    Raises:
+        InputError: If inputs, output targets, payload construction, rendering,
+            publication, or cleanup fails.
+    """
     render_requested = bool(args.output_tex or args.output_pdf or args.output_chart_dir)
     derived_tex_path = (
         args.output_tex or str(Path(args.output_json).with_suffix(".tex"))
@@ -3311,6 +3357,11 @@ def run_describe(args: argparse.Namespace) -> int:
         [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
     )
     _require_new_or_empty_chart_dir(args.output_chart_dir)
+    _require_new_descriptive_file_outputs([args.output_json, derived_tex_path, args.output_pdf])
+    chart_target = (
+        Path(args.output_chart_dir) if args.output_chart_dir is not None else None
+    )
+    chart_dir_was_empty = chart_target is not None and chart_target.exists()
     descriptive = _load_descriptive_report_module()
     try:
         schema = descriptive.load_descriptive_schema(args.descriptive_schema)
@@ -3318,7 +3369,6 @@ def run_describe(args: argparse.Namespace) -> int:
         payload = descriptive.build_descriptive_payload(workbook, schema)
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
-    write_json(args.output_json, payload)
     if render_requested:
         render_args = argparse.Namespace(
             input_json=args.output_json,
@@ -3327,15 +3377,55 @@ def run_describe(args: argparse.Namespace) -> int:
             output_chart_dir=args.output_chart_dir,
         )
         _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema])
+    try:
+        write_json(args.output_json, payload)
+    except InputError as exc:
+        cleanup_failures: list[OSError] = []
+        for output_path in (args.output_json, derived_tex_path, args.output_pdf):
+            if output_path is None:
+                continue
+            try:
+                Path(output_path).unlink(missing_ok=True)
+            except OSError as cleanup_exc:
+                cleanup_failures.append(cleanup_exc)
+        if chart_target is not None:
+            try:
+                if chart_target.exists():
+                    shutil.rmtree(chart_target)
+                if chart_dir_was_empty:
+                    chart_target.mkdir()
+            except OSError as cleanup_exc:
+                cleanup_failures.append(cleanup_exc)
+        if cleanup_failures:
+            details = "; ".join(str(failure) for failure in cleanup_failures)
+            raise InputError(
+                f"{exc}; cleanup could not remove partial descriptive outputs: {details}"
+            ) from exc
+        raise
     return EXIT_OK
 
 
 def run_render_descriptive_report(args: argparse.Namespace) -> int:
-    """Render an existing standalone descriptive-statistics payload."""
+    """Render an existing standalone descriptive-statistics payload.
+
+    Args:
+        args: Parsed render-descriptive-report arguments.
+
+    Returns:
+        The successful process status.
+
+    Raises:
+        InputError: If the payload cannot be read or validated, targets are
+            unsafe, or rendering fails.
+    """
     try:
         payload = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise InputError(f"Could not read descriptive-statistics payload {args.input_json}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise InputError(
+            "Descriptive-statistics payload root must be an object (JSON object required)."
+        )
     if payload.get("payload_type") != "so2_descriptive_statistics":
         raise InputError("Expected a descriptive-statistics payload.")
     _render_descriptive_payload(payload, args, [args.input_json])

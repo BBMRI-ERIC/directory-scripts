@@ -1,7 +1,9 @@
 """Tests for the self-contained SO2 descriptive-workbook reader."""
 
+from copy import deepcopy
 import importlib
 from datetime import datetime
+import inspect
 from pathlib import Path
 import shutil
 
@@ -130,7 +132,14 @@ def descriptive_schema(question):
                 {
                     "question_id": f"parent_{index}", "column": column,
                     "question_type": "ordinal", "label": column,
-                    "categories": ["frequently"],
+                    "categories": list(dict.fromkeys([
+                        "frequently",
+                        *(
+                            question.get("applicability", {}).get("values", [])
+                            if question.get("applicability", {}).get("column") == column
+                            else []
+                        ),
+                    ])),
                 }
                 for index, column in enumerate(question.get("parent_columns", []))
             ],
@@ -283,6 +292,7 @@ def test_multi_choice_preserves_unexpected_literals_and_sorts_all_contributions(
             {"source_row": 5, "values": ["Odd"]},
             {"source_row": 8, "values": ["Odd"]},
         ],
+        "contradictory_selections": [],
     }
     assert result["pie_categories"][-1]["excluded_from_chart"] is True
 
@@ -356,6 +366,113 @@ def test_blank_declared_applicability_value_is_unknown_not_inapplicable():
     }
 
 
+def test_applicability_matches_a_selection_inside_multi_choice_parent():
+    """A routing value may be one selection in a delimiter-separated parent answer."""
+    question = {
+        "question_id": "q_020_exchange",
+        "column": "Exchange",
+        "question_type": "multi_choice",
+        "label": "Exchange",
+        "categories": ["No", "Yes"],
+        "delimiter": ";",
+        "parent_columns": ["Standards"],
+        "applicability": {"column": "Standards", "values": ["HL7 FHIR"]},
+    }
+    workbook = descriptive_workbook([{
+        "Name of Institution": "Alpha",
+        "Country": "Austria",
+        "Standards": "MIABIS;HL7 FHIR",
+        "Exchange": "Yes",
+    }])
+    schema = descriptive_schema(question)
+    schema["questions"][0].update({
+        "question_type": "multi_choice",
+        "categories": ["MIABIS", "HL7 FHIR"],
+        "delimiter": ";",
+    })
+
+    result = payload_question(workbook, schema)
+
+    assert result["applicability"]["applicable_rows"] == 1
+    assert result["applicability"]["inapplicable_rows"] == 0
+    assert result["applicability"]["out_of_route_answered_rows"] == 0
+
+
+def test_schema_rejects_invalid_applicability_references_and_values():
+    """Routing rules must reference declared questions and canonical parent values."""
+    question = {
+        "question_id": "conditional",
+        "column": "Conditional",
+        "question_type": "single_choice",
+        "label": "Conditional",
+        "categories": ["Yes", "No"],
+        "parent_columns": ["Gate"],
+        "applicability": {"column": "Missing gate", "values": ["Yes"]},
+    }
+    schema = descriptive_schema(question)
+    columns = ["Name of Institution", "Country", "Gate", "Conditional"]
+
+    with pytest.raises(module.InputError, match="applicability column.*declared question"):
+        module.validate_descriptive_schema(schema, columns)
+
+    question["applicability"] = {"column": "Gate", "values": ["Maybe"]}
+    schema = descriptive_schema(question)
+    schema["questions"][0]["categories"] = ["Yes", "No"]
+
+    with pytest.raises(module.InputError, match="applicability value.*Maybe.*Gate"):
+        module.validate_descriptive_schema(schema, columns)
+
+
+def test_multi_choice_exclusive_category_combination_is_diagnosed():
+    """Mutually exclusive selections remain counted and are traceable as contradictions."""
+    question = {
+        "question_id": "q_020_exchange",
+        "column": "Exchange",
+        "question_type": "multi_choice",
+        "label": "Exchange",
+        "categories": ["No", "Yes - national", "Yes - international"],
+        "delimiter": ";",
+        "exclusive_categories": ["No"],
+    }
+    workbook = descriptive_workbook([
+        {
+            "Name of Institution": "Alpha",
+            "Country": "Austria",
+            "Exchange": "No;Yes - national",
+        }
+    ])
+
+    result = payload_question(workbook, descriptive_schema(question))
+
+    assert result["diagnostics"]["contradictory_selections"] == [{
+        "source_row": 5,
+        "exclusive_values": ["No"],
+        "values": ["No", "Yes - national"],
+    }]
+    assert [(item["value"], item["count"]) for item in result["categories"]] == [
+        ("No", 1), ("Yes - national", 1), ("Yes - international", 0), ("Missing", 0)
+    ]
+
+
+def test_schema_rejects_invalid_exclusive_categories():
+    """Only multi-choice questions may declare canonical mutually exclusive values."""
+    question = {
+        "question_id": "q_020_exchange",
+        "column": "Exchange",
+        "question_type": "multi_choice",
+        "label": "Exchange",
+        "categories": ["No", "Yes"],
+        "delimiter": ";",
+        "exclusive_categories": ["Unknown"],
+    }
+    schema = descriptive_schema(question)
+
+    with pytest.raises(module.InputError, match="exclusive categor.*Unknown"):
+        module.validate_descriptive_schema(
+            schema, ["Name of Institution", "Country", "Exchange"]
+        )
+
+
 def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies():
     """Payload provenance and narrative diagnostics make later rendering self-contained."""
     question = {
@@ -394,6 +511,7 @@ def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies(
     assert result["diagnostics"] == {
         "duplicate_selections": [],
         "unexpected_selections": [],
+        "contradictory_selections": [],
         "missing_parent_answers": [{"source_row": 6, "columns": ["Barrier A"]}],
         "unexpected_parent_answers": [{
             "source_row": 5,
@@ -673,6 +791,29 @@ def test_production_schema_accounts_for_every_header():
     assert len(classified) == len(headers)
 
 
+def test_production_schema_declares_verified_routing_and_exclusive_answers():
+    """Production diagnostics are driven by explicit survey semantics."""
+    schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
+    questions = {question["question_id"]: question for question in schema["questions"]}
+
+    assert questions[
+        "q_020_if_you_support_hl7_fhir_does_your_repository_support_the_national_or_int"
+    ]["applicability"] == {
+        "column": questions[
+            "q_018_does_the_staff_dedicated_or_not_managing_the_repository_have_experience_"
+        ]["column"],
+        "values": ["HL7 FHIR"],
+    }
+    expected_exclusive = {
+        "q_100_do_you_store_returned_data_select_all_that_apply":
+            {"We don’t store returned data."},
+    }
+    assert {
+        question_id: set(questions[question_id]["exclusive_categories"])
+        for question_id in expected_exclusive
+    } == expected_exclusive
+
+
 def test_production_schema_narrative_barrier_columns_are_free_text_with_parents():
     """Other-barrier narrative answers remain text while retaining their matrix context."""
     questions = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))
@@ -754,9 +895,16 @@ def report_payload(*questions):
         "payload_type": "so2_descriptive_statistics",
         "payload_version": "1",
         "provenance": {
+            "source_path": "survey.xlsx",
             "alias": "SO2_2025",
             "export_date": "2026-03-13T07:22:45",
+            "source_sha256": "a" * 64,
+            "worksheet": "Survey responses",
+            "header_row": 4,
+            "total_data_rows": 5,
             "included_response_rows": 3,
+            "excluded_blank_rows": 2,
+            "schema_version": "2026-09-16",
         },
         "diagnostics": {"duplicate_respondent_groups": []},
         "questions": list(questions),
@@ -851,6 +999,37 @@ def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
     assert "charts/09-institution-type.pdf" in tex
 
 
+def test_report_tex_is_self_contained_and_displays_required_semantics():
+    """Published TeX embeds charts and exposes provenance and question denominators."""
+    payload = multi_choice_payload()
+
+    tex = module.render_descriptive_tex(payload, chart_dir=None).tex
+
+    assert r"\input{fragments/" not in tex
+    assert tex.count(r"\begin{axis}[xbar") == 1
+    assert "Source path: survey.xlsx" in tex
+    assert "Source SHA-256: " + ("a" * 64) in tex
+    assert "Worksheet: Survey responses" in tex
+    assert "Header row: 4" in tex
+    assert "Total data rows: 5" in tex
+    assert "Included response rows: 3" in tex
+    assert "Excluded blank rows: 2" in tex
+    assert "Descriptive schema version: 2026-09-16" in tex
+    assert "N/A/M: 3 / 2 / 1" in tex
+    assert "Applicability: unknown" in tex
+
+
+def test_empty_free_text_question_is_explicitly_reported():
+    """An unanswered narrative question is not rendered as an unexplained empty table."""
+    narrative = payload_with_repeated_and_free_text()["questions"][1]
+    narrative["population"] = {"N": 3, "A": 0, "M": 3, "blank_rows": 3}
+    narrative["free_text_rows"] = []
+
+    tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
+
+    assert "No text responses" in tex
+
+
 def test_pie_eligible_single_choice_with_missing_has_two_variants():
     """A schema-designated pie exposes both missing-inclusive and answered-only views."""
     rendered = module.render_descriptive_tex(single_choice_payload_with_missing(), chart_dir=None)
@@ -860,6 +1039,55 @@ def test_pie_eligible_single_choice_with_missing_has_two_variants():
     assert set(rendered.chart_fragments) == {
         "11-hosting-organisation", "11-hosting-organisation-answered-only"
     }
+
+
+def test_standalone_chart_has_context_and_report_relative_payload_path(tmp_path):
+    """Standalone charts retain interpretation context and payload paths are portable."""
+    payload = multi_choice_payload()
+    report_path = tmp_path / "publication" / "report.tex"
+    chart_dir = tmp_path / "publication" / "charts"
+
+    rendered = module.render_descriptive_tex(
+        payload, chart_dir=chart_dir, report_path=report_path,
+    )
+
+    key = "09-institution-type"
+    assert rendered.chart_paths[key] == "charts/09-institution-type.pdf"
+    assert payload["questions"][0]["chart_paths"] == ["charts/09-institution-type.pdf"]
+    assert payload["chart_paths"] == {key: "charts/09-institution-type.pdf"}
+    standalone = rendered.chart_documents[key]
+    assert r"q\_009\_institution\_type" in standalone
+    assert "Institution type" in standalone
+    assert "Denominator: 2 answering rows; Missing uses 3 included rows" in standalone
+    assert "Unit: submitted response rows selecting each value" in standalone
+    assert "Missing: 1 of 3 included rows" in standalone
+    assert rendered.chart_fragments[key] in standalone
+
+
+def test_missing_bar_is_distinct_and_ordinal_exceptions_are_separated():
+    """Missing and ordinal exceptions cannot visually masquerade as scale levels."""
+    ordinal = structured_report_question(
+        question_id="q_012_frequency",
+        label="Frequency",
+        question_type="ordinal",
+        categories=[
+            {"value": "Never", "count": 1, "percent_base": 2, "percent": 50.0},
+            {"value": "Often", "count": 1, "percent_base": 2, "percent": 50.0},
+            {"value": "Not applicable", "count": 0, "percent_base": 2, "percent": 0.0},
+            {"value": "I don't know", "count": 0, "percent_base": 2, "percent": 0.0},
+            {"value": "Missing", "count": 1, "percent_base": 3, "percent": 33.3333},
+        ],
+    )
+
+    fragment = module.render_descriptive_tex(report_payload(ordinal), None).chart_fragments[
+        "12-frequency"
+    ]
+
+    assert "Ordered scale" in fragment
+    assert "Exceptional categories" in fragment
+    assert "fill=bbmriGray" in fragment
+    assert fragment.index("Ordered scale") < fragment.index("Exceptional categories")
+    assert fragment.index("Exceptional categories") < fragment.index("I don't know")
 
 
 def test_chart_key_bounds_long_sanitized_question_labels():
@@ -928,6 +1156,35 @@ def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkey
     assert report_tex.read_text(encoding="utf-8") == rendered.tex
     assert report_pdf.read_bytes().startswith(b"%PDF")
     assert (chart_dir / "09-institution-type.pdf").read_bytes().startswith(b"%PDF")
+
+
+def test_pdf_publication_never_replaces_across_filesystems(tmp_path, monkeypatch):
+    """Every promoted artifact is first staged beside its destination."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    real_replace = module.os.replace
+
+    def reject_cross_device_replace(source, destination):
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if source_path.parent.resolve() != destination_path.parent.resolve():
+            raise OSError(__import__("errno").EXDEV, "simulated cross-device replace")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    monkeypatch.setattr(module.os, "replace", reject_cross_device_replace)
+
+    module.render_descriptive_pdf(
+        rendered_payload(), tmp_path / "report.tex", tmp_path / "report.pdf", tmp_path / "charts",
+    )
+
+    assert (tmp_path / "report.tex").is_file()
+    assert (tmp_path / "report.pdf").is_file()
+    assert (tmp_path / "charts" / "09-institution-type.pdf").is_file()
 
 
 def test_pdf_render_keeps_final_outputs_absent_when_report_compilation_fails(
@@ -1090,3 +1347,109 @@ def test_real_xelatex_renders_minimal_descriptive_report(tmp_path):
     module.render_descriptive_pdf(rendered, tmp_path / "report.tex", tmp_path / "report.pdf", None)
 
     assert (tmp_path / "report.pdf").read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.parametrize(
+    "mutate, message",
+    [
+        (lambda payload: payload.pop("provenance"), "provenance"),
+        (
+            lambda payload: payload["questions"][0].update(
+                {"population": {"N": 3, "A": "2", "M": 1}}
+            ),
+            "population",
+        ),
+        (
+            lambda payload: payload["questions"][0].update(
+                {"question_type": "invented"}
+            ),
+            "question_type",
+        ),
+        (
+            lambda payload: payload["questions"][0].update(
+                {"categories": [{"value": "LIMS", "count": -1}]}
+            ),
+            "categories",
+        ),
+        (
+            lambda payload: payload["questions"][0].update(
+                {"contributions": [{"value": "PACS"}]}
+            ),
+            "contributions",
+        ),
+        (
+            lambda payload: payload["questions"][0]["pie_categories"][0].pop("count"),
+            "pie_categories",
+        ),
+    ],
+)
+def test_renderer_rejects_malformed_nested_payload_as_input_error(mutate, message):
+    """Malformed external payloads never escape as incidental Python exceptions."""
+    payload = deepcopy(multi_choice_payload())
+    mutate(payload)
+
+    with pytest.raises(module.InputError, match=message):
+        module.render_descriptive_tex(payload, chart_dir=None)
+
+
+def test_public_descriptive_apis_document_contracts():
+    """Public APIs state their inputs, results, and user-facing failure modes."""
+    public_functions = [
+        module.load_descriptive_schema,
+        module.is_nonblank_response_row,
+        module.validate_descriptive_schema,
+        module.read_descriptive_workbook,
+        module.build_descriptive_payload,
+        module.render_descriptive_tex,
+        module.render_descriptive_pdf,
+    ]
+
+    for function in public_functions:
+        docstring = inspect.getdoc(function) or ""
+        assert "Args:" in docstring, function.__name__
+        assert "Returns:" in docstring, function.__name__
+        if function is not module.is_nonblank_response_row:
+            assert "Raises:" in docstring, function.__name__
+
+
+def test_target_filesystem_staging_write_failure_is_input_error_without_output(
+    tmp_path, monkeypatch,
+):
+    """A target-side write error is actionable and leaves no published file."""
+    rendered = rendered_payload()
+    report_tex = tmp_path / "report.tex"
+    real_write_text = Path.write_text
+
+    def fail_publication_stage(path, *args, **kwargs):
+        if path.parent == tmp_path and ".so2-stage-" in path.name:
+            raise OSError("simulated target write failure")
+        return real_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_publication_stage)
+
+    with pytest.raises(module.InputError, match="stage.*simulated target write failure"):
+        module.render_descriptive_pdf(rendered, report_tex, None, None)
+
+    assert not report_tex.exists()
+    assert not list(tmp_path.glob(".*.so2-stage-*"))
+
+
+def test_chart_source_write_failure_is_input_error_without_output(tmp_path, monkeypatch):
+    """Temporary chart-source write failures use the public error boundary."""
+    rendered = rendered_payload()
+    report_tex = tmp_path / "report.tex"
+    chart_dir = tmp_path / "charts"
+    real_write_text = Path.write_text
+
+    def fail_chart_source(path, *args, **kwargs):
+        if path.parent.name.startswith("so2-charts-"):
+            raise OSError("simulated chart source write failure")
+        return real_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_chart_source)
+
+    with pytest.raises(module.InputError, match="chart source.*simulated chart source write"):
+        module.render_descriptive_pdf(rendered, report_tex, None, chart_dir)
+
+    assert not report_tex.exists()
+    assert not chart_dir.exists()

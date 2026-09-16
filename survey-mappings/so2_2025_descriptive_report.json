@@ -166,7 +166,11 @@
         "National Cancer Institute thesaurus (NCIt)",
         "HL v2"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "No experience",
+        "I don’t know"
+      ]
     },
     {
       "question_id": "q_019_standards",
@@ -187,7 +191,15 @@
         "Yes – local exchange",
         "Yes – international exchange"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "I don’t know",
+        "No"
+      ],
+      "applicability": {
+        "column": "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:",
+        "values": ["HL7 FHIR"]
+      }
     },
     {
       "question_id": "q_021_what_type_of_information_system_is_used_to_run_the_biobank_select_all_th",
@@ -267,7 +279,11 @@
         "IT infrastructure requiring pay-per-use",
         "Other (please specify):"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "I don’t know",
+        "No infrastructure"
+      ]
     },
     {
       "question_id": "q_028_it_infrastructure",
@@ -332,7 +348,11 @@
         "Yes – using virtual/cloud capacities",
         "Yes – but need to procure new hardware"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "No",
+        "I don’t know"
+      ]
     },
     {
       "question_id": "q_035_does_the_repository_have_a_direct_access_to_data_from_any_of_the_followi",
@@ -407,7 +427,11 @@
         "TCGA",
         "dbSNP"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "No",
+        "I don’t know"
+      ]
     },
     {
       "question_id": "q_043_database",
@@ -473,7 +497,11 @@
       "categories": [],
       "parent_columns": [
         "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)"
-      ]
+      ],
+      "applicability": {
+        "column": "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)",
+        "values": ["No"]
+      }
     },
     {
       "question_id": "q_050_which_types_of_samples_do_you_manage",
@@ -547,7 +575,11 @@
         "We track only individual handlers.",
         "I don’t know"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "We do not systematically track this information.",
+        "I don’t know"
+      ]
     },
     {
       "question_id": "q_056_are_sample_related_data_linked_to_donor_data_in_your_system_or_on_the_le",
@@ -820,7 +852,10 @@
         "Other (please specify):",
         "Not applicable"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "Not applicable"
+      ]
     },
     {
       "question_id": "q_078_other_semantic_issues",
@@ -842,7 +877,10 @@
         "Have not experienced such challenges",
         "Other (please specify)"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "Have not experienced such challenges"
+      ]
     },
     {
       "question_id": "q_080_other_technical_challenges",
@@ -1060,7 +1098,10 @@
         "We have biobank-level strategy on storing the data. (please specify)",
         "Other (please specify):"
       ],
-      "delimiter": ";"
+      "delimiter": ";",
+      "exclusive_categories": [
+        "We don’t store returned data."
+      ]
     },
     {
       "question_id": "q_101_biobank_network",
