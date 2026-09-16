@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import openpyxl
+import pandas as pd
 import pytest
 
 
@@ -91,6 +92,283 @@ def write_descriptive_workbook(tmp_path, rows=(), mutator=None):
     path = tmp_path / "descriptive.xlsx"
     workbook.save(path)
     return path
+
+
+def descriptive_workbook(rows, source_rows=None):
+    """Build a validated in-memory survey workbook for payload behavior tests."""
+    source_rows = source_rows or range(5, 5 + len(rows))
+    return module.SurveyWorkbook(
+        source_path="controlled.xlsx",
+        source_sha256="a" * 64,
+        worksheet="Survey responses",
+        alias="SO2_2025",
+        export_date="2026-03-13T07:22:45",
+        header_row=4,
+        responses=pd.DataFrame(
+            [{**row, "source_row": source_row} for row, source_row in zip(rows, source_rows, strict=True)]
+        ),
+        total_data_rows=len(rows),
+        excluded_blank_rows=0,
+    )
+
+
+def descriptive_schema(question):
+    """Build the schema required for a controlled descriptive question."""
+    return {
+        "schema_version": "1",
+        "input": {"worksheet": "Survey responses", "alias": "SO2_2025", "header_row": 4},
+        "columns": {
+            "respondent_context": ["Name of Institution", "Country"],
+            "institution_column": "Name of Institution",
+            "country_column": "Country",
+            "administrative_exclusions": [],
+            "administrative_exclusion_reasons": {},
+        },
+        "questions": [
+            *[
+                {
+                    "question_id": f"parent_{index}", "column": column,
+                    "question_type": "ordinal", "label": column,
+                    "categories": ["frequently"],
+                }
+                for index, column in enumerate(question.get("parent_columns", []))
+            ],
+            question,
+        ],
+        "output": {"source_row_column": "source_row"},
+    }
+
+
+def payload_question(workbook, schema):
+    """Return the one question in a controlled descriptive payload."""
+    return next(
+        item for item in module.build_descriptive_payload(workbook, schema)["questions"]
+        if item["question_id"] == schema["questions"][-1]["question_id"]
+    )
+
+
+def test_multi_choice_has_answered_selection_percentages_and_all_row_missing_percent():
+    """Selections use answered rows while Missing always uses every response row."""
+    question = {
+        "question_id": "systems",
+        "column": "Systems",
+        "question_type": "multi_choice",
+        "label": "Systems",
+        "categories": ["LIMS", "PACS"],
+        "delimiter": ";",
+    }
+    workbook = descriptive_workbook([
+        {"Name of Institution": "Alpha", "Country": "Austria", "Systems": "LIMS;PACS"},
+        {"Name of Institution": "Beta", "Country": "Belgium", "Systems": "PACS"},
+        {"Name of Institution": "Gamma", "Country": "Czech Republic", "Systems": ""},
+    ])
+
+    result = payload_question(workbook, descriptive_schema(question))
+
+    assert result["population"] == {"N": 3, "A": 2, "M": 1, "blank_rows": 1}
+    assert result["categories"] == [
+        {"value": "LIMS", "count": 1, "percent_base": 2, "percent": 50.0},
+        {"value": "PACS", "count": 2, "percent_base": 2, "percent": 100.0},
+        {"value": "Missing", "count": 1, "percent_base": 3, "percent": pytest.approx(33.3333)},
+    ]
+
+
+def test_literal_duplicate_contributions_are_preserved_and_marked():
+    """Repeated normalized respondents retain both literal source contributions."""
+    question = {
+        "question_id": "answer",
+        "column": "Answer",
+        "question_type": "single_choice",
+        "label": "Answer",
+        "categories": ["Yes", "No"],
+    }
+    workbook = descriptive_workbook([
+        {"Name of Institution": " Alpha ", "Country": "Austria", "Answer": "Yes"},
+        {"Name of Institution": "alpha", "Country": "austria", "Answer": "Yes"},
+    ], source_rows=[5, 6])
+
+    contributions = payload_question(workbook, descriptive_schema(question))["contributions"]
+
+    assert [(row["source_row"], row["repeated_response"]) for row in contributions] == [
+        (5, True), (6, True)
+    ]
+    assert contributions[0]["institution"] == " Alpha "
+
+
+def test_free_text_preserves_missing_parent_and_parent_group():
+    """Narrative rows preserve literal text and normalized missing parent values."""
+    question = {
+        "question_id": "other_barrier",
+        "column": "Other barrier",
+        "question_type": "free_text",
+        "label": "Other barrier",
+        "categories": [],
+        "parent_columns": ["Barrier A", "Barrier B"],
+    }
+    workbook = descriptive_workbook([
+        {
+            "Name of Institution": "Alpha",
+            "Country": "Austria",
+            "Barrier A": "frequently",
+            "Barrier B": "",
+            "Other barrier": "Need legal support",
+        }
+    ])
+
+    row = payload_question(workbook, descriptive_schema(question))["free_text_rows"][0]
+
+    assert row["parent_answers"] == [
+        {"column": "Barrier A", "value": "frequently"},
+        {"column": "Barrier B", "value": "Missing"},
+    ]
+    assert row["text"] == "Need legal support"
+
+
+def test_blank_conditional_answer_stays_blank_when_applicability_is_unknown():
+    """A blank answer is not inferred as inapplicable without explicit routing metadata."""
+    question = {
+        "question_id": "conditional",
+        "column": "Conditional",
+        "question_type": "single_choice",
+        "label": "Conditional",
+        "categories": ["Yes", "No"],
+    }
+    workbook = descriptive_workbook([
+        {"Name of Institution": "Alpha", "Country": "Austria", "Conditional": ""}
+    ])
+
+    result = payload_question(workbook, descriptive_schema(question))
+
+    assert result["applicability"] == {"status": "unknown"}
+    assert result["population"]["blank_rows"] == 1
+
+
+def test_multi_choice_preserves_unexpected_literals_and_sorts_all_contributions():
+    """Multi-select evidence remains literal, deduplicated, diagnosed, and ordered."""
+    question = {
+        "question_id": "systems",
+        "column": "Systems",
+        "question_type": "multi_choice",
+        "label": "Systems",
+        "categories": ["LIMS", "PACS"],
+        "delimiter": ";",
+    }
+    workbook = descriptive_workbook(
+        [
+            {"Name of Institution": "Zeta", "Country": "Sweden", "Systems": "PACS;LIMS;PACS;Odd"},
+            {"Name of Institution": "Beta", "Country": "Austria", "Systems": "Odd"},
+            {"Name of Institution": "Alpha", "Country": "Belgium", "Systems": ""},
+            {"Name of Institution": "Alpha", "Country": "Austria", "Systems": "LIMS"},
+        ],
+        source_rows=[8, 5, 6, 7],
+    )
+
+    result = payload_question(workbook, descriptive_schema(question))
+
+    assert result["population"] == {"N": 4, "A": 3, "M": 1, "blank_rows": 1}
+    assert result["categories"] == [
+        {"value": "LIMS", "count": 2, "percent_base": 3, "percent": pytest.approx(66.6667)},
+        {"value": "PACS", "count": 1, "percent_base": 3, "percent": pytest.approx(33.3333)},
+        {"value": "Odd", "count": 2, "percent_base": 3, "percent": pytest.approx(66.6667)},
+        {"value": "Missing", "count": 1, "percent_base": 4, "percent": 25.0},
+    ]
+    assert [row["value"] for row in result["contributions"]] == [
+        "LIMS", "LIMS", "PACS", "Odd", "Odd", "Missing"
+    ]
+    assert [row["source_row"] for row in result["contributions"]] == [7, 8, 8, 5, 8, 6]
+    assert result["diagnostics"] == {
+        "duplicate_selections": [{"source_row": 8, "values": ["PACS"]}],
+        "unexpected_selections": [
+            {"source_row": 5, "values": ["Odd"]},
+            {"source_row": 8, "values": ["Odd"]},
+        ],
+    }
+    assert result["pie_categories"][-1]["excluded_from_chart"] is True
+
+
+def test_declared_applicability_separates_skips_unanswered_and_out_of_route_answers():
+    """Declared routing exposes row states without discarding any submitted answer."""
+    question = {
+        "question_id": "conditional",
+        "column": "Conditional",
+        "question_type": "single_choice",
+        "label": "Conditional",
+        "categories": ["Yes", "No"],
+        "parent_columns": ["Gate"],
+        "applicability": {"column": "Gate", "values": ["Yes"]},
+    }
+    workbook = descriptive_workbook(
+        [
+            {"Name of Institution": "Alpha", "Country": "Austria", "Gate": "Yes", "Conditional": ""},
+            {"Name of Institution": "Beta", "Country": "Belgium", "Gate": "No", "Conditional": ""},
+            {"Name of Institution": "Gamma", "Country": "Czech Republic", "Gate": "No", "Conditional": "No"},
+            {"Name of Institution": "Delta", "Country": "Denmark", "Gate": "Yes", "Conditional": "Yes"},
+        ]
+    )
+
+    result = payload_question(workbook, descriptive_schema(question))
+
+    assert result["applicability"] == {
+        "status": "evaluated",
+        "column": "Gate",
+        "values": ["Yes"],
+        "applicable_rows": 2,
+        "inapplicable_rows": 2,
+        "eligible_unanswered_rows": 1,
+        "structurally_skipped_rows": 1,
+        "eligibility_unknown_rows": 0,
+        "out_of_route_answered_rows": 1,
+    }
+    assert result["population"] == {"N": 4, "A": 2, "M": 2, "blank_rows": 2}
+    assert [(row["value"], row["source_row"]) for row in result["contributions"]] == [
+        ("Yes", 8), ("No", 7), ("Missing", 5), ("Missing", 6)
+    ]
+
+
+def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies():
+    """Payload provenance and narrative diagnostics make later rendering self-contained."""
+    question = {
+        "question_id": "other_barrier",
+        "column": "Other barrier",
+        "question_type": "free_text",
+        "label": "Other barrier",
+        "categories": [],
+        "parent_columns": ["Barrier A"],
+    }
+    workbook = descriptive_workbook(
+        [
+            {"Name of Institution": "Alpha", "Country": "Austria", "Barrier A": "unexpected", "Other barrier": "Text A"},
+            {"Name of Institution": "Beta", "Country": "Belgium", "Barrier A": "", "Other barrier": "Text B"},
+        ]
+    )
+    schema = descriptive_schema(question)
+
+    payload = module.build_descriptive_payload(workbook, schema)
+    result = payload_question(workbook, schema)
+
+    assert payload["payload_type"] == "so2_descriptive_statistics"
+    assert payload["payload_version"] == "1"
+    assert payload["provenance"] == {
+        "source_path": "controlled.xlsx",
+        "source_sha256": "a" * 64,
+        "worksheet": "Survey responses",
+        "alias": "SO2_2025",
+        "export_date": "2026-03-13T07:22:45",
+        "header_row": 4,
+        "total_data_rows": 2,
+        "excluded_blank_rows": 0,
+        "included_response_rows": 2,
+        "schema_version": "1",
+    }
+    assert result["diagnostics"] == {
+        "duplicate_selections": [],
+        "unexpected_selections": [],
+        "missing_parent_answers": [{"source_row": 6, "columns": ["Barrier A"]}],
+        "unexpected_parent_answers": [{
+            "source_row": 5,
+            "values": [{"column": "Barrier A", "value": "unexpected"}],
+        }],
+    }
 
 
 def wrong_alias_row(sheet):

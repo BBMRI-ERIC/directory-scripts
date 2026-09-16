@@ -336,3 +336,315 @@ def read_descriptive_workbook(
         total_data_rows=len(data.index),
         excluded_blank_rows=int((~response_mask).sum()),
     )
+
+
+def _display_value(value: Any) -> str:
+    """Return a JSON-safe literal response value, using Missing only for blanks."""
+    return "Missing" if _is_blank(value) else str(value)
+
+
+def _normalised_respondent_value(value: Any) -> str:
+    """Normalize a respondent identity component solely for repeat detection."""
+    return " ".join(_display_value(value).split()).casefold()
+
+
+def _percentage(count: int, base: int) -> float | None:
+    """Return a four-decimal percentage or null when no denominator exists."""
+    return None if base == 0 else round(count * 100 / base, 4)
+
+
+def _applicability_summary(
+    question: QuestionDefinition, responses: pd.DataFrame
+) -> dict[str, Any]:
+    """Evaluate an explicitly declared routing rule, never infer one from blanks."""
+    if question.applicability is None:
+        return {"status": "unknown"}
+    column = question.applicability.get("column")
+    values = question.applicability.get("values")
+    if not isinstance(column, str) or not isinstance(values, list) or not all(
+        isinstance(value, str) for value in values
+    ):
+        raise InputError(
+            f"Schema applicability for {question.column!r} must declare column and string values."
+        )
+    if column not in responses.columns:
+        raise InputError(f"Schema applicability column is absent: {column!r}.")
+    applicable = responses[column].isin(values)
+    answered = ~responses[question.column].map(_is_blank)
+    return {
+        "status": "evaluated",
+        "column": column,
+        "values": values,
+        "applicable_rows": int(applicable.sum()),
+        "inapplicable_rows": int((~applicable).sum()),
+        "eligible_unanswered_rows": int((applicable & ~answered).sum()),
+        "structurally_skipped_rows": int((~applicable & ~answered).sum()),
+        "eligibility_unknown_rows": 0,
+        "out_of_route_answered_rows": int((~applicable & answered).sum()),
+    }
+
+
+def _respondent_groups(
+    responses: pd.DataFrame, institution_column: str, country_column: str, source_row_column: str
+) -> tuple[set[int], list[dict[str, Any]]]:
+    """Flag repeated normalized country/institution pairs without removing source rows."""
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for _, row in responses.iterrows():
+        key = (
+            _normalised_respondent_value(row[country_column]),
+            _normalised_respondent_value(row[institution_column]),
+        )
+        groups.setdefault(key, []).append(
+            {
+                "country": _display_value(row[country_column]),
+                "institution": _display_value(row[institution_column]),
+                "source_row": int(row[source_row_column]),
+            }
+        )
+    duplicates = [group for group in groups.values() if len(group) > 1]
+    duplicate_rows = {item["source_row"] for group in duplicates for item in group}
+    return duplicate_rows, [
+        {"responses": sorted(group, key=lambda item: item["source_row"])}
+        for group in sorted(duplicates, key=lambda group: min(item["source_row"] for item in group))
+    ]
+
+
+def _structured_answers(
+    question: QuestionDefinition, value: Any
+) -> tuple[list[str], list[str]]:
+    """Return deduplicated declared selections and duplicate selections from one response."""
+    if _is_blank(value):
+        return [], []
+    raw_answers = (
+        [part.strip() for part in str(value).split(question.delimiter)]
+        if question.question_type == "multi_choice"
+        else [str(value)]
+    )
+    answers: list[str] = []
+    duplicates: list[str] = []
+    for answer in raw_answers:
+        if answer in answers:
+            duplicates.append(answer)
+        else:
+            answers.append(answer)
+    return answers, duplicates
+
+
+def _structured_question_payload(
+    question: QuestionDefinition,
+    responses: pd.DataFrame,
+    institution_column: str,
+    country_column: str,
+    source_row_column: str,
+    duplicate_rows: set[int],
+) -> dict[str, Any]:
+    """Build counts and literal evidence for one non-narrative survey question."""
+    counts = {category: 0 for category in question.categories}
+    declared_categories = frozenset(question.categories)
+    contributions: list[dict[str, Any]] = []
+    duplicate_selections: list[dict[str, Any]] = []
+    unexpected_selections: list[dict[str, Any]] = []
+    answered_rows = 0
+    for _, row in responses.iterrows():
+        source_row = int(row[source_row_column])
+        answers, duplicates = _structured_answers(question, row[question.column])
+        if answers:
+            answered_rows += 1
+        if duplicates:
+            duplicate_selections.append({"source_row": source_row, "values": duplicates})
+        unexpected = [answer for answer in answers if answer not in declared_categories]
+        if unexpected:
+            unexpected_selections.append({"source_row": source_row, "values": unexpected})
+            for answer in unexpected:
+                counts.setdefault(answer, 0)
+        selected = answers
+        if not selected:
+            selected = ["Missing"]
+        for answer in selected:
+            if answer != "Missing":
+                counts[answer] += 1
+            contributions.append(
+                {
+                    "value": answer,
+                    "country": _display_value(row[country_column]),
+                    "institution": _display_value(row[institution_column]),
+                    "source_row": source_row,
+                    "repeated_response": source_row in duplicate_rows,
+                }
+            )
+    duplicate_selections.sort(key=lambda item: item["source_row"])
+    unexpected_selections.sort(key=lambda item: item["source_row"])
+    population = {"N": len(responses), "A": answered_rows, "M": len(responses) - answered_rows}
+    population["blank_rows"] = population["M"]
+    category_rows = [
+        {
+            "value": category,
+            "count": counts[category],
+            "percent_base": population["A"],
+            "percent": _percentage(counts[category], population["A"]),
+        }
+        for category in counts
+    ]
+    category_rows.append(
+        {
+            "value": "Missing",
+            "count": population["M"],
+            "percent_base": population["N"],
+            "percent": _percentage(population["M"], population["N"]),
+        }
+    )
+    category_order = {value: index for index, value in enumerate((*counts, "Missing"))}
+    contributions.sort(
+        key=lambda item: (
+            category_order[item["value"]], item["country"], item["institution"], item["source_row"]
+        )
+    )
+    return {
+        "population": population,
+        "categories": category_rows,
+        "pie_categories": [
+            {**category, "excluded_from_chart": category["value"] == "Missing"}
+            for category in category_rows
+        ],
+        "contributions": contributions,
+        "free_text_rows": [],
+        "diagnostics": {
+            "duplicate_selections": duplicate_selections,
+            "unexpected_selections": unexpected_selections,
+        },
+    }
+
+
+def _free_text_question_payload(
+    question: QuestionDefinition,
+    responses: pd.DataFrame,
+    institution_column: str,
+    country_column: str,
+    source_row_column: str,
+    question_by_column: Mapping[str, QuestionDefinition],
+) -> dict[str, Any]:
+    """Build literal narrative evidence and parent-answer context for one free-text question."""
+    rows = []
+    missing_parent_answers: list[dict[str, Any]] = []
+    unexpected_parent_answers: list[dict[str, Any]] = []
+    for _, response in responses.iterrows():
+        if _is_blank(response[question.column]):
+            continue
+        source_row = int(response[source_row_column])
+        parent_answers = [
+            {"column": column, "value": _display_value(response[column])}
+            for column in question.parent_columns
+        ]
+        missing_columns = [answer["column"] for answer in parent_answers if answer["value"] == "Missing"]
+        if missing_columns:
+            missing_parent_answers.append({"source_row": source_row, "columns": missing_columns})
+        unexpected_values = [
+            answer
+            for answer in parent_answers
+            if answer["value"] != "Missing"
+            and answer["value"] not in question_by_column[answer["column"]].categories
+        ]
+        if unexpected_values:
+            unexpected_parent_answers.append({"source_row": source_row, "values": unexpected_values})
+        rows.append(
+            {
+                "country": _display_value(response[country_column]),
+                "institution": _display_value(response[institution_column]),
+                "source_row": source_row,
+                "text": str(response[question.column]),
+                "parent_answers": parent_answers,
+            }
+        )
+    rows.sort(key=lambda item: (item["country"], item["institution"], item["source_row"]))
+    population = {"N": len(responses), "A": len(rows), "M": len(responses) - len(rows)}
+    population["blank_rows"] = population["M"]
+    return {
+        "population": population,
+        "categories": [],
+        "pie_categories": [],
+        "contributions": [],
+        "free_text_rows": rows,
+        "diagnostics": {
+            "duplicate_selections": [],
+            "unexpected_selections": [],
+            "missing_parent_answers": missing_parent_answers,
+            "unexpected_parent_answers": unexpected_parent_answers,
+        },
+    }
+
+
+def build_descriptive_payload(
+    workbook: SurveyWorkbook, schema: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Build a self-contained descriptive payload without Directory data.
+
+    Args:
+        workbook: Validated source workbook and nonblank survey rows.
+        schema: Validated complete descriptive registry.
+
+    Returns:
+        JSON-serializable provenance, diagnostics, question counts, literal
+        contribution rows, and free-text evidence.
+
+    Raises:
+        InputError: If the schema or its explicit applicability rule is invalid.
+    """
+    root = _required_mapping(schema, "schema")
+    output = _required_mapping(root["output"], "output")
+    source_row_column = _required_text(output["source_row_column"], "output.source_row_column")
+    headers = [column for column in workbook.responses.columns if column != source_row_column]
+    questions = validate_descriptive_schema(schema, headers)
+    if source_row_column not in workbook.responses.columns:
+        raise InputError(f"Workbook responses lack source-row column {source_row_column!r}.")
+    columns = _required_mapping(root["columns"], "columns")
+    institution_column = _required_text(columns["institution_column"], "columns.institution_column")
+    country_column = _required_text(columns["country_column"], "columns.country_column")
+    duplicate_rows, duplicate_groups = _respondent_groups(
+        workbook.responses, institution_column, country_column, source_row_column
+    )
+    question_by_column = {question.column: question for question in questions}
+    question_payloads = []
+    for question in questions:
+        detail = (
+            _free_text_question_payload(
+                question,
+                workbook.responses,
+                institution_column,
+                country_column,
+                source_row_column,
+                question_by_column,
+            )
+            if question.question_type == "free_text"
+            else _structured_question_payload(
+                question, workbook.responses, institution_column, country_column,
+                source_row_column, duplicate_rows
+            )
+        )
+        question_payloads.append(
+            {
+                "question_id": question.question_id,
+                "column": question.column,
+                "label": question.label,
+                "question_type": question.question_type,
+                "applicability": _applicability_summary(question, workbook.responses),
+                **detail,
+            }
+        )
+    return {
+        "payload_type": "so2_descriptive_statistics",
+        "payload_version": "1",
+        "provenance": {
+            "source_path": workbook.source_path,
+            "source_sha256": workbook.source_sha256,
+            "worksheet": workbook.worksheet,
+            "alias": workbook.alias,
+            "export_date": workbook.export_date,
+            "header_row": workbook.header_row,
+            "total_data_rows": workbook.total_data_rows,
+            "excluded_blank_rows": workbook.excluded_blank_rows,
+            "included_response_rows": len(workbook.responses),
+            "schema_version": root["schema_version"],
+        },
+        "diagnostics": {"duplicate_respondent_groups": duplicate_groups},
+        "questions": question_payloads,
+    }
