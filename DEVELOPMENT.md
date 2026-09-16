@@ -788,6 +788,67 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
   - one canonical description per finding type belongs in the appendix, with clickable links from the summary/status tables
   - `Mapping` and `Entity` cells should remain breakable enough for PDF readability (`.` / `_` for mapping IDs; `-` / `:` / `_` / `.` for entity identifiers)
 
+### SO2 descriptive statistics report
+
+`survey-so2-directory.py` also provides a standalone descriptive-statistics
+workflow. It is intentionally separate from the Directory-consistency workflow
+above and must not be added as a section of its findings report.
+
+- The CLI consists of `describe`, which reads a survey XLSX and writes a versioned
+  descriptive-statistics JSON payload with optional TeX/PDF output, and
+  `render-descriptive-report`, which renders TeX/PDF from that payload without
+  re-reading the survey workbook. It must not load `directory.py`, request
+  credentials, require the entity-resolution mapping, or create findings/update
+  JSON.
+- The population is exactly one observation for every nonblank worksheet row.
+  No Directory-resolution status, biobank deduplication, or collection expansion
+  may affect descriptive counts. Report total, nonblank and excluded-blank row
+  counts, workbook hash, worksheet, header row and descriptive-schema version.
+- A versioned descriptive-report schema declares source worksheet/header, every
+  question's source column(s), question type, display label/order, category rules,
+  optional multi-select delimiter, and optional parent question for free-text
+  follow-ups. Do not infer multi-select semantics solely from question wording or
+  semicolons in an answer. A declared parent value must be read from the same row,
+  never inferred from column adjacency.
+- Support at least `single_choice`, `multi_choice`, `ordinal`, and `free_text`
+  question types. For every structured question report answered denominator and
+  missing count. Single-choice counts must reconcile exactly with its answered
+  denominator. Multi-choice values are deduplicated within a response and use the
+  answered-question denominator; their percentages may exceed 100 percent. Keep
+  blank, `No`, `Don't know`, `Not applicable` and `Planned` distinct. Numeric
+  bands are frequency categories, not data to average.
+- Free-text tables list the reported institution, its declared parent answer when
+  applicable, and the unmodified answer text. Do not incidentally copy emails or
+  other identifying values into unrelated tables; a field is listed only when it
+  is the answer being reported.
+- Use native TeX PGF/TikZ, primarily `pgfplots`, for report charts. Python computes
+  statistics and emits reusable chart fragments; TeX renders them in the report.
+  Use pie charts only for readable non-overlapping single-choice distributions,
+  horizontal bars for high-cardinality or multi-choice distributions, and ordered
+  bars for ordinal questions. When a pie-eligible single-choice question has
+  missing responses, render two side-by-side pies: one including `Missing`, and
+  one using only answered responses with its denominator labelled. Multi-choice
+  data must never use pie charts.
+- `describe --output-chart-dir DIR` additionally renders each report chart from
+  the same PGF/TikZ fragment as a standalone vector PDF. The report displays the
+  relative output path below its corresponding embedded chart. The directory must
+  be new or empty, and chart filenames must use a stable question ordinal,
+  sanitized identifier and variant suffix. The descriptive payload records those
+  filenames; no PNG export is required initially.
+- TeX builds must stage every generated chart asset in the temporary compilation
+  directory. Rendering must fail clearly if a referenced asset or a XeLaTeX/
+  `latexmk` dependency is unavailable; it must not produce a partial PDF.
+- All public or reusable methods in `survey-so2-directory.py` must document their
+  purpose, inputs, returns and raised user-facing exceptions. Validate external
+  workbook/schema/report-payload assumptions with actionable `InputError`s; use
+  assertions only for already-validated internal invariants.
+- Tests must cover all-row inclusion without Directory access, blank rows,
+  question-type semantics, parent/free-text rows, duplicate selections, embedded
+  delimiter text, missing/invalid schema columns, output collisions, Unicode/TeX
+  escaping, legacy descriptive payloads and chart-asset staging. A real XeLaTeX
+  rendering/layout check is conditional on the compiler being installed; otherwise
+  validate generated TeX and report the missing dependency explicitly.
+
 ### Current fix-producing module labels
 
 - exported `module` values intentionally match the visible QC check-prefix family that users see in warning IDs
