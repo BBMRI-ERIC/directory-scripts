@@ -794,11 +794,13 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 workflow. It is intentionally separate from the Directory-consistency workflow
 above and must not be added as a section of its findings report.
 
-- The CLI consists of `describe`, which reads the authoritative EUS form archive
-  and one or two response exports before writing a versioned descriptive-statistics
-  JSON payload with optional TeX/PDF output, and `render-descriptive-report`,
-  which renders TeX/PDF from that payload without re-reading source artifacts. It
-  must not load `directory.py`, request credentials, require the
+- The CLI consists of `export-eus-form-json`, which deliberately regenerates
+  the checked-in form manifest from the authoritative EUS archive, `describe`,
+  which reads that JSON manifest and one or two response exports before writing
+  a versioned descriptive-statistics JSON payload with optional TeX/PDF output,
+  and `render-descriptive-report`, which renders TeX/PDF from that payload
+  without re-reading source artifacts. `describe` and rendering must not load
+  the EUS decoder or `directory.py`, request credentials, require the
   entity-resolution mapping, or create findings/update JSON.
 - The observation unit is one submitted, institution-attributed response for every
   nonblank worksheet row. The survey does not distinguish whether that respondent
@@ -864,7 +866,7 @@ above and must not be added as a section of its findings report.
   volunteered comments as prevalence estimates. Do not incidentally copy emails
   or other identifying values into unrelated tables; a field is listed only when
   it is the answer being reported.
-- The rendered report repeats full source provenance and shows a compact, breakable complete `Question identifier:` line, `N`, `A`, `M`, EUS-derived response type, and mandatory/optional declaration for every question. It must not display the internal applicability diagnostic. It must define `N`, `A`, `M`, `oAR`, and `oIR` immediately after the table of contents; bar labels use the abbreviated percentage bases. Standalone chart documents repeat the question, denominator, unit,
+- The rendered report repeats full source provenance and shows a compact, breakable complete `Question identifier:` line, `N`, `A`, `M`, manifest-derived response type, and mandatory/optional declaration for every question. It must not display the internal applicability diagnostic. It must define `N`, `A`, `M`, `oAR`, and `oIR` immediately after the table of contents; bar labels use the abbreviated percentage bases. Standalone chart documents repeat the question, denominator, unit,
   and missingness context so they remain interpretable outside the report.
 - Use native TeX PGF/TikZ, primarily `pgfplots`, for report charts. Python computes
   statistics and emits reusable chart fragments; TeX renders them in the report.
@@ -909,67 +911,81 @@ above and must not be added as a section of its findings report.
 
 ### SO2 EUSurvey authoritative form and response inputs
 
-The SO2 descriptive-statistics workflow uses three distinct artifact roles. The
-committed EUSurvey archive
-`survey-mappings/SO2_2025-u65uym7bs7d8bfs7j7hpcwoc1y.eus` is the authority for
-form configuration only; it must never be treated as a response source. XML is
-the preferred response source, while XLSX remains a compatibility response
-source. `describe` must require the EUS archive and exactly one answer source,
-or both answer sources for strict cross-validation.
+The SO2 descriptive-statistics workflow separates EUSurvey configuration
+extraction from ordinary report execution. The committed EUSurvey archive
+`survey-mappings/SO2_2025-u65uym7bs7d8bfs7j7hpcwoc1y.eus` is form-configuration
+provenance only; it must never be treated as a response source. The committed,
+reviewable JSON manifest `survey-mappings/so2_2025_form.json` is the runtime
+form contract. XML is the preferred response source, while XLSX remains a
+compatibility response source. `describe` must require the JSON manifest and
+exactly one answer source, or both answer sources for strict cross-validation.
 
-- The EUS loader must read exactly one `survey-active.eus` member through a
-  bounded, data-only Java-serialization decoder. It must not instantiate
-  EUSurvey application classes, inspect unrelated account data, or silently
-  fall back to `survey.eus`, which may contain draft changes. It must extract
-  form UID, field UID, title, position, type, `optional`, readonly/hidden state,
-  choices, choice dependencies, and matrix layout. `optional=False` means
-  mandatory. Matrix-row labels inherit their containing matrix's status unless
-  EUS explicitly provides independent row constraints.
-- EUS field UIDs are the canonical identity. XML field and choice IDs, types,
-  labels, choice ownership, matrix rows/scales, and dependency targets must
-  reconcile with the EUS form model. Unknown or dangling identifiers,
-  incompatible types, malformed matrices, unsupported routing structures, or
-  form-identity mismatch must fail before response statistics are calculated.
-- The XLSX adapter must use a versioned explicit header-to-EUS-UID mapping. It
+- `export-eus-form-json` is the only command that decodes EUS Java
+  serialization. It must read exactly one `survey-active.eus` member through a
+  bounded, data-only decoder and deterministically generate the JSON manifest.
+  It must not instantiate EUSurvey application classes, inspect unrelated
+  account data, or silently fall back to `survey.eus`, which may contain draft
+  changes. Normal descriptive reporting and Directory-coherency analysis must
+  not import the decoder or require `javaobj-py3`.
+- The generated manifest must record its schema version, generator version,
+  EUS archive SHA-256, active-member SHA-256, survey UID/alias, and the complete
+  normalized form model. The model includes field UID, title, position, type,
+  `optional`, readonly/hidden state, choices, choice dependencies, and matrix
+  layout. Regeneration with the same EUS input and generator version must be
+  byte-stable. A changed checked-in manifest must be reviewed alongside the EUS
+  provenance hash change. `optional=False` means mandatory. Matrix-row labels
+  inherit their containing matrix's status unless EUS explicitly provides
+  independent row constraints.
+- Form field UIDs in the manifest are the canonical identity. XML field and
+  choice IDs, types, labels, choice ownership, matrix rows/scales, and
+  dependency targets must reconcile with the manifest. Unknown or dangling
+  identifiers, incompatible types, malformed matrices, unsupported routing
+  structures, manifest-version mismatch, or manifest integrity mismatch must
+  fail before response statistics are calculated.
+- The XLSX adapter must use a versioned explicit header-to-form-UID mapping. It
   must account for every meaningful XLSX header as a field, matrix row,
   respondent-context field, or documented transport metadata. It must map
   choices only through documented export transformations; ambiguous headers,
   delimiters, formulas, truncation, or unknown values must fail rather than use
   fuzzy label matching.
-- The XML adapter must resolve every `qid` and `aid` against EUS-owned fields
-  and choices. An XML response element with an `aid` is a selection even when
-  its text is empty. Parsing must reject external entities and preserve literal
-  free-text evidence without case-folding or placeholder-to-blank conversion.
+- The XML adapter must resolve every `qid` and `aid` against manifest-owned
+  fields and choices. An XML response element with an `aid` is a selection even
+  when its text is empty. Parsing must reject external entities and preserve
+  literal free-text evidence without case-folding or placeholder-to-blank
+  conversion.
 - Each adapter emits the same complete UID-based canonical response vector,
   including respondent-context fields, matrix coordinates, unordered
   multi-choice selections, explicit unanswered values, and duplicate response
   multiplicity. Source-specific raw evidence remains available for diagnostics.
 - If XML and XLSX are both supplied, both must independently validate against
-  EUS and their complete `Counter(response_vector)` values must match exactly.
-  Matching record counts, marginal totals, institution identities, or row order
-  are insufficient. Differences block JSON, TeX, and PDF publication and must
-  report affected field UIDs and surplus-vector multiplicities without inventing
-  a respondent pairing. Existing outputs must remain intact on failure.
+  the manifest and their complete `Counter(response_vector)` values must match
+  exactly. Matching record counts, marginal totals, institution identities, or
+  row order are insufficient. Differences block JSON, TeX, and PDF publication
+  and must report affected field UIDs and surplus-vector multiplicities without
+  inventing a respondent pairing. Existing outputs must remain intact on
+  failure.
 - Requiredness is interpreted with routing. A mandatory field that was not
   shown is not a missing answer. Out-of-route answers remain diagnostics unless
-  the validated EUS routing semantics prove them invalid. Dependencies must be
-  represented as structured Boolean expressions, preserving EUS AND/OR and
-  matrix/container semantics rather than flattening them into labels.
-- Descriptive payloads record EUS/member/XML/XLSX hashes, decoder and
-  normalization versions, source coverage, validation status, field metadata,
-  and structured routing expressions. `render-descriptive-report` must render
-  that self-contained payload without reopening inputs.
-- Every report question must show EUS-derived response type and status:
+  the validated manifest routing semantics prove them invalid. Dependencies
+  must be represented as structured Boolean expressions, preserving EUS AND/OR
+  and matrix/container semantics rather than flattening them into labels.
+- Descriptive payloads record manifest/archive/member/XML/XLSX hashes,
+  generator and normalization versions, source coverage, validation status,
+  field metadata, and structured routing expressions.
+  `render-descriptive-report` must render that self-contained payload without
+  reopening inputs.
+- Every report question must show manifest-derived response type and status:
   `Mandatory`, `Optional`, `Mandatory when shown`, or `Optional when shown`.
   Conditional fields must also show a human-readable `Shown when:` expression.
   Do not infer either type or status from question wording, XLSX blanks, or
   observed response frequencies. Readonly/hidden/validation metadata remains in
   payloads and is printed only where it materially changes interpretation.
-- The report introduction must summarize the validated active form and selected
-  answer source(s), field counts by type/status, input hashes, and XML/XLSX
-  cross-validation result. Existing chart denominators and row-level statistical
-  semantics remain unchanged.
+- The report introduction must summarize the validated active-form manifest and
+  selected answer source(s), field counts by type/status, input hashes, and
+  XML/XLSX cross-validation result. Existing chart denominators and row-level
+  statistical semantics remain unchanged.
 - Tests must cover active-versus-draft selection, corrupt/oversized archives,
+  deterministic manifest serialization, manifest provenance/integrity checks,
   UID collisions, unsupported classes, mandatory/optional flags, nested AND/OR
   dependencies, matrices, XML reference validation, XLSX mapping/value
   validation, semantic XML/XLSX equivalence, duplicate response multiplicity,
