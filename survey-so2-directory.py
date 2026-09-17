@@ -277,7 +277,10 @@ class InputError(Exception):
 
 
 def build_cli() -> argparse.ArgumentParser:
-    """Build and return the SO2 analysis and descriptive-report command-line parser."""
+    """Build the SO2 analysis and descriptive-report command-line parser.
+
+    Returns:
+        Configured top-level argparse parser with all supported subcommands."""
     parser = build_parser(description="Analyze the SO2 Datafication survey against the BBMRI Directory.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -321,13 +324,22 @@ def build_cli() -> argparse.ArgumentParser:
 
     describe = subparsers.add_parser("describe", help="Build descriptive statistics without Directory access.")
     add_logging_arguments(describe)
+    form_export = subparsers.add_parser("export-eus-form-json", help="Generate a JSON form manifest from an EUSurvey archive.")
+    add_logging_arguments(form_export)
+    form_export.add_argument("--form-eus", required=True, help="Path to the authoritative EUSurvey .eus archive.")
+    form_export.add_argument("-o", "--output-json", required=True, help="Write the generated form manifest JSON to this path.")
     describe.add_argument("-i", "--survey-file", required=True, help="Path to the SO2 survey XLSX export.")
     describe.add_argument("--descriptive-schema", required=True, help="Path to the descriptive-workbook schema JSON.")
+    describe.add_argument("--form-json", required=True, help="Path to the generated authoritative SO2 form manifest JSON.")
     describe.add_argument("-o", "--output-json", required=True, help="Write descriptive-statistics payload JSON to this path.")
     describe.add_argument("--output-tex", help="Optional path for the rendered TeX report.")
     describe.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
     describe.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
     describe.add_argument("--long-report", action="store_true", help="Include grouped structured-response contribution tables.")
+    describe.add_argument(
+        "--include-parent-context", action="store_true",
+        help="Include complete raw parent answers in free-text evidence tables.",
+    )
     describe.add_argument("--overwrite", action="store_true", help="Replace existing describe outputs after successful regeneration.")
 
     render_descriptive = subparsers.add_parser("render-descriptive-report", help="Render TeX/PDF from a descriptive-statistics payload.")
@@ -337,6 +349,10 @@ def build_cli() -> argparse.ArgumentParser:
     render_descriptive.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
     render_descriptive.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
     render_descriptive.add_argument("--long-report", action="store_true", help="Include grouped structured-response contribution tables.")
+    render_descriptive.add_argument(
+        "--include-parent-context", action="store_true",
+        help="Include complete raw parent answers in free-text evidence tables.",
+    )
     export = subparsers.add_parser("export-update-plan", help="Export qcheck-updater-compatible JSON from findings.")
     add_logging_arguments(export)
     export.add_argument("-i", "--input-json", required=True, help="Findings JSON produced by analyze.")
@@ -351,7 +367,13 @@ def build_cli() -> argparse.ArgumentParser:
 
 
 def _add_common_cli(parser: argparse.ArgumentParser) -> None:
-    """Add shared logging, authentication, schema, and target options to an analysis parser."""
+    """Add shared Directory connection options to one subcommand parser.
+
+    Args:
+        parser: Subcommand parser to extend in place.
+
+    Returns:
+        ``None`` after mutating the supplied parser."""
     add_logging_arguments(parser)
     add_directory_auth_arguments(parser)
     add_directory_schema_argument(parser, default="ERIC")
@@ -363,7 +385,13 @@ def _add_common_cli(parser: argparse.ArgumentParser) -> None:
 
 
 def load_mapping(path: str | Path) -> dict[str, Any]:
-    """Load and minimally validate the survey-to-Directory mapping JSON; raise InputError for unusable input."""
+    """Load the editable survey-to-Directory mapping configuration.
+
+    Args:
+        path: Input filesystem path.
+
+    Returns:
+        Parsed mapping object used to classify and compare survey fields."""
     mapping_path = Path(path)
     if not mapping_path.exists():
         raise InputError(f"Mapping JSON {mapping_path} does not exist.")
@@ -374,7 +402,13 @@ def load_mapping(path: str | Path) -> dict[str, Any]:
 
 
 def load_objectives_mapping(path: str | Path) -> dict[str, Any]:
-    """Load and minimally validate the survey-question objective mapping JSON; raise InputError for unusable input."""
+    """Load survey-question strategic-objective metadata.
+
+    Args:
+        path: Input filesystem path.
+
+    Returns:
+        Parsed objective mapping used to annotate findings."""
     mapping_path = Path(path)
     if not mapping_path.exists():
         raise InputError(f"Strategic-objective mapping JSON {mapping_path} does not exist.")
@@ -387,7 +421,14 @@ def load_objectives_mapping(path: str | Path) -> dict[str, Any]:
 
 
 def load_survey(mapping: dict[str, Any], survey_file: str | Path) -> pd.DataFrame:
-    """Read the mapped survey worksheet at its declared header row; raise InputError when the file is absent."""
+    """Read and validate the mapped SO2 survey workbook.
+
+    Args:
+        mapping: Parsed survey mapping configuration.
+        survey_file: Source SO2 XLSX export path.
+
+    Returns:
+        Data frame containing validated survey response rows."""
     survey_path = Path(survey_file)
     if not survey_path.exists():
         raise InputError(f"Survey file {survey_path} does not exist.")
@@ -396,7 +437,13 @@ def load_survey(mapping: dict[str, Any], survey_file: str | Path) -> pd.DataFram
 
 
 def build_directory(args: argparse.Namespace) -> Any:
-    """Construct the lazy Directory client for an analysis command; raise InputError when non-ERIC credentials are absent."""
+    """Construct a Directory client from command-line settings.
+
+    Args:
+        args: Parsed command-line options for the active subcommand.
+
+    Returns:
+        Configured Directory instance for survey analysis."""
     global Directory
     if Directory is None:
         from directory import Directory as directory_class
@@ -420,7 +467,13 @@ def build_directory(args: argparse.Namespace) -> Any:
 
 
 def normalize_text(value: Any) -> str:
-    """Return an accent-insensitive, case-folded comparison form for a scalar value."""
+    """Normalize literal text for conservative matching.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Case-folded whitespace-normalized text."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return ""
     text = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii")
@@ -446,7 +499,13 @@ def normalize_text(value: Any) -> str:
 
 
 def normalized_institution_signature(value: Any) -> tuple[str, ...]:
-    """Return sorted meaningful normalized institution tokens for conservative similarity matching."""
+    """Extract a token signature for institution matching.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Ordered normalized institution tokens."""
     tokens = [
         token
         for token in normalize_text(value).split()
@@ -456,7 +515,13 @@ def normalized_institution_signature(value: Any) -> tuple[str, ...]:
 
 
 def normalize_country(value: Any) -> str:
-    """Return the known ISO-2 country code or an uppercased fallback for a survey value."""
+    """Normalize a submitted country to a comparison key.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Canonical country comparison string."""
     if value is None:
         return ""
     text = normalize_text(value)
@@ -466,7 +531,13 @@ def normalize_country(value: Any) -> str:
 
 
 def split_semicolon_values(value: Any) -> list[str]:
-    """Return nonblank semicolon-delimited scalar values in their source order."""
+    """Split one semicolon-delimited survey response.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Trimmed nonblank selected values."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return []
     parts = [part.strip() for part in str(value).split(";")]
@@ -474,7 +545,13 @@ def split_semicolon_values(value: Any) -> list[str]:
 
 
 def cell_text(value: Any) -> str:
-    """Return a trimmed spreadsheet cell string, treating null and NaN as blank."""
+    """Convert a survey cell to printable text.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Empty string for blank cells, otherwise literal text."""
     if value is None:
         return ""
     if isinstance(value, float) and pd.isna(value):
@@ -484,7 +561,14 @@ def cell_text(value: Any) -> str:
 
 
 def get_row_value(row: pd.Series, *column_names: str) -> Any:
-    """Return the first matching row value using exact, then normalized, column names."""
+    """Retrieve the first available value among alternative row columns.
+
+    Args:
+        row: One submitted survey response row.
+        column_names: Alternative survey column names checked in declared order.
+
+    Returns:
+        Matched row value or an empty value when no candidate column is present."""
     for column_name in column_names:
         if column_name in row.index:
             return row.get(column_name)
@@ -501,7 +585,13 @@ def get_row_value(row: pd.Series, *column_names: str) -> Any:
 
 
 def parse_material_value(value: Any) -> list[str]:
-    """Return nonblank material terms from a list or comma-delimited Directory value."""
+    """Parse a material-type survey response into canonical values.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Normalized material descriptors."""
     if value is None:
         return []
     if isinstance(value, list):
@@ -512,7 +602,13 @@ def parse_material_value(value: Any) -> list[str]:
 
 
 def parse_sample_size_bucket(value: Any) -> str:
-    """Normalize known survey sample-size bucket spellings without changing unknown labels."""
+    """Parse a textual sample-size answer into one bucket label.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Recognized sample-size bucket or empty result."""
     text = cell_text(value)
     if not text:
         return ""
@@ -531,7 +627,13 @@ def parse_sample_size_bucket(value: Any) -> str:
 
 
 def classify_sample_size_bucket(count: int | None) -> str:
-    """Classify an explicit count into the survey sample-size bucket, or blank for None."""
+    """Classify a numeric sample count into a survey size bucket.
+
+    Args:
+        count: Optional numeric sample count to classify.
+
+    Returns:
+        Bucket label corresponding to the supplied count."""
     if count is None:
         return ""
     if count < 500:
@@ -546,7 +648,13 @@ def classify_sample_size_bucket(count: int | None) -> str:
 
 
 def is_negative_technology_detail(value: Any) -> bool:
-    """Return whether technology free text explicitly denies usable direct access."""
+    """Detect whether technology free text explicitly denies availability.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Whether the detail is a negative/non-availability response."""
     normalized = normalize_text(value)
     if not normalized:
         return False
@@ -570,7 +678,13 @@ def is_negative_technology_detail(value: Any) -> bool:
 
 
 def is_genotyping_panel_detail(value: Any) -> bool:
-    """Return whether positive technology free text denotes genotyping, arrays, GWAS, or panels."""
+    """Detect genotyping or panel technology detail.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Whether the detail supports the genotyping/panels modality."""
     normalized = normalize_text(value)
     if not normalized or is_negative_technology_detail(value):
         return False
@@ -578,7 +692,13 @@ def is_genotyping_panel_detail(value: Any) -> bool:
 
 
 def classify_modality_question_answer(value: Any) -> str:
-    """Classify a dedicated modality answer as yes, no, planned, other, or blank."""
+    """Classify one direct-access modality response.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Canonical modality response classification."""
     text = cell_text(value)
     if not text:
         return ""
@@ -592,7 +712,14 @@ def classify_modality_question_answer(value: Any) -> str:
 
 
 def build_technology_modality_row(row: pd.Series, row_resolution: dict[str, Any]) -> dict[str, Any]:
-    """Build one normalized modality-analysis record from a survey row and its resolution metadata."""
+    """Build one resolved respondent row for technology-modality analysis.
+
+    Args:
+        row: One submitted survey response row.
+        row_resolution: Resolved Directory context for the same survey row.
+
+    Returns:
+        Literal modality evidence linked to its survey resolution."""
     selected_choices = split_semicolon_values(get_row_value(row, TECHNOLOGY_DIRECT_ACCESS_FIELD))
     selected_set = set(selected_choices)
     row_payload = {
@@ -663,7 +790,13 @@ def build_technology_modality_row(row: pd.Series, row_resolution: dict[str, Any]
 
 
 def build_technology_modalities_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Aggregate normalized modality rows into reproducible counts and inconsistency evidence."""
+    """Aggregate respondent modality rows into an analysis payload.
+
+    Args:
+        rows: Resolved survey rows to aggregate.
+
+    Returns:
+        JSON-serializable modality counts, evidence, and diagnostics."""
     inconsistencies = []
     for row in rows:
         for modality in ("radiology", "pathology"):
@@ -718,7 +851,13 @@ def build_technology_modalities_payload(rows: list[dict[str, Any]]) -> dict[str,
 
 
 def escape_r_string(value: str) -> str:
-    """Escape backslashes and double quotes for an R string literal."""
+    """Escape literal text for an R string literal.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        R-safe quoted-string content."""
     return value.replace(chr(92), chr(92) * 2).replace('"', chr(92) + '"')
 
 
@@ -733,7 +872,20 @@ def build_technology_upset_r_script(
     matrix_pdf_filename: str,
     matrix_png_filename: str,
 ) -> str:
-    """Return an R script that renders coordinated technology UpSet, deviation, and matrix figures."""
+    """Generate the standalone R script for modality UpSet figures.
+
+    Args:
+        payload: JSON-serializable report or analysis payload.
+        csv_filename: Filename for the generated modality CSV.
+        upset_pdf_filename: Filename for the UpSet PDF output.
+        upset_png_filename: Filename for the UpSet PNG output.
+        deviation_pdf_filename: Filename for the deviation PDF output.
+        deviation_png_filename: Filename for the deviation PNG output.
+        matrix_pdf_filename: Filename for the modality matrix PDF output.
+        matrix_png_filename: Filename for the modality matrix PNG output.
+
+    Returns:
+        Complete R source producing requested figures."""
     modality_ids = [modality["id"] for modality in payload.get("modalities", [])]
     modality_labels = {modality["id"]: modality["label"] for modality in payload.get("modalities", [])}
     modality_ids_r = ", ".join(f'"{escape_r_string(modality_id)}"' for modality_id in modality_ids)
@@ -917,7 +1069,14 @@ ggplot2::ggsave(matrix_png_path, matrix_plot, width = 10, height = matrix_height
 
 
 def write_technology_upset_artifacts(report: dict[str, Any], output_prefix: str | Path) -> dict[str, str]:
-    """Write modality CSV and R-script artifacts; raise InputError when report modality rows are unavailable."""
+    """Write modality CSV and R-script artifacts beside an output prefix.
+
+    Args:
+        report: Completed SO2 findings report.
+        output_prefix: Output artifact prefix.
+
+    Returns:
+        Paths of generated modality artifacts."""
     payload = report.get("technology_modalities")
     if not isinstance(payload, dict) or not isinstance(payload.get("rows"), list):
         raise InputError("Report JSON does not contain technology modality data for UpSet export.")
@@ -962,7 +1121,13 @@ def write_technology_upset_artifacts(report: dict[str, Any], output_prefix: str 
 
 
 def escape_latex(value: Any) -> str:
-    """Escape scalar text for ordinary TeX content while allowing breaks after underscores."""
+    """Escape literal text for ordinary LaTeX contexts.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        LaTeX-safe literal text."""
     text = "" if value is None else str(value)
     replacements = {
         "\\": r"\textbackslash{}",
@@ -980,33 +1145,63 @@ def escape_latex(value: Any) -> str:
 
 
 def escape_latex_breakable_identifier(value: Any) -> str:
-    """Render an identifier as a PDF-safe TeX token with line-break opportunities."""
+    """Escape an identifier while permitting safe line breaks.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        LaTeX-safe breakable identifier markup."""
     text = "" if value is None else str(value)
     return latex_breakable_token(text)
 
 
 def escape_latex_breakable_entity(value: Any) -> str:
-    """Render an entity identifier as a readable, breakable PDF-safe TeX token."""
+    """Escape an entity identifier with semantic break points.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        LaTeX-safe breakable entity markup."""
     text = "" if value is None else str(value)
     text = re.sub(r"(?<=[a-z])(?=[A-Z])", "-", text)
     return latex_breakable_token(text)
 
 
 def escape_latex_breakable_email(value: Any) -> str:
-    """Render an email address as a breakable PDF-safe TeX token."""
+    """Escape an email address with safe break points.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        LaTeX-safe breakable email markup."""
     text = "" if value is None else str(value)
     return latex_breakable_token(text)
 
 
 def latex_breakable_token(value: Any) -> str:
-    """Wrap a token for TeX and PDF-bookmark-safe breakable URL-style rendering."""
+    """Escape one token and insert safe inline break opportunities.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Breakable LaTeX token markup."""
     text = "" if value is None else str(value)
     pdf_text = text.replace("{", "").replace("}", "")
     return rf"\texorpdfstring{{\nolinkurl{{{text}}}}}{{{pdf_text}}}"
 
 
 def escape_latex_with_inline_breaks(value: Any) -> str:
-    """Escape prose while rendering embedded identifiers and emails as breakable TeX tokens."""
+    """Escape text while preserving selected inline break opportunities.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        LaTeX-safe text with controlled break markup."""
     text = "" if value is None else str(value)
     fragments: list[str] = []
     last_index = 0
@@ -1087,19 +1282,37 @@ STABLE_STATUS_SECTIONS = {
 
 
 def ordered_statuses(statuses: list[str]) -> list[str]:
-    """Return finding statuses in the report display order with unknown statuses sorted last."""
+    """Order finding statuses for stable report presentation.
+
+    Args:
+        statuses: Finding statuses to order.
+
+    Returns:
+        Statuses in report display order."""
     order = {status: index for index, status in enumerate(STATUS_DISPLAY_ORDER)}
     return sorted(statuses, key=lambda status: (order.get(status, len(order)), status))
 
 
 def latex_label(value: Any) -> str:
-    """Return a stable lowercase TeX label fragment from arbitrary text."""
+    """Create a stable LaTeX label key from text.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Safe label identifier."""
     text = "" if value is None else str(value)
     return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-").lower() or "item"
 
 
 def serialize_report_value(value: Any) -> str:
-    """Return a compact deterministic report representation, preserving explicit empty values."""
+    """Serialize a report value for JSON or textual output.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Deterministic printable representation."""
     if value is None:
         return "<empty>"
     if isinstance(value, str):
@@ -1114,7 +1327,14 @@ def serialize_report_value(value: Any) -> str:
 
 
 def summarize_detail(value: Any, max_len: int = 220) -> str:
-    """Return a bounded report-value summary with an ellipsis when it exceeds max_len."""
+    """Shorten detailed report text without losing its literal prefix.
+
+    Args:
+        value: Raw value processed by this helper.
+        max_len: Maximum retained summary length.
+
+    Returns:
+        Bounded summary text."""
     text = serialize_report_value(value)
     if len(text) <= max_len:
         return text
@@ -1122,7 +1342,13 @@ def summarize_detail(value: Any, max_len: int = 220) -> str:
 
 
 def summarize_sequence(value: Any) -> str:
-    """Return a comma-separated report summary for a list or serialize another value."""
+    """Summarize a sequence of report values.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Compact deterministic sequence representation."""
     if isinstance(value, list):
         items = [str(item) for item in value if str(item).strip()]
         return ", ".join(items) if items else "<empty>"
@@ -1130,7 +1356,13 @@ def summarize_sequence(value: Any) -> str:
 
 
 def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
-    """Return concise survey and Directory value summaries tailored to a finding mapping."""
+    """Format survey and Directory values for one finding.
+
+    Args:
+        finding: One normalized consistency finding.
+
+    Returns:
+        Pair of printable survey and Directory values."""
     mapping_id = str(finding.get("mapping_id", ""))
     survey_value = finding.get("survey_value")
     directory_value = finding.get("directory_value")
@@ -1221,7 +1453,13 @@ def format_finding_values(finding: dict[str, Any]) -> tuple[str, str]:
 
 
 def escape_report_value(value: str) -> str:
-    """Escape a report value and preserve breakability for whole identifiers or embedded tokens."""
+    """Escape a report value for its output medium.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Escaped report-safe value."""
     text = "" if value is None else str(value)
     if WHOLE_IDENTIFIER_PATTERN.fullmatch(text):
         if "@" in text:
@@ -1231,7 +1469,13 @@ def escape_report_value(value: str) -> str:
 
 
 def finding_link(mapping_id: str) -> str:
-    """Return a TeX hyperlink from a finding mapping identifier to its appendix entry."""
+    """Build the LaTeX anchor for one mapping finding.
+
+    Args:
+        mapping_id: Stable mapping identifier.
+
+    Returns:
+        Internal hyperlink target markup."""
     label = latex_label(f"appendix-{mapping_id}")
     return rf"\hyperref[{label}]{{{escape_latex_breakable_identifier(mapping_id)} {escape_latex('(appendix)')}}}"
 
@@ -1244,14 +1488,27 @@ STATUS_DISPLAY_LABELS = {
 
 
 def colored_status_text(status: str) -> str:
-    """Return the colored TeX label for a finding status."""
+    """Format a finding status with its report color.
+
+    Args:
+        status: Finding status classification.
+
+    Returns:
+        LaTeX status text with semantic color."""
     color = STATUS_COLORS.get(status, "black")
     label = STATUS_DISPLAY_LABELS.get(status, status.replace('_', ' ').title())
     return rf"\textcolor{{{color}}}{{{escape_latex(label)}}}"
 
 
 def format_finding_result(finding: dict[str, Any], *, concise_consistent: bool) -> str:
-    """Return the concise TeX-ready result sentence for a report finding."""
+    """Format one finding for the main consistency report.
+
+    Args:
+        finding: One normalized consistency finding.
+        concise_consistent: Whether consistent findings should be reduced to a terse marker.
+
+    Returns:
+        LaTeX result row or concise consistency marker."""
     status = str(finding.get("status", ""))
     explanation = str(finding.get("explanation", "")).strip()
     if concise_consistent and status == "consistent":
@@ -1263,7 +1520,13 @@ def format_finding_result(finding: dict[str, Any], *, concise_consistent: bool) 
 
 
 def build_appendix_entries(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Aggregate report findings into one sorted appendix entry per mapping identifier."""
+    """Group report findings into appendix entries.
+
+    Args:
+        report: Completed SO2 findings report.
+
+    Returns:
+        Appendix entries indexed by deterministic identifiers."""
     entries: dict[str, dict[str, Any]] = {}
     for finding in report.get("findings", []):
         mapping_id = str(finding.get("mapping_id", "")).strip()
@@ -1311,7 +1574,16 @@ def choose_contact(
     collection_index: dict[str, dict[str, Any]],
     contact_index: dict[str, dict[str, Any]],
 ) -> dict[str, Any] | None:
-    """Select the most relevant contact in a mapped scope using biobank and collection indexes."""
+    """Choose the most relevant contact for a resolved entity scope.
+
+    Args:
+        scope: Resolved entity scope under consideration.
+        biobank_index: Directory biobanks indexed by identifier.
+        collection_index: Collection index.
+        contact_index: Contact index.
+
+    Returns:
+        Selected contact record or ``None`` when none is available."""
     if scope["collection_ids"]:
         contact_ids = []
         for collection_id in scope["collection_ids"]:
@@ -1333,7 +1605,14 @@ def choose_contact(
 
 
 def get_collections_ids_from_biobank(directory: Directory, biobank_id: str) -> list[str]:
-    """Return collection identifiers reachable from one Directory biobank graph."""
+    """List collection identifiers belonging to one biobank.
+
+    Args:
+        directory: Loaded Directory traversal client.
+        biobank_id: Canonical biobank identifier.
+
+    Returns:
+        Sorted collection identifiers in the biobank hierarchy."""
     graph = directory.getGraphBiobankCollectionsFromBiobank(biobank_id)
     return sorted(node_id for node_id in graph.nodes() if ":collection:" in str(node_id))
 
@@ -1342,7 +1621,14 @@ def summarize_collection_scope(
     matched_collection_ids: list[str],
     all_biobank_collection_ids: list[str],
 ) -> str:
-    """Summarize mapped collection evidence for a survey row and resolution status."""
+    """Summarize survey-matched collections against the biobank collection set.
+
+    Args:
+        matched_collection_ids: Collection identifiers directly matched from the survey.
+        all_biobank_collection_ids: Full resolved biobank collection ids.
+
+    Returns:
+        Scope classification and explanatory collection identifiers."""
     matched = sorted(dict.fromkeys(matched_collection_ids))
     all_collections = sorted(dict.fromkeys(all_biobank_collection_ids))
     if not matched:
@@ -1356,7 +1642,14 @@ def summarize_collection_scope(
 
 
 def aggregate_scope(scope: dict[str, Any], collection_index: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """Aggregate supported Directory metadata over a resolved collection scope."""
+    """Aggregate collection-level resolution into one survey scope.
+
+    Args:
+        scope: Resolved entity scope under consideration.
+        collection_index: Collection index.
+
+    Returns:
+        Derived entity scope and identifiers for comparison."""
     collections = [collection_index.get(collection_id) for collection_id in scope["collection_ids"]]
     collections = [collection for collection in collections if collection]
     scope_collection_ids = {collection["id"] for collection in collections}
@@ -1445,7 +1738,13 @@ def aggregate_scope(scope: dict[str, Any], collection_index: dict[str, dict[str,
 
 
 def normalize_collection_id(value: str) -> str:
-    """Return the canonical collection identifier or blank for an unusable survey value."""
+    """Normalize a submitted collection identifier.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Canonical collection identifier comparison key."""
     collection_id = cell_text(value)
     if not collection_id:
         return ""
@@ -1457,7 +1756,13 @@ def normalize_collection_id(value: str) -> str:
 
 
 def normalize_biobank_id(value: str) -> str:
-    """Return the canonical biobank identifier or blank for an unusable survey value."""
+    """Normalize a submitted biobank identifier.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Canonical biobank identifier comparison key."""
     biobank_id = cell_text(value)
     if not biobank_id:
         return ""
@@ -1471,7 +1776,13 @@ def normalize_biobank_id(value: str) -> str:
 
 
 def normalize_network_id(value: str) -> str:
-    """Return the canonical network identifier or blank for an unusable survey value."""
+    """Normalize a submitted network identifier.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Canonical network identifier comparison key."""
     network_id = cell_text(value)
     if network_id.startswith("bbmri-eric:networkID:"):
         return network_id
@@ -1479,7 +1790,13 @@ def normalize_network_id(value: str) -> str:
 
 
 def institution_aliases(value: Any) -> set[str]:
-    """Return normalized institution-name and acronym aliases for conservative matching."""
+    """Generate conservative aliases for one institution name.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Normalized name aliases usable for matching."""
     raw_text = cell_text(value)
     normalized = normalize_text(raw_text)
     aliases = {normalized} if normalized else set()
@@ -1495,7 +1812,13 @@ def institution_aliases(value: Any) -> set[str]:
 
 
 def biobank_id_aliases(value: Any) -> set[str]:
-    """Return normalized aliases derived from a canonical biobank identifier."""
+    """Generate matching aliases from one biobank identifier.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Normalized biobank identifier aliases."""
     normalized_id = normalize_biobank_id(value)
     aliases = {normalized_id.casefold()} if normalized_id else set()
     if normalized_id.startswith("bbmri-eric:ID:"):
@@ -1515,7 +1838,15 @@ def match_biobank_alias_candidates(
     *,
     country: str,
 ) -> list[dict[str, Any]]:
-    """Return distinct alias-matched biobanks, optionally restricted to one country."""
+    """Find country-compatible biobanks matching supplied aliases.
+
+    Args:
+        aliases: Normalized aliases used for lookup.
+        biobanks_by_alias: Alias lookup index.
+        country: Normalized country filter for candidates.
+
+    Returns:
+        Candidate biobank identifiers in deterministic order."""
     candidates_by_id: dict[str, dict[str, Any]] = {}
     for alias in aliases:
         for candidate in biobanks_by_alias.get(alias, []):
@@ -1529,7 +1860,14 @@ def build_contact_usage_indexes(
     biobank_index: dict[str, dict[str, Any]],
     collection_index: dict[str, dict[str, Any]],
 ) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
-    """Build contact, owner, and email indexes used for respondent resolution."""
+    """Index biobank and collection use of contacts.
+
+    Args:
+        biobank_index: Directory biobanks indexed by identifier.
+        collection_index: Collection index.
+
+    Returns:
+        Indexes mapping contacts to linked biobank and collection identifiers."""
     biobank_ids_by_contact: dict[str, set[str]] = defaultdict(set)
     collection_ids_by_contact: dict[str, set[str]] = defaultdict(set)
     for biobank in biobank_index.values():
@@ -1551,7 +1889,13 @@ def build_contact_usage_indexes(
 
 
 def extract_email_domain(value: Any) -> str:
-    """Return a normalized email domain only for a syntactically usable address."""
+    """Extract a normalized domain from one email-like value.
+
+    Args:
+        value: Raw value processed by this helper.
+
+    Returns:
+        Domain comparison key or empty string."""
     email = cell_text(value).lower()
     if "@" not in email:
         return ""
@@ -1562,7 +1906,14 @@ def build_collection_contact_domain_counts(
     collection_index: dict[str, dict[str, Any]],
     contact_index: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, int]]:
-    """Count collection contact-email domains per biobank for resolution evidence."""
+    """Count contact email domains for each collection.
+
+    Args:
+        collection_index: Collection index.
+        contact_index: Contact index.
+
+    Returns:
+        Per-collection domain-frequency indexes."""
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for collection in collection_index.values():
         contact_value = collection.get("contact")
@@ -1584,7 +1935,15 @@ def infer_collection_scope_from_row(
     candidate_collection_ids: list[str],
     collection_index: dict[str, dict[str, Any]],
 ) -> tuple[list[str], str]:
-    """Infer a conservative collection scope from one survey row and Directory indexes."""
+    """Infer collection scope from explicit and candidate collection ids.
+
+    Args:
+        row: One submitted survey response row.
+        candidate_collection_ids: Candidate collection ids.
+        collection_index: Collection index.
+
+    Returns:
+        Resolved collection scope, status, and explanatory notes."""
     if len(candidate_collection_ids) <= 1:
         return candidate_collection_ids, ""
     survey_context = " ".join(
@@ -1660,7 +2019,25 @@ def resolve_row(
     biobanks_by_signature: dict[tuple[str, ...], list[dict[str, Any]]],
     collection_contact_domain_counts: dict[str, dict[str, int]],
 ) -> dict[str, Any]:
-    """Resolve one survey response to Directory entities with explicit evidence and confidence metadata."""
+    """Resolve one survey row to Directory entities and contact context.
+
+    Args:
+        row: One submitted survey response row.
+        row_index: Original row index used for deterministic diagnostics.
+        directory: Loaded Directory traversal client.
+        biobank_index: Directory biobanks indexed by identifier.
+        collection_index: Collection index.
+        network_index: Directory networks indexed by identifier.
+        contacts_by_email: Email contact index.
+        biobank_ids_by_contact: Biobank identifiers indexed by contact identifier.
+        collection_ids_by_contact: Collection identifiers indexed by contact identifier.
+        biobanks_by_normalized_name: Biobank identifiers indexed by normalized institution name.
+        biobanks_by_alias: Alias lookup index.
+        biobanks_by_signature: Biobank identifiers indexed by token signatures.
+        collection_contact_domain_counts: Per-collection contact-domain frequencies.
+
+    Returns:
+        Structured row-resolution record with evidence and confidence."""
     survey_row = row_index + 5
     raw_biobank_id = cell_text(get_row_value(row, "BiobankID in the Directory (if available)"))
     biobank_id = normalize_biobank_id(raw_biobank_id)
@@ -1979,7 +2356,29 @@ def make_finding(
     proposed_update: dict[str, Any] | None = None,
     export_update_plan: bool = False,
 ) -> dict[str, Any]:
-    """Create one self-contained report finding with stable comparison and provenance fields."""
+    """Construct one normalized survey-versus-Directory finding.
+
+    Args:
+        row_resolution: Resolved Directory context for the same survey row.
+        mapping_id: Stable mapping identifier.
+        entity_type: Directory entity type for the finding or update.
+        entity_id: Canonical Directory entity identifier.
+        status: Finding status classification.
+        survey_value: Literal survey-side comparison value.
+        directory_value: Literal Directory-side comparison value.
+        relation_type: Declared survey-to-Directory relation type.
+        reliability: Reliability classification of the comparison.
+        why_relevant: Explanation of relevance to Directory consistency.
+        explanation: Human-readable finding or update explanation.
+        survey_fields: Survey source fields contributing evidence.
+        strategic_objectives: Strategic objectives attached to the finding.
+        directory_fields: Directory fields compared against survey evidence.
+        comparison_description: Description of the comparison rule.
+        proposed_update: Optional generated update proposal.
+        export_update_plan: Whether update-plan proposals are requested.
+
+    Returns:
+        JSON-serializable finding record, including optional update proposal."""
     survey_row = row_resolution["survey_row"]
     return {
         "finding_id": f"{mapping_id}:{entity_type}:{entity_id}:row{survey_row}",
@@ -2020,7 +2419,24 @@ def build_update(
     rationale: str,
     source_check_id: str,
 ) -> dict[str, Any]:
-    """Create a conservative qcheck-compatible update proposal for a supported survey finding."""
+    """Construct one qcheck-updater-compatible update proposal.
+
+    Args:
+        mapping_id: Stable mapping identifier.
+        module: QC module prefix attached to an update.
+        entity_type: Directory entity type for the finding or update.
+        entity_id: Canonical Directory entity identifier.
+        field: Directory field targeted by an update.
+        mode: Update application mode.
+        confidence: Candidate update confidence.
+        current_value: Expected current Directory value.
+        proposed_value: Proposed replacement or append value.
+        explanation: Human-readable finding or update explanation.
+        rationale: Evidence supporting the update.
+        source_check_id: Source check identifier for updater traceability.
+
+    Returns:
+        Normalized update-plan record."""
     proposal = EntityFixProposal(
         update_id=mapping_id,
         module=module,
@@ -2043,7 +2459,13 @@ def build_update(
 
 
 def index_question_objectives(objectives_mapping: dict[str, Any]) -> dict[str, list[str]]:
-    """Index survey fields to sorted strategic-objective identifiers from mapping JSON."""
+    """Index strategic objectives by survey field.
+
+    Args:
+        objectives_mapping: Parsed survey question-to-objective configuration.
+
+    Returns:
+        Field-to-objective identifier mapping."""
     indexed: dict[str, list[str]] = {}
     for item in objectives_mapping.get("question_mappings", []):
         survey_field = str(item.get("survey_field") or "").strip()
@@ -2054,7 +2476,14 @@ def index_question_objectives(objectives_mapping: dict[str, Any]) -> dict[str, l
 
 
 def objectives_for_fields(question_objectives: dict[str, list[str]], survey_fields: list[str]) -> list[str]:
-    """Return the unique strategic objectives associated with the supplied survey fields."""
+    """Collect objectives relevant to a set of survey fields.
+
+    Args:
+        question_objectives: Field-indexed objective mapping.
+        survey_fields: Survey source fields contributing evidence.
+
+    Returns:
+        Sorted unique strategic-objective identifiers."""
     result: set[str] = set()
     for field in survey_fields:
         result.update(question_objectives.get(field, []))
@@ -2062,7 +2491,13 @@ def objectives_for_fields(question_objectives: dict[str, list[str]], survey_fiel
 
 
 def analyze_survey(args: argparse.Namespace) -> dict[str, Any]:
-    """Analyze mapped SO2 responses against Directory data and return a findings report."""
+    """Run the complete Directory consistency analysis.
+
+    Args:
+        args: Parsed command-line options for the active subcommand.
+
+    Returns:
+        Report payload containing resolutions, findings, summaries, and diagnostics."""
     mapping = load_mapping(args.mapping_file)
     objectives_mapping = load_objectives_mapping(args.objectives_mapping_file)
     question_objectives = index_question_objectives(objectives_mapping)
@@ -2736,7 +3171,13 @@ def write_json(path: str | Path, payload: dict[str, Any]) -> None:
 
 
 def build_biobank_summary(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
-    """Group report findings by mapped biobank for the TeX summary tables."""
+    """Aggregate findings by resolved biobank.
+
+    Args:
+        report: Completed SO2 findings report.
+
+    Returns:
+        Biobank-indexed finding summary."""
     findings_by_row: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for finding in report.get("findings", []):
         findings_by_row[int(finding["survey_row"])].append(finding)
@@ -2770,7 +3211,13 @@ def build_biobank_summary(report: dict[str, Any]) -> dict[str, list[dict[str, An
 
 
 def build_objective_summary(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Group report findings by strategic objective and biobank for the TeX report."""
+    """Aggregate findings by strategic objective.
+
+    Args:
+        report: Completed SO2 findings report.
+
+    Returns:
+        Objective-indexed finding summary."""
     objective_metadata = report.get("strategic_objectives", {})
     summary: dict[str, dict[str, Any]] = {}
     for objective_id, metadata in objective_metadata.items():
@@ -2807,7 +3254,13 @@ def build_objective_summary(report: dict[str, Any]) -> dict[str, dict[str, Any]]
 
 
 def display_entity_label(finding: dict[str, Any]) -> str:
-    """Return a readable entity label for a finding, including resolution fallback context."""
+    """Build the human-readable label for a finding entity.
+
+    Args:
+        finding: One normalized consistency finding.
+
+    Returns:
+        Literal entity label for report display."""
     entity_label = f"{finding['entity_type']} {finding['entity_id']}"
     if str(finding.get("status", "")) == "missing_from_directory":
         survey_value = finding.get("survey_value")
@@ -2819,7 +3272,13 @@ def display_entity_label(finding: dict[str, Any]) -> str:
 
 
 def render_entity_label_latex(label: str) -> str:
-    """Render a readable entity label as escaped, breakable TeX content."""
+    """Render one entity label with safe LaTeX line breaks.
+
+    Args:
+        label: Literal entity label to render.
+
+    Returns:
+        LaTeX-safe entity-label markup."""
     match = re.fullmatch(r"(\([A-Z]{2}\)\s+)?(BIOBANK|COLLECTION|CONTACT|NETWORK)\s+(.+)", label)
     if not match:
         return escape_report_value(label)
@@ -2835,7 +3294,13 @@ TECHNOLOGY_MODALITY_LABELS = {modality["id"]: modality["label"] for modality in 
 
 
 def summarize_technology_counts(counts: dict[str, Any]) -> str:
-    """Return a compact human-readable modality count summary for a report payload."""
+    """Format modality counts for the report narrative.
+
+    Args:
+        counts: Modality counts to format.
+
+    Returns:
+        Compact modality count summary."""
     return ", ".join(
         f"{TECHNOLOGY_MODALITY_LABELS[modality['id']]}={int(counts.get(modality['id'], 0))}"
         for modality in TECHNOLOGY_MODALITIES
@@ -2844,7 +3309,13 @@ def summarize_technology_counts(counts: dict[str, Any]) -> str:
 
 
 def build_technology_matrix_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return sorted respondent-by-modality rows for the TeX report matrix."""
+    """Build rows for the technology availability matrix.
+
+    Args:
+        payload: JSON-serializable report or analysis payload.
+
+    Returns:
+        Sorted matrix rows with institution and modality values."""
     rows = []
     for row in payload.get("rows", []):
         modality_ids = [modality["id"] for modality in TECHNOLOGY_MODALITIES if int(row.get(modality["id"], 0)) == 1]
@@ -2866,7 +3337,13 @@ def build_technology_matrix_rows(payload: dict[str, Any]) -> list[dict[str, Any]
 
 
 def render_tex(report: dict[str, Any]) -> str:
-    """Render a self-contained findings report as XeLaTeX source."""
+    """Render the Directory consistency report as self-contained LaTeX.
+
+    Args:
+        report: Completed SO2 findings report.
+
+    Returns:
+        Complete report TeX source."""
     summary = report.get("summary", {})
     findings = report.get("findings", [])
     grouped = defaultdict(list)
@@ -3203,7 +3680,15 @@ def render_tex(report: dict[str, Any]) -> str:
 
 
 def render_pdf(tex_content: str, tex_path: str | Path, pdf_path: str | Path | None) -> None:
-    """Write TeX and optionally compile its PDF in a temporary directory; raise InputError when compilation fails."""
+    """Compile rendered report TeX and publish the requested PDF.
+
+    Args:
+        tex_content: Rendered TeX content to compile.
+        tex_path: Target TeX source path.
+        pdf_path: Optional target PDF path.
+
+    Returns:
+        ``None`` after publishing requested TeX/PDF outputs."""
     tex_output_path = Path(tex_path)
     tex_output_path.write_text(tex_content, encoding="utf-8")
     if pdf_path is None:
@@ -3243,13 +3728,28 @@ def render_pdf(tex_content: str, tex_path: str | Path, pdf_path: str | Path | No
 
 
 def confidence_at_least(confidence: str, minimum: str) -> bool:
-    """Return whether a proposal confidence meets the requested export threshold."""
+    """Compare two named update confidence levels.
+
+    Args:
+        confidence: Candidate update confidence.
+        minimum: Required minimum confidence.
+
+    Returns:
+        Whether the candidate confidence meets the configured minimum."""
     order = {"uncertain": 0, "almost_certain": 1, "certain": 2}
     return order[confidence] >= order[minimum]
 
 
 def export_update_plan_from_report(report: dict[str, Any], output_json: str | Path, min_confidence: str) -> dict[str, Any]:
-    """Export eligible report proposals as a qcheck-compatible update-plan JSON payload."""
+    """Export eligible report proposals as an updater plan.
+
+    Args:
+        report: Completed SO2 findings report.
+        output_json: Output JSON path.
+        min_confidence: Minimum confidence name.
+
+    Returns:
+        Serialized update-plan payload written to the requested path."""
     updates = []
     for finding in report.get("findings", []):
         if not finding.get("export_update_plan"):
@@ -3277,7 +3777,14 @@ def export_update_plan_from_report(report: dict[str, Any], output_json: str | Pa
 
 
 def _require_distinct_descriptive_outputs(input_paths: list[str | Path], output_paths: list[str | Path | None]) -> None:
-    """Reject descriptive outputs that would overwrite an input artifact."""
+    """Reject descriptive outputs that alias inputs or one another.
+
+    Args:
+        input_paths: Protected input paths for render output validation.
+        output_paths: Optional output targets to validate.
+
+    Returns:
+        ``None`` after validating output-path distinctness."""
     resolved_inputs = {Path(path).resolve() for path in input_paths}
     resolved_outputs = [Path(path).resolve() for path in output_paths if path is not None]
     if any(path in resolved_inputs for path in resolved_outputs):
@@ -3289,7 +3796,14 @@ def _require_distinct_descriptive_outputs(input_paths: list[str | Path], output_
 def _require_new_descriptive_file_outputs(
     output_paths: list[str | Path | None], overwrite: bool = False,
 ) -> None:
-    """Require report file targets to be new and to have writable-shaped parents."""
+    """Validate safety of descriptive file output targets.
+
+    Args:
+        output_paths: Optional output targets to validate.
+        overwrite: Whether explicit replacement of existing outputs is allowed.
+
+    Returns:
+        ``None`` after targets satisfy new-file or explicit-overwrite rules."""
     for output_path in output_paths:
         if output_path is None:
             continue
@@ -3303,7 +3817,14 @@ def _require_new_descriptive_file_outputs(
 
 
 def _require_new_or_empty_chart_dir(chart_dir: str | Path | None, overwrite: bool = False) -> None:
-    """Reject chart output directories that could mix old and new artifacts."""
+    """Validate safety of a standalone-chart output directory.
+
+    Args:
+        chart_dir: Optional target directory for standalone chart PDFs.
+        overwrite: Whether explicit replacement of existing outputs is allowed.
+
+    Returns:
+        ``None`` after the directory satisfies publication rules."""
     if chart_dir is None:
         return
     target = Path(chart_dir)
@@ -3314,13 +3835,24 @@ def _require_new_or_empty_chart_dir(chart_dir: str | Path | None, overwrite: boo
 
 
 def _load_descriptive_report_module() -> Any:
-    """Import the independent descriptive implementation only when requested."""
+    """Import the optional descriptive-report implementation lazily.
+
+    Returns:
+        Loaded descriptive-report module."""
     import so2_descriptive_report
     return so2_descriptive_report
 
 
 def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespace, input_paths: list[str | Path]) -> None:
-    """Render descriptive outputs after validating all target paths."""
+    """Render a validated descriptive payload through the shared output pipeline.
+
+    Args:
+        payload: JSON-serializable report or analysis payload.
+        args: Parsed command-line options for the active subcommand.
+        input_paths: Protected input paths for render output validation.
+
+    Returns:
+        ``None`` after requested report artifacts are rendered."""
     if not (args.output_tex or args.output_pdf or args.output_chart_dir):
         raise InputError("render-descriptive-report requires at least one of --output-tex, --output-pdf, or --output-chart-dir.")
     tex_path = args.output_tex or str(Path(args.input_json).with_suffix(".tex"))
@@ -3329,20 +3861,40 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
     _require_new_descriptive_file_outputs([tex_path, args.output_pdf], getattr(args, "overwrite", False))
     descriptive = _load_descriptive_report_module()
     try:
-        if getattr(args, "long_report", False):
-            rendered = descriptive.render_descriptive_tex(
-                payload, args.output_chart_dir, report_path=tex_path, include_contribution_tables=True,
-            )
-        else:
-            rendered = descriptive.render_descriptive_tex(
-                payload, args.output_chart_dir, report_path=tex_path,
-            )
+        rendered = descriptive.render_descriptive_tex(
+            payload,
+            args.output_chart_dir,
+            report_path=tex_path,
+            include_contribution_tables=getattr(args, "long_report", False),
+            include_parent_context=getattr(args, "include_parent_context", False),
+        )
         descriptive.render_descriptive_pdf(
             rendered, tex_path, args.output_pdf, args.output_chart_dir,
             overwrite=getattr(args, "overwrite", False),
         )
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
+
+
+def run_export_eus_form_json(args: argparse.Namespace) -> int:
+    """Generate the reviewable runtime form manifest from an EUSurvey archive.
+
+    Args:
+        args: Parsed maintenance-command options containing EUS input and JSON output paths.
+
+    Returns:
+        The successful process status.
+
+    Raises:
+        InputError: If decoding or writing the EUS-derived manifest fails.
+    """
+    try:
+        from so2_eusurvey import FormInputError, load_active_form, write_form_manifest
+        form = load_active_form(args.form_eus)
+        write_form_manifest(form, args.output_json)
+    except (FormInputError, OSError) as exc:
+        raise InputError(str(exc)) from exc
+    return EXIT_OK
 
 
 def run_describe(args: argparse.Namespace) -> int:
@@ -3364,7 +3916,7 @@ def run_describe(args: argparse.Namespace) -> int:
         if render_requested else None
     )
     _require_distinct_descriptive_outputs(
-        [args.survey_file, args.descriptive_schema],
+        [args.survey_file, args.descriptive_schema, args.form_json],
         [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
     )
     _require_new_or_empty_chart_dir(args.output_chart_dir, args.overwrite)
@@ -3376,8 +3928,9 @@ def run_describe(args: argparse.Namespace) -> int:
     descriptive = _load_descriptive_report_module()
     try:
         schema = descriptive.load_descriptive_schema(args.descriptive_schema)
+        form_structure = descriptive.load_form_manifest_structure(args.form_json)
         workbook = descriptive.read_descriptive_workbook(args.survey_file, schema)
-        payload = descriptive.build_descriptive_payload(workbook, schema)
+        payload = descriptive.build_descriptive_payload(workbook, schema, form_structure)
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
     if render_requested:
@@ -3387,9 +3940,10 @@ def run_describe(args: argparse.Namespace) -> int:
             output_pdf=args.output_pdf,
             output_chart_dir=args.output_chart_dir,
             long_report=args.long_report,
+            include_parent_context=getattr(args, "include_parent_context", False),
             overwrite=args.overwrite,
         )
-        _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema])
+        _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema, args.form_json])
     try:
         write_json(args.output_json, payload)
     except InputError as exc:
@@ -3445,7 +3999,13 @@ def run_render_descriptive_report(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 def run_analyze(args: argparse.Namespace) -> int:
-    """Run the analysis CLI command and optionally render its findings outputs."""
+    """Run the analyze subcommand and write its findings report.
+
+    Args:
+        args: Parsed command-line options for the active subcommand.
+
+    Returns:
+        Process exit status for the completed command."""
     report = analyze_survey(args)
     write_json(args.output_json, report)
     if getattr(args, "output_tech_upset_prefix", None):
@@ -3457,7 +4017,13 @@ def run_analyze(args: argparse.Namespace) -> int:
 
 
 def run_render(args: argparse.Namespace) -> int:
-    """Run the findings-rendering CLI command without reanalyzing the survey."""
+    """Run the render-report subcommand from existing findings JSON.
+
+    Args:
+        args: Parsed command-line options for the active subcommand.
+
+    Returns:
+        Process exit status for the completed command."""
     report = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
     if getattr(args, "output_tech_upset_prefix", None):
         write_technology_upset_artifacts(report, args.output_tech_upset_prefix)
@@ -3470,14 +4036,23 @@ def run_render(args: argparse.Namespace) -> int:
 
 
 def run_export_update_plan(args: argparse.Namespace) -> int:
-    """Run the update-plan export CLI command and return its process status."""
+    """Run the update-plan export subcommand.
+
+    Args:
+        args: Parsed command-line options for the active subcommand.
+
+    Returns:
+        Process exit status for the completed command."""
     report = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
     export_update_plan_from_report(report, args.output_json, args.min_confidence)
     return EXIT_OK
 
 
 def main() -> int:
-    """Dispatch the selected SO2 CLI command and translate user input errors into process statuses."""
+    """Dispatch the selected SO2 command-line subcommand.
+
+    Returns:
+        Process exit status, including handled input or interruption errors."""
     parser = build_cli()
     args = parser.parse_args()
     configure_logging(args)
@@ -3488,6 +4063,8 @@ def main() -> int:
             return run_render(args)
         if args.command == "export-update-plan":
             return run_export_update_plan(args)
+        if args.command == "export-eus-form-json":
+            return run_export_eus_form_json(args)
         if args.command == "describe":
             return run_describe(args)
         if args.command == "render-descriptive-report":

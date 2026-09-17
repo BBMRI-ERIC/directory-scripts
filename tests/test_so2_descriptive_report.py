@@ -158,6 +158,37 @@ def payload_question(workbook, schema):
     )
 
 
+def test_so2_modules_document_each_parameter_and_return_value():
+    """SO2 helpers expose parameter and return semantics, including variadic inputs."""
+    import ast
+    import re
+
+    for source_path in (WORKTREE / "so2_descriptive_report.py", WORKTREE / "survey-so2-directory.py"):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        for function in (node for node in tree.body if isinstance(node, ast.FunctionDef)):
+            docstring = ast.get_docstring(function, clean=False) or ""
+            parameters = [
+                argument.arg
+                for argument in [*function.args.posonlyargs, *function.args.args, *function.args.kwonlyargs]
+                if argument.arg not in {"self", "cls"}
+            ]
+            if function.args.vararg is not None:
+                parameters.append(function.args.vararg.arg)
+            if function.args.kwarg is not None:
+                parameters.append(function.args.kwarg.arg)
+            if parameters:
+                assert "Args:" in docstring, (source_path.name, function.name)
+                args_section = docstring.split("Args:", 1)[1].split("Returns:", 1)[0]
+                for parameter in parameters:
+                    assert re.search(rf"^        {re.escape(parameter)}:", args_section, re.MULTILINE), (
+                        source_path.name,
+                        function.name,
+                        parameter,
+                    )
+            assert "Returns:" in docstring, (source_path.name, function.name)
+
+
+
 def test_multi_choice_has_answered_selection_percentages_and_all_row_missing_percent():
     """Selections use answered rows while Missing always uses every response row."""
     question = {
@@ -234,6 +265,130 @@ def test_free_text_preserves_missing_parent_and_parent_group():
     ]
     assert row["text"] == "Need legal support"
 
+
+
+def test_free_text_context_keeps_only_its_configured_parent_selection():
+    """A follow-up does not repeat unrelated multi-choice parent selections."""
+    question = {
+        "question_id": "standards_other",
+        "column": "Standards",
+        "question_type": "free_text",
+        "label": "Standards",
+        "categories": [],
+        "parent_columns": ["Terminologies"],
+        "parent_context_values": {
+            "Terminologies": ["Other standards (please specify):"],
+        },
+    }
+    workbook = descriptive_workbook([{
+        "Name of Institution": "Alpha",
+        "Country": "Austria",
+        "Terminologies": "ICD-9 with national modifications;HPO;Other standards (please specify):",
+        "Standards": "ATC, mzML",
+    }])
+    schema = descriptive_schema(question)
+    schema["questions"][0].update({
+        "question_type": "multi_choice",
+        "categories": [
+            "ICD-9 with national modifications", "HPO", "Other standards (please specify):",
+        ],
+        "delimiter": ";",
+    })
+
+    result = payload_question(workbook, schema)
+
+    assert result["free_text_rows"][0]["parent_answers"] == [{
+        "column": "Terminologies", "value": "Other standards (please specify):",
+    }]
+    assert result["free_text_rows"][0]["raw_parent_answers"] == [{
+        "column": "Terminologies",
+        "value": "ICD-9 with national modifications;HPO;Other standards (please specify):",
+    }]
+    assert result["diagnostics"]["unmatched_parent_context"] == []
+
+
+def test_free_text_context_retains_unmatched_text_as_a_diagnostic():
+    """A child response is retained when its configured parent trigger is absent."""
+    question = {
+        "question_id": "other_system",
+        "column": "Other system",
+        "question_type": "free_text",
+        "label": "Other system",
+        "categories": [],
+        "parent_columns": ["Systems"],
+        "parent_context_values": {"Systems": ["Other (please specify):"]},
+    }
+    workbook = descriptive_workbook([{
+        "Name of Institution": "Alpha", "Country": "Austria",
+        "Systems": "Named system", "Other system": "Unexpected narrative",
+    }])
+    schema = descriptive_schema(question)
+    schema["questions"][0].update({
+        "question_type": "multi_choice",
+        "categories": ["Named system", "Other (please specify):"],
+        "delimiter": ";",
+    })
+
+    result = payload_question(workbook, schema)
+
+    assert result["free_text_rows"][0]["text"] == "Unexpected narrative"
+    assert result["free_text_rows"][0]["parent_answers"] == [
+        {"column": "Systems", "value": "Not selected"},
+    ]
+    assert result["free_text_rows"][0]["raw_parent_answers"] == [
+        {"column": "Systems", "value": "Named system"},
+    ]
+    assert result["diagnostics"]["unmatched_parent_context"] == [
+        {"source_row": 5, "columns": ["Systems"]},
+    ]
+
+
+def test_schema_rejects_unknown_free_text_parent_context_values():
+    """Context filters may reference only declared parent columns and values."""
+    question = {
+        "question_id": "other_system",
+        "column": "Other system",
+        "question_type": "free_text",
+        "label": "Other system",
+        "categories": [],
+        "parent_columns": ["Systems"],
+        "parent_context_values": {"Systems": ["Not a category"]},
+    }
+    schema = descriptive_schema(question)
+    schema["questions"][0].update({
+        "question_type": "multi_choice", "categories": ["Named system"], "delimiter": ";",
+    })
+
+    with pytest.raises(module.InputError, match="parent_context_values value.*Not a category"):
+        module.validate_descriptive_schema(
+            schema, ["Name of Institution", "Country", "Systems", "Other system"]
+        )
+
+
+def test_schema_rejects_empty_or_non_free_text_parent_context_filters():
+    """Semantic context filters are nonempty metadata exclusive to free-text follow-ups."""
+    structured = {
+        "question_id": "systems",
+        "column": "Systems",
+        "question_type": "single_choice",
+        "label": "Systems",
+        "categories": ["Yes"],
+        "parent_context_values": {"Systems": ["Yes"]},
+    }
+    with pytest.raises(module.InputError, match="only for free-text"):
+        module.validate_descriptive_schema(
+            descriptive_schema(structured), ["Name of Institution", "Country", "Systems"]
+        )
+
+    child = {
+        "question_id": "other", "column": "Other", "question_type": "free_text",
+        "label": "Other", "categories": [], "parent_columns": ["Gate"],
+        "parent_context_values": {"Gate": []},
+    }
+    with pytest.raises(module.InputError, match="must not be empty"):
+        module.validate_descriptive_schema(
+            descriptive_schema(child), ["Name of Institution", "Country", "Gate", "Other"]
+        )
 
 def test_blank_conditional_answer_stays_blank_when_applicability_is_unknown():
     """A blank answer is not inferred as inapplicable without explicit routing metadata."""
@@ -514,6 +669,7 @@ def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies(
         "unexpected_selections": [],
         "contradictory_selections": [],
         "missing_parent_answers": [{"source_row": 6, "columns": ["Barrier A"]}],
+        "unmatched_parent_context": [],
         "unexpected_parent_answers": [{
             "source_row": 5,
             "values": [{"column": "Barrier A", "value": "unexpected"}],
@@ -1023,6 +1179,7 @@ def payload_with_repeated_and_free_text():
             "country": "Austria", "institution": "Alpha", "source_row": 5,
             "text": "Need legal support",
             "parent_answers": [{"column": "Barrier A", "value": "frequently"}],
+            "raw_parent_answers": [{"column": "Barrier A", "value": "frequently"}],
         }],
         "diagnostics": {
             "duplicate_selections": [], "unexpected_selections": [],
@@ -1047,6 +1204,30 @@ def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
     assert "1 (33.3\\% oIR)" in tex
     assert "charts/09-institution-type.pdf" in tex
 
+
+
+def test_bar_label_width_uses_document_text_width_not_nested_axis_linewidth():
+    """Long labels retain their intended physical width inside the PGFPlots axis."""
+    question = structured_report_question(categories=[
+        {
+            "value": "Electronic – standalone biobank system (BIMS or LIMS) managed by the biobank",
+            "count": 84, "percent_base": 148, "percent": 56.8,
+        },
+        {
+            "value": "Separate system for storing or linking research data derived from samples (e.g., sequencing database, imaging repository) managed by a third party",
+            "count": 8, "percent_base": 148, "percent": 5.4,
+        },
+    ])
+
+    fragment = module.render_descriptive_tex(report_payload(question), chart_dir=None).chart_fragments[
+        "09-institution-type"
+    ]
+
+    assert r"width=0.42\textwidth" in fragment
+    assert r"xshift=0.46\textwidth" in fragment
+    assert r"text width=0.40\textwidth" in fragment
+    assert r"\parbox" not in fragment
+    assert r"\linewidth" not in fragment
 
 def test_bar_tex_locks_every_bar_to_its_category_row_and_reserves_label_space():
     """Separate colour plots must not be shifted away from their y-axis labels."""
@@ -1080,11 +1261,68 @@ def test_report_tex_is_self_contained_and_displays_required_semantics():
     assert "Descriptive schema version: 2026-09-16" in tex
     assert "N/A/M (included/answered/missing): 3 / 2 / 1" in tex
     assert "oAR: percentage of answering rows" in tex
-    assert r"\smaller[3]\texttt{" in tex
-    assert "Applicability: unknown" in tex
+    assert r"\noindent\smaller[3] Question identifier: \texttt{" in tex
+    assert "Applicability:" not in tex
+    assert "Response type: unavailable (form structure not supplied); mandatory/optional: unavailable." in tex
+    assert r"\documentclass[11pt]{scrartcl}" in tex
+    assert r"\KOMAoptions{parskip=half}" in tex
+    assert r"\setlength{\parindent}{0pt}" in tex
     assert r"\usepackage{relsize}" in tex
     assert r"\tableofcontents" in tex
     assert "\n\\clearpage\n\\section{" in tex
+
+
+def test_form_structure_uses_xml_question_types_matrix_rows_and_dependencies(tmp_path):
+    """XML form metadata preserves types, matrix headers, and answer routing links."""
+    form_path = tmp_path / "form.xml"
+    form_path.write_text(
+        '<Results><Survey><Elements>'
+        '<Question id="parent" type="Multiple Choice">Parent</Question>'
+        '<Answer id="parent-answer" type="Choice Answer" dependentElements="child-a;child-b">Other</Answer>'
+        '<Question id="child-a" type="Free Text">Child A</Question>'
+        '<Question id="child-b" type="Free Text">Child B</Question>'
+        '<MatrixTitle id="matrix" type="Matrix">Matrix title</MatrixTitle>'
+        '<MatrixQuestion id="matrix-row" type="Single Choice Matrix Question">Row A</MatrixQuestion>'
+        '</Elements></Survey></Results>',
+        encoding="utf-8",
+    )
+
+    form = module.load_form_structure(form_path)
+
+    parent = form["questions"][module._form_label("Parent")]
+    child = form["questions"][module._form_label("Child A")]
+    matrix = form["questions"][module._form_label("Matrix title: Row A")]
+    assert parent["response_type"] == "Multiple Choice"
+    assert child["dependencies"] == [{"parent_question": "Parent", "answer": "Other"}]
+    assert matrix["response_type"] == "Single Choice Matrix Question"
+    assert matrix["requiredness"] == "not declared by form export"
+
+
+def test_payload_carries_authoritative_xml_response_metadata(tmp_path):
+    """Payload questions retain the form-derived type and non-inferred requiredness."""
+    schema = descriptive_schema({
+        "question_id": "digital_maturity",
+        "column": "Digital maturity",
+        "question_type": "ordinal",
+        "label": "Digital maturity",
+        "categories": ["Low", "High"],
+    })
+    form_path = tmp_path / "form.xml"
+    form_path.write_text(
+        '<Results><Survey><Elements><Question id="q1" type="Single Choice">Digital maturity</Question></Elements></Survey></Results>',
+        encoding="utf-8",
+    )
+    workbook = descriptive_workbook([{
+        "Name of Institution": "Example", "Country": "Czech Republic", "Digital maturity": "High",
+    }])
+
+    payload = module.build_descriptive_payload(workbook, schema, module.load_form_structure(form_path))
+
+    assert payload["questions"][0]["form"] == {
+        "id": "q1", "label": "Digital maturity", "response_type": "Single Choice",
+        "requiredness": "not declared by form export", "dependencies": [],
+    }
+
 
 
 def test_free_text_urls_render_as_short_hyperlinks_and_placeholders_are_suppressed():
@@ -1197,14 +1435,38 @@ def test_chart_key_bounds_long_sanitized_question_labels():
     assert len(f"{chart_key}.tex".encode("utf-8")) <= 120
 
 
-def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
-    """Evidence tables keep repeat warnings, row provenance, and free-text parent answers."""
-    tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None, include_contribution_tables=True).tex
+def test_parent_context_is_opt_in_and_uses_raw_parent_answers():
+    """Narrative tables omit context by default and show unfiltered evidence on request."""
+    narrative = payload_with_repeated_and_free_text()["questions"][1]
+    narrative["free_text_rows"][0]["parent_answers"] = [
+        {"column": "Terminologies", "value": "Other standards (please specify):"},
+    ]
+    narrative["free_text_rows"][0]["raw_parent_answers"] = [{
+        "column": "Terminologies",
+        "value": "ICD-9 with national modifications;HPO;Other standards (please specify):",
+    }]
+    payload = report_payload(narrative)
+
+    default_tex = module.render_descriptive_tex(payload, chart_dir=None).tex
+    context_tex = module.render_descriptive_tex(
+        payload, chart_dir=None, include_parent_context=True,
+    ).tex
+
+    assert "Parent context" not in default_tex
+    assert "Other standards (please specify):" not in default_tex
+    assert r"Parent context\par\smaller[3]Terminologies" in context_tex
+    assert "ICD-9 with national modifications;HPO;Other standards (please specify):" in context_tex
+
+
+def test_contribution_table_prints_literal_repeated_rows_when_requested():
+    """Structured evidence tables retain repeat warnings and omit source-row provenance."""
+    tex = module.render_descriptive_tex(
+        payload_with_repeated_and_free_text(), chart_dir=None, include_contribution_tables=True,
+    ).tex
 
     assert "suspected repeated response" in tex
     assert "Source row" not in tex
-    assert "frequently" in tex
-    assert "Barrier A =" not in tex
+    assert "Parent context" not in tex
 
 
 def test_structured_evidence_table_groups_institutions_and_uses_compact_type():
@@ -1230,6 +1492,26 @@ def test_short_report_omits_structured_contribution_tables():
     assert "Source row" not in tex
 
 
+def test_free_text_parent_header_lists_fixed_parent_questions_once():
+    """Fixed parent columns appear in the header while cells contain values only."""
+    narrative = payload_with_repeated_and_free_text()["questions"][1]
+    narrative["free_text_rows"][0]["parent_answers"].append(
+        {"column": "Barrier B", "value": "Missing"}
+    )
+    narrative["free_text_rows"][0]["raw_parent_answers"].append(
+        {"column": "Barrier B", "value": "Missing"}
+    )
+
+    tex = module.render_descriptive_tex(
+        report_payload(narrative), chart_dir=None, include_parent_context=True,
+    ).tex
+
+    assert r"Parent context\par\smaller[3]Barrier A\par Barrier B\par" in tex
+    assert r"frequently\par Missing\par" in tex
+    assert "Barrier A =" not in tex
+    assert "Barrier B =" not in tex
+
+
 def test_free_text_table_uses_country_codes_and_omits_uniform_empty_parent_context():
     """Narrative tables reserve their width for institutions and responses, not empty metadata."""
     narrative = payload_with_repeated_and_free_text()["questions"][1]
@@ -1251,23 +1533,42 @@ def test_pie_labels_are_distributed_on_both_sides_of_the_chart():
         "11-hosting-organisation"
     ]
 
-    assert "-- (1.72," in fragment
-    assert "-- (-1.72," in fragment
+    assert "-- (1.76," in fragment
+    assert "-- (-1.76," in fragment
+    assert "-- (1.76,1.06);" in fragment
 
 
-def test_long_bar_charts_split_into_pages_with_a_shared_x_axis_scale():
-    """Continuation charts retain directly comparable count scales."""
-    question = structured_report_question(categories=[
-        {"value": f"Category {index}", "count": index, "percent_base": 20, "percent": index * 5.0}
-        for index in range(1, 25)
-    ])
+def test_question_identifier_line_uses_compact_type_throughout():
+    """The Question identifier label and identifier share the same compact style."""
+    tex = module.render_descriptive_tex(single_choice_payload_with_missing(), None).tex
+
+    assert r"\noindent\smaller[3] Question identifier: \texttt{" in tex
+
+
+def test_question_identifier_has_a_small_following_paragraph_gap():
+    """Question metadata is visibly separated from denominator metadata."""
+    tex = module.render_descriptive_tex(single_choice_payload_with_missing(), None).tex
+
+    assert r"\normalsize\par\vspace{0.35\baselineskip}" in tex
+
+
+def test_long_bar_charts_fill_printable_page_capacity_before_splitting():
+    """Continuation charts use the printable page height, not an arbitrary half page."""
+    categories = [
+        {"value": f"Category {index}", "count": index, "percent_base": 60, "percent": index / 60 * 100}
+        for index in range(1, 61)
+    ]
+    chunks = module._bar_chunks(categories)
+    question = structured_report_question(categories=categories)
 
     fragment = module.render_descriptive_tex(report_payload(question), None).chart_fragments[
         "09-institution-type"
     ]
 
+    assert len(chunks) >= 2
+    assert sum(module._bar_row_height(category) for category in chunks[0]) > module._BAR_PAGE_MAX_COORDINATE_HEIGHT - 1.35
     assert "\\clearpage" in fragment
-    assert fragment.count("xmax=28.32") >= 2
+    assert fragment.count("xmax=70.80") >= 2
 
 
 
@@ -1288,6 +1589,25 @@ def test_production_free_text_followups_have_validated_parent_contexts():
 
     for child, parent in expected_parents.items():
         assert by_number[child]["parent_columns"] == [by_number[parent]["column"]]
+
+    intentionally_unfiltered = {"028", "054", "059", "062", "067", "072"}
+    all_parented = {
+        question["question_id"].split("_")[1]
+        for question in schema["questions"]
+        if question["question_type"] == "free_text" and question.get("parent_columns")
+    }
+    filtered = {
+        question["question_id"].split("_")[1]
+        for question in schema["questions"]
+        if question.get("parent_context_values")
+    }
+    assert filtered | intentionally_unfiltered == all_parented
+    assert filtered & intentionally_unfiltered == set()
+    assert by_number["019"]["parent_context_values"] == {
+        by_number["018"]["column"]: [
+            "Other standards (any other terminologies, ontologies, common data models, or exchange formats) (please specify):"
+        ]
+    }
 
 def test_free_text_evidence_table_uses_less_aggressive_compact_type():
     """Narrative evidence remains row-level but has a readable compact table size."""
@@ -1706,3 +2026,54 @@ def test_chart_source_write_failure_is_input_error_without_output(tmp_path, monk
 
     assert not report_tex.exists()
     assert not chart_dir.exists()
+
+
+def test_form_manifest_structure_exposes_matrix_rows_and_requiredness():
+    """Runtime form metadata is derived from JSON rather than XML serialization."""
+    manifest = Path(__file__).parents[1] / "survey-mappings" / "so2_2025_form.json"
+
+    structure = module.load_form_manifest_structure(manifest)
+
+    question = structure["questions"][module._form_label("How many years of experience do you have in the field?")]
+    assert question["response_type"] == "Single Choice"
+    assert question["requiredness"] == "mandatory"
+    assert any(item["response_type"] == "Single Choice Matrix Question" for item in structure["questions"].values())
+
+
+def test_pie_leader_lines_use_radial_pie_arc_intersections():
+    """Pie leaders start at the arc point nearest the positioned swatch."""
+    fragment = module._pie_fragment({
+        "pie_categories": [
+            {"value": "Alpha", "count": 3, "percent": 75, "excluded_from_chart": False},
+            {"value": "Beta", "count": 1, "percent": 25, "excluded_from_chart": False},
+        ],
+    }, answered_only=False)
+
+    assert "dashed,thin] (" in fragment
+    assert "-- (1.76," in fragment or "-- (-1.76," in fragment
+    assert ":1.5) -- (1.72," not in fragment
+    assert ":1.5) -- (-1.72," not in fragment
+
+
+def test_response_structure_prints_concise_status_and_dependencies():
+    """Report metadata shows a plain status plus readable routing evidence."""
+    text = module._response_structure_text({"form": {
+        "response_type": "Free Text", "requiredness": "optional",
+        "dependencies": [{"parent_question": "Institution type", "answer": "Other"}],
+    }})
+
+    assert "Response type: free text; Optional." in text
+    assert "Shown when: Institution type = Other." in text
+    assert "mandatory/optional" not in text
+
+
+def test_manifest_structure_resolves_dependency_to_human_labels():
+    """Manifest routing is readable in the descriptive report metadata."""
+    manifest = Path(__file__).parents[1] / "survey-mappings" / "so2_2025_form.json"
+    structure = module.load_form_manifest_structure(manifest)
+    form = structure["questions"][module._form_label("Type of Institution")]
+
+    assert form["dependencies"] == [{
+        "parent_question": "What type of institution do you work for? (Select all that apply)",
+        "answer": "Other (please specify):",
+    }]

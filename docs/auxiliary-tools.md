@@ -73,15 +73,21 @@ JSON rather than hard-coding uncertain respondent matches.
 
 `survey-so2-directory.py describe` and `render-descriptive-report` are a
 standalone, Directory-free workflow. They do not load Directory data, request
-credentials, resolve institutions, or create update proposals. `describe` reads
-the versioned survey schema and workbook, while `render-descriptive-report`
-renders an existing descriptive-statistics JSON payload without reopening the
-workbook.
+credentials, resolve institutions, or create update proposals. `export-eus-form-json`
+regenerates the reviewable form manifest from the committed EUS archive; `describe`
+reads that manifest, the versioned survey schema, and workbook, while
+`render-descriptive-report` renders an existing descriptive-statistics JSON payload
+without reopening source files.
 
 ```bash
+python3 survey-so2-directory.py export-eus-form-json \
+  --form-eus survey-mappings/SO2_2025-u65uym7bs7d8bfs7j7hpcwoc1y.eus \
+  -o survey-mappings/so2_2025_form.json
+
 python3 survey-so2-directory.py describe \
   -i Content_Export_SO2_2025_20260313.xlsx \
   --descriptive-schema survey-mappings/so2_2025_descriptive_report.json \
+  --form-json survey-mappings/so2_2025_form.json \
   -o so2-descriptive.json \
   --output-tex so2-descriptive.tex \
   --output-pdf so2-descriptive.pdf \
@@ -91,6 +97,7 @@ python3 survey-so2-directory.py describe \
 python3 survey-so2-directory.py describe \
   -i Content_Export_SO2_2025_20260313.xlsx \
   --descriptive-schema survey-mappings/so2_2025_descriptive_report.json \
+  --form-json survey-mappings/so2_2025_form.json \
   -o so2-descriptive.json \
   --output-tex so2-descriptive.tex \
   --output-pdf so2-descriptive.pdf \
@@ -104,7 +111,11 @@ python3 survey-so2-directory.py render-descriptive-report \
 
 The observation unit is every nonblank submitted worksheet row. Counts are
 unweighted and are not deduplicated to institutions, biobanks, or countries.
-Structured-response contribution tables are omitted from the normal report; pass `--long-report` to either descriptive command to include grouped `Value | Country | Institutions` tables. Free-text response tables remain in both report forms. Explicit empty free-text placeholders are omitted, and HTTP(S) URLs are rendered as short hyperlinks. Contribution evidence retains the reported country, institution, and free-text answers; source-row provenance remains in the JSON payload rather than the readable tables. Free-text tables use ISO alpha-2 country codes and omit the parent-context column when no displayed response has configured parent context. Repeated normalized country/institution combinations are flagged as suspected repeated responses but are never removed. Treat generated
+`describe` requires the generated JSON form manifest so payloads and reports use
+its actual single-choice, multiple-choice, free-text, matrix, and requiredness
+metadata. Only explicit manifest regeneration decodes EUS Java serialization;
+ordinary reporting does not require that decoder.
+Structured-response contribution tables are omitted from the normal report; pass `--long-report` to either descriptive command to include grouped `Value | Country | Institutions` tables. Free-text response tables remain in both report forms. Explicit empty free-text placeholders are omitted, and HTTP(S) URLs are rendered as short hyperlinks. Contribution evidence retains the reported country, institution, and free-text answers; source-row provenance remains in the JSON payload rather than the readable tables. Free-text tables use ISO alpha-2 country codes and omit parent context by default. Pass `--include-parent-context` to show a `Parent context` column containing complete raw parent responses; it intentionally does not show the schema's semantically filtered subset, which would be incomplete context. The JSON retains both raw and semantic parent evidence, and a missing semantic trigger is diagnosed without omitting the text. Repeated normalized country/institution combinations are flagged as suspected repeated responses but are never removed. Treat generated
 JSON, TeX, PDFs, and chart directories as sensitive because they can contain
 institution names and free text.
 

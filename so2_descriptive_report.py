@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
 import json
-from math import ceil, cos, radians
+from html import unescape
+from math import atan2, ceil, cos, degrees, radians, sin
 import os
 from pathlib import Path
 import re
@@ -17,6 +18,7 @@ from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence
 from unicodedata import normalize
 from zipfile import BadZipFile
+from xml.etree import ElementTree as ET
 
 import openpyxl
 import pandas as pd
@@ -32,7 +34,13 @@ _QUESTION_TYPES = frozenset({"single_choice", "multi_choice", "ordinal", "free_t
 
 @dataclass(frozen=True)
 class QuestionDefinition:
-    """Validated classification and presentation metadata for one survey question."""
+    """Validated classification and presentation metadata for one survey question.
+
+    ``parent_context_values`` maps a free-text parent column to the canonical
+    structured selections that semantically enable that follow-up. An absent
+    mapping retains the full parent response as context rather than inventing a
+    routing rule.
+    """
 
     question_id: str
     column: str
@@ -42,6 +50,9 @@ class QuestionDefinition:
     delimiter: str | None
     parent_columns: tuple[str, ...]
     applicability: Mapping[str, Any] | None
+    parent_context_values: Mapping[str, tuple[str, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
     exclusive_categories: tuple[str, ...] = ()
     category_aliases: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
 
@@ -62,7 +73,16 @@ class SurveyWorkbook:
 
 
 def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    """Build a JSON object while rejecting ambiguous duplicate keys."""
+    """Build a JSON object while rejecting ambiguous duplicate keys.
+
+    Args:
+        pairs: Decoder-supplied ordered key/value pairs for one JSON object.
+
+    Returns:
+        Dictionary preserving the decoded object values after duplicate checking.
+
+    Raises:
+        InputError: If a key occurs more than once in the same object."""
     result = {}
     for key, value in pairs:
         if key in result:
@@ -97,22 +117,222 @@ def load_descriptive_schema(path: str | Path) -> dict[str, Any]:
     return schema
 
 
+def _form_label(value: str) -> str:
+    """Normalize an XML/form label for stable schema matching.
+
+    Args:
+        value: Literal question or answer text from XML or the descriptive schema.
+
+    Returns:
+        Case-folded alphanumeric comparison key with markup and whitespace removed.
+    """
+    previous = value
+    while True:
+        decoded = unescape(previous)
+        if decoded == previous:
+            break
+        previous = decoded
+    plain = re.sub(r"<[^>]+>", " ", decoded)
+    return re.sub(r"[^\w]+", "", plain, flags=re.UNICODE).casefold()
+
+
+def load_form_structure(path: str | Path) -> dict[str, Any]:
+    """Load authoritative response types and dependencies from an SO2 form XML export.
+
+    Args:
+        path: XML form-definition export containing ``Survey/Elements``.
+
+    Returns:
+        Source provenance and question metadata indexed by normalized form label.
+
+    Raises:
+        InputError: If the XML cannot be read or lacks a consistent Elements definition.
+    """
+    source = Path(path)
+    try:
+        source_bytes = source.read_bytes()
+        root = ET.fromstring(source_bytes)
+    except (OSError, ET.ParseError) as exc:
+        raise InputError(f"Could not read form-structure XML {source}: {exc}") from exc
+    elements = root.find("./Survey/Elements")
+    if elements is None:
+        raise InputError("Form-structure XML lacks Survey/Elements.")
+    questions_by_id: dict[str, dict[str, Any]] = {}
+    answers: list[tuple[str, str, tuple[str, ...]]] = []
+    current_question_id: str | None = None
+    matrix_title: str | None = None
+
+    def register_question(question_id: str | None, question_type: str | None, label: str) -> None:
+        """Register one XML question after validating its identity and display text."""
+        if not question_id or not question_type or not label:
+            raise InputError("Form-structure XML has a question without id, type, or text.")
+        if question_id in questions_by_id:
+            raise InputError(f"Form-structure XML repeats question id {question_id!r}.")
+        questions_by_id[question_id] = {
+            "id": question_id,
+            "label": label,
+            "response_type": question_type,
+            # This export contains no question-level requiredness attribute.
+            "requiredness": "not declared by form export",
+            "dependencies": [],
+        }
+
+    for element in elements:
+        if element.tag == "MatrixTitle":
+            matrix_title = (element.text or "").strip()
+            current_question_id = None
+        elif element.tag == "MatrixQuestion":
+            row_label = (element.text or "").strip()
+            if not matrix_title:
+                raise InputError("Form-structure XML has a matrix row without a matrix title.")
+            register_question(
+                element.get("id"), element.get("type"), f"{matrix_title}: {row_label}",
+            )
+            current_question_id = None
+        elif element.tag == "Question":
+            label = (element.text or "").strip()
+            register_question(element.get("id"), element.get("type"), label)
+            current_question_id = element.get("id")
+            matrix_title = None
+        elif element.tag == "Answer" and current_question_id is not None:
+            dependent = tuple(filter(
+                None,
+                re.split(r"[;,\s]+", element.get("dependentElements") or ""),
+            ))
+            answers.append((current_question_id, (element.text or "").strip(), dependent))
+    for parent_id, answer_text, children in answers:
+        parent = questions_by_id[parent_id]
+        for child_id in children:
+            child = questions_by_id.get(child_id)
+            if child is None:
+                raise InputError(f"Form-structure XML references missing dependent question {child_id!r}.")
+            child["dependencies"].append({"parent_question": parent["label"], "answer": answer_text})
+    by_label: dict[str, dict[str, Any]] = {}
+    for item in questions_by_id.values():
+        key = _form_label(item["label"])
+        if key in by_label:
+            raise InputError(f"Form-structure XML has duplicate normalized question text: {item['label']!r}.")
+        by_label[key] = item
+    return {"source_path": str(source), "source_sha256": sha256(source_bytes).hexdigest(), "questions": by_label}
+
+
+def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
+    """Load report-facing field metadata from a generated EUS JSON manifest.
+
+    Args:
+        path: Path to the checked-in JSON form manifest generated by
+            ``export-eus-form-json``.
+
+    Returns:
+        Provenance and question metadata indexed by normalized report labels;
+        matrix rows are exposed as individual report questions.
+
+    Raises:
+        InputError: If the manifest cannot be loaded or does not expose a
+            unique label for each report-facing question.
+    """
+    try:
+        from so2_eusurvey import FormInputError, load_form_manifest
+
+        form = load_form_manifest(path)
+    except FormInputError as exc:
+        raise InputError(str(exc)) from exc
+    response_types = {
+        "free_text": "Free Text",
+        "single_choice": "Single Choice",
+        "multi_choice": "Multiple Choice",
+        "matrix": "Single Choice Matrix Question",
+    }
+    questions: dict[str, dict[str, Any]] = {}
+
+    def add_question(label: str, response_type: str, mandatory: bool, dependencies: list[dict[str, str]]) -> None:
+        """Store one report-facing question after label uniqueness validation."""
+        key = _form_label(label)
+        if key in questions:
+            raise InputError(f"Form manifest has duplicate normalized question text: {label!r}.")
+        questions[key] = {
+            "id": key,
+            "label": label,
+            "response_type": response_type,
+            "requiredness": "mandatory" if mandatory else "optional",
+            "dependencies": dependencies,
+        }
+
+    for field in form.fields_by_uid.values():
+        dependencies = []
+        if field.shown_when is not None:
+            dependencies = []
+            for atom in field.shown_when.atoms:
+                parent = form.fields_by_uid.get(atom.parent_uid)
+                choice = None if parent is None else next(
+                    (item for item in parent.choices if item.uid == atom.choice_uid), None
+                )
+                if parent is None or choice is None:
+                    raise InputError("Form manifest dependency does not resolve to readable labels.")
+                dependencies.append({"parent_question": parent.title, "answer": choice.label})
+        if field.field_type == "matrix":
+            for row in field.matrix_rows:
+                add_question(
+                    f"{field.title}: {row.label}", response_types[field.field_type],
+                    field.mandatory, dependencies,
+                )
+        else:
+            add_question(field.title, response_types[field.field_type], field.mandatory, dependencies)
+    return {
+        "source_path": str(path),
+        "source_sha256": sha256(Path(path).read_bytes()).hexdigest(),
+        "archive_sha256": form.archive_sha256,
+        "active_member_sha256": form.active_member_sha256,
+        "questions": questions,
+    }
+
+
 def _required_mapping(value: Any, name: str) -> Mapping[str, Any]:
-    """Return a required object-shaped schema value."""
+    """Validate one required object-shaped schema value.
+
+    Args:
+        value: Candidate value supplied by the parsed schema.
+        name: Fully qualified schema field name used in error messages.
+
+    Returns:
+        The same value narrowed to a mapping.
+
+    Raises:
+        InputError: If the value is not mapping-shaped."""
     if not isinstance(value, Mapping):
         raise InputError(f"Schema field {name} must be an object.")
     return value
 
 
 def _required_text(value: Any, name: str) -> str:
-    """Return a required nonblank schema string."""
+    """Validate one required nonblank schema string.
+
+    Args:
+        value: Candidate value supplied by the parsed schema.
+        name: Fully qualified schema field name used in error messages.
+
+    Returns:
+        The original nonblank string.
+
+    Raises:
+        InputError: If the value is not a nonblank string."""
     if not isinstance(value, str) or not value.strip():
         raise InputError(f"Schema field {name} must be a nonblank string.")
     return value
 
 
 def _text_sequence(value: Any, name: str) -> tuple[str, ...]:
-    """Return a sequence of unique nonblank schema strings."""
+    """Validate an ordered sequence of unique schema strings.
+
+    Args:
+        value: Candidate JSON array from the schema.
+        name: Fully qualified schema field name used in error messages.
+
+    Returns:
+        Immutable ordered strings after nonblank and duplicate validation.
+
+    Raises:
+        InputError: If the value is not an array of unique nonblank strings."""
     if not isinstance(value, list):
         raise InputError(f"Schema field {name} must be an array of strings.")
     values = tuple(_required_text(item, name) for item in value)
@@ -122,7 +342,13 @@ def _text_sequence(value: Any, name: str) -> tuple[str, ...]:
 
 
 def _is_blank(value: Any) -> bool:
-    """Return whether a scalar spreadsheet value is blank for response filtering."""
+    """Classify one spreadsheet scalar as blank or answered.
+
+    Args:
+        value: Raw cell value, including pandas missing-value sentinels.
+
+    Returns:
+        ``True`` only when the value is absent, whitespace-only, or pandas-null."""
     if value is None:
         return True
     if isinstance(value, str):
@@ -144,7 +370,17 @@ def is_nonblank_response_row(row: pd.Series, classified_columns: Sequence[str]) 
 
 
 def _validate_question(question: Any, position: int) -> QuestionDefinition:
-    """Validate one question object and return its immutable public definition."""
+    """Validate one schema question and construct its immutable definition.
+
+    Args:
+        question: Candidate object from the schema ``questions`` array.
+        position: Zero-based question position used for contextual validation errors.
+
+    Returns:
+        Validated immutable definition with normalized optional fields.
+
+    Raises:
+        InputError: If required fields, category rules, aliases, or options are invalid."""
     item = _required_mapping(question, f"questions[{position}]")
     required_fields = ("question_id", "column", "question_type", "label", "categories")
     for field in required_fields:
@@ -173,6 +409,15 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
     parent_columns = _text_sequence(
         item.get("parent_columns", []), f"questions[{position}].parent_columns"
     )
+    parent_context_values_raw = _required_mapping(
+        item.get("parent_context_values", {}),
+        f"questions[{position}].parent_context_values",
+    )
+    parent_context_values = {
+        _required_text(column, f"questions[{position}].parent_context_values key"):
+        _text_sequence(values, f"questions[{position}].parent_context_values[{column!r}]")
+        for column, values in parent_context_values_raw.items()
+    }
     exclusive_categories = _text_sequence(
         item.get("exclusive_categories", []),
         f"questions[{position}].exclusive_categories",
@@ -209,6 +454,7 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
         categories=categories,
         delimiter=delimiter,
         parent_columns=parent_columns,
+        parent_context_values=MappingProxyType(parent_context_values),
         applicability=applicability,
         exclusive_categories=exclusive_categories,
         category_aliases=MappingProxyType(category_aliases),
@@ -323,12 +569,37 @@ def validate_descriptive_schema(
                 f"for {applicability_column!r}."
             )
     for question in questions:
+        if question.parent_context_values and question.question_type != "free_text":
+            raise InputError(
+                "Schema parent_context_values is allowed only for free-text questions: "
+                f"{question.column!r}."
+            )
         if question.question_type == "free_text":
             invalid_parents = sorted(set(question.parent_columns) - question_columns)
             if invalid_parents:
                 raise InputError(
                     f"Schema free_text parent column must name a declared question column: {invalid_parents[0]!r}."
                 )
+            invalid_context_columns = sorted(
+                set(question.parent_context_values) - set(question.parent_columns)
+            )
+            if invalid_context_columns:
+                raise InputError(
+                    "Schema free-text parent_context_values column must be a declared parent column: "
+                    f"{invalid_context_columns[0]!r}."
+                )
+            for parent_column, values in question.parent_context_values.items():
+                if not values:
+                    raise InputError(
+                        "Schema free-text parent_context_values must not be empty for "
+                        f"{parent_column!r}."
+                    )
+                invalid_values = sorted(set(values) - set(question_by_column[parent_column].categories))
+                if invalid_values:
+                    raise InputError(
+                        "Schema free-text parent_context_values value is not declared "
+                        f"for {parent_column!r}: {invalid_values[0]!r}."
+                    )
 
     classifications = (
         list(context_columns)
@@ -452,17 +723,36 @@ def read_descriptive_workbook(
 
 
 def _display_value(value: Any) -> str:
-    """Return a JSON-safe literal response value, using Missing only for blanks."""
+    """Convert one response value to its report-safe literal representation.
+
+    Args:
+        value: Raw spreadsheet value from a response or context column.
+
+    Returns:
+        ``Missing`` for blank values, otherwise the literal string representation."""
     return "Missing" if _is_blank(value) else str(value)
 
 
 def _normalised_respondent_value(value: Any) -> str:
-    """Normalize a respondent identity component solely for repeat detection."""
+    """Normalize one respondent identity component for repeat detection only.
+
+    Args:
+        value: Raw country or institution value from a submitted response.
+
+    Returns:
+        Case-folded, whitespace-normalized display value used as a grouping key."""
     return " ".join(_display_value(value).split()).casefold()
 
 
 def _percentage(count: int, base: int) -> float | None:
-    """Return a four-decimal percentage or null when no denominator exists."""
+    """Calculate a count percentage when a denominator exists.
+
+    Args:
+        count: Nonnegative numerator count.
+        base: Nonnegative denominator count.
+
+    Returns:
+        Percentage rounded to four decimals, or ``None`` when ``base`` is zero."""
     return None if base == 0 else round(count * 100 / base, 4)
 
 
@@ -471,7 +761,18 @@ def _applicability_summary(
     responses: pd.DataFrame,
     question_by_column: Mapping[str, QuestionDefinition],
 ) -> dict[str, Any]:
-    """Evaluate an explicitly declared routing rule, never infer one from blanks."""
+    """Evaluate an explicitly declared question-routing rule.
+
+    Args:
+        question: Validated question whose optional applicability rule is evaluated.
+        responses: Included survey response rows.
+        question_by_column: Validated questions indexed by their source columns.
+
+    Returns:
+        Unknown status when no rule exists, otherwise row counts for each routing outcome.
+
+    Raises:
+        InputError: If the declared rule is malformed or references an absent column."""
     if question.applicability is None:
         return {"status": "unknown"}
     column = question.applicability.get("column")
@@ -510,7 +811,16 @@ def _applicability_summary(
 def _respondent_groups(
     responses: pd.DataFrame, institution_column: str, country_column: str, source_row_column: str
 ) -> tuple[set[int], list[dict[str, Any]]]:
-    """Flag repeated normalized country/institution pairs without removing source rows."""
+    """Find repeated normalized country/institution submissions without deduplication.
+
+    Args:
+        responses: Included survey response rows.
+        institution_column: Source column identifying the reported institution.
+        country_column: Source column identifying the reported country.
+        source_row_column: Synthetic original-workbook row number column.
+
+    Returns:
+        Source-row set flagged as repeated and deterministic repeat-group diagnostics."""
     groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for _, row in responses.iterrows():
         key = (
@@ -535,7 +845,14 @@ def _respondent_groups(
 def _structured_answers(
     question: QuestionDefinition, value: Any
 ) -> tuple[list[str], list[str]]:
-    """Return deduplicated declared selections and duplicate selections from one response."""
+    """Parse and canonicalize one structured response value.
+
+    Args:
+        question: Validated structured question defining delimiter and category aliases.
+        value: Raw response cell value for that question.
+
+    Returns:
+        Deduplicated canonical selections and duplicate selections, in source order."""
     if _is_blank(value):
         return [], []
     raw_answers = (
@@ -562,7 +879,18 @@ def _structured_question_payload(
     source_row_column: str,
     duplicate_rows: set[int],
 ) -> dict[str, Any]:
-    """Build counts and literal evidence for one non-narrative survey question."""
+    """Build counts, evidence, and diagnostics for one structured question.
+
+    Args:
+        question: Validated non-free-text question definition.
+        responses: Included survey response rows.
+        institution_column: Source column identifying the reported institution.
+        country_column: Source column identifying the reported country.
+        source_row_column: Synthetic original-workbook row number column.
+        duplicate_rows: Source rows belonging to repeated respondent groups.
+
+    Returns:
+        JSON-serializable population counts, categories, literal evidence, and diagnostics."""
     counts = {category: 0 for category in question.categories}
     declared_categories = frozenset(question.categories)
     contributions: list[dict[str, Any]] = []
@@ -671,20 +999,35 @@ def _free_text_question_payload(
         question_by_column: Complete validated registry, used to diagnose parent values.
 
     Returns:
-        JSON-serializable free-text rows retaining literal narrative and parent
-        context, together with population and parent-context diagnostics.
+        JSON-serializable free-text rows retaining literal narrative, filtered
+        display context, raw parent evidence, and parent-context diagnostics.
     """
     rows = []
     missing_parent_answers: list[dict[str, Any]] = []
+    unmatched_parent_context: list[dict[str, Any]] = []
     unexpected_parent_answers: list[dict[str, Any]] = []
     for _, response in responses.iterrows():
         if _is_blank(response[question.column]) or _is_empty_free_text(response[question.column]):
             continue
         source_row = int(response[source_row_column])
-        parent_answers = [
-            {"column": column, "value": _display_value(response[column])}
-            for column in question.parent_columns
-        ]
+        parent_answers = []
+        raw_parent_answers = []
+        for column in question.parent_columns:
+            raw_parent_answers.append({"column": column, "value": _display_value(response[column])})
+            parent_question = question_by_column[column]
+            answers, _ = _structured_answers(parent_question, response[column])
+            context_values = question.parent_context_values.get(column)
+            matching_answers = (
+                [answer for answer in answers if answer in context_values]
+                if context_values is not None else answers
+            )
+            parent_answers.append({
+                "column": column,
+                "value": ";".join(matching_answers) if matching_answers
+                else ("Missing" if _is_blank(response[column]) else "Not selected"),
+            })
+            if context_values is not None and not matching_answers and not _is_blank(response[column]):
+                unmatched_parent_context.append({"source_row": source_row, "columns": [column]})
         missing_columns = [answer["column"] for answer in parent_answers if answer["value"] == "Missing"]
         if missing_columns:
             missing_parent_answers.append({"source_row": source_row, "columns": missing_columns})
@@ -706,6 +1049,7 @@ def _free_text_question_payload(
                 "source_row": source_row,
                 "text": str(response[question.column]),
                 "parent_answers": parent_answers,
+                "raw_parent_answers": raw_parent_answers,
             }
         )
     rows.sort(key=lambda item: (item["country"], item["institution"], item["source_row"]))
@@ -722,19 +1066,21 @@ def _free_text_question_payload(
             "unexpected_selections": [],
             "contradictory_selections": [],
             "missing_parent_answers": missing_parent_answers,
+            "unmatched_parent_context": unmatched_parent_context,
             "unexpected_parent_answers": unexpected_parent_answers,
         },
     }
 
 
 def build_descriptive_payload(
-    workbook: SurveyWorkbook, schema: Mapping[str, Any]
+    workbook: SurveyWorkbook, schema: Mapping[str, Any], form_structure: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a self-contained descriptive payload without Directory data.
 
     Args:
         workbook: Validated source workbook and nonblank survey rows.
         schema: Validated complete descriptive registry.
+        form_structure: Optional authoritative XML-derived question metadata.
 
     Returns:
         JSON-serializable provenance, diagnostics, question counts, literal
@@ -757,8 +1103,24 @@ def build_descriptive_payload(
         workbook.responses, institution_column, country_column, source_row_column
     )
     question_by_column = {question.column: question for question in questions}
+    form_questions = form_structure.get("questions", {}) if form_structure is not None else {}
+    expected_form_types = {
+        "single_choice": frozenset({"Single Choice"}),
+        "multi_choice": frozenset({"Multiple Choice"}),
+        "ordinal": frozenset({"Single Choice", "Single Choice Matrix Question"}),
+        "free_text": frozenset({"Free Text"}),
+    }
     question_payloads = []
     for question in questions:
+        form_question = form_questions.get(_form_label(question.column))
+        if form_structure is not None and form_question is None:
+            raise InputError(f"Descriptive schema question is absent from form XML: {question.column!r}.")
+        if form_question is not None and form_question["response_type"] not in expected_form_types[question.question_type]:
+            allowed_types = ", ".join(sorted(expected_form_types[question.question_type]))
+            raise InputError(
+                f"Descriptive schema type {question.question_type!r} conflicts with XML response type "
+                f"{form_question['response_type']!r} for {question.column!r}; expected {allowed_types}."
+            )
         detail = (
             _free_text_question_payload(
                 question,
@@ -780,6 +1142,7 @@ def build_descriptive_payload(
                 "column": question.column,
                 "label": question.label,
                 "question_type": question.question_type,
+                "form": form_question,
                 "applicability": _applicability_summary(
                     question, workbook.responses, question_by_column
                 ),
@@ -802,6 +1165,10 @@ def build_descriptive_payload(
             "schema_version": root["schema_version"],
         },
         "diagnostics": {"duplicate_respondent_groups": duplicate_groups},
+        "form_structure": None if form_structure is None else {
+            "source_path": form_structure["source_path"],
+            "source_sha256": form_structure["source_sha256"],
+        },
         "questions": question_payloads,
     }
 
@@ -831,7 +1198,13 @@ _TEX_ESCAPE = {
 
 
 def _tex(value: Any) -> str:
-    """Escape a literal value for ordinary TeX text."""
+    """Escape one literal value for ordinary TeX text.
+
+    Args:
+        value: Literal value that must not be interpreted as TeX markup.
+
+    Returns:
+        TeX-escaped string safe for ordinary text contexts."""
     return "".join(_TEX_ESCAPE.get(character, character) for character in str(value))
 
 
@@ -881,17 +1254,33 @@ def _question_identifier(value: Any) -> str:
     Returns:
         TeX markup for a smaller monospace identifier which may wrap at underscores.
     """
-    return r"\smaller[3]\texttt{" + _tex(value).replace(r"\_", r"\_\hspace{0pt}") + r"}\normalsize"
+    return r"\texttt{" + _tex(value).replace(r"\_", r"\_\hspace{0pt}") + r"}"
 
 
 def _slug(value: str) -> str:
-    """Return an ASCII filename stem derived from presentation metadata."""
+    """Create an ASCII filename stem from presentation metadata.
+
+    Args:
+        value: Human-readable label or identifier to convert.
+
+    Returns:
+        Lowercase hyphenated ASCII filename stem, possibly empty."""
     ascii_value = normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", ascii_value.lower())).strip("-")
 
 
 def _chart_key(question: Mapping[str, Any], answered_only: bool = False) -> str:
-    """Return a stable chart filename key from the question identifier and label."""
+    """Build a stable bounded chart filename key.
+
+    Args:
+        question: Renderable question payload containing identifier and label.
+        answered_only: Whether this is the Missing-excluded pie variant.
+
+    Returns:
+        Stable filename stem with question ordinal and optional variant suffix.
+
+    Raises:
+        InputError: If the question identifier or label cannot produce a safe key."""
     match = re.search(r"(?:^|_)q?0*(\d{1,3})(?:_|$)", str(question["question_id"]))
     if match is None:
         raise InputError(f"Question id lacks a numeric chart prefix: {question['question_id']!r}.")
@@ -907,7 +1296,13 @@ def _chart_key(question: Mapping[str, Any], answered_only: bool = False) -> str:
 
 
 def _category_label(category: Mapping[str, Any]) -> str:
-    """Return an explicit count and denominator-aware percentage label."""
+    """Format one category count with its denominator-aware percentage.
+
+    Args:
+        category: Renderable category with value, count, and percentage metadata.
+
+    Returns:
+        TeX-safe descriptive label for legends or textual category summaries."""
     value = _tex(category["value"])
     count = int(category["count"])
     percentage = category.get("percent")
@@ -938,6 +1333,15 @@ _ORDINAL_EXCEPTIONS = frozenset({
     "missing", "not applicable", "n/a", "don't know", "i don't know", "i don’t know",
 })
 
+# The default 11pt article text block is 541.4pt (about 19.03cm). The axis
+# height formula adds 1cm to 0.52cm per coordinate, so 34.6 uses 19.0cm.
+_BAR_PAGE_PRINTABLE_HEIGHT_CM = 19.0
+_BAR_AXIS_BASE_HEIGHT_CM = 1.0
+_BAR_AXIS_COORDINATE_HEIGHT_CM = 0.52
+_BAR_PAGE_MAX_COORDINATE_HEIGHT = (
+    _BAR_PAGE_PRINTABLE_HEIGHT_CM - _BAR_AXIS_BASE_HEIGHT_CM
+) / _BAR_AXIS_COORDINATE_HEIGHT_CM
+
 
 def _bar_row_height(category: Mapping[str, Any]) -> float:
     """Return vertical axis space needed by a category label.
@@ -952,13 +1356,16 @@ def _bar_row_height(category: Mapping[str, Any]) -> float:
 
 
 def _bar_chunks(
-    categories: Sequence[Mapping[str, Any]], max_height: float = 12.0
+    categories: Sequence[Mapping[str, Any]],
+    max_height: float = _BAR_PAGE_MAX_COORDINATE_HEIGHT,
 ) -> list[list[Mapping[str, Any]]]:
     """Partition ordered categories into page-sized chart groups.
 
     Args:
         categories: Categories in the semantic display order to preserve.
         max_height: Maximum sum of adaptive row heights in one chart fragment.
+            The default consumes the complete printable height of the default
+            report page, excluding page margins, headers, and footers.
 
     Returns:
         Non-empty ordered groups; each fits the requested height unless one
@@ -1022,17 +1429,17 @@ def _bar_axis(
         )
         ticks.append(f"{position:.2f}")
     tick_labels = ",".join(
-        rf"{{\parbox{{0.40\linewidth}}{{\raggedleft {_tex(category['value'])}}}}}"
+        rf"{{\raggedleft {_tex(category['value'])}}}"
         for category in categories
     )
     return "\n".join([
         r"\begin{tikzpicture}",
         r"\begin{axis}[xbar, xmin=0, xmax=" + f"{max(1, max_count) * 1.18:.2f}, "
-        r"ymin=0, ymax=" + f"{cursor + 0.70:.2f}, width=0.42\\linewidth, xshift=0.46\\linewidth, "
-        r"scale only axis, height=" + f"{max(3.0, 0.52 * cursor + 1):.1f}cm,",
+        r"ymin=0, ymax=" + f"{cursor + 0.70:.2f}, width=0.42\\textwidth, xshift=0.46\\textwidth, "
+        r"scale only axis, height=" + f"{max(3.0, _BAR_AXIS_COORDINATE_HEIGHT_CM * cursor + _BAR_AXIS_BASE_HEIGHT_CM):.1f}cm,",
         f"ytick={{{','.join(ticks)}}}, yticklabels={{{tick_labels}}},",
         r"xlabel={Count}, y dir=reverse, axis x line*=bottom, axis y line*=left,",
-        r"yticklabel style={text width=0.40\linewidth,align=right,font=\scriptsize},",
+        r"yticklabel style={text width=0.40\textwidth,align=right,font=\scriptsize},",
         r"enlarge x limits={upper,value=0.14}, clip=false]",
         *rows,
         *labels,
@@ -1083,6 +1490,93 @@ def _bar_fragment(question: Mapping[str, Any]) -> str:
         fragments.extend([r"\noindent\textit{Exceptional categories}\par", _bar_charts(exceptional)])
     return "\n".join(fragments)
 
+_PIE_RADIUS = 1.5
+_PIE_LABEL_BOUND = 1.45
+_PIE_LABEL_GAP = 0.08
+
+
+def _pie_label_height(lines: int) -> float:
+    """Return the vertical space reserved for a pie label.
+
+    Args:
+        lines: Wrapped-line count calculated from the literal category label.
+
+    Returns:
+        Height in TikZ coordinates, including a small separation allowance.
+    """
+    return 0.42 * lines + 0.16
+
+
+def _pie_label_layout(labels: Sequence[Mapping[str, Any]]) -> dict[int, tuple[str, float]]:
+    """Place pie labels near their slice centers without exceeding pie height.
+
+    Args:
+        labels: Segment descriptors containing a stable ``index``, middle angle,
+            and wrapped-line count.
+
+    Returns:
+        Mapping from segment index to its selected horizontal side and bounded
+        vertical label center. Labels are moved to the opposite side only when
+        their preferred side cannot fit within the pie's vertical extent.
+
+    Raises:
+        InputError: If label blocks cannot fit within the fixed pie height.
+    """
+    groups = {"left": [], "right": []}
+    for label in labels:
+        preferred = "right" if cos(radians(float(label["middle"]))) >= 0 else "left"
+        groups[preferred].append({**label, "side": preferred})
+
+    def occupied_height(items: Sequence[Mapping[str, Any]]) -> float:
+        return sum(_pie_label_height(int(item["lines"])) for item in items) + max(0, len(items) - 1) * _PIE_LABEL_GAP
+
+    available = 2 * _PIE_LABEL_BOUND
+    for side in ("left", "right"):
+        while occupied_height(groups[side]) > available:
+            other = "left" if side == "right" else "right"
+            candidates = sorted(
+                groups[side],
+                key=lambda item: (abs(cos(radians(float(item["middle"])))), -int(item["lines"])),
+            )
+            candidate = next(
+                (
+                    item for item in candidates
+                    if occupied_height([*groups[other], item]) <= available
+                ),
+                None,
+            )
+            if candidate is None:
+                raise InputError("Pie-chart labels cannot fit within the fixed pie height.")
+            groups[side].remove(candidate)
+            candidate["side"] = other
+            groups[other].append(candidate)
+
+    layout: dict[int, tuple[str, float]] = {}
+    for side, items in groups.items():
+        ordered = sorted(items, key=lambda item: _PIE_RADIUS * sin(radians(float(item["middle"]))))
+        centers: list[float] = []
+        heights = [_pie_label_height(int(item["lines"])) for item in ordered]
+        for item, height in zip(ordered, heights, strict=True):
+            desired = _PIE_RADIUS * sin(radians(float(item["middle"])))
+            minimum = -_PIE_LABEL_BOUND + height / 2
+            maximum = _PIE_LABEL_BOUND - height / 2
+            center = min(max(desired, minimum), maximum)
+            if centers:
+                center = max(center, centers[-1] + heights[len(centers) - 1] / 2 + _PIE_LABEL_GAP + height / 2)
+            centers.append(center)
+        # Clamp the upper label first, then preserve the required gap backward.
+        for index in range(len(centers) - 1, -1, -1):
+            maximum = _PIE_LABEL_BOUND - heights[index] / 2
+            if index < len(centers) - 1:
+                maximum = min(maximum, centers[index + 1] - heights[index + 1] / 2 - _PIE_LABEL_GAP - heights[index] / 2)
+            centers[index] = min(centers[index], maximum)
+        if centers and centers[0] - heights[0] / 2 < -_PIE_LABEL_BOUND:
+            raise InputError("Pie-chart labels cannot fit within the fixed pie height.")
+        for item, center in zip(ordered, centers, strict=True):
+            layout[int(item["index"])] = (side, center)
+    return layout
+
+
 def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
     """Render a pie whose leader lines connect each segment to its label.
 
@@ -1091,7 +1585,8 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
         answered_only: Whether the Missing category is excluded from this chart.
 
     Returns:
-        Complete TikZ markup with labels placed on the nearest horizontal side.
+        Complete TikZ markup with labels near slice centers and within the pie's
+        fixed vertical extent.
     """
     categories = [
         category for category in question["pie_categories"]
@@ -1107,9 +1602,8 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
             r"\end{tikzpicture}",
         ])
     start = 0.0
-    legend_y = {"left": 1.35, "right": 1.35}
     colors = ("bbmriBlue", "bbmriTeal", "bbmriGold", "bbmriGray", "bbmriRed")
-    slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
+    segments = []
     for index, category in enumerate(categories):
         count = int(category["count"])
         end = start + 360 * count / total
@@ -1118,33 +1612,49 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
             "bbmriRed" if str(category["value"]).strip().casefold() == "missing"
             else colors[index % len(colors)]
         )
-        label = f"{_tex(category['value'])}: {count} ({100 * count / total:.1f}\\%)"
-        label_lines = max(1, ceil(len(str(category["value"])) / 42))
-        side = "right" if cos(radians(middle)) >= 0 else "left"
-        y = legend_y[side]
+        segments.append({
+            "index": index, "category": category, "start": start, "end": end,
+            "middle": middle, "color": color,
+            "label": f"{_tex(category['value'])}: {count} ({100 * count / total:.1f}\\%)",
+            "lines": max(1, ceil(len(str(category["value"])) / 42)),
+        })
+        start = end
+    layout = _pie_label_layout(segments)
+    slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
+    for segment in segments:
+        side, y = layout[segment["index"]]
         slices.append(
-            rf"\path[fill={color},draw=white] (0,0) -- ({start:.3f}:1.5)"
-            rf" arc ({start:.3f}:{end:.3f}:1.5) -- cycle;"
+            rf"\path[fill={segment['color']},draw=white] (0,0) -- ({segment['start']:.3f}:1.5)"
+            rf" arc ({segment['start']:.3f}:{segment['end']:.3f}:1.5) -- cycle;"
         )
+        swatch_x = 1.76 if side == "right" else -1.76
+        # Intersect the centre-to-swatch ray with the pie arc. This keeps the
+        # leader line visually radial even after label collision adjustments.
+        contact_angle = degrees(atan2(y, swatch_x))
         if side == "right":
             slices.extend([
-                rf"\draw[{color},dashed,thin] ({middle:.3f}:1.5) -- (1.72,{y:.2f});",
-                rf"\fill[{color}] (1.76,{y - 0.06:.2f}) rectangle (1.90,{y + 0.06:.2f});",
-                rf"\node[anchor=west,align=left,text width=0.40\linewidth,font=\scriptsize] at (1.98,{y:.2f}) {{{label}}};",
+                rf"\draw[{segment['color']},dashed,thin] ({contact_angle:.3f}:1.5) -- ({swatch_x:.2f},{y:.2f});",
+                rf"\fill[{segment['color']}] (1.76,{y - 0.06:.2f}) rectangle (1.90,{y + 0.06:.2f});",
+                rf"\node[anchor=west,align=left,text width=0.40\linewidth,font=\scriptsize] at (1.98,{y:.2f}) {{{segment['label']}}};",
             ])
         else:
             slices.extend([
-                rf"\draw[{color},dashed,thin] ({middle:.3f}:1.5) -- (-1.72,{y:.2f});",
-                rf"\fill[{color}] (-1.90,{y - 0.06:.2f}) rectangle (-1.76,{y + 0.06:.2f});",
-                rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\scriptsize] at (-1.98,{y:.2f}) {{{label}}};",
+                rf"\draw[{segment['color']},dashed,thin] ({contact_angle:.3f}:1.5) -- ({swatch_x:.2f},{y:.2f});",
+                rf"\fill[{segment['color']}] (-1.90,{y - 0.06:.2f}) rectangle (-1.76,{y + 0.06:.2f});",
+                rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\scriptsize] at (-1.98,{y:.2f}) {{{segment['label']}}};",
             ])
-        legend_y[side] -= 0.42 * label_lines + 0.16
-        start = end
     slices.append(r"\end{tikzpicture}")
     return "\n".join(slices)
 
 def _table(rows: Sequence[Sequence[str]], columns: str) -> str:
-    """Render a longtable with a repeated header and literal rows."""
+    """Render a repeated-header longtable from already escaped cells.
+
+    Args:
+        rows: Header followed by body rows, with TeX-safe cell values.
+        columns: TeX longtable column specification.
+
+    Returns:
+        Complete longtable TeX, or an empty string when no rows are supplied."""
     if not rows:
         return ""
     header, *body = rows
@@ -1187,11 +1697,15 @@ def _country_code(value: Any) -> str:
     return _COUNTRY_CODES.get(normalized.strip().casefold(), "??")
 
 
-def _question_tables(question: Mapping[str, Any]) -> str:
-    """Render the optional evidence table for one validated question payload.
+def _question_tables(
+    question: Mapping[str, Any], *, include_parent_context: bool = False,
+) -> str:
+    """Render an optional evidence table for one validated question payload.
 
     Args:
         question: Validated question payload with either free-text rows or structured contributions.
+        include_parent_context: Whether free-text tables include complete raw parent
+            answers; the default omits parent context entirely.
 
     Returns:
         TeX for the table, or an empty string if no free-text evidence exists.
@@ -1200,19 +1714,32 @@ def _question_tables(question: Mapping[str, Any]) -> str:
         evidence = question["free_text_rows"]
         if not evidence:
             return ""
-        show_parent = any(item["parent_answers"] for item in evidence)
+        parent_key = "raw_parent_answers"
+        parent_columns = (
+            tuple(parent["column"] for parent in evidence[0].get(parent_key, []))
+            if include_parent_context else ()
+        )
+        if include_parent_context and any(
+            tuple(parent["column"] for parent in item.get(parent_key, [])) != parent_columns
+            for item in evidence
+        ):
+            raise InputError("Free-text table mixes different parent questions and cannot use one parent-context header.")
+        show_parent = bool(parent_columns)
         headers = [r"CC", r"Institution"]
         if show_parent:
-            headers.append(r"Parent context")
+            parent_header = r"{\raggedright Parent context\par\smaller[3]" + r"\par ".join(
+                _tex(column) for column in parent_columns
+            ) + r"\par}"
+            headers.append(parent_header)
         headers.append(r"Response")
         rows = [headers]
         for item in evidence:
-            # The nearby child-question heading identifies the parent question;
-            # values retain the useful response context without repeating it verbatim.
-            parents = "; ".join(parent["value"] for parent in item["parent_answers"]) or "None"
+            parent_values = r"{\raggedright " + r"\par ".join(
+                _tex(parent["value"]) for parent in item.get(parent_key, [])
+            ) + r"\par}"
             row = [_tex(_country_code(item["country"])), _tex(item["institution"])]
             if show_parent:
-                row.append(_tex(parents))
+                row.append(parent_values)
             row.append(_tex_with_links(item["text"]))
             rows.append(row)
         columns = (
@@ -1239,8 +1766,13 @@ def _question_tables(question: Mapping[str, Any]) -> str:
 
 
 def _preamble() -> str:
-    """Return the shared XeLaTeX preamble for reports and standalone charts."""
-    return r"""\documentclass[11pt]{article}
+    """Build the shared XeLaTeX preamble for reports and standalone charts.
+
+    Returns:
+        TeX declarations for fonts, tables, links, TikZ/PGFPlots, and report colors."""
+    return r"""\documentclass[11pt]{scrartcl}
+\KOMAoptions{parskip=half}
+\setlength{\parindent}{0pt}
 \usepackage{fontspec}
 \usepackage{relsize}
 \usepackage{longtable}
@@ -1259,48 +1791,72 @@ def _preamble() -> str:
 """
 
 
-def _applicability_text(question: Mapping[str, Any]) -> str:
-    """Return a compact literal rendering of declared applicability results."""
-    applicability = question["applicability"]
-    if applicability.get("status") != "evaluated":
-        return "Applicability: unknown (no verified routing rule)"
-    values = ", ".join(str(value) for value in applicability["values"])
-    return (
-        f"Applicability: evaluated from {applicability['column']} = {values}; "
-        f"applicable {applicability['applicable_rows']}; "
-        f"inapplicable {applicability['inapplicable_rows']}; "
-        f"eligible unanswered {applicability['eligible_unanswered_rows']}; "
-        f"structurally skipped {applicability['structurally_skipped_rows']}; "
-        f"eligibility unknown {applicability['eligibility_unknown_rows']}; "
-        f"out-of-route answered {applicability['out_of_route_answered_rows']}"
-    )
+def _response_structure_text(question: Mapping[str, Any]) -> str:
+    """Format authoritative XML response metadata for a report question.
+
+    Args:
+        question: Renderable payload question with optional XML form metadata.
+
+    Returns:
+        Response type and requiredness text without inferred applicability.
+    """
+    form = question.get("form")
+    if not isinstance(form, Mapping):
+        return "Response type: unavailable (form structure not supplied); mandatory/optional: unavailable."
+    response_type = str(form.get("response_type", "unavailable")).casefold()
+    requiredness = str(form.get("requiredness", "unavailable")).capitalize()
+    dependencies = form.get("dependencies", [])
+    result = f"Response type: {response_type}; {requiredness}."
+    if dependencies:
+        conditions = "; ".join(
+            f"{item['parent_question']} = {item['answer']}" for item in dependencies
+        )
+        result += f" Shown when: {conditions}."
+    return result
 
 
 def _chart_unit(question: Mapping[str, Any]) -> str:
-    """Return the observation unit represented by one chart bar or slice."""
+    """Return the respondent-level observation unit represented by one chart mark.
+
+    Args:
+        question: Renderable question payload containing its declared response type.
+
+    Returns:
+        A human-readable unit. Multi-choice marks count rows selecting each
+        value; all other chart marks count submitted response rows.
+    """
     if question["question_type"] == "multi_choice":
         return "submitted response rows selecting each value"
     return "submitted response rows"
 
 
+
 def _standalone_tex(
     question: Mapping[str, Any], fragment: str, answered_only: bool,
 ) -> str:
-    """Return a self-contained chart document with interpretation metadata."""
+    """Build a self-contained TeX document for one chart variant.
+
+    Args:
+        question: Renderable question payload providing title and population counts.
+        fragment: Complete TikZ/PGFPlots fragment for the selected chart variant.
+        answered_only: Whether the chart excludes Missing responses.
+
+    Returns:
+        Standalone XeLaTeX document including interpretation metadata and the chart."""
     population = question["population"]
     variant = " (answered rows only)" if answered_only else ""
     note = (
         f"Missing: {population['M']} of {population['N']} included rows. "
-        "Blank means blank; applicability is reported separately."
+        "Blank means blank; mandatory/optional status is reported from the form definition."
     )
     return "\n".join([
         _preamble(),
         r"\begin{document}",
         rf"\section*{{{_tex(question['label'])}{_tex(variant)}}}",
-        rf"\noindent Question identifier: {_question_identifier(question['question_id'])}\\",
+        rf"\noindent\smaller[3] Question identifier: {_question_identifier(question['question_id'])}\normalsize\par\vspace{{0.35\baselineskip}}",
         rf"Denominator: {population['A']} answering rows; Missing uses "
-        rf"{population['N']} included rows\\",
-        rf"Unit: {_tex(_chart_unit(question))}\\",
+        rf"{population['N']} included rows\par",
+        rf"Unit: {_tex(_chart_unit(question))}\par",
         rf"\emph{{{_tex(note)}}}",
         fragment,
         r"\end{document}",
@@ -1309,28 +1865,68 @@ def _standalone_tex(
 
 
 def _payload_mapping(value: Any, path: str) -> Mapping[str, Any]:
-    """Return one object-shaped payload value or raise a contextual input error."""
+    """Validate one object-shaped descriptive payload value.
+
+    Args:
+        value: Candidate value from a serialized descriptive payload.
+        path: Dot/bracket payload path used in actionable error messages.
+
+    Returns:
+        The same value narrowed to a mapping.
+
+    Raises:
+        InputError: If the value is not mapping-shaped."""
     if not isinstance(value, Mapping):
         raise InputError(f"Descriptive statistics payload {path} must be an object.")
     return value
 
 
 def _payload_array(value: Any, path: str) -> list[Any]:
-    """Return one array-shaped payload value or raise a contextual input error."""
+    """Validate one array-shaped descriptive payload value.
+
+    Args:
+        value: Candidate value from a serialized descriptive payload.
+        path: Dot/bracket payload path used in actionable error messages.
+
+    Returns:
+        The same value narrowed to a list.
+
+    Raises:
+        InputError: If the value is not an array."""
     if not isinstance(value, list):
         raise InputError(f"Descriptive statistics payload {path} must be an array.")
     return value
 
 
 def _payload_text(value: Any, path: str) -> str:
-    """Return one nonblank payload string or raise a contextual input error."""
+    """Validate one nonblank descriptive payload string.
+
+    Args:
+        value: Candidate value from a serialized descriptive payload.
+        path: Dot/bracket payload path used in actionable error messages.
+
+    Returns:
+        The original nonblank string.
+
+    Raises:
+        InputError: If the value is not a nonblank string."""
     if not isinstance(value, str) or not value.strip():
         raise InputError(f"Descriptive statistics payload {path} must be a nonblank string.")
     return value
 
 
 def _payload_count(value: Any, path: str) -> int:
-    """Return one nonnegative integer payload count."""
+    """Validate one nonnegative integer descriptive payload count.
+
+    Args:
+        value: Candidate value from a serialized descriptive payload.
+        path: Dot/bracket payload path used in actionable error messages.
+
+    Returns:
+        The original nonnegative integer.
+
+    Raises:
+        InputError: If the value is boolean, nonintegral, or negative."""
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise InputError(
             f"Descriptive statistics payload {path} must be a nonnegative integer."
@@ -1339,7 +1935,16 @@ def _payload_count(value: Any, path: str) -> int:
 
 
 def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
-    """Validate the nested immutable payload contract consumed by the renderer."""
+    """Validate the complete payload contract consumed by the renderer.
+
+    Args:
+        payload: Candidate JSON-deserialized descriptive statistics payload.
+
+    Returns:
+        Validated question payloads in declared report order.
+
+    Raises:
+        InputError: If provenance, question counts, evidence, or chart metadata is invalid."""
     if not isinstance(payload, Mapping):
         raise InputError("Descriptive statistics payload root must be a JSON object.")
     if payload.get("payload_type") != "so2_descriptive_statistics":
@@ -1426,11 +2031,18 @@ def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str
                     parent_answers = _payload_array(
                         row.get("parent_answers"), f"{row_path}.parent_answers"
                     )
-                    for parent_index, parent_value in enumerate(parent_answers):
-                        parent_path = f"{row_path}.parent_answers[{parent_index}]"
-                        parent = _payload_mapping(parent_value, parent_path)
-                        _payload_text(parent.get("column"), f"{parent_path}.column")
-                        _payload_text(parent.get("value"), f"{parent_path}.value")
+                    parent_fields = ["parent_answers"]
+                    if "raw_parent_answers" in row:
+                        parent_fields.append("raw_parent_answers")
+                    for parent_field in parent_fields:
+                        parent_answers = _payload_array(
+                            row.get(parent_field), f"{row_path}.{parent_field}"
+                        )
+                        for parent_index, parent_value in enumerate(parent_answers):
+                            parent_path = f"{row_path}.{parent_field}[{parent_index}]"
+                            parent = _payload_mapping(parent_value, parent_path)
+                            _payload_text(parent.get("column"), f"{parent_path}.column")
+                            _payload_text(parent.get("value"), f"{parent_path}.value")
         _payload_mapping(question.get("diagnostics"), f"{path}.diagnostics")
         applicability = _payload_mapping(
             question.get("applicability"), f"{path}.applicability"
@@ -1499,6 +2111,7 @@ def render_descriptive_tex(
     chart_dir: str | Path | None,
     report_path: str | Path | None = None,
     include_contribution_tables: bool = False,
+    include_parent_context: bool = False,
 ) -> RenderedDescriptiveReport:
     """Render a self-contained report and reusable standalone chart documents.
 
@@ -1508,6 +2121,8 @@ def render_descriptive_tex(
         report_path: Optional report path used as the base for relative chart paths.
         include_contribution_tables: Whether optional grouped structured-response
             evidence tables are included in the report body.
+        include_parent_context: Whether free-text tables include complete raw parent
+            answers. The default omits the parent-context column.
 
     Returns:
         Report TeX, shared chart fragments, standalone documents, and chart paths.
@@ -1522,28 +2137,28 @@ def render_descriptive_tex(
     chart_paths: dict[str, str] = {}
     report = [_preamble(), r"\begin{document}", r"\section*{SO2 descriptive statistics}"]
     provenance = payload.get("provenance", {})
-    report.append(rf"Source path: {_tex(provenance['source_path'])}\\")
-    report.append(rf"Alias: {_tex(provenance.get('alias', 'Unknown'))}\\")
-    report.append(rf"Export date: {_tex(provenance.get('export_date', 'Unknown'))}\\")
-    report.append(rf"Source SHA-256: {_tex(provenance.get('source_sha256', 'Unknown'))}\\")
-    report.append(rf"Worksheet: {_tex(provenance.get('worksheet', 'Unknown'))}\\")
-    report.append(rf"Header row: {_tex(provenance['header_row'])}\\")
-    report.append(rf"Total data rows: {_tex(provenance['total_data_rows'])}\\")
+    report.append(rf"Source path: {_tex(provenance['source_path'])}\par")
+    report.append(rf"Alias: {_tex(provenance.get('alias', 'Unknown'))}\par")
+    report.append(rf"Export date: {_tex(provenance.get('export_date', 'Unknown'))}\par")
+    report.append(rf"Source SHA-256: {_tex(provenance.get('source_sha256', 'Unknown'))}\par")
+    report.append(rf"Worksheet: {_tex(provenance.get('worksheet', 'Unknown'))}\par")
+    report.append(rf"Header row: {_tex(provenance['header_row'])}\par")
+    report.append(rf"Total data rows: {_tex(provenance['total_data_rows'])}\par")
     report.append(
-        rf"Included response rows: {_tex(provenance.get('included_response_rows', 'Unknown'))}\\"
+        rf"Included response rows: {_tex(provenance.get('included_response_rows', 'Unknown'))}\par"
     )
     report.append(
-        rf"Excluded blank rows: {_tex(provenance.get('excluded_blank_rows', 'Unknown'))}\\"
+        rf"Excluded blank rows: {_tex(provenance.get('excluded_blank_rows', 'Unknown'))}\par"
     )
     report.append(
-        rf"Descriptive schema version: {_tex(provenance.get('schema_version', 'Unknown'))}\\"
+        rf"Descriptive schema version: {_tex(provenance.get('schema_version', 'Unknown'))}\par"
     )
     report.extend([
         r"\tableofcontents",
         r"\clearpage",
         r"\section*{Abbreviations}",
-        r"\noindent CC: ISO 3166-1 alpha-2 country code; N: included response rows; A: rows with a nonblank answer; M: missing responses (N - A).\\",
-        r"\noindent oAR: percentage of answering rows; oIR: percentage of included response rows.\\",
+        r"\noindent CC: ISO 3166-1 alpha-2 country code; N: included response rows; A: rows with a nonblank answer; M: missing responses (N - A).\par",
+        r"\noindent oAR: percentage of answering rows; oIR: percentage of included response rows.\par",
         r"\clearpage",
     ])
     for question in questions:
@@ -1553,11 +2168,14 @@ def render_descriptive_tex(
                 raise InputError(f"Descriptive statistics question lacks {field}: {question!r}.")
         report.extend([r"\clearpage", rf"\section{{{_tex(question['label'])}}}"])
         population = question["population"]
-        report.append(rf"\noindent Question identifier: {_question_identifier(question['question_id'])}\\")
-        report.append(rf"N/A/M (included/answered/missing): {population['N']} / {population['A']} / {population['M']}\\")
-        report.append(rf"{_tex(_applicability_text(question))}\\")
+        report.append(rf"\noindent\smaller[3] Question identifier: {_question_identifier(question['question_id'])}\normalsize\par\vspace{{0.35\baselineskip}}")
+        report.append(rf"N/A/M (included/answered/missing): {population['N']} / {population['A']} / {population['M']}\par")
+        report.append(rf"{_tex(_response_structure_text(question))}\par")
         if question["question_type"] == "free_text":
-            report.append(_question_tables(question) or r"\emph{No text responses.}")
+            report.append(
+                _question_tables(question, include_parent_context=include_parent_context)
+                or r"\emph{No text responses.}"
+            )
             continue
         use_pie = question["question_type"] == "single_choice"
         variants = (False, True) if use_pie and population["M"] else ((True,) if use_pie else (False,))
@@ -1581,9 +2199,9 @@ def render_descriptive_tex(
                 ])
         if chart_dir is not None and isinstance(question, dict):
             question["chart_paths"] = question_paths
-        tables = _question_tables(question) if (
-            question["question_type"] == "free_text" or include_contribution_tables
-        ) else ""
+        tables = _question_tables(
+            question, include_parent_context=include_parent_context,
+        ) if (question["question_type"] == "free_text" or include_contribution_tables) else ""
         if tables:
             report.append(tables)
     report.extend([r"\end{document}", ""])
@@ -1598,7 +2216,19 @@ def render_descriptive_tex(
 
 
 def _run_xelatex(source: Path, output_dir: Path, passes: int = 1) -> Path:
-    """Compile one staged XeLaTeX source repeatedly and return its completed PDF."""
+    """Compile one staged TeX source the required number of times.
+
+    Args:
+        source: Staged TeX source file to compile.
+        output_dir: Directory receiving compiler intermediates and the PDF.
+        passes: Positive number of XeLaTeX runs, normally two for the report ToC.
+
+    Returns:
+        Completed PDF path in ``output_dir``.
+
+    Raises:
+        AssertionError: If ``passes`` is less than one.
+        InputError: If XeLaTeX is unavailable or compilation fails."""
     if passes < 1:
         raise AssertionError("XeLaTeX compilation requires at least one pass.")
     compiler = shutil.which("xelatex")
@@ -1617,7 +2247,17 @@ def _run_xelatex(source: Path, output_dir: Path, passes: int = 1) -> Path:
 
 
 def _require_new_or_empty_chart_dir(chart_dir: Path, overwrite: bool = False) -> None:
-    """Reject unsafe chart output paths and directories with existing artifacts."""
+    """Validate chart-directory safety before publication.
+
+    Args:
+        chart_dir: Target directory for standalone chart PDFs.
+        overwrite: Whether a nonempty existing directory may be transactionally replaced.
+
+    Returns:
+        ``None`` after the path satisfies the publication precondition.
+
+    Raises:
+        InputError: If the path is a symbolic link, non-directory, or unsafe existing directory."""
     if chart_dir.is_symlink():
         raise InputError(f"Chart directory must not be a symbolic link: {chart_dir}")
     if chart_dir.exists() and (not chart_dir.is_dir() or (not overwrite and any(chart_dir.iterdir()))):
@@ -1625,7 +2265,18 @@ def _require_new_or_empty_chart_dir(chart_dir: Path, overwrite: bool = False) ->
 
 
 def _write_compilation_source(path: Path, content: str, description: str) -> None:
-    """Write a temporary TeX source through the user-facing input error boundary."""
+    """Write one temporary TeX source with an actionable error boundary.
+
+    Args:
+        path: Temporary source path to create or replace.
+        content: Complete TeX text to write using UTF-8.
+        description: Human-readable source role included in write errors.
+
+    Returns:
+        ``None`` after the source is written.
+
+    Raises:
+        InputError: If the temporary source cannot be written."""
     try:
         path.write_text(content, encoding="utf-8")
     except OSError as exc:
@@ -1635,7 +2286,19 @@ def _write_compilation_source(path: Path, content: str, description: str) -> Non
 def _stage_publication_file(
     target: Path, *, text: str | None = None, source: Path | None = None,
 ) -> Path:
-    """Create a complete hidden staging file on the target filesystem."""
+    """Create one complete hidden staging file on the target filesystem.
+
+    Args:
+        target: Final output path whose parent hosts the staging file.
+        text: Optional UTF-8 content to stage directly.
+        source: Optional existing file to copy into the stage.
+
+    Returns:
+        Hidden complete staging-file path ready for atomic promotion.
+
+    Raises:
+        AssertionError: If neither or both source forms are provided.
+        OSError: If staging content cannot be written or copied."""
     if (text is None) == (source is None):
         raise AssertionError("Exactly one publication source must be provided.")
     descriptor, stage_name = tempfile.mkstemp(
@@ -1655,7 +2318,13 @@ def _stage_publication_file(
 
 
 def _discard_publication_stages(stages: Sequence[Path]) -> None:
-    """Remove target-filesystem staging files that were not promoted."""
+    """Delete publication staging files that were not promoted.
+
+    Args:
+        stages: Staging-file paths to remove if they still exist.
+
+    Returns:
+        ``None`` after best-effort stage cleanup."""
     for stage in stages:
         stage.unlink(missing_ok=True)
 

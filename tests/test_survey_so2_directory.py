@@ -39,6 +39,27 @@ def write_descriptive_schema(tmp_path: Path) -> Path:
     return path
 
 
+def write_descriptive_form_manifest(tmp_path: Path) -> Path:
+    """Write runtime JSON form metadata for the controlled question."""
+    path = tmp_path / "descriptive-form.json"
+    path.write_text(json.dumps({
+        "schema_version": 1,
+        "generator_version": "1",
+        "survey_uid": "",
+        "survey_alias": "SO2_2025",
+        "source_path": "fixture.eus",
+        "archive_sha256": "a" * 64,
+        "active_member_sha256": "b" * 64,
+        "fields": [{
+            "uid": "q1", "title": "Digital maturity", "field_type": "single_choice",
+            "mandatory": True, "readonly": False, "hidden": False, "position": 1,
+            "choices": [], "shown_when": None, "matrix_rows": [], "matrix_columns": [],
+        }],
+    }), encoding="utf-8")
+    return path
+
+
+
 def write_descriptive_workbook(tmp_path: Path) -> Path:
     path = tmp_path / "descriptive.xlsx"
     workbook = __import__("openpyxl").Workbook()
@@ -60,6 +81,7 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -75,6 +97,7 @@ def test_describe_refuses_to_overwrite_existing_payload(tmp_path):
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -92,6 +115,7 @@ def test_describe_overwrite_replaces_existing_json(tmp_path):
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json), "--overwrite",
     ])
 
@@ -118,11 +142,15 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return {}
 
         @staticmethod
+        def load_form_manifest_structure(_path):
+            return object()
+
+        @staticmethod
         def read_descriptive_workbook(_path, _schema):
             return object()
 
         @staticmethod
-        def build_descriptive_payload(_workbook, _schema):
+        def build_descriptive_payload(_workbook, _schema, _form_structure):
             return {
                 "payload_type": "so2_descriptive_statistics",
                 "payload_version": "1",
@@ -130,7 +158,12 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             }
 
         @staticmethod
-        def render_descriptive_tex(payload, chart_path, report_path=None):
+        def render_descriptive_tex(
+            payload, chart_path, report_path=None, include_contribution_tables=False,
+            include_parent_context=False,
+        ):
+            assert include_contribution_tables is False
+            assert include_parent_context is True
             assert Path(report_path) == output_tex
             relative = Path(__import__("os").path.relpath(
                 Path(chart_path) / "q.pdf", output_tex.parent
@@ -148,9 +181,11 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(output_tex),
         "--output-chart-dir", str(chart_dir),
+        "--include-parent-context",
     ])
 
     assert module.run_describe(args) == module.EXIT_OK
@@ -174,6 +209,7 @@ def test_describe_wraps_payload_write_failure_as_input_error(tmp_path, monkeypat
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -215,6 +251,7 @@ def test_describe_rejects_output_alias_to_source(tmp_path):
     args = module.build_cli().parse_args([
         "describe", "-i", str(source),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(source),
     ])
 
@@ -235,6 +272,7 @@ def test_describe_rejects_implicit_tex_path_that_aliases_output_json(tmp_path):
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
         "--output-pdf", str(tmp_path / "descriptive.pdf"),
     ])
@@ -293,6 +331,7 @@ def test_descriptive_commands_require_new_file_outputs(tmp_path, monkeypatch):
     )
     describe_args = module.build_cli().parse_args([
         "describe", "-i", str(source), "--descriptive-schema", str(schema),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -337,6 +376,7 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(tmp_path / "descriptive.tex"),
     ])
@@ -360,6 +400,7 @@ def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monk
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(output_tex),
     ])

@@ -61,7 +61,12 @@
       "categories": [],
       "parent_columns": [
         "What type of institution do you work for? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What type of institution do you work for? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_011_is_this_the_institution_hosting_a_bbmri_eric_national_or_organisational_",
@@ -96,7 +101,12 @@
       "categories": [],
       "parent_columns": [
         "What field of research does your biobank or biomolecular resource support? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What field of research does your biobank or biomolecular resource support? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_014_are_you_interested_in_promoting_your_biobank_resources_to_new_partners",
@@ -147,7 +157,12 @@
       "categories": [],
       "parent_columns": [
         "Please indicate which of the following activities are carried out by the dedicated biobank personnel. (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Please indicate which of the following activities are carried out by the dedicated biobank personnel. (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_018_does_the_staff_dedicated_or_not_managing_the_repository_have_experience_",
@@ -192,7 +207,12 @@
       "categories": [],
       "parent_columns": [
         "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the staff (dedicated or not) managing the repository have experience in data modelling and hands-on experience with annotations using (or transformation into) common terminologies, ontologies, or common data models? (Select all that apply) Terminologies:": [
+          "Other standards (any other terminologies, ontologies, common data models, or exchange formats) (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_020_if_you_support_hl7_fhir_does_your_repository_support_the_national_or_int",
@@ -243,7 +263,16 @@
       "categories": [],
       "parent_columns": [
         "What type of information system is used to run the biobank? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What type of information system is used to run the biobank? (Select all that apply)": [
+          "Electronic – standalone biobank system (BIMS or LIMS) managed by the biobank",
+          "Electronic – integrated into a larger system of a organization (hospital, university etc.)",
+          "Electronic – standalone biobank system (BIMS or LIMS) managed by a third party",
+          "Separate system for storing or linking research data derived from samples (e.g., sequencing database, imaging repository) managed by the biobank",
+          "Separate system for storing or linking research data derived from samples (e.g., sequencing database, imaging repository) managed by a third party"
+        ]
+      }
     },
     {
       "question_id": "q_023_what_other_systems_is_the_repository_electronically_connected_to_and_can",
@@ -270,7 +299,12 @@
       "categories": [],
       "parent_columns": [
         "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)": [
+          "National health registry (please specify list of registries)"
+        ]
+      }
     },
     {
       "question_id": "q_025_international_registries_please_separate_with_if_more_than_1",
@@ -280,7 +314,12 @@
       "categories": [],
       "parent_columns": [
         "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)": [
+          "International registries (please specify list of registries)"
+        ]
+      }
     },
     {
       "question_id": "q_026_other_data_sources_please_separate_with_if_more_than_1",
@@ -290,7 +329,12 @@
       "categories": [],
       "parent_columns": [
         "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What other systems is the repository electronically connected to and can retrieve data from? (Select all that apply)": [
+          "Other (please specify list of other data sources):"
+        ]
+      }
     },
     {
       "question_id": "q_027_do_you_have_an_it_infrastructure_for_the_repository_and_if_yes_how_is_it",
@@ -348,7 +392,12 @@
       "categories": [],
       "parent_columns": [
         "What type of data storage systems does your repository have? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What type of data storage systems does your repository have? (Select all that apply)": [
+          "Large-scale storage system for large volume research data (>10 TB) – if yes, provide capacity"
+        ]
+      }
     },
     {
       "question_id": "q_031_capacity_of_large_scale_storage_for_healthcare_data",
@@ -358,7 +407,12 @@
       "categories": [],
       "parent_columns": [
         "What type of data storage systems does your repository have? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What type of data storage systems does your repository have? (Select all that apply)": [
+          "Large-scale storage system for large volume healthcare data (>10 TB) – if yes, provide capacity"
+        ]
+      }
     },
     {
       "question_id": "q_032_capacity_of_s3_storage",
@@ -368,7 +422,12 @@
       "categories": [],
       "parent_columns": [
         "What type of data storage systems does your repository have? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What type of data storage systems does your repository have? (Select all that apply)": [
+          "Externally-provided cloud-based storage systems – if yes, provide capacity S3 object storage systems"
+        ]
+      }
     },
     {
       "question_id": "q_033_type_of_storage_system",
@@ -378,7 +437,12 @@
       "categories": [],
       "parent_columns": [
         "What type of data storage systems does your repository have? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What type of data storage systems does your repository have? (Select all that apply)": [
+          "Other (specify):"
+        ]
+      }
     },
     {
       "question_id": "q_034_can_the_repository_allocate_computational_and_data_storage_resources_to_",
@@ -422,7 +486,12 @@
       "categories": [],
       "parent_columns": [
         "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": [
+          "Next-gen sequencing (if yes, specify technology/vendor)"
+        ]
+      }
     },
     {
       "question_id": "q_037_radiology_imaging_technology_vendor",
@@ -432,7 +501,12 @@
       "categories": [],
       "parent_columns": [
         "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": [
+          "Radiology imaging (if yes, specify technology/vendor)"
+        ]
+      }
     },
     {
       "question_id": "q_038_pathology_imaging_technology_vendor",
@@ -442,7 +516,12 @@
       "categories": [],
       "parent_columns": [
         "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": [
+          "Pathology imaging (if yes, specify technology/vendor)"
+        ]
+      }
     },
     {
       "question_id": "q_039_proteomics_technology_vendor",
@@ -452,7 +531,12 @@
       "categories": [],
       "parent_columns": [
         "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": [
+          "Proteomics (if yes, specify technology/vendor)"
+        ]
+      }
     },
     {
       "question_id": "q_040_metabolomics_technology_vendor",
@@ -462,7 +546,12 @@
       "categories": [],
       "parent_columns": [
         "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": [
+          "Metabolomics (if yes, specify technology/vendor)"
+        ]
+      }
     },
     {
       "question_id": "q_041_technologies",
@@ -472,7 +561,12 @@
       "categories": [],
       "parent_columns": [
         "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Does the repository have a direct access to data from any of the following technologies? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_042_are_you_contributing_or_depositing_data_to_some_bigger_national_or_inter",
@@ -503,7 +597,12 @@
       "categories": [],
       "parent_columns": [
         "Are you contributing or depositing data to some bigger national or international databases? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Are you contributing or depositing data to some bigger national or international databases? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_044_are_you_connected_to_or_providing_data_to_international_or_major_nationa",
@@ -527,7 +626,12 @@
       "categories": [],
       "parent_columns": [
         "Are you connected to or providing data to international or major national initiatives? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Are you connected to or providing data to international or major national initiatives? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_046_what_is_the_origin_of_the_samples_stored_at_your_biobank_select_all_that",
@@ -550,7 +654,12 @@
       "categories": [],
       "parent_columns": [
         "What is the origin of the samples stored at your biobank? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What is the origin of the samples stored at your biobank? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_048_do_the_collections_in_the_directory_reflect_representatively_the_size_of",
@@ -574,6 +683,11 @@
       "applicability": {
         "column": "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)",
         "values": [
+          "No"
+        ]
+      },
+      "parent_context_values": {
+        "Do the collections in the Directory reflect representatively the size of your biobank/collections and material types you are processing? (If you only provided biobankID, we assume all the collections of that biobank)": [
           "No"
         ]
       }
@@ -604,7 +718,12 @@
       "categories": [],
       "parent_columns": [
         "Which types of samples do you manage?"
-      ]
+      ],
+      "parent_context_values": {
+        "Which types of samples do you manage?": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_052_what_is_the_approximate_size_of_your_biobank_number_of_samples_aliquots",
@@ -943,7 +1062,12 @@
       "categories": [],
       "parent_columns": [
         "Which of the following semantic issues have you experienced? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Which of the following semantic issues have you experienced? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_079_what_technical_challenges_have_you_faced_select_all_that_apply",
@@ -971,7 +1095,12 @@
       "categories": [],
       "parent_columns": [
         "What technical challenges have you faced? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "What technical challenges have you faced? (Select all that apply)": [
+          "Other (please specify)"
+        ]
+      }
     },
     {
       "question_id": "q_081_what_tools_do_you_currently_use_to_collect_edit_health_data_e_g_hospital",
@@ -998,7 +1127,12 @@
       "categories": [],
       "parent_columns": [
         "Do you know about the BBMRI-ERIC Federated Platform?"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you know about the BBMRI-ERIC Federated Platform?": [
+          "Yes"
+        ]
+      }
     },
     {
       "question_id": "q_084_are_you_interested_in_promoting_your_biobank_resources_to_new_research_o",
@@ -1064,7 +1198,14 @@
       "categories": [],
       "parent_columns": [
         "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?"
-      ]
+      ],
+      "parent_context_values": {
+        "Does your biobank provide access to whole-slide image (WSI) histopathology datasets? E.g., disease-focused cohorts with clinical and/or molecular annotations or normal-tissue reference histology across multiple organs from non-diseased donors?": [
+          "In planning / preparation",
+          "Yes — access to internally generated WSI data collections",
+          "Yes — access to WSI data collections received via partners / consortia"
+        ]
+      }
     },
     {
       "question_id": "q_090_does_your_biobank_provide_access_to_radiology_datasets",
@@ -1086,7 +1227,14 @@
       "categories": [],
       "parent_columns": [
         "Does your biobank provide access to radiology datasets?"
-      ]
+      ],
+      "parent_context_values": {
+        "Does your biobank provide access to radiology datasets?": [
+          "In planning / preparation",
+          "Yes — access to radiology data collections received via partners / consortia",
+          "Yes — access to internally generated radiology data collections (e.g., directly connected to a PACS system)"
+        ]
+      }
     },
     {
       "question_id": "q_092_does_your_biobank_provide_access_to_other_imaging_datasets",
@@ -1109,7 +1257,15 @@
       "categories": [],
       "parent_columns": [
         "Does your biobank provide access to other imaging datasets?"
-      ]
+      ],
+      "parent_context_values": {
+        "Does your biobank provide access to other imaging datasets?": [
+          "Other human imaging data",
+          "Other imaging data",
+          "Animal imaging data",
+          "Other imaging data related to OneHealth"
+        ]
+      }
     },
     {
       "question_id": "q_094_have_data_been_previously_returned_to_you",
@@ -1129,7 +1285,12 @@
       "categories": [],
       "parent_columns": [
         "Have data been previously returned to you?"
-      ]
+      ],
+      "parent_context_values": {
+        "Have data been previously returned to you?": [
+          "Yes"
+        ]
+      }
     },
     {
       "question_id": "q_096_have_you_linked_the_returned_data_with_the_samples_from_which_they_were_",
@@ -1159,7 +1320,12 @@
       "categories": [],
       "parent_columns": [
         "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you have a policy or workflow for returned data from researchers using your samples, e.g. data transfer agreement?": [
+          "Yes"
+        ]
+      }
     },
     {
       "question_id": "q_099_how_do_you_expect_to_be_notified_about_the_existence_of_data_to_be_retur",
@@ -1200,7 +1366,12 @@
       "categories": [],
       "parent_columns": [
         "Do you store returned data? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you store returned data? (Select all that apply)": [
+          "We are part of a network which has a common strategy on storing the data. (please specify)"
+        ]
+      }
     },
     {
       "question_id": "q_102_biobank_level_strategy",
@@ -1210,7 +1381,12 @@
       "categories": [],
       "parent_columns": [
         "Do you store returned data? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you store returned data? (Select all that apply)": [
+          "We have biobank-level strategy on storing the data. (please specify)"
+        ]
+      }
     },
     {
       "question_id": "q_103_institutional_strategy",
@@ -1220,7 +1396,12 @@
       "categories": [],
       "parent_columns": [
         "Do you store returned data? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you store returned data? (Select all that apply)": [
+          "We have institutional strategy on storing the data. (please specify)"
+        ]
+      }
     },
     {
       "question_id": "q_104_network_strategy",
@@ -1230,7 +1411,12 @@
       "categories": [],
       "parent_columns": [
         "Do you store returned data? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you store returned data? (Select all that apply)": [
+          "We are part of a network which has a common strategy on storing the data. (please specify)"
+        ]
+      }
     },
     {
       "question_id": "q_105_how_do_you_store_data",
@@ -1240,7 +1426,12 @@
       "categories": [],
       "parent_columns": [
         "Do you store returned data? (Select all that apply)"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you store returned data? (Select all that apply)": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_106_how_much_disk_space_do_you_currently_require_storing_returned_data_overa",
@@ -1277,7 +1468,12 @@
       "categories": [],
       "parent_columns": [
         "Do you monitor the quality of the returned data?"
-      ]
+      ],
+      "parent_context_values": {
+        "Do you monitor the quality of the returned data?": [
+          "Yes"
+        ]
+      }
     },
     {
       "question_id": "q_109_what_do_you_see_as_the_main_hurdles_in_hosting_returned_data",
@@ -1302,7 +1498,12 @@
       "categories": [],
       "parent_columns": [
         "What do you see as the main hurdles in hosting returned data?"
-      ]
+      ],
+      "parent_context_values": {
+        "What do you see as the main hurdles in hosting returned data?": [
+          "Other (please specify):"
+        ]
+      }
     },
     {
       "question_id": "q_111_we_may_wish_to_follow_up_with_some_participants_to_learn_more_about_spec",

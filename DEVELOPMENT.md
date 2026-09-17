@@ -821,7 +821,14 @@ above and must not be added as a section of its findings report.
   question's source column(s), question type, display label/order, allowed and
   canonical categories, optional multi-select delimiter and category aliases for documented literal-value normalisation, optional applicability
   rule, optional mutually exclusive categories, and optional parent question for
-  free-text follow-ups. Applicability values must belong to the referenced
+  free-text follow-ups. A free-text follow-up may declare `parent_context_values`,
+  mapping each parent column to only the canonical structured selections that
+  semantically enable the follow-up. It never drops substantive child text:
+  retain raw parent evidence in JSON and diagnose a nonmatching parent selection.
+  Readable reports omit parent context by default; `--include-parent-context`
+  shows complete raw parent answers, never the semantically filtered subset.
+  Omit this metadata only when no
+  safe answer-based restriction exists. Applicability values must belong to the referenced
   structured parent question; exclusive selections must belong to the question
   that declares them. Account for every
   source column as a reportable question/subquestion, respondent-context field,
@@ -860,7 +867,7 @@ above and must not be added as a section of its findings report.
   as excluded from that chart. Contribution tables are respondent-level evidence:
   they reconcile with the chart's value counts but must never be summed across
   questions.
-- Free-text tables list every substantive nonblank answer with a two-letter ISO country code, the reported institution, response text, and same-row declared parent answer, including a missing or unexpected parent value. Omit source-row provenance from the readable table but retain it in JSON. Omit the parent-context column only when every displayed row has no configured parent answer. Suppress only explicit empty placeholders such as `None`, `N/A`, `No`, or `Nothing` after whitespace normalization. Render HTTP(S) URLs as a short `link` hyperlink. Flag inconsistencies without suppressing text. Report
+- Free-text tables list every substantive nonblank answer with a two-letter ISO country code, the reported institution, response text, and same-row declared parent answer, including a missing or unexpected parent value. Omit source-row provenance from the readable table but retain it in JSON. Put the fixed parent question or questions under the `Parent context` table header and put only same-order parent values in cells; reject a payload which mixes parent-question columns across rows. Omit the parent-context column only when every displayed row has no configured parent answer. Suppress only explicit empty placeholders such as `None`, `N/A`, `No`, or `Nothing` after whitespace normalization. Render HTTP(S) URLs as a short `link` hyperlink. Flag inconsistencies without suppressing text. Report
   answered and blank counts and render an explicit `No text responses` section
   when empty. Do not deduplicate identical text, infer parent answers, or treat
   volunteered comments as prevalence estimates. Do not incidentally copy emails
@@ -868,11 +875,15 @@ above and must not be added as a section of its findings report.
   it is the answer being reported.
 - The rendered report repeats full source provenance and shows a compact, breakable complete `Question identifier:` line, `N`, `A`, `M`, manifest-derived response type, and mandatory/optional declaration for every question. It must not display the internal applicability diagnostic. It must define `N`, `A`, `M`, `oAR`, and `oIR` immediately after the table of contents; bar labels use the abbreviated percentage bases. Standalone chart documents repeat the question, denominator, unit,
   and missingness context so they remain interpretable outside the report.
+- Descriptive-report TeX must use `scrartcl`, `\KOMAoptions{parskip=half}`, and
+  zero paragraph indentation. Do not use `\\` for ordinary paragraph spacing:
+  use `\par`, `\vspace`, or `\vspace*`; retain `\\` only where a table row or
+  deliberate premature line termination requires it.
 - Use native TeX PGF/TikZ, primarily `pgfplots`, for report charts. Python computes
   statistics and emits reusable chart fragments; TeX renders them in the report.
   Horizontal zero-based count bars are the default for category comparison and
   are mandatory for multi-choice questions: each selected value has a bar with its `n (percent oAR)` label, a fill-matching outline, adaptive label-row spacing, and explicit vertical margin below the final bar; `Missing` is a visually distinct separate bar
-  even when zero. Long categorical charts must split into page-sized continuation charts while retaining an identical zero-based horizontal scale. Use pie charts only for small, readable, non-overlapping single-choice distributions. Every external pie label must have an explicit same-colour leader line and swatch, placed on the nearest left or right side to limit leader length. When such a pie-eligible question has missing
+  even when zero. Long categorical charts must fill the printable text height before splitting into continuation charts, while retaining an identical zero-based horizontal scale. Use pie charts only for small, readable, non-overlapping single-choice distributions. Every external pie label must have an explicit same-colour leader line and swatch, placed near the slice's vertical center while remaining within the pie's fixed vertical extent; rebalance an overloaded side only when needed. When such a pie-eligible question has missing
   responses, render two side-by-side pies: one including `Missing`, and one
   using only answered responses with its denominator labelled. Use ordered bars
   for ordinal questions; retain unobserved declared levels and place `Not
@@ -896,8 +907,7 @@ above and must not be added as a section of its findings report.
   invocation. Those builds must
   fail clearly if a referenced asset or the `xelatex` dependency is
   unavailable. Report PDF rendering must run XeLaTeX twice so table-of-contents links resolve; they must not produce partial PDFs.
-- All public or reusable methods in `survey-so2-directory.py` must document their
-  purpose, inputs, returns and raised user-facing exceptions. Validate external
+- Every function in `so2_descriptive_report.py` and `survey-so2-directory.py` must document its purpose, every input parameter's semantics, every return value's semantics, and raised user-facing exceptions where applicable. The descriptive-report tests enforce the parameter/return documentation contract. Validate external
   workbook/schema/report-payload assumptions with actionable `InputError`s; use
   assertions only for already-validated internal invariants.
 - Tests must cover all-row inclusion without Directory access, blank rows,
