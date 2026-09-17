@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
 import json
-from math import ceil
+from math import ceil, cos, radians
 import os
 from pathlib import Path
 import re
@@ -43,6 +43,7 @@ class QuestionDefinition:
     parent_columns: tuple[str, ...]
     applicability: Mapping[str, Any] | None
     exclusive_categories: tuple[str, ...] = ()
+    category_aliases: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True)
@@ -184,6 +185,17 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
     if unknown_exclusive:
         raise InputError(
             f"Schema question {position} has unknown exclusive category {unknown_exclusive[0]!r}.")
+    aliases = _required_mapping(item.get("category_aliases", {}), f"questions[{position}].category_aliases")
+    category_aliases = {
+        _required_text(source, f"questions[{position}].category_aliases key"):
+        _required_text(target, f"questions[{position}].category_aliases[{source!r}]")
+        for source, target in aliases.items()
+    }
+    unknown_alias_targets = sorted(set(category_aliases.values()) - set(categories))
+    if unknown_alias_targets:
+        raise InputError(
+            f"Schema question {position} aliases unknown category {unknown_alias_targets[0]!r}."
+        )
     applicability = item.get("applicability")
     if applicability is not None:
         applicability = MappingProxyType(dict(_required_mapping(
@@ -199,6 +211,7 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
         parent_columns=parent_columns,
         applicability=applicability,
         exclusive_categories=exclusive_categories,
+        category_aliases=MappingProxyType(category_aliases),
     )
 
 
@@ -533,10 +546,11 @@ def _structured_answers(
     answers: list[str] = []
     duplicates: list[str] = []
     for answer in raw_answers:
-        if answer in answers:
-            duplicates.append(answer)
+        canonical_answer = question.category_aliases.get(answer, answer)
+        if canonical_answer in answers:
+            duplicates.append(canonical_answer)
         else:
-            answers.append(answer)
+            answers.append(canonical_answer)
     return answers, duplicates
 
 
@@ -646,12 +660,25 @@ def _free_text_question_payload(
     source_row_column: str,
     question_by_column: Mapping[str, QuestionDefinition],
 ) -> dict[str, Any]:
-    """Build literal narrative evidence and parent-answer context for one free-text question."""
+    """Build literal narrative evidence and parent-answer context for one free-text question.
+
+    Args:
+        question: Validated free-text question definition and its configured parent columns.
+        responses: Included, nonblank survey response rows.
+        institution_column: Response column identifying the responding institution.
+        country_column: Response column containing the submitted country value.
+        source_row_column: Synthetic workbook-row provenance column.
+        question_by_column: Complete validated registry, used to diagnose parent values.
+
+    Returns:
+        JSON-serializable free-text rows retaining literal narrative and parent
+        context, together with population and parent-context diagnostics.
+    """
     rows = []
     missing_parent_answers: list[dict[str, Any]] = []
     unexpected_parent_answers: list[dict[str, Any]] = []
     for _, response in responses.iterrows():
-        if _is_blank(response[question.column]):
+        if _is_blank(response[question.column]) or _is_empty_free_text(response[question.column]):
             continue
         source_row = int(response[source_row_column])
         parent_answers = [
@@ -808,6 +835,55 @@ def _tex(value: Any) -> str:
     return "".join(_TEX_ESCAPE.get(character, character) for character in str(value))
 
 
+_URL_PATTERN = re.compile(r"https?://[^\s<>{}\[\]]+")
+_EMPTY_FREE_TEXT = frozenset({"", "-", "n/a", "na", "nil", "none", "no", "no comment", "nothing", "not applicable"})
+
+
+def _is_empty_free_text(value: Any) -> bool:
+    """Return whether a nominal free-text response conveys no narrative information.
+
+    Args:
+        value: Literal cell value from a free-text survey question.
+
+    Returns:
+        ``True`` when the normalized value is a known empty-response placeholder.
+    """
+    return str(value).strip().casefold().rstrip(".") in _EMPTY_FREE_TEXT
+
+
+def _tex_with_links(value: Any) -> str:
+    """Escape narrative text while replacing literal HTTP(S) URLs with short hyperlinks.
+
+    Args:
+        value: Literal free-text response which may include HTTP(S) URLs.
+
+    Returns:
+        TeX-safe text, with each detected URL represented by a ``link`` hyperlink.
+    """
+    text = str(value)
+    parts: list[str] = []
+    cursor = 0
+    for match in _URL_PATTERN.finditer(text):
+        parts.append(_tex(text[cursor:match.start()]))
+        url = match.group(0)
+        parts.append(r"\href{\detokenize{" + url + r"}}{link}")
+        cursor = match.end()
+    parts.append(_tex(text[cursor:]))
+    return "".join(parts)
+
+
+def _question_identifier(value: Any) -> str:
+    """Render a compact monospace identifier with legal line breaks at underscores.
+
+    Args:
+        value: Question identifier from the descriptive-report schema.
+
+    Returns:
+        TeX markup for a smaller monospace identifier which may wrap at underscores.
+    """
+    return r"\smaller[3]\texttt{" + _tex(value).replace(r"\_", r"\_\hspace{0pt}") + r"}\normalsize"
+
+
 def _slug(value: str) -> str:
     """Return an ASCII filename stem derived from presentation metadata."""
     ascii_value = normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
@@ -842,13 +918,20 @@ def _category_label(category: Mapping[str, Any]) -> str:
 
 
 def _bar_end_label(category: Mapping[str, Any]) -> str:
-    """Return a short, denominator-aware label for the end of one bar."""
+    """Return a short denominator-aware label for one bar endpoint.
+
+    Args:
+        category: Renderable category with count, percentage, and value semantics.
+
+    Returns:
+        TeX-safe count/percentage text using the report abbreviation glossary.
+    """
     count = int(category["count"])
     percentage = category.get("percent")
     if percentage is None:
         return f"{count} (no percentage base)"
-    basis = "all included rows" if category["value"] == "Missing" else "answering rows"
-    return f"{count} ({float(percentage):.1f}\\% of {basis})"
+    basis = "oIR" if category["value"] == "Missing" else "oAR"
+    return f"{count} ({float(percentage):.1f}\\% {basis})"
 
 
 _ORDINAL_EXCEPTIONS = frozenset({
@@ -856,18 +939,69 @@ _ORDINAL_EXCEPTIONS = frozenset({
 })
 
 
-def _bar_axis(categories: Sequence[Mapping[str, Any]]) -> str:
-    """Render one horizontal count-bar axis with semantic category colours."""
+def _bar_row_height(category: Mapping[str, Any]) -> float:
+    """Return vertical axis space needed by a category label.
+
+    Args:
+        category: Renderable descriptive category with a literal ``value``.
+
+    Returns:
+        Axis-coordinate height that prevents neighbouring wrapped labels touching.
+    """
+    return max(1, ceil(len(str(category["value"])) / 26)) + 0.35
+
+
+def _bar_chunks(
+    categories: Sequence[Mapping[str, Any]], max_height: float = 12.0
+) -> list[list[Mapping[str, Any]]]:
+    """Partition ordered categories into page-sized chart groups.
+
+    Args:
+        categories: Categories in the semantic display order to preserve.
+        max_height: Maximum sum of adaptive row heights in one chart fragment.
+
+    Returns:
+        Non-empty ordered groups; each fits the requested height unless one
+        category alone requires more space.
+    """
+    chunks: list[list[Mapping[str, Any]]] = []
+    current: list[Mapping[str, Any]] = []
+    current_height = 0.0
+    for category in categories:
+        row_height = _bar_row_height(category)
+        if current and current_height + row_height > max_height:
+            chunks.append(current)
+            current = []
+            current_height = 0.0
+        current.append(category)
+        current_height += row_height
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _bar_axis(
+    categories: Sequence[Mapping[str, Any]], *, shared_max_count: int | None = None
+) -> str:
+    """Render one horizontal count-bar axis with adaptive row spacing.
+
+    Args:
+        categories: Non-empty ordered categories to render in this axis.
+        shared_max_count: Optional maximum count across sibling chunks, ensuring
+            their horizontal axes use an identical scale.
+
+    Returns:
+        A complete TikZ/PGFPlots axis fragment, or explanatory TeX when empty.
+    """
     if not categories:
         return r"\emph{No categories in this group.}"
+    max_count = shared_max_count or max(int(category["count"]) for category in categories)
     rows = []
     labels = []
     ticks = []
     cursor = 0.0
     for category in categories:
-        # The y-tick labels occupy a fixed left column. Allocate a chart row
-        # for every wrapped line so adjacent labels cannot overlap.
-        row_height = max(1, ceil(len(str(category["value"])) / 34))
+        row_height = _bar_row_height(category)
         position = cursor + row_height / 2
         cursor += row_height
         count = int(category["count"])
@@ -878,27 +1012,28 @@ def _bar_axis(categories: Sequence[Mapping[str, Any]]) -> str:
             else "bbmriBlue"
         )
         rows.append(
-            f"\\addplot+[fill={color},bar shift=0pt] coordinates "
+            f"\\addplot+[fill={color},draw={color},bar shift=0pt] coordinates "
             f"{{({count},{position:.2f})}};"
         )
         labels.append(
-            f"\\node[anchor=west,font=\\scriptsize,text width=0.14\\linewidth,align=left] "
+            f"\\node[anchor=west,font=\\scriptsize,align=left] "
             f"at (axis cs:{count + 0.08},{position:.2f}) "
             f"{{{_bar_end_label(category)}}};"
         )
         ticks.append(f"{position:.2f}")
     tick_labels = ",".join(
-        rf"{{\parbox{{0.32\linewidth}}{{\raggedleft {_tex(category['value'])}}}}}"
+        rf"{{\parbox{{0.40\linewidth}}{{\raggedleft {_tex(category['value'])}}}}}"
         for category in categories
     )
     return "\n".join([
         r"\begin{tikzpicture}",
-        r"\begin{axis}[xbar, xmin=0, width=0.50\linewidth, xshift=0.37\linewidth, "
-        r"scale only axis, height=" + f"{max(3.0, 0.48 * cursor + 1):.1f}cm,",
+        r"\begin{axis}[xbar, xmin=0, xmax=" + f"{max(1, max_count) * 1.18:.2f}, "
+        r"ymin=0, ymax=" + f"{cursor + 0.70:.2f}, width=0.42\\linewidth, xshift=0.46\\linewidth, "
+        r"scale only axis, height=" + f"{max(3.0, 0.52 * cursor + 1):.1f}cm,",
         f"ytick={{{','.join(ticks)}}}, yticklabels={{{tick_labels}}},",
-        r"xlabel={Count}, y dir=reverse, axis x line*=bottom, axis y line=none,",
-        r"yticklabel style={text width=0.32\linewidth,align=right,font=\scriptsize},",
-        r"enlarge x limits={upper,value=0.18}, enlarge y limits={upper,value=0.08,lower,value=0.08}, clip=false]",
+        r"xlabel={Count}, y dir=reverse, axis x line*=bottom, axis y line*=left,",
+        r"yticklabel style={text width=0.40\linewidth,align=right,font=\scriptsize},",
+        r"enlarge x limits={upper,value=0.14}, clip=false]",
         *rows,
         *labels,
         r"\end{axis}",
@@ -906,29 +1041,62 @@ def _bar_axis(categories: Sequence[Mapping[str, Any]]) -> str:
     ])
 
 
+def _bar_charts(categories: Sequence[Mapping[str, Any]]) -> str:
+    """Render page-sized bar charts with an identical count scale.
+
+    Args:
+        categories: Ordered categories for one conceptual chart.
+
+    Returns:
+        TeX fragments separated by page breaks when multiple chunks are needed.
+    """
+    if not categories:
+        return _bar_axis(categories)
+    shared_max_count = max(int(category["count"]) for category in categories)
+    fragments = []
+    for index, chunk in enumerate(_bar_chunks(categories)):
+        if index:
+            fragments.extend([r"\clearpage", r"\noindent\textit{Continued}\par"])
+        fragments.append(_bar_axis(chunk, shared_max_count=shared_max_count))
+    return "\n".join(fragments)
+
+
 def _bar_fragment(question: Mapping[str, Any]) -> str:
-    """Render bars, separating exceptional answers from an ordinal scale."""
+    """Render a question's categorical bars, separating ordinal exceptions.
+
+    Args:
+        question: Validated question payload containing category counts.
+
+    Returns:
+        TeX for one or more compatible bar-chart pages.
+    """
     categories = question["categories"]
     if question["question_type"] != "ordinal":
-        return _bar_axis(categories)
+        return _bar_charts(categories)
     ordered = [
         category for category in categories
         if str(category["value"]).strip().casefold() not in _ORDINAL_EXCEPTIONS
     ]
     exceptional = [category for category in categories if category not in ordered]
-    return "\n".join([
-        r"\noindent\textit{Ordered scale}\par",
-        _bar_axis(ordered),
-        r"\noindent\textit{Exceptional categories}\par",
-        _bar_axis(exceptional),
-    ])
-
+    fragments = [r"\noindent\textit{Ordered scale}\par", _bar_charts(ordered)]
+    if any(int(category["count"]) for category in exceptional):
+        fragments.extend([r"\noindent\textit{Exceptional categories}\par", _bar_charts(exceptional)])
+    return "\n".join(fragments)
 
 def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
-    """Render a small categorical pie from the same payload category data."""
+    """Render a pie whose leader lines connect each segment to its label.
+
+    Args:
+        question: Validated categorical question payload with pie categories.
+        answered_only: Whether the Missing category is excluded from this chart.
+
+    Returns:
+        Complete TikZ markup with labels placed on the nearest horizontal side.
+    """
     categories = [
         category for category in question["pie_categories"]
-        if not (answered_only and category.get("excluded_from_chart"))
+        if int(category["count"]) > 0
+        and not (answered_only and category.get("excluded_from_chart"))
     ]
     total = sum(int(category["count"]) for category in categories)
     title = "answered rows only" if answered_only else "including Missing"
@@ -939,24 +1107,41 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
             r"\end{tikzpicture}",
         ])
     start = 0.0
+    legend_y = {"left": 1.35, "right": 1.35}
     colors = ("bbmriBlue", "bbmriTeal", "bbmriGold", "bbmriGray", "bbmriRed")
     slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
     for index, category in enumerate(categories):
-        end = start + 360 * int(category["count"]) / total
+        count = int(category["count"])
+        end = start + 360 * count / total
+        middle = (start + end) / 2
         color = (
             "bbmriRed" if str(category["value"]).strip().casefold() == "missing"
             else colors[index % len(colors)]
         )
+        label = f"{_tex(category['value'])}: {count} ({100 * count / total:.1f}\\%)"
+        label_lines = max(1, ceil(len(str(category["value"])) / 42))
+        side = "right" if cos(radians(middle)) >= 0 else "left"
+        y = legend_y[side]
         slices.append(
             rf"\path[fill={color},draw=white] (0,0) -- ({start:.3f}:1.5)"
             rf" arc ({start:.3f}:{end:.3f}:1.5) -- cycle;"
         )
+        if side == "right":
+            slices.extend([
+                rf"\draw[{color},dashed,thin] ({middle:.3f}:1.5) -- (1.72,{y:.2f});",
+                rf"\fill[{color}] (1.76,{y - 0.06:.2f}) rectangle (1.90,{y + 0.06:.2f});",
+                rf"\node[anchor=west,align=left,text width=0.40\linewidth,font=\scriptsize] at (1.98,{y:.2f}) {{{label}}};",
+            ])
+        else:
+            slices.extend([
+                rf"\draw[{color},dashed,thin] ({middle:.3f}:1.5) -- (-1.72,{y:.2f});",
+                rf"\fill[{color}] (-1.90,{y - 0.06:.2f}) rectangle (-1.76,{y + 0.06:.2f});",
+                rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\scriptsize] at (-1.98,{y:.2f}) {{{label}}};",
+            ])
+        legend_y[side] -= 0.42 * label_lines + 0.16
         start = end
-    legend = r" \\ ".join(_category_label(category) for category in categories)
-    slices.extend([rf"\node[align=left,text width=0.9\linewidth] at (0,-2.2) {{{legend}}};",
-                   r"\end{tikzpicture}"])
+    slices.append(r"\end{tikzpicture}")
     return "\n".join(slices)
-
 
 def _table(rows: Sequence[Sequence[str]], columns: str) -> str:
     """Render a longtable with a repeated header and literal rows."""
@@ -979,26 +1164,62 @@ def _table(rows: Sequence[Sequence[str]], columns: str) -> str:
     ])
 
 
+_COUNTRY_CODES = {
+    "austria": "AT", "belgium": "BE", "bulgaria": "BG", "czech republic": "CZ",
+    "cz": "CZ", "denmark": "DK", "estonia": "EE", "finland": "FI", "france": "FR",
+    "germany": "DE", "hungary": "HU", "italia": "IT", "italy": "IT", "latvia": "LV",
+    "lithuania": "LT", "malta": "MT", "netherlands": "NL", "the netherlands": "NL",
+    "norway": "NO", "poland": "PL", "qatar": "QA", "slovakia": "SK", "spain": "ES",
+    "sweden": "SE", "switzerland": "CH",
+}
+
+
+def _country_code(value: Any) -> str:
+    """Return the ISO 3166-1 alpha-2 code for a reported country or ``??`` if unknown.
+
+    Args:
+        value: Literal country value from one submitted survey row.
+
+    Returns:
+        A two-letter code after whitespace, case, and accent normalisation.
+    """
+    normalized = normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii")
+    return _COUNTRY_CODES.get(normalized.strip().casefold(), "??")
+
+
 def _question_tables(question: Mapping[str, Any]) -> str:
-    """Render contribution or free-text evidence tables for a question."""
+    """Render the optional evidence table for one validated question payload.
+
+    Args:
+        question: Validated question payload with either free-text rows or structured contributions.
+
+    Returns:
+        TeX for the table, or an empty string if no free-text evidence exists.
+    """
     if question["question_type"] == "free_text":
-        if not question["free_text_rows"]:
+        evidence = question["free_text_rows"]
+        if not evidence:
             return ""
-        rows = [[r"Country", r"Institution", r"Source row", r"Parent context", r"Response"]]
-        for item in question["free_text_rows"]:
-            parents = "; ".join(
-                f"{parent['column']} = {parent['value']}" for parent in item["parent_answers"]
-            ) or "None"
-            rows.append([
-                _tex(item["country"]), _tex(item["institution"]), str(item["source_row"]),
-                _tex(parents), _tex(item["text"]),
-            ])
-        return "\n".join([
-            r"\smaller[1]",
-            _table(rows, r"p{0.12\linewidth}p{0.16\linewidth}r"
-                         r"p{0.27\linewidth}p{0.27\linewidth}"),
-            r"\normalsize",
-        ])
+        show_parent = any(item["parent_answers"] for item in evidence)
+        headers = [r"CC", r"Institution"]
+        if show_parent:
+            headers.append(r"Parent context")
+        headers.append(r"Response")
+        rows = [headers]
+        for item in evidence:
+            # The nearby child-question heading identifies the parent question;
+            # values retain the useful response context without repeating it verbatim.
+            parents = "; ".join(parent["value"] for parent in item["parent_answers"]) or "None"
+            row = [_tex(_country_code(item["country"])), _tex(item["institution"])]
+            if show_parent:
+                row.append(_tex(parents))
+            row.append(_tex_with_links(item["text"]))
+            rows.append(row)
+        columns = (
+            r"p{0.04\linewidth}p{0.27\linewidth}p{0.61\linewidth}"
+            if not show_parent else r"p{0.04\linewidth}p{0.21\linewidth}p{0.20\linewidth}p{0.47\linewidth}"
+        )
+        return "\n".join([r"\smaller[1]", _table(rows, columns), r"\normalsize"])
     grouped: dict[tuple[str, str], list[str]] = {}
     for item in question["contributions"]:
         entry = _tex(item["institution"])
@@ -1076,7 +1297,7 @@ def _standalone_tex(
         _preamble(),
         r"\begin{document}",
         rf"\section*{{{_tex(question['label'])}{_tex(variant)}}}",
-        rf"\noindent Question identifier: \texttt{{{_tex(question['question_id'])}}}\\",
+        rf"\noindent Question identifier: {_question_identifier(question['question_id'])}\\",
         rf"Denominator: {population['A']} answering rows; Missing uses "
         rf"{population['N']} included rows\\",
         rf"Unit: {_tex(_chart_unit(question))}\\",
@@ -1285,6 +1506,8 @@ def render_descriptive_tex(
         payload: Validated descriptive-statistics payload.
         chart_dir: Optional target directory used to derive printable chart paths.
         report_path: Optional report path used as the base for relative chart paths.
+        include_contribution_tables: Whether optional grouped structured-response
+            evidence tables are included in the report body.
 
     Returns:
         Report TeX, shared chart fragments, standalone documents, and chart paths.
@@ -1315,7 +1538,14 @@ def render_descriptive_tex(
     report.append(
         rf"Descriptive schema version: {_tex(provenance.get('schema_version', 'Unknown'))}\\"
     )
-    report.extend([r"\tableofcontents", r"\clearpage"])
+    report.extend([
+        r"\tableofcontents",
+        r"\clearpage",
+        r"\section*{Abbreviations}",
+        r"\noindent CC: ISO 3166-1 alpha-2 country code; N: included response rows; A: rows with a nonblank answer; M: missing responses (N - A).\\",
+        r"\noindent oAR: percentage of answering rows; oIR: percentage of included response rows.\\",
+        r"\clearpage",
+    ])
     for question in questions:
         for field in ("question_id", "label", "question_type", "categories", "population",
                       "contributions", "free_text_rows", "applicability"):
@@ -1323,14 +1553,14 @@ def render_descriptive_tex(
                 raise InputError(f"Descriptive statistics question lacks {field}: {question!r}.")
         report.extend([r"\clearpage", rf"\section{{{_tex(question['label'])}}}"])
         population = question["population"]
-        report.append(rf"\noindent Question identifier: \texttt{{{_tex(question['question_id'])}}}\\")
-        report.append(rf"N/A/M: {population['N']} / {population['A']} / {population['M']}\\")
+        report.append(rf"\noindent Question identifier: {_question_identifier(question['question_id'])}\\")
+        report.append(rf"N/A/M (included/answered/missing): {population['N']} / {population['A']} / {population['M']}\\")
         report.append(rf"{_tex(_applicability_text(question))}\\")
         if question["question_type"] == "free_text":
             report.append(_question_tables(question) or r"\emph{No text responses.}")
             continue
-        use_pie = question["question_type"] == "single_choice" and question.get("chart") == "pie"
-        variants = (False, True) if use_pie and population["M"] else (False,)
+        use_pie = question["question_type"] == "single_choice"
+        variants = (False, True) if use_pie and population["M"] else ((True,) if use_pie else (False,))
         question_paths: list[str] = []
         for answered_only in variants:
             key = _chart_key(question, answered_only)
@@ -1343,7 +1573,12 @@ def render_descriptive_tex(
                 base = Path(report_path).parent if report_path is not None else Path.cwd()
                 chart_paths[key] = Path(os.path.relpath(chart_pdf, start=base)).as_posix()
                 question_paths.append(chart_paths[key])
-                report.append(rf"\noindent\texttt{{{_tex(chart_paths[key])}}}\\")
+                report.extend([
+                    r"\noindent",
+                    r"\begingroup\raggedright\smaller[3]",
+                    rf"\url{{{_tex(chart_paths[key])}}}\par",
+                    r"\endgroup",
+                ])
         if chart_dir is not None and isinstance(question, dict):
             question["chart_paths"] = question_paths
         tables = _question_tables(question) if (
@@ -1362,27 +1597,30 @@ def render_descriptive_tex(
     )
 
 
-def _run_xelatex(source: Path, output_dir: Path) -> Path:
-    """Compile one staged XeLaTeX source and return its completed PDF."""
+def _run_xelatex(source: Path, output_dir: Path, passes: int = 1) -> Path:
+    """Compile one staged XeLaTeX source repeatedly and return its completed PDF."""
+    if passes < 1:
+        raise AssertionError("XeLaTeX compilation requires at least one pass.")
     compiler = shutil.which("xelatex")
     if compiler is None:
         raise InputError("XeLaTeX is required to render descriptive report PDFs.")
-    result = subprocess.run(
-        [compiler, "-interaction=nonstopmode", "-halt-on-error", "-output-directory", str(output_dir), str(source)],
-        cwd=source.parent, capture_output=True, text=True, check=False,
-    )
     pdf = output_dir / f"{source.stem}.pdf"
-    if result.returncode != 0 or not pdf.is_file():
-        details = (result.stderr or result.stdout).strip()
-        raise InputError(f"XeLaTeX failed for {source.name}: {details or 'no PDF was produced'}")
+    for _ in range(passes):
+        result = subprocess.run(
+            [compiler, "-interaction=nonstopmode", "-halt-on-error", "-output-directory", str(output_dir), str(source)],
+            cwd=source.parent, capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0 or not pdf.is_file():
+            details = (result.stderr or result.stdout).strip()
+            raise InputError(f"XeLaTeX failed for {source.name}: {details or 'no PDF was produced'}")
     return pdf
 
 
-def _require_new_or_empty_chart_dir(chart_dir: Path) -> None:
+def _require_new_or_empty_chart_dir(chart_dir: Path, overwrite: bool = False) -> None:
     """Reject unsafe chart output paths and directories with existing artifacts."""
     if chart_dir.is_symlink():
         raise InputError(f"Chart directory must not be a symbolic link: {chart_dir}")
-    if chart_dir.exists() and (not chart_dir.is_dir() or any(chart_dir.iterdir())):
+    if chart_dir.exists() and (not chart_dir.is_dir() or (not overwrite and any(chart_dir.iterdir()))):
         raise InputError(f"Chart directory must be new or empty: {chart_dir}")
 
 
@@ -1427,6 +1665,7 @@ def render_descriptive_pdf(
     tex_path: str | Path,
     pdf_path: str | Path | None,
     chart_dir: str | Path | None,
+    overwrite: bool = False,
 ) -> None:
     """Compile and transactionally publish a descriptive report and charts.
 
@@ -1434,7 +1673,8 @@ def render_descriptive_pdf(
         rendered: Self-contained TeX and standalone chart documents.
         tex_path: Target for the published report source.
         pdf_path: Optional target for the compiled report PDF.
-        chart_dir: Optional new or empty directory for standalone chart PDFs.
+        chart_dir: Optional output directory for standalone chart PDFs.
+        overwrite: Whether existing outputs may be replaced after successful staging.
 
     Returns:
         None.
@@ -1447,7 +1687,7 @@ def render_descriptive_pdf(
     target_pdf = Path(pdf_path) if pdf_path is not None else None
     target_charts = Path(chart_dir) if chart_dir is not None else None
     if target_charts is not None:
-        _require_new_or_empty_chart_dir(target_charts)
+        _require_new_or_empty_chart_dir(target_charts, overwrite)
     targets = [target_tex, *(path for path in (target_pdf, target_charts) if path is not None)]
     if any(not target.parent.exists() for target in targets):
         raise InputError("Output parent directory does not exist.")
@@ -1467,7 +1707,7 @@ def render_descriptive_pdf(
         if target_pdf is not None:
             report_source = report_stage / "report.tex"
             _write_compilation_source(report_source, rendered.tex, "report source")
-            report_pdf = _run_xelatex(report_source, report_stage)
+            report_pdf = _run_xelatex(report_source, report_stage, passes=2)
         publication_stages: list[Path] = []
         try:
             staged_tex = _stage_publication_file(target_tex, text=rendered.tex)
@@ -1482,7 +1722,7 @@ def render_descriptive_pdf(
 
         publish_charts = None
         if target_charts is not None:
-            _require_new_or_empty_chart_dir(target_charts)
+            _require_new_or_empty_chart_dir(target_charts, overwrite)
             publish_charts = Path(tempfile.mkdtemp(prefix=".so2-charts-", dir=target_charts.parent))
             try:
                 for key, source_pdf in chart_pdfs.items():
@@ -1509,15 +1749,22 @@ def render_descriptive_pdf(
             os.replace(source, target)
             published.append(target)
 
+        def replace_directory(source: Path, target: Path) -> None:
+            """Publish a staged directory while retaining its prior directory for rollback."""
+            if target.exists():
+                backup = Path(tempfile.mkdtemp(prefix=".so2-charts-backup-", dir=target.parent))
+                backup.rmdir()
+                os.replace(target, backup)
+                backups[target] = backup
+            os.replace(source, target)
+            published.append(target)
+
         try:
             replace_file(staged_tex, target_tex)
             if target_pdf is not None and staged_pdf is not None:
                 replace_file(staged_pdf, target_pdf)
             if target_charts is not None and publish_charts is not None:
-                if target_charts.exists():
-                    target_charts.rmdir()
-                os.replace(publish_charts, target_charts)
-                published.append(target_charts)
+                replace_directory(publish_charts, target_charts)
         except OSError as exc:
             rollback_failures: list[OSError] = []
             for target in reversed(published):
@@ -1557,4 +1804,7 @@ def render_descriptive_pdf(
             raise InputError(f"Could not publish descriptive report outputs: {exc}") from exc
         _discard_publication_stages(publication_stages)
         for backup in backups.values():
-            backup.unlink(missing_ok=True)
+            if backup.is_dir():
+                shutil.rmtree(backup)
+            else:
+                backup.unlink(missing_ok=True)

@@ -328,6 +328,7 @@ def build_cli() -> argparse.ArgumentParser:
     describe.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
     describe.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
     describe.add_argument("--long-report", action="store_true", help="Include grouped structured-response contribution tables.")
+    describe.add_argument("--overwrite", action="store_true", help="Replace existing describe outputs after successful regeneration.")
 
     render_descriptive = subparsers.add_parser("render-descriptive-report", help="Render TeX/PDF from a descriptive-statistics payload.")
     add_logging_arguments(render_descriptive)
@@ -3286,14 +3287,14 @@ def _require_distinct_descriptive_outputs(input_paths: list[str | Path], output_
 
 
 def _require_new_descriptive_file_outputs(
-    output_paths: list[str | Path | None],
+    output_paths: list[str | Path | None], overwrite: bool = False,
 ) -> None:
     """Require report file targets to be new and to have writable-shaped parents."""
     for output_path in output_paths:
         if output_path is None:
             continue
         target = Path(output_path)
-        if target.is_symlink() or target.exists():
+        if target.is_symlink() or (target.exists() and not overwrite):
             raise InputError(f"Descriptive output must be a new file: {target}")
         if not target.parent.is_dir():
             raise InputError(
@@ -3301,14 +3302,14 @@ def _require_new_descriptive_file_outputs(
             )
 
 
-def _require_new_or_empty_chart_dir(chart_dir: str | Path | None) -> None:
+def _require_new_or_empty_chart_dir(chart_dir: str | Path | None, overwrite: bool = False) -> None:
     """Reject chart output directories that could mix old and new artifacts."""
     if chart_dir is None:
         return
     target = Path(chart_dir)
     if target.is_symlink():
         raise InputError(f"Chart directory must not be a symbolic link: {target}")
-    if target.exists() and (not target.is_dir() or any(target.iterdir())):
+    if target.exists() and (not target.is_dir() or (not overwrite and any(target.iterdir()))):
         raise InputError(f"Chart directory must be new or empty: {target}")
 
 
@@ -3324,8 +3325,8 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
         raise InputError("render-descriptive-report requires at least one of --output-tex, --output-pdf, or --output-chart-dir.")
     tex_path = args.output_tex or str(Path(args.input_json).with_suffix(".tex"))
     _require_distinct_descriptive_outputs(input_paths, [tex_path, args.output_pdf, args.output_chart_dir])
-    _require_new_or_empty_chart_dir(args.output_chart_dir)
-    _require_new_descriptive_file_outputs([tex_path, args.output_pdf])
+    _require_new_or_empty_chart_dir(args.output_chart_dir, getattr(args, "overwrite", False))
+    _require_new_descriptive_file_outputs([tex_path, args.output_pdf], getattr(args, "overwrite", False))
     descriptive = _load_descriptive_report_module()
     try:
         if getattr(args, "long_report", False):
@@ -3336,7 +3337,10 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
             rendered = descriptive.render_descriptive_tex(
                 payload, args.output_chart_dir, report_path=tex_path,
             )
-        descriptive.render_descriptive_pdf(rendered, tex_path, args.output_pdf, args.output_chart_dir)
+        descriptive.render_descriptive_pdf(
+            rendered, tex_path, args.output_pdf, args.output_chart_dir,
+            overwrite=getattr(args, "overwrite", False),
+        )
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
 
@@ -3363,8 +3367,8 @@ def run_describe(args: argparse.Namespace) -> int:
         [args.survey_file, args.descriptive_schema],
         [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
     )
-    _require_new_or_empty_chart_dir(args.output_chart_dir)
-    _require_new_descriptive_file_outputs([args.output_json, derived_tex_path, args.output_pdf])
+    _require_new_or_empty_chart_dir(args.output_chart_dir, args.overwrite)
+    _require_new_descriptive_file_outputs([args.output_json, derived_tex_path, args.output_pdf], args.overwrite)
     chart_target = (
         Path(args.output_chart_dir) if args.output_chart_dir is not None else None
     )
@@ -3383,6 +3387,7 @@ def run_describe(args: argparse.Namespace) -> int:
             output_pdf=args.output_pdf,
             output_chart_dir=args.output_chart_dir,
             long_report=args.long_report,
+            overwrite=args.overwrite,
         )
         _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema])
     try:

@@ -817,7 +817,7 @@ above and must not be added as a section of its findings report.
   version may declare a different validated envelope in its descriptive schema.
 - A versioned descriptive-report schema declares source worksheet/header, every
   question's source column(s), question type, display label/order, allowed and
-  canonical categories, optional multi-select delimiter, optional applicability
+  canonical categories, optional multi-select delimiter and category aliases for documented literal-value normalisation, optional applicability
   rule, optional mutually exclusive categories, and optional parent question for
   free-text follow-ups. Applicability values must belong to the referenced
   structured parent question; exclusive selections must belong to the question
@@ -838,7 +838,7 @@ above and must not be added as a section of its findings report.
   eligibility-unknown, and out-of-route answered rows separately; otherwise
   state that applicability is unknown. Never infer routing from observed counts
   or discard out-of-route answers. Single-choice counts must reconcile exactly
-  with `A`. Multi-choice values are deduplicated within a response: every
+  with `A`. Category aliases may normalise documented source spelling variants to their declared canonical category; the raw workbook remains the source evidence. Multi-choice values are deduplicated within a response: every
   selection label is `n (n/A percent of answering rows)`, while Missing is
   `M (M/N percent of all included rows)`. State both bases, render an undefined
   percentage as `N/A`, and never divide by total selections. Individual
@@ -847,10 +847,7 @@ above and must not be added as a section of its findings report.
   Numeric bands are frequency categories, not data to average. Matrix
   subquestions with ordered frequency answers are `ordinal`, even if a nearby
   heading says “select all”.
-- Every structured-question chart is followed by a literal respondent-level
-  contribution table with `Value`, `Country`, `Institution`, `Source row`,
-  and `Repeated response` columns, ordered by declared value order, then
-  country, institution and source row. The descriptive schema declares the
+- Every structured question has a literal respondent-level contribution table in `--long-report`, with `Value`, `Country`, `Institution`, and compact grouped institution evidence ordered by declared value order, then country and institution. The descriptive schema declares the
   shared country and institution source columns. A multi-choice response appears
   once for each selected value; a non-answer appears once under `Missing`.
   Keep missing country/institution cells visible as `Missing` rather than
@@ -861,25 +858,19 @@ above and must not be added as a section of its findings report.
   as excluded from that chart. Contribution tables are respondent-level evidence:
   they reconcile with the chart's value counts but must never be summed across
   questions.
-- Free-text tables list every nonblank unmodified answer with the reported
-  institution and same-row declared parent answer, including a missing or
-  unexpected parent value. Flag inconsistencies without suppressing text. Report
+- Free-text tables list every substantive nonblank answer with a two-letter ISO country code, the reported institution, response text, and same-row declared parent answer, including a missing or unexpected parent value. Omit source-row provenance from the readable table but retain it in JSON. Omit the parent-context column only when every displayed row has no configured parent answer. Suppress only explicit empty placeholders such as `None`, `N/A`, `No`, or `Nothing` after whitespace normalization. Render HTTP(S) URLs as a short `link` hyperlink. Flag inconsistencies without suppressing text. Report
   answered and blank counts and render an explicit `No text responses` section
   when empty. Do not deduplicate identical text, infer parent answers, or treat
   volunteered comments as prevalence estimates. Do not incidentally copy emails
   or other identifying values into unrelated tables; a field is listed only when
   it is the answer being reported.
-- The rendered report repeats the full source provenance and shows the question
-  identifier, `N`, `A`, `M`, and applicability status or counts for every
-  question. Standalone chart documents repeat the question, denominator, unit,
+- The rendered report repeats full source provenance and shows a compact, breakable question identifier, `N`, `A`, `M`, and applicability status or counts for every question. It must define `N`, `A`, `M`, `oAR`, and `oIR` immediately after the table of contents; bar labels use the abbreviated percentage bases. Standalone chart documents repeat the question, denominator, unit,
   and missingness context so they remain interpretable outside the report.
 - Use native TeX PGF/TikZ, primarily `pgfplots`, for report charts. Python computes
   statistics and emits reusable chart fragments; TeX renders them in the report.
   Horizontal zero-based count bars are the default for category comparison and
-  are mandatory for multi-choice questions: each selected value has a bar with
-  its `n (percent)` label, and `Missing` is a visually distinct separate bar
-  even when zero. Use pie charts only for small, readable, non-overlapping
-  single-choice distributions. When such a pie-eligible question has missing
+  are mandatory for multi-choice questions: each selected value has a bar with its `n (percent oAR)` label, a fill-matching outline, adaptive label-row spacing, and explicit vertical margin below the final bar; `Missing` is a visually distinct separate bar
+  even when zero. Long categorical charts must split into page-sized continuation charts while retaining an identical zero-based horizontal scale. Use pie charts only for small, readable, non-overlapping single-choice distributions. Every external pie label must have an explicit same-colour leader line and swatch, placed on the nearest left or right side to limit leader length. When such a pie-eligible question has missing
   responses, render two side-by-side pies: one including `Missing`, and one
   using only answered responses with its denominator labelled. Use ordered bars
   for ordinal questions; retain unobserved declared levels and place `Not
@@ -888,8 +879,7 @@ above and must not be added as a section of its findings report.
   consistent category order and scales.
 - `describe --output-chart-dir DIR` additionally renders each report chart from
   the same PGF/TikZ fragment as a standalone vector PDF. The report displays the
-  relative output path below its corresponding embedded chart. The directory must
-  be new or empty, and chart filenames must use a stable question ordinal,
+  relative output path below its corresponding embedded chart. The directory must be new or empty by default (or explicitly replaced with `describe --overwrite`), and chart filenames must use a stable question ordinal,
   sanitized identifier and variant suffix. Every standalone chart PDF retains
   the full question identifier, denominator, unit and missingness note. The
   descriptive payload records report-relative chart paths; no PNG export is required
@@ -899,11 +889,11 @@ above and must not be added as a section of its findings report.
   standalone-chart builds must stage every generated chart asset in a temporary
   compilation directory, then publish from hidden sibling paths on each target
   filesystem so cross-device publication cannot fail with `EXDEV`. Descriptive
-  file outputs must be new and the chart directory must be new or empty. Any
+  file outputs must be new by default and the chart directory must be new or empty by default. `describe --overwrite` may replace its existing JSON, TeX, PDF and chart directory only after successful staging. Any
   write, compile, or publication failure must roll back all outputs from that
   invocation. Those builds must
   fail clearly if a referenced asset or the `xelatex` dependency is
-  unavailable; they must not produce partial PDFs.
+  unavailable. Report PDF rendering must run XeLaTeX twice so table-of-contents links resolve; they must not produce partial PDFs.
 - All public or reusable methods in `survey-so2-directory.py` must document their
   purpose, inputs, returns and raised user-facing exceptions. Validate external
   workbook/schema/report-payload assumptions with actionable `InputError`s; use

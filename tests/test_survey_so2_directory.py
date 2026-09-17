@@ -84,6 +84,21 @@ def test_describe_refuses_to_overwrite_existing_payload(tmp_path):
     assert output_json.read_text(encoding="utf-8") == "keep me"
 
 
+def test_describe_overwrite_replaces_existing_json(tmp_path):
+    """Explicit overwrite permits a deliberate descriptive JSON rerun."""
+    module = load_module()
+    output_json = tmp_path / "descriptive.json"
+    output_json.write_text("old payload", encoding="utf-8")
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "-o", str(output_json), "--overwrite",
+    ])
+
+    assert module.run_describe(args) == module.EXIT_OK
+    assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
+
+
 def test_describe_records_report_relative_chart_paths_before_writing_payload(
     tmp_path, monkeypatch,
 ):
@@ -125,7 +140,8 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return object()
 
         @staticmethod
-        def render_descriptive_pdf(_rendered, tex_path, _pdf_path, _chart_dir):
+        def render_descriptive_pdf(_rendered, tex_path, _pdf_path, _chart_dir, overwrite=False):
+            assert overwrite is False
             Path(tex_path).write_text("report", encoding="utf-8")
 
     monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)

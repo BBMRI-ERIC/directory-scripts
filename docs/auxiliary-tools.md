@@ -87,6 +87,16 @@ python3 survey-so2-directory.py describe \
   --output-pdf so2-descriptive.pdf \
   --output-chart-dir so2-descriptive-charts
 
+# Deliberately replace all prior describe artifacts at these paths
+python3 survey-so2-directory.py describe \
+  -i Content_Export_SO2_2025_20260313.xlsx \
+  --descriptive-schema survey-mappings/so2_2025_descriptive_report.json \
+  -o so2-descriptive.json \
+  --output-tex so2-descriptive.tex \
+  --output-pdf so2-descriptive.pdf \
+  --output-chart-dir so2-descriptive-charts \
+  --overwrite
+
 python3 survey-so2-directory.py render-descriptive-report \
   -i so2-descriptive.json \
   --output-pdf so2-descriptive-rerendered.pdf
@@ -94,24 +104,18 @@ python3 survey-so2-directory.py render-descriptive-report \
 
 The observation unit is every nonblank submitted worksheet row. Counts are
 unweighted and are not deduplicated to institutions, biobanks, or countries.
-Contribution tables retain the reported country, institution, source row, and
-They are omitted from the normal report; pass `--long-report` to either descriptive command to include the grouped `Value | Country | Institutions` tables. Free-text response tables remain in both report forms.
-free-text answers; repeated normalized country/institution combinations are
-flagged as suspected repeated responses but are never removed. Treat generated
+Structured-response contribution tables are omitted from the normal report; pass `--long-report` to either descriptive command to include grouped `Value | Country | Institutions` tables. Free-text response tables remain in both report forms. Explicit empty free-text placeholders are omitted, and HTTP(S) URLs are rendered as short hyperlinks. Contribution evidence retains the reported country, institution, and free-text answers; source-row provenance remains in the JSON payload rather than the readable tables. Free-text tables use ISO alpha-2 country codes and omit the parent-context column when no displayed response has configured parent context. Repeated normalized country/institution combinations are flagged as suspected repeated responses but are never removed. Treat generated
 JSON, TeX, PDFs, and chart directories as sensitive because they can contain
 institution names and free text.
 
 TeX-only output requires no compiler and does not render standalone chart PDFs.
 The published TeX is self-contained and can be compiled without a fragments
-directory. PDF rendering invokes `xelatex` directly; a missing compiler fails PDF
+directory. PDF rendering invokes `xelatex` twice directly so the table of contents is resolved; a missing compiler fails PDF
 or standalone-chart rendering rather than producing a partial PDF. With
-`--output-chart-dir`, the directory must be new or empty and receives standalone
-vector-PDF charts generated from the same PGF/TikZ source as the report. Each
-chart includes its question, denominator, unit, and missingness context, while the
-JSON payload records its report-relative path. The report includes full source
-provenance and per-question `N`, `A`, `M`, and applicability information; empty
-free-text questions explicitly state `No text responses.` File outputs must be
-new, and all output paths must be distinct from inputs and from one another.
+`--output-chart-dir`, the directory must be new or empty by default and receives standalone
+vector-PDF charts generated from the same PGF/TikZ source as the report. Each chart includes its question, denominator, unit, and missingness context, while the
+JSON payload records its report-relative path. The report includes full source provenance, a post-contents abbreviation glossary, and per-question `N`, `A`, `M`, and applicability information. Bar percentages use `oAR` (answering rows) or `oIR` (included rows); empty
+free-text questions explicitly state `No text responses.` File outputs are new by default and all output paths must be distinct from inputs and from one another. `describe --overwrite` deliberately replaces its JSON, TeX, PDF, and chart-directory outputs after successful regeneration; it never permits an output to alias an input.
 Publication uses target-directory sibling stages and rolls back the invocation on
 write, compile, or publication failure.
 

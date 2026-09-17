@@ -3,6 +3,7 @@
 from copy import deepcopy
 import importlib
 from datetime import datetime
+import json
 import inspect
 from pathlib import Path
 import shutil
@@ -947,14 +948,62 @@ def multi_choice_payload():
 
 
 def single_choice_payload_with_missing():
-    """Return a schema-designated pie payload that has missing rows."""
+    """Return a single-choice payload that has missing rows."""
     return report_payload(structured_report_question(
         question_id="q_011_hosting_organisation",
         column="Hosting organisation",
         label="Hosting organisation",
         question_type="single_choice",
-        chart="pie",
     ))
+
+
+def test_single_choice_questions_render_two_denominator_aware_pies_without_metadata():
+    """Single-choice charts are pies even though payloads carry no chart hint."""
+    rendered = module.render_descriptive_tex(single_choice_payload_with_missing(), chart_dir=None)
+
+    assert "including Missing" in rendered.tex
+    assert "answered rows only" in rendered.tex
+    assert "arc (" in rendered.tex
+
+
+def test_fully_answered_single_choice_pie_omits_the_zero_missing_slice():
+    """A complete single-choice response set does not receive a misleading Missing pie."""
+    question = structured_report_question(
+        question_type="single_choice",
+        population={"N": 3, "A": 3, "M": 0, "blank_rows": 0},
+        categories=[
+            {"value": "Yes", "count": 2, "percent_base": 3, "percent": 66.6667},
+            {"value": "No", "count": 1, "percent_base": 3, "percent": 33.3333},
+            {"value": "Missing", "count": 0, "percent_base": 3, "percent": 0.0},
+        ],
+        pie_categories=[
+            {"value": "Yes", "count": 2, "percent_base": 3, "percent": 66.6667, "excluded_from_chart": False},
+            {"value": "No", "count": 1, "percent_base": 3, "percent": 33.3333, "excluded_from_chart": False},
+            {"value": "Missing", "count": 0, "percent_base": 3, "percent": 0.0, "excluded_from_chart": True},
+        ],
+    )
+
+    tex = module.render_descriptive_tex(report_payload(question), chart_dir=None).tex
+
+    assert "answered rows only" in tex
+    assert "Missing: 0" not in tex
+
+
+def test_bar_charts_keep_category_labels_and_skip_empty_ordinal_exceptions():
+    """Horizontal bars retain labels and do not emit a degenerate zero-only panel."""
+    question = structured_report_question(
+        question_type="ordinal",
+        categories=[
+            {"value": "1-5 years", "count": 3, "percent_base": 3, "percent": 100.0},
+            {"value": "Missing", "count": 0, "percent_base": 3, "percent": 0.0},
+        ],
+    )
+
+    tex = module.render_descriptive_tex(report_payload(question), chart_dir=None).tex
+
+    assert "axis y line=none" not in tex
+    assert "1-5 years" in tex
+    assert "Exceptional categories" not in tex
 
 
 def payload_with_repeated_and_free_text():
@@ -994,8 +1043,8 @@ def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
     tex = module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts").tex
 
     assert r"\begin{axis}[xbar" in tex
-    assert "2 (100.0\\% of answering rows)" in tex
-    assert "1 (33.3\\% of all included rows)" in tex
+    assert "2 (100.0\\% oAR)" in tex
+    assert "1 (33.3\\% oIR)" in tex
     assert "charts/09-institution-type.pdf" in tex
 
 
@@ -1006,6 +1055,8 @@ def test_bar_tex_locks_every_bar_to_its_category_row_and_reserves_label_space():
     ]
 
     assert "bar shift=0pt" in fragment
+    assert "draw=bbmriBlue" in fragment
+    assert "ymax=" in fragment
     assert "scale only axis" in fragment
     assert "yticklabel style={text width=" in fragment
     assert "anchor=west,font=\\scriptsize" in fragment
@@ -1027,11 +1078,26 @@ def test_report_tex_is_self_contained_and_displays_required_semantics():
     assert "Included response rows: 3" in tex
     assert "Excluded blank rows: 2" in tex
     assert "Descriptive schema version: 2026-09-16" in tex
-    assert "N/A/M: 3 / 2 / 1" in tex
+    assert "N/A/M (included/answered/missing): 3 / 2 / 1" in tex
+    assert "oAR: percentage of answering rows" in tex
+    assert r"\smaller[3]\texttt{" in tex
     assert "Applicability: unknown" in tex
     assert r"\usepackage{relsize}" in tex
     assert r"\tableofcontents" in tex
     assert "\n\\clearpage\n\\section{" in tex
+
+
+def test_free_text_urls_render_as_short_hyperlinks_and_placeholders_are_suppressed():
+    """Narrative tables retain usable links while omitting semantically empty responses."""
+    narrative = payload_with_repeated_and_free_text()["questions"][1]
+    narrative["free_text_rows"][0]["text"] = "See https://example.org/a/very/long/path?query=1"
+
+    tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
+
+    assert r"\href{\detokenize{https://example.org/a/very/long/path?query=1}}{link}" in tex
+    assert module._is_empty_free_text("  None ")
+    assert module._is_empty_free_text("N/A")
+    assert not module._is_empty_free_text("No external data are available")
 
 
 def test_empty_free_text_question_is_explicitly_reported():
@@ -1043,6 +1109,17 @@ def test_empty_free_text_question_is_explicitly_reported():
     tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
 
     assert "No text responses" in tex
+
+
+def test_pie_legends_have_coloured_connectors_for_each_slice():
+    """Pie labels are explicitly connected to their corresponding coloured segment."""
+    fragment = module.render_descriptive_tex(single_choice_payload_with_missing(), None).chart_fragments[
+        "11-hosting-organisation"
+    ]
+
+    assert "dashed" in fragment
+    assert "fill=bbmriBlue" in fragment
+    assert "LIMS: 1" in fragment
 
 
 def test_pie_eligible_single_choice_with_missing_has_two_variants():
@@ -1069,9 +1146,11 @@ def test_standalone_chart_has_context_and_report_relative_payload_path(tmp_path)
     key = "09-institution-type"
     assert rendered.chart_paths[key] == "charts/09-institution-type.pdf"
     assert payload["questions"][0]["chart_paths"] == ["charts/09-institution-type.pdf"]
+    assert r"\begingroup\raggedright\smaller[3]" in rendered.tex
+    assert r"\url{charts/09-institution-type.pdf}\par" in rendered.tex
     assert payload["chart_paths"] == {key: "charts/09-institution-type.pdf"}
     standalone = rendered.chart_documents[key]
-    assert r"q\_009\_institution\_type" in standalone
+    assert r"q\_\hspace{0pt}009\_\hspace{0pt}institution\_\hspace{0pt}type" in standalone
     assert "Institution type" in standalone
     assert "Denominator: 2 answering rows; Missing uses 3 included rows" in standalone
     assert "Unit: submitted response rows selecting each value" in standalone
@@ -1123,8 +1202,9 @@ def test_contribution_table_prints_literal_repeated_rows_and_parent_context():
     tex = module.render_descriptive_tex(payload_with_repeated_and_free_text(), chart_dir=None, include_contribution_tables=True).tex
 
     assert "suspected repeated response" in tex
-    assert "Source row" in tex
-    assert "Barrier A = frequently" in tex
+    assert "Source row" not in tex
+    assert "frequently" in tex
+    assert "Barrier A =" not in tex
 
 
 def test_structured_evidence_table_groups_institutions_and_uses_compact_type():
@@ -1150,6 +1230,65 @@ def test_short_report_omits_structured_contribution_tables():
     assert "Source row" not in tex
 
 
+def test_free_text_table_uses_country_codes_and_omits_uniform_empty_parent_context():
+    """Narrative tables reserve their width for institutions and responses, not empty metadata."""
+    narrative = payload_with_repeated_and_free_text()["questions"][1]
+    narrative["free_text_rows"][0]["country"] = "Czech Republic"
+    narrative["free_text_rows"][0]["parent_answers"] = []
+
+    tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
+
+    assert "CC & Institution & Response" in tex
+    assert "Source row" not in tex
+    assert "Parent context" not in tex
+    assert "CZ & Alpha" in tex
+    assert "CC: ISO 3166-1 alpha-2 country code" in tex
+
+
+def test_pie_labels_are_distributed_on_both_sides_of_the_chart():
+    """Bilateral leader labels keep individual pie connectors short."""
+    fragment = module.render_descriptive_tex(single_choice_payload_with_missing(), None).chart_fragments[
+        "11-hosting-organisation"
+    ]
+
+    assert "-- (1.72," in fragment
+    assert "-- (-1.72," in fragment
+
+
+def test_long_bar_charts_split_into_pages_with_a_shared_x_axis_scale():
+    """Continuation charts retain directly comparable count scales."""
+    question = structured_report_question(categories=[
+        {"value": f"Category {index}", "count": index, "percent_base": 20, "percent": index * 5.0}
+        for index in range(1, 25)
+    ])
+
+    fragment = module.render_descriptive_tex(report_payload(question), None).chart_fragments[
+        "09-institution-type"
+    ]
+
+    assert "\\clearpage" in fragment
+    assert fragment.count("xmax=28.32") >= 2
+
+
+
+def test_production_free_text_followups_have_validated_parent_contexts():
+    """Configured SO2 follow-ups retain their immediately preceding structured context."""
+    schema = json.loads(
+        (Path(__file__).parents[1] / "survey-mappings" / "so2_2025_descriptive_report.json").read_text()
+    )
+    by_number = {question["question_id"].split("_")[1]: question for question in schema["questions"]}
+    expected_parents = {
+        "010": "009", "013": "012", "017": "016", "019": "018", "022": "021",
+        "024": "023", "025": "023", "026": "023", "028": "027",
+        "030": "029", "031": "029", "032": "029", "033": "029",
+        "036": "035", "037": "035", "038": "035", "039": "035", "040": "035", "041": "035",
+        "043": "042", "045": "044", "047": "046", "051": "050", "078": "077",
+        "080": "079", "093": "092",
+    }
+
+    for child, parent in expected_parents.items():
+        assert by_number[child]["parent_columns"] == [by_number[parent]["column"]]
+
 def test_free_text_evidence_table_uses_less_aggressive_compact_type():
     """Narrative evidence remains row-level but has a readable compact table size."""
     narrative = payload_with_repeated_and_free_text()["questions"][1]
@@ -1157,7 +1296,7 @@ def test_free_text_evidence_table_uses_less_aggressive_compact_type():
     tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
 
     assert r"\smaller[1]" in tex
-    assert "Source row" in tex
+    assert "Source row" not in tex
 
 
 def test_chart_dir_must_be_new_or_empty(tmp_path):
@@ -1168,6 +1307,27 @@ def test_chart_dir_must_be_new_or_empty(tmp_path):
 
     with pytest.raises(module.InputError, match="new or empty"):
         module.render_descriptive_pdf(rendered_payload(), tmp_path / "report.tex", None, target)
+
+
+def test_pdf_render_overwrite_replaces_a_nonempty_chart_directory(tmp_path, monkeypatch):
+    """Explicit overwrite replaces chart artifacts rather than mixing generations."""
+    def fake_xelatex(command, **_kwargs):
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    chart_dir = tmp_path / "charts"
+    chart_dir.mkdir()
+    (chart_dir / "obsolete.pdf").write_bytes(b"old")
+
+    module.render_descriptive_pdf(
+        rendered_payload(), tmp_path / "report.tex", tmp_path / "report.pdf", chart_dir, overwrite=True,
+    )
+
+    assert not (chart_dir / "obsolete.pdf").exists()
+    assert (chart_dir / "09-institution-type.pdf").read_bytes().startswith(b"%PDF")
 
 
 def test_tex_only_render_does_not_require_a_compiler_or_render_chart_pdfs(tmp_path, monkeypatch):
@@ -1204,6 +1364,23 @@ def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkey
     assert report_tex.read_text(encoding="utf-8") == rendered.tex
     assert report_pdf.read_bytes().startswith(b"%PDF")
     assert (chart_dir / "09-institution-type.pdf").read_bytes().startswith(b"%PDF")
+
+
+def test_report_pdf_runs_xelatex_twice_to_resolve_the_table_of_contents(tmp_path, monkeypatch):
+    """The report receives two passes while standalone chart files receive one."""
+    calls = []
+
+    def fake_xelatex(command, **_kwargs):
+        calls.append(Path(command[-1]).name)
+        output_dir = Path(command[command.index("-output-directory") + 1])
+        source = Path(command[-1])
+        (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
+        return __import__("subprocess").CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_xelatex)
+    module.render_descriptive_pdf(rendered_payload(), tmp_path / "report.tex", tmp_path / "report.pdf", None)
+
+    assert calls == ["report.tex", "report.tex"]
 
 
 def test_pdf_publication_never_replaces_across_filesystems(tmp_path, monkeypatch):
