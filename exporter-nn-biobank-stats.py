@@ -97,7 +97,12 @@ def build_report_model(directory):
         bid = biobank["id"]; node = directory.getBiobankNN(bid) or "UNKNOWN"
         collections = [c for c in directory.getCollections() if c["biobank"]["id"] == bid]
         if not collections and not directory.getBiobankServices(bid): problems[node].append(bid)
-        category = classify_biobank_collections(collections).category
+        classification = classify_biobank_collections(collections)
+        category = classification.category
+        if classification.mixed:
+            log.info("Mixed biobank %s: votes=%s, selected=%s, tie=%s, frontier=%s", bid, classification.votes, category, classification.tie, classification.frontier_ids)
+        if classification.provisional:
+            log.warning("Provisional fallback to others for biobank %s due to hierarchy corruption.", bid)
         classifications[bid] = (node, category)
         for row in ("total biobanks", category):
             values = result[node][row]; values["total_biobanks"] += 1; values["directory_biobanks"] += 1
@@ -128,6 +133,8 @@ def main(argv=None, directory_factory=Directory):
     add_no_stdout_argument(parser); add_directory_schema_argument(parser, default="ERIC"); add_purge_cache_arguments(parser, ["directory"])
     parser.add_argument("input_xlsx", help="Negotiator representatives XLSX")
     args = parser.parse_args(argv); configure_logging(args)
+    unsupported = ", ".join(rule.name for rule in CATEGORY_POLICY if not rule.supported)
+    log.warning("Unsupported biobank categories currently fall into others: %s", unsupported)
     directory = directory_factory(**build_directory_kwargs(args)); directory.loadNegotiatorRepresentatives(args.input_xlsx)
     model = build_report_model(directory)
     if not args.nostdout:
