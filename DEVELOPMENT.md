@@ -68,6 +68,11 @@ operation.
     `getBiobankNegotiatorCoverage(biobank_id)`, and
     `getNegotiatorCoverage()`. Returned registrations and representative sets
     are immutable/defensive views.
+    Both loaders compute unmatched IDs against the configured visibility
+    scope and replace resource records and unmatched IDs atomically. Direct
+    representative queries must not expose registrations for absent or
+    out-of-scope collections or owners; raw registrations remain available
+    separately for reconciliation.
   - Negotiator coverage means actual direct non-empty representatives only.
     Parent-chain and same-biobank candidates in
     `exporter-negotiator-orphans.py` are advisory suggestions and must never
@@ -91,6 +96,11 @@ operation.
   - keep unavailable source/category/quality data distinct from real zeroes,
     use direct Directory ownership traversal, and atomically replace XLSX
     output only after a complete workbook has been written.
+  - validate every hierarchy component before selecting the voting frontier;
+    a rootless cycle must cause provisional `others`, not disappear from the
+    classification. Initialize supported empty categories with zero counts.
+    Provenance uses `Directory.getSchema()` and the retained
+    `skip_graph_dag_validation` constructor state, not assumed defaults.
 - `geojsonutils.py`
   - shared coordinate parsing and GeoJSON feature-writing helpers
   - reuse it from exporters/tools that expose mapped entities instead of duplicating DMS/DMM/decimal coordinate normalization or ad hoc GeoJSON serialization

@@ -575,6 +575,14 @@ def test_get_parent_biobank_rejects_malformed_ownership(bad_owner):
         directory.getParentBiobank("col1")
 
 
+def test_get_parent_biobank_rejects_missing_ownership_field():
+    directory = _make_directory_stub()
+    directory.collections[0].pop("biobank")
+
+    with pytest.raises(ValueError, match="col1"):
+        directory.getParentBiobank("col1")
+
+
 def test_get_parent_biobank_handles_missing_parent():
     directory = _make_directory_stub()
     directory.biobanks = directory.biobanks[1:]
@@ -582,6 +590,31 @@ def test_get_parent_biobank_handles_missing_parent():
     assert directory.getParentBiobank("col1") is None
     with pytest.raises(KeyError, match="bb1"):
         directory.getParentBiobank("col1", raise_on_missing=True)
+
+
+def test_get_parent_biobank_handles_parent_missing_from_graph():
+    directory = _make_directory_stub()
+    directory.biobanks = directory.biobanks[1:]
+    directory.directoryGraph.remove_node("bb1")
+
+    assert directory.getParentBiobank("col1") is None
+    with pytest.raises(KeyError, match="bb1"):
+        directory.getParentBiobank("col1", raise_on_missing=True)
+
+
+def test_get_parent_biobank_handles_placeholder_parent():
+    directory = _make_directory_stub()
+    directory.directoryGraph.nodes["bb1"].clear()
+
+    assert directory.getParentBiobank("col1") is None
+    with pytest.raises(KeyError, match="bb1"):
+        directory.getParentBiobank("col1", raise_on_missing=True)
+
+
+def test_get_parent_biobank_does_not_treat_biobank_as_collection():
+    directory = _make_directory_stub()
+
+    assert directory.getParentBiobank("bb1") is None
 
 
 def test_get_parent_biobank_excludes_withdrawn_collection_in_active_scope():
@@ -616,6 +649,48 @@ def test_set_negotiator_representatives_normalizes_immutable_sets():
 
     assert directory.hasNegotiatorData() is True
     assert directory.getCollectionNegotiatorRepresentatives("col1") == frozenset({"rep@example.org"})
+
+
+@pytest.mark.parametrize("source", ["injection", "xlsx"])
+def test_negotiator_query_respects_visibility_and_injection_tracks_unmatched(source, tmp_path):
+    directory = _make_directory_stub()
+    directory.include_withdrawn_entities = False
+    directory.only_withdrawn_entities = False
+
+    records = {
+        "col1": {"representatives": {"visible@example.org"}},
+        "col3": {"representatives": {"withdrawn@example.org"}},
+        "unknown": {"representatives": {"unknown@example.org"}},
+    }
+    if source == "injection":
+        directory.setNegotiatorRepresentatives(records)
+    else:
+        workbook = tmp_path / "scope.xlsx"
+        pd.DataFrame([
+            {"network_name": "N", "biobank_name": "B", "resource_name": "C",
+             "resource_source_id": cid,
+             "representatives_emails": ";".join(row["representatives"])}
+            for cid, row in records.items()
+        ]).to_excel(workbook, index=False)
+        directory.loadNegotiatorRepresentatives(workbook)
+
+    assert directory.getCollectionNegotiatorRepresentatives("col1") == frozenset({"visible@example.org"})
+    assert directory.getCollectionNegotiatorRepresentatives("col3") == frozenset()
+    assert directory.getCollectionNegotiatorRepresentatives("unknown") == frozenset()
+    assert directory.getUnmatchedNegotiatorResourceIds() == ("col3", "unknown")
+
+
+def test_negotiator_replacement_is_atomic_on_invalid_ownership():
+    directory = _make_directory_stub()
+    directory.setNegotiatorRepresentatives({"col1": {"representatives": {"old@example.org"}}})
+    previous = directory.getNegotiatorResources()
+    directory.collections[0].pop("biobank")
+
+    with pytest.raises(ValueError, match="ownership"):
+        directory.setNegotiatorRepresentatives({"col1": {"representatives": {"new@example.org"}}})
+
+    assert directory.getNegotiatorResources() == previous
+    assert directory.getUnmatchedNegotiatorResourceIds() == ()
 
 
 def test_negotiator_coverage_uses_direct_representatives_only():
@@ -761,7 +836,8 @@ def test_quality_info_api_rejects_invalid_scope():
         directory.getBiobankQualityInfo(scope="invalid")
 
 
-def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_path):
+@pytest.mark.parametrize("skip_dag", [False, True])
+def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_path, skip_dag):
     calls = []
 
     class ClientStub:
@@ -794,9 +870,11 @@ def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_
     monkeypatch.setattr(directory_module, "Client", ClientStub)
     monkeypatch.chdir(tmp_path)
 
-    directory = Directory(schema="BBMRI-EU", username="user", password="secret")
+    directory = Directory(schema="BBMRI-EU", username="user", password="secret",
+                          skip_graph_dag_validation=skip_dag)
 
     assert directory.getSchema() == "BBMRI-EU"
+    assert directory.skip_graph_dag_validation is skip_dag
     assert ("signin", "user", "secret") in calls
     assert ("set_schema", "BBMRI-EU") in calls
     assert calls.index(("signin", "user", "secret")) < calls.index(("set_schema", "BBMRI-EU"))

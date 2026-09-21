@@ -102,6 +102,20 @@ def classify_biobank_collections(collections):
         if parent:
             if parent not in by_id: return BiobankClassification("others", {}, (), False, False, True)
             children[parent].append(item["id"]); roots.discard(item["id"])
+    # Validate every component before pruning the supported voting frontier.
+    states = {}
+    def validate(cid):
+        state = states.get(cid, 0)
+        if state == 1: raise ValueError("cycle")
+        if state == 2: return
+        states[cid] = 1
+        parent = by_id[cid].get("parent_collection", {}).get("id")
+        if parent: validate(parent)
+        states[cid] = 2
+    try:
+        for cid in sorted(by_id): validate(cid)
+    except ValueError:
+        return BiobankClassification("others", {}, (), False, False, True)
     mapped = {typ: rule.name for rule in CATEGORY_POLICY for typ in rule.types}
     votes, frontier = Counter(), []
     def walk(cid, stack):
@@ -149,6 +163,9 @@ def build_report_model(directory):
             values = result[node][row]; values["total_biobanks"] += 1; values["directory_biobanks"] += 1
             status = coverage[bid].status
             if status in {"fully", "partially", "missing"}: values["negotiator_" + status] += 1
+    for node in tuple(result):
+        for row in ROWS:
+            result[node][row]
     quality_sources = {}
     for table, entity_column, level_column, prefix, source_name in (
         (directory.getBiobankQualityInfo(), "biobank", "assess_level_bio", "q_org_", "Biobank quality table"),
@@ -179,7 +196,7 @@ def build_report_model(directory):
         "quality_sources": quality_sources,
         "problems": problems,
         "metadata": {
-            "Directory schema": getattr(directory, "schema", "ERIC"),
+            "Directory schema": directory.getSchema(),
             "Emergency DAG checks skipped": bool(
                 getattr(directory, "skip_graph_dag_validation", False)
             ),
@@ -283,8 +300,8 @@ def render_stdout(model: Mapping[str, Any], stream=sys.stdout) -> None:
 def _safe_sheet_name(node: str) -> str:
     """Return the deterministic Excel-compatible name for one normalized Node."""
     sanitized = "".join("_" if character in EXCEL_INVALID_SHEET_CHARS else character for character in node)
-    sanitized = sanitized.strip() or "UNKNOWN"
-    return sanitized[:31]
+    sanitized = sanitized.strip().strip("'") or "UNKNOWN"
+    return sanitized[:31].rstrip("'") or "UNKNOWN"
 
 
 def _sheet_names(nodes) -> dict[str, str]:
@@ -303,13 +320,14 @@ def _sheet_names(nodes) -> dict[str, str]:
     reverse = {}
     for node in sorted(nodes):
         sheet_name = _safe_sheet_name(node)
-        prior = reverse.get(sheet_name)
+        collision_key = sheet_name.casefold()
+        prior = reverse.get(collision_key)
         if prior is not None and prior != node:
             raise ValueError(
                 f"Worksheet name collision: Nodes {prior!r} and {node!r} both map to {sheet_name!r}."
             )
         result[node] = sheet_name
-        reverse[sheet_name] = node
+        reverse[collision_key] = node
     return result
 
 

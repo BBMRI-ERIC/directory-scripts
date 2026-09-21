@@ -149,6 +149,7 @@ class Directory:
             purgeCaches = list()
         self.__pp = pp
         self.__package = schema
+        self.skip_graph_dag_validation = bool(skip_graph_dag_validation)
         self._negotiator_resources: Optional[dict[str, NegotiatorResource]] = None
         self._negotiator_unmatched_resource_ids: tuple[str, ...] = ()
         self.only_withdrawn_entities = only_withdrawn_entities
@@ -1067,8 +1068,8 @@ class Directory:
     def _get_loaded_biobank_by_id(self, biobankID: str) -> Optional[dict[str, Any]]:
         """Return a loaded biobank regardless of withdrawn scope, or None when absent."""
         if self.directoryGraph.has_node(biobankID):
-            biobank = self.directoryGraph.nodes[biobankID]['data']
-            if 'country' in biobank or 'contact' in biobank:
+            biobank = self.directoryGraph.nodes[biobankID].get('data')
+            if isinstance(biobank, dict) and ('country' in biobank or 'contact' in biobank):
                 return biobank
         return None
 
@@ -1254,27 +1255,35 @@ class Directory:
             KeyError: An entity is unavailable and raise_on_missing is true.
             ValueError: The loaded collection has malformed ownership metadata.
         """
-        collection = self._get_loaded_collection_by_id(collectionID)
-        if collection is None:
+        if (not self.directoryGraph.has_node(collectionID)
+                or not any(item['id'] == collectionID for item in self.collections)):
             if raise_on_missing:
                 raise KeyError(f"Collection {collectionID!r} is not present in the loaded directory snapshot.")
             log.warning("Collection %r is not present in the loaded directory snapshot.", collectionID)
             return None
+        collection = self.directoryGraph.nodes[collectionID].get("data")
+        if not isinstance(collection, dict):
+            raise ValueError(f"Collection {collectionID!r} has malformed graph data.")
         owner = collection.get("biobank")
         if not isinstance(owner, dict) or not isinstance(owner.get("id"), str) or not owner["id"].strip():
             raise ValueError(f"Collection {collectionID!r} has malformed biobank ownership metadata.")
+        biobank_id = owner["id"]
+        loaded_biobank = self._get_loaded_biobank_by_id(biobank_id)
+        if loaded_biobank is None:
+            reason = "not present in the loaded directory snapshot"
+            if raise_on_missing:
+                raise KeyError(f"Parent biobank {biobank_id!r} of collection {collectionID!r} is {reason}.")
+            log.warning("Parent biobank %r of collection %r is %s.", biobank_id, collectionID, reason)
+            return None
         if self._get_visible_collection_by_id(collectionID) is None:
             if raise_on_missing:
                 raise KeyError(f"Collection {collectionID!r} is unavailable in the configured scope.")
             log.warning("Collection %r is unavailable in the configured scope.", collectionID)
             return None
-        biobank_id = owner["id"]
         biobank = self.getBiobankById(biobank_id)
         if biobank is not None:
             return biobank
-        reason = ("not present in the loaded directory snapshot"
-                  if self._get_loaded_biobank_by_id(biobank_id) is None
-                  else "unavailable in the configured scope")
+        reason = "unavailable in the configured scope"
         if raise_on_missing:
             raise KeyError(f"Parent biobank {biobank_id!r} of collection {collectionID!r} is {reason}.")
         log.warning("Parent biobank %r of collection %r is %s.", biobank_id, collectionID, reason)
@@ -1298,10 +1307,22 @@ class Directory:
         """Normalize injected Negotiator resource mappings.
 
         Args:
-            data: Resource mappings keyed by Directory collection ID.
+            data: Resource mappings keyed by Directory collection ID. Each
+                value may contain ``network_name``, ``biobank_name``, and
+                ``resource_name`` scalar metadata plus ``representatives``,
+                an iterable of email-address strings (not a semicolon-delimited
+                string). Omitted metadata and null-like metadata become empty
+                strings; blank/null representatives are ignored and email
+                strings are stripped, lowercased, and deduplicated.
 
         Returns:
-            None. The instance retains an immutable normalized copy.
+            None. Atomically replaces the normalized resource records and the
+            unmatched-ID list, using the current Directory visibility scope.
+            Resource records and their representative sets are immutable.
+
+        Raises:
+            ValueError: A matched collection has malformed ownership metadata;
+                the previous Negotiator dataset remains unchanged.
         """
         resources = {}
         for resource_id, row in data.items():
@@ -1319,8 +1340,12 @@ class Directory:
                 self._normalize_negotiator_scalar(row.get("resource_name")),
                 emails,
             )
+        unmatched = tuple(sorted(
+            resource_id for resource_id in resources
+            if self.getParentBiobank(resource_id) is None
+        ))
         self._negotiator_resources = resources
-        self._negotiator_unmatched_resource_ids = ()
+        self._negotiator_unmatched_resource_ids = unmatched
 
     def _require_negotiator_data(self) -> dict[str, NegotiatorResource]:
         """Return loaded Negotiator data or raise a clear state error."""
@@ -1336,9 +1361,18 @@ class Directory:
             collection_id: Directory collection identifier.
 
         Returns:
-            Immutable representative emails; empty when no resource row exists.
+            Immutable representative emails; empty when no resource row exists
+            or the collection or its parent is absent or outside the current
+            Directory visibility scope.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+            ValueError: The loaded collection has malformed ownership metadata.
         """
-        resource = self._require_negotiator_data().get(collection_id)
+        resources = self._require_negotiator_data()
+        if self.getParentBiobank(collection_id) is None:
+            return frozenset()
+        resource = resources.get(collection_id)
         return resource.representatives if resource else frozenset()
 
     def getNegotiatorResources(self) -> dict[str, NegotiatorResource]:
@@ -1400,11 +1434,6 @@ class Directory:
                 email.strip().lower() for email in self._normalize_negotiator_scalar(row["representatives_emails"]).split(";") if email.strip()
             )
         self.setNegotiatorRepresentatives(records)
-        unmatched = []
-        for resource_id in self._negotiator_resources:
-            if self.getParentBiobank(resource_id) is None:
-                unmatched.append(resource_id)
-        self._negotiator_unmatched_resource_ids = tuple(sorted(unmatched))
 
     def getBiobankNegotiatorCoverage(self, biobank_id: str) -> NegotiatorCoverage:
         """Return actual direct Negotiator coverage for one visible biobank.

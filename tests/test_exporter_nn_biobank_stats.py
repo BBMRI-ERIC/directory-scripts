@@ -33,10 +33,28 @@ def test_frontier_prunes_mapped_parent_and_tie_uses_row_priority():
     assert result.tie and result.mixed
 
 
+@pytest.mark.parametrize("cycle_length", [1, 2, 3])
+def test_rootless_cycle_forces_provisional_others_fallback(cycle_length):
+    module = _module()
+
+    result = module.classify_biobank_collections([
+        {"id": "hospital", "type": {"id": "HOSPITAL"}},
+        *[{
+            "id": f"cycle-{index}",
+            "parent_collection": {"id": f"cycle-{(index + 1) % cycle_length}"},
+            "type": {"id": "POPULATION_BASED"},
+        } for index in range(cycle_length)],
+    ])
+
+    assert result.category == "others"
+    assert result.provisional is True
+
+
 def test_report_model_keeps_federated_platform_unavailable():
     module = _module()
 
     class Directory:
+        def getSchema(self): return "TEST"
         def getNegotiatorCoverage(self):
             return {"bb": type("Coverage", (), {"status": "fully"})()}
         def getBiobanks(self): return [{"id": "bb"}]
@@ -51,10 +69,72 @@ def test_report_model_keeps_federated_platform_unavailable():
     assert model["nodes"]["CZ"]["hospital-integrated"]["negotiator_fully"] == 1
 
 
+def test_report_model_initializes_empty_supported_categories_to_zero():
+    module = _module()
+
+    class Directory:
+        skip_graph_dag_validation = False
+
+        def getSchema(self): return "TEST"
+        def getNegotiatorCoverage(self):
+            return {"bb": type("Coverage", (), {"status": "fully"})()}
+        def getBiobanks(self): return [{"id": "bb"}]
+        def getBiobankNN(self, _): return "CZ"
+        def getCollections(self):
+            return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
+        def getBiobankServices(self, _): return []
+        def getBiobankQualityInfo(self):
+            return __import__("pandas").DataFrame(columns=["biobank", "assess_level_bio"])
+        def getCollectionQualityInfo(self):
+            return __import__("pandas").DataFrame(columns=["collection", "assess_level_col"])
+
+    model = module.build_report_model(Directory())
+
+    assert set(module.ROWS).issubset(model["nodes"]["CZ"])
+    assert model["nodes"]["CZ"]["population-based"] == {
+        metric: 0 for metric in module.METRICS
+    }
+    assert model["nodes"]["CZ"]["others"] == {
+        metric: 0 for metric in module.METRICS
+    }
+    for for_xlsx in (False, True):
+        rendered = module._node_table_values(model, "CZ", for_xlsx=for_xlsx)
+        population = next(row for row in rendered if row[0] == "population-based")
+        assert population[1:3] == [0, 0]
+        assert population[3] == (None if for_xlsx else "N/A")
+        assert population[4:] == [0] * 7
+    assert model["metadata"] == {
+        "Directory schema": "TEST",
+        "Emergency DAG checks skipped": False,
+    }
+
+
+def test_report_metadata_records_real_emergency_state():
+    module = _module()
+
+    class Directory:
+        skip_graph_dag_validation = True
+
+        def getSchema(self): return "STAGING"
+        def getNegotiatorCoverage(self): return {}
+        def getBiobanks(self): return []
+        def getCollections(self): return []
+        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+
+    model = module.build_report_model(Directory())
+
+    assert model["metadata"] == {
+        "Directory schema": "STAGING",
+        "Emergency DAG checks skipped": True,
+    }
+
+
 def test_missing_quality_tables_are_unavailable_not_zero():
     module = _module()
 
     class Directory:
+        def getSchema(self): return "TEST"
         def getNegotiatorCoverage(self):
             return {"bb": type("Coverage", (), {"status": "fully"})()}
         def getBiobanks(self): return [{"id": "bb"}]
@@ -76,6 +156,7 @@ def test_empty_quality_tables_with_required_columns_remain_numeric_zero():
     module = _module()
 
     class Directory:
+        def getSchema(self): return "TEST"
         def getNegotiatorCoverage(self):
             return {"bb": type("Coverage", (), {"status": "fully"})()}
         def getBiobanks(self): return [{"id": "bb"}]
@@ -200,6 +281,12 @@ def test_xlsx_sanitizes_long_node_names_and_rejects_collisions(tmp_path):
     collision.write_text("keep", encoding="utf-8")
     with pytest.raises(ValueError, match="collision"):
         module.write_xlsx_report(_model(module, ("A/B", "A?B")), collision)
+    assert collision.read_text(encoding="utf-8") == "keep"
+
+    assert module._safe_sheet_name("'Quoted'") == "Quoted"
+    assert not module._safe_sheet_name("a" * 30 + "'rest").endswith("'")
+    with pytest.raises(ValueError, match="collision"):
+        module.write_xlsx_report(_model(module, ("Node", "node")), collision)
     assert collision.read_text(encoding="utf-8") == "keep"
 
 

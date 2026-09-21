@@ -49,13 +49,16 @@ withdrawn-scope, and logging conventions documented in
 - **Availability:** Federated Platform inventory is not available in this
   version. It is shown as `N/A` on stdout and blank in XLSX, which means
   unavailable rather than zero. The same unavailable convention applies to
-  unsupported category rows and missing optional quality tables.
+  unsupported category rows and missing optional quality tables. Supported
+  categories with no members show numeric zero for available metrics.
 - **Negotiator:** Only direct, non-empty representative assignments count.
   `fully`, `partially`, and `missing` partition biobanks with active
   collections; `no_collections` is intentionally omitted from those columns.
   Parent or same-biobank assignment candidates reported by
   `exporter-negotiator-orphans.py` remain advisory and are never counted as
   registrations.
+  Resource IDs outside the active Directory scope are retained as unmatched
+  evidence, not counted as represented collections or biobanks.
 - **Quality labels:** Organization columns count unique biobanks and collection
   columns count unique collections, grouped by the parent biobank's Node and
   category. A label assessed as both levels is counted once as `Accredited`,
@@ -65,7 +68,10 @@ withdrawn-scope, and logging conventions documented in
   Node, while `-v`/`-d` list IDs. `--emergency-skip-dag-checks` permits a
   best-effort run through broken collection hierarchies, but classifications
   affected by hierarchy corruption are provisional and should not be used as
-  authoritative statistics.
+  authoritative statistics. Every collection component is checked, including
+  cycles disconnected from top-level collections; an affected biobank falls
+  back to provisional `others`. Workbook metadata records the actual schema
+  and whether DAG validation was skipped.
 
 ```bash
 python3 exporter-nn-biobank-stats.py representatives.xlsx -X nn-biobank-stats.xlsx
