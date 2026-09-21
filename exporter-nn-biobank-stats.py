@@ -85,14 +85,33 @@ def build_report_model(directory):
     """Build Node/category metrics using only active Directory and loaded Negotiator data."""
     coverage = directory.getNegotiatorCoverage()
     result = defaultdict(lambda: defaultdict(lambda: {metric: 0 for metric in METRICS}))
+    classifications = {}
     for biobank in directory.getBiobanks():
         bid = biobank["id"]; node = directory.getBiobankNN(bid) or "UNKNOWN"
         collections = [c for c in directory.getCollections() if c["biobank"]["id"] == bid]
         category = classify_biobank_collections(collections).category
+        classifications[bid] = (node, category)
         for row in ("total biobanks", category):
             values = result[node][row]; values["total_biobanks"] += 1; values["directory_biobanks"] += 1
             status = coverage[bid].status
             if status in {"fully", "partially", "missing"}: values["negotiator_" + status] += 1
+    for table, entity_column, level_column, prefix in (
+        (directory.getBiobankQualityInfo(), "biobank", "assess_level_bio", "q_org_"),
+        (directory.getCollectionQualityInfo(), "collection", "assess_level_col", "q_collection_"),
+    ):
+        if not {entity_column, level_column}.issubset(table.columns):
+            continue
+        levels = defaultdict(set)
+        for _, record in table.iterrows():
+            entity = Directory.getEntityAttributeId(record.get(entity_column))
+            level = Directory.getEntityAttributeId(record.get(level_column))
+            if entity and level in {"eric", "accredited"}: levels[entity].add(level)
+        for entity, levels_for_entity in levels.items():
+            bid = entity if prefix == "q_org_" else (directory.getParentBiobank(entity) or {}).get("id")
+            if bid not in classifications: continue
+            node, category = classifications[bid]
+            level = "accredited" if "accredited" in levels_for_entity else "eric"
+            for row in ("total biobanks", category): result[node][row][prefix + level] += 1
     return result
 
 def main(argv=None, directory_factory=Directory):
