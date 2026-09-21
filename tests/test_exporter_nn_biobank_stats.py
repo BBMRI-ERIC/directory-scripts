@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+import io
 
 def _module():
     path = Path(__file__).parents[1] / "exporter-nn-biobank-stats.py"
@@ -44,3 +45,12 @@ def test_report_model_keeps_federated_platform_unavailable():
     model = module.build_report_model(Directory())
     assert model["federated_platform"].available is False
     assert model["nodes"]["CZ"]["hospital-integrated"]["negotiator_fully"] == 1
+
+
+def test_stdout_marks_unavailable_federated_platform():
+    module = _module()
+    model = {"nodes": {"EXT": {"total biobanks": {metric: 0 for metric in module.METRICS}}}, "problems": {"EXT": ["bb"]}}
+    buffer = io.StringIO()
+    module.render_stdout(model, buffer)
+    assert "Node EXT" in buffer.getvalue()
+    assert "N/A" in buffer.getvalue()

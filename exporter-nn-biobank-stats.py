@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 import logging
+import sys
 
 import pandas as pd
 
@@ -127,6 +128,34 @@ def build_report_model(directory):
             for row in ("total biobanks", category): result[node][row][prefix + level] += 1
     return {"nodes": result, "federated_platform": SourceResult(False, "Locator/Finder inventory API unavailable"), "problems": problems}
 
+def render_stdout(model, stream=sys.stdout):
+    """Render one deterministic, human-readable Node block per report Node."""
+    for node in sorted(model["nodes"]):
+        print(f"Node {node}", file=stream)
+        frame = pd.DataFrame(model["nodes"][node]).T.reindex(ROWS)
+        frame["federated_platform_biobanks"] = "N/A"
+        print(frame.fillna(0).to_string(), file=stream)
+        print(f"Biobanks without collections or services: {len(model['problems'][node])}", file=stream)
+
+def write_xlsx_report(model, path):
+    """Write per-Node report sheets, leaving unavailable values blank.
+
+    Args:
+        model: Result from :func:`build_report_model`.
+        path: Destination XLSX path.
+    """
+    with pd.ExcelWriter(path, engine="xlsxwriter", engine_kwargs={"options": {"strings_to_urls": False}}) as writer:
+        for node in sorted(model["nodes"]):
+            frame = pd.DataFrame(model["nodes"][node]).T.reindex(ROWS)
+            frame["federated_platform_biobanks"] = None
+            frame.to_excel(writer, sheet_name=node[:31] or "UNKNOWN")
+            sheet = writer.sheets[node[:31] or "UNKNOWN"]
+            start = len(frame) + 3
+            sheet.write(start, 0, "Problems: biobanks without collections or services")
+            sheet.write(start + 1, 0, len(model["problems"][node]))
+            sheet.write(start + 3, 0, "Policy version")
+            sheet.write(start + 3, 1, POLICY_VERSION)
+
 def main(argv=None, directory_factory=Directory):
     parser = build_parser(description="Export per-Node biobank statistics.")
     add_logging_arguments(parser); add_directory_auth_arguments(parser); add_xlsx_output_argument(parser)
@@ -137,13 +166,8 @@ def main(argv=None, directory_factory=Directory):
     log.warning("Unsupported biobank categories currently fall into others: %s", unsupported)
     directory = directory_factory(**build_directory_kwargs(args)); directory.loadNegotiatorRepresentatives(args.input_xlsx)
     model = build_report_model(directory)
-    if not args.nostdout:
-        for node in sorted(model["nodes"]):
-            print("Node", node, pd.DataFrame(model["nodes"][node]).T.to_string())
-            print("Biobanks without collections or services:", len(model["problems"][node]))
+    if not args.nostdout: render_stdout(model)
     if args.outputXLSX:
-        with pd.ExcelWriter(args.outputXLSX[0], engine="xlsxwriter") as writer:
-            for node in sorted(model["nodes"]):
-                pd.DataFrame(model["nodes"][node]).T.reindex(ROWS).to_excel(writer, sheet_name=node[:31])
+        write_xlsx_report(model, args.outputXLSX[0])
 
 if __name__ == "__main__": main()
