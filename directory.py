@@ -1286,7 +1286,12 @@ class Directory:
         return "" if value is None or pd.isna(value) else str(value).strip()
 
     def hasNegotiatorData(self) -> bool:
-        """Return whether a Negotiator resource dataset has been loaded."""
+        """Return whether a Negotiator resource dataset has been loaded.
+
+        Returns:
+            ``True`` after either supported loader has installed a normalized
+            resource dataset; otherwise ``False``.
+        """
         return getattr(self, "_negotiator_resources", None) is not None
 
     def setNegotiatorRepresentatives(self, data: dict[str, dict[str, Any]]) -> None:
@@ -1337,11 +1342,27 @@ class Directory:
         return resource.representatives if resource else frozenset()
 
     def getNegotiatorResources(self) -> dict[str, NegotiatorResource]:
-        """Return a defensive mapping of normalized resource registrations."""
+        """Return a defensive mapping of normalized resource registrations.
+
+        Returns:
+            New mapping keyed by resource source ID. Its immutable values hold
+            normalized resource metadata and direct representative emails.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+        """
         return dict(self._require_negotiator_data())
 
     def getUnmatchedNegotiatorResourceIds(self) -> tuple[str, ...]:
-        """Return normalized resource IDs absent from the visible Directory scope."""
+        """Return normalized resource IDs absent from the visible Directory scope.
+
+        Returns:
+            Sorted immutable resource IDs that could not be matched to a
+            visible Directory collection and parent biobank.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+        """
         self._require_negotiator_data()
         return tuple(getattr(self, "_negotiator_unmatched_resource_ids", ()))
 
@@ -1397,7 +1418,15 @@ class Directory:
         return self.getNegotiatorCoverage()[biobank_id]
 
     def getNegotiatorCoverage(self) -> dict[str, NegotiatorCoverage]:
-        """Return actual direct representative coverage for visible biobanks."""
+        """Return actual direct representative coverage for visible biobanks.
+
+        Returns:
+            Mapping from visible biobank ID to direct-only coverage counts and
+            one of ``fully``, ``partially``, ``missing``, or ``no_collections``.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+        """
         self._require_negotiator_data()
         result = {}
         for biobank in self.getBiobanks():

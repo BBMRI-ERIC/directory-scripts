@@ -25,6 +25,8 @@ POLICY_VERSION = "1"
 
 @dataclass(frozen=True)
 class CategoryRule:
+    """One versioned biobank-category mapping rule."""
+
     name: str
     types: frozenset[str]
     supported: bool
@@ -62,6 +64,8 @@ EXCEL_INVALID_SHEET_CHARS = "[]:*?/\\"
 
 @dataclass(frozen=True)
 class BiobankClassification:
+    """Classification result and frontier evidence for one biobank."""
+
     category: str
     votes: dict[str, int]
     frontier_ids: tuple[str, ...]
@@ -81,7 +85,15 @@ def _ids(value):
     return {str(value)} if value else set()
 
 def classify_biobank_collections(collections):
-    """Classify a biobank from its top-most supported collection frontier."""
+    """Classify a biobank from its top-most supported collection frontier.
+
+    Args:
+        collections: Active collection mappings belonging to one biobank.
+
+    Returns:
+        Selected category, votes, frontier identifiers, and mixed/tie or
+        provisional-hierarchy indicators.
+    """
     by_id = {item["id"]: item for item in collections}
     children = defaultdict(list)
     roots = set(by_id)
@@ -108,7 +120,16 @@ def classify_biobank_collections(collections):
     return BiobankClassification(winners[0], dict(votes), tuple(sorted(frontier)), len(votes) > 1, len(winners) > 1)
 
 def build_report_model(directory):
-    """Build Node/category metrics using only active Directory and loaded Negotiator data."""
+    """Build Node/category metrics using only active Directory and Negotiator data.
+
+    Args:
+        directory: Initialized ``Directory`` with a loaded Negotiator resource
+            dataset and active-scope entity access.
+
+    Returns:
+        Aggregate Node metrics, source availability states, resource problems,
+        and rendering metadata shared by stdout and XLSX output.
+    """
     coverage = directory.getNegotiatorCoverage()
     result = defaultdict(lambda: defaultdict(lambda: {metric: 0 for metric in METRICS}))
     problems = defaultdict(list)
@@ -128,12 +149,19 @@ def build_report_model(directory):
             values = result[node][row]; values["total_biobanks"] += 1; values["directory_biobanks"] += 1
             status = coverage[bid].status
             if status in {"fully", "partially", "missing"}: values["negotiator_" + status] += 1
-    for table, entity_column, level_column, prefix in (
-        (directory.getBiobankQualityInfo(), "biobank", "assess_level_bio", "q_org_"),
-        (directory.getCollectionQualityInfo(), "collection", "assess_level_col", "q_collection_"),
+    quality_sources = {}
+    for table, entity_column, level_column, prefix, source_name in (
+        (directory.getBiobankQualityInfo(), "biobank", "assess_level_bio", "q_org_", "Biobank quality table"),
+        (directory.getCollectionQualityInfo(), "collection", "assess_level_col", "q_collection_", "Collection quality table"),
     ):
-        if not {entity_column, level_column}.issubset(table.columns):
+        required_columns = {entity_column, level_column}
+        if not required_columns.issubset(table.columns):
+            quality_sources[prefix] = SourceResult(
+                False,
+                f"{source_name} unavailable: missing required columns",
+            )
             continue
+        quality_sources[prefix] = SourceResult(True, f"{source_name} available")
         levels = defaultdict(set)
         for _, record in table.iterrows():
             entity = Directory.getEntityAttributeId(record.get(entity_column))
@@ -148,6 +176,7 @@ def build_report_model(directory):
     return {
         "nodes": result,
         "federated_platform": SourceResult(False, "Locator/Finder inventory API unavailable"),
+        "quality_sources": quality_sources,
         "problems": problems,
         "metadata": {
             "Directory schema": getattr(directory, "schema", "ERIC"),
@@ -181,6 +210,12 @@ def _rendered_cell_value(
             ).available
         )
     )
+    if metric.startswith("q_"):
+        prefix = "q_org_" if metric.startswith("q_org_") else "q_collection_"
+        quality_source = model.get("quality_sources", {}).get(prefix)
+        unavailable = unavailable or (
+            quality_source is not None and not quality_source.available
+        )
     if unavailable:
         return None if for_xlsx else "N/A"
     return value if value is not None else (None if for_xlsx else "N/A")

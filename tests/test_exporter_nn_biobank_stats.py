@@ -51,6 +51,27 @@ def test_report_model_keeps_federated_platform_unavailable():
     assert model["nodes"]["CZ"]["hospital-integrated"]["negotiator_fully"] == 1
 
 
+def test_missing_quality_tables_are_unavailable_not_zero():
+    module = _module()
+
+    class Directory:
+        def getNegotiatorCoverage(self):
+            return {"bb": type("Coverage", (), {"status": "fully"})()}
+        def getBiobanks(self): return [{"id": "bb"}]
+        def getBiobankNN(self, _): return "CZ"
+        def getCollections(self): return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
+        def getBiobankServices(self, _): return []
+        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+
+    model = module.build_report_model(Directory())
+
+    assert model["quality_sources"]["q_org_"].available is False
+    assert model["quality_sources"]["q_collection_"].available is False
+    assert module._node_table_values(model, "CZ", for_xlsx=False)[0][7:] == ["N/A"] * 4
+    assert module._node_table_values(model, "CZ", for_xlsx=True)[0][7:] == [None] * 4
+
+
 def test_stdout_marks_unavailable_federated_platform():
     module = _module()
     model = {"nodes": {"EXT": {"total biobanks": {metric: 0 for metric in module.METRICS}}}, "problems": {"EXT": ["bb"]}}

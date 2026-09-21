@@ -51,9 +51,46 @@ operation.
 - `directory.py`
   - single shared abstraction for Directory / Molgenis access
   - owns shared data retrieval, schema handling, withdrawal scoping, and graph helpers
+  - `getParentBiobank(collectionID, raise_on_missing=False)` is the only shared
+    collection-to-biobank ownership traversal API for exporters. It returns a
+    visible parent biobank, logs and returns `None` for unavailable entities by
+    default, raises `KeyError` for unavailable collection/parent records when
+    requested, and raises `ValueError` for malformed ownership metadata. Do not
+    infer ownership by slicing IDs or matching names.
+  - owns optional normalized Negotiator data when loaded through
+    `loadNegotiatorRepresentatives(path)` or
+    `setNegotiatorRepresentatives(data)`. Consumers must check
+    `hasNegotiatorData()` where optional loading is intended; otherwise the
+    query methods deliberately raise a clear `RuntimeError`. The public query
+    surface is `getNegotiatorResources()`,
+    `getUnmatchedNegotiatorResourceIds()`,
+    `getCollectionNegotiatorRepresentatives(collection_id)`,
+    `getBiobankNegotiatorCoverage(biobank_id)`, and
+    `getNegotiatorCoverage()`. Returned registrations and representative sets
+    are immutable/defensive views.
+  - Negotiator coverage means actual direct non-empty representatives only.
+    Parent-chain and same-biobank candidates in
+    `exporter-negotiator-orphans.py` are advisory suggestions and must never
+    be included in coverage states or aggregate counts. Any change to this
+    coverage contract must add or update a parity test covering both the
+    Directory API and `exporter-negotiator-orphans.py` summary semantics.
   - Services and Studies are first-class cached/traversable entities there too: keep biobank<->service traversal and biobank->collection->study traversal logic in `directory.py` instead of reconstructing parentage ad hoc in exporters
   - for study linkage, treat `Collections.studies` as the authoritative relationship source; use `getCollectionStudies(...)`, `getCollectionStudyIds(...)`, `getStudyCollectionIds(...)`, and `getStudyCountries(...)` rather than reconstructing study membership from stale or partial `Studies.collections` payloads in scripts
   - owns shared quality-information access too: new code should prefer `getBiobankQualityInfo(...)`, `getCollectionQualityInfo(...)`, `getBiobankQualityInfoWide(...)`, `getCollectionQualityInfoWide(...)`, and `getQualityStandardsOntology(...)` over ad hoc DataFrame filtering/pivoting in exporters
+  - optional quality tables are unavailable when their required columns are
+    absent; that state must stay distinct from an available table with zero
+    rows. Reports must not manufacture zero counts for unavailable quality
+    data.
+- `exporter-nn-biobank-stats.py`
+  - owns only the versioned `CATEGORY_POLICY` mapping and report rendering;
+    keep category names, supported flags, type mappings, and tie priority in
+    that one policy structure so future taxonomy changes remain localized.
+  - `build_report_model(...)` is the sole aggregate source for both stdout and
+    XLSX. Renderers may format unavailable values differently (`N/A` versus
+    blank) but must not recalculate classifications, coverage, or counts.
+  - keep unavailable source/category/quality data distinct from real zeroes,
+    use direct Directory ownership traversal, and atomically replace XLSX
+    output only after a complete workbook has been written.
 - `geojsonutils.py`
   - shared coordinate parsing and GeoJSON feature-writing helpers
   - reuse it from exporters/tools that expose mapped entities instead of duplicating DMS/DMM/decimal coordinate normalization or ad hoc GeoJSON serialization
