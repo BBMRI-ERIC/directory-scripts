@@ -49,6 +49,12 @@ class BiobankClassification:
     tie: bool
     provisional: bool = False
 
+@dataclass(frozen=True)
+class SourceResult:
+    """Availability and provenance of one report source."""
+    available: bool
+    reason: str
+
 def _ids(value):
     if isinstance(value, dict): value = value.get("id")
     if isinstance(value, list): return {str(item.get("id", item)) for item in value}
@@ -85,10 +91,12 @@ def build_report_model(directory):
     """Build Node/category metrics using only active Directory and loaded Negotiator data."""
     coverage = directory.getNegotiatorCoverage()
     result = defaultdict(lambda: defaultdict(lambda: {metric: 0 for metric in METRICS}))
+    problems = defaultdict(list)
     classifications = {}
     for biobank in directory.getBiobanks():
         bid = biobank["id"]; node = directory.getBiobankNN(bid) or "UNKNOWN"
         collections = [c for c in directory.getCollections() if c["biobank"]["id"] == bid]
+        if not collections and not directory.getBiobankServices(bid): problems[node].append(bid)
         category = classify_biobank_collections(collections).category
         classifications[bid] = (node, category)
         for row in ("total biobanks", category):
@@ -112,7 +120,7 @@ def build_report_model(directory):
             node, category = classifications[bid]
             level = "accredited" if "accredited" in levels_for_entity else "eric"
             for row in ("total biobanks", category): result[node][row][prefix + level] += 1
-    return result
+    return {"nodes": result, "federated_platform": SourceResult(False, "Locator/Finder inventory API unavailable"), "problems": problems}
 
 def main(argv=None, directory_factory=Directory):
     parser = build_parser(description="Export per-Node biobank statistics.")
@@ -123,9 +131,12 @@ def main(argv=None, directory_factory=Directory):
     directory = directory_factory(**build_directory_kwargs(args)); directory.loadNegotiatorRepresentatives(args.input_xlsx)
     model = build_report_model(directory)
     if not args.nostdout:
-        for node in sorted(model): print("Node", node, pd.DataFrame(model[node]).T.to_string())
+        for node in sorted(model["nodes"]):
+            print("Node", node, pd.DataFrame(model["nodes"][node]).T.to_string())
+            print("Biobanks without collections or services:", len(model["problems"][node]))
     if args.outputXLSX:
         with pd.ExcelWriter(args.outputXLSX[0], engine="xlsxwriter") as writer:
-            for node in sorted(model): pd.DataFrame(model[node]).T.reindex(ROWS).to_excel(writer, sheet_name=node[:31])
+            for node in sorted(model["nodes"]):
+                pd.DataFrame(model["nodes"][node]).T.reindex(ROWS).to_excel(writer, sheet_name=node[:31])
 
 if __name__ == "__main__": main()
