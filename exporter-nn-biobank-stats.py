@@ -6,7 +6,11 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 import logging
+import os
+from pathlib import Path
 import sys
+import tempfile
+from typing import Any, Mapping
 
 import pandas as pd
 
@@ -37,9 +41,24 @@ CATEGORY_POLICY = (
     CategoryRule("others", frozenset(), True),
 )
 ROWS = ("total biobanks",) + tuple(rule.name for rule in CATEGORY_POLICY)
-METRICS = ("total_biobanks", "directory_biobanks", "federated_platform_biobanks",
-           "negotiator_fully", "negotiator_partially", "negotiator_missing",
-           "q_org_eric", "q_org_accredited", "q_collection_eric", "q_collection_accredited")
+METRICS = (
+    "total_biobanks", "directory_biobanks", "federated_platform_biobanks",
+    "negotiator_fully", "negotiator_partially", "negotiator_missing",
+    "q_org_eric", "q_org_accredited", "q_collection_eric", "q_collection_accredited",
+)
+METRIC_COLUMNS = (
+    ("Biobanks", "Total", "total_biobanks", "unique biobanks"),
+    ("Biobanks", "Directory", "directory_biobanks", "unique biobanks"),
+    ("Biobanks", "Federated Platform", "federated_platform_biobanks", "unique biobanks"),
+    ("Negotiator: biobanks", "Fully represented", "negotiator_fully", "unique biobanks"),
+    ("Negotiator: biobanks", "Partially represented", "negotiator_partially", "unique biobanks"),
+    ("Negotiator: biobanks", "Missing", "negotiator_missing", "unique biobanks"),
+    ("Q-labels: organizations", "ERIC", "q_org_eric", "unique biobanks"),
+    ("Q-labels: organizations", "Accredited", "q_org_accredited", "unique biobanks"),
+    ("Q-labels: collections", "ERIC", "q_collection_eric", "unique collections"),
+    ("Q-labels: collections", "Accredited", "q_collection_accredited", "unique collections"),
+)
+EXCEL_INVALID_SHEET_CHARS = "[]:*?/\\"
 
 @dataclass(frozen=True)
 class BiobankClassification:
@@ -126,46 +145,293 @@ def build_report_model(directory):
             node, category = classifications[bid]
             level = "accredited" if "accredited" in levels_for_entity else "eric"
             for row in ("total biobanks", category): result[node][row][prefix + level] += 1
-    return {"nodes": result, "federated_platform": SourceResult(False, "Locator/Finder inventory API unavailable"), "problems": problems}
+    return {
+        "nodes": result,
+        "federated_platform": SourceResult(False, "Locator/Finder inventory API unavailable"),
+        "problems": problems,
+        "metadata": {
+            "Directory schema": getattr(directory, "schema", "ERIC"),
+            "Emergency DAG checks skipped": bool(
+                getattr(directory, "skip_graph_dag_validation", False)
+            ),
+        },
+    }
 
-def render_stdout(model, stream=sys.stdout):
-    """Render one deterministic, human-readable Node block per report Node."""
-    for node in sorted(model["nodes"]):
-        print(f"Node {node}", file=stream)
-        frame = pd.DataFrame(model["nodes"][node]).T.reindex(ROWS)
-        frame["federated_platform_biobanks"] = "N/A"
-        print(frame.fillna(0).to_string(), file=stream)
-        print(f"Biobanks without collections or services: {len(model['problems'][node])}", file=stream)
+def _unsupported_rows() -> frozenset[str]:
+    """Return report rows whose version-one values are unavailable."""
+    return frozenset(rule.name for rule in CATEGORY_POLICY if not rule.supported)
 
-def write_xlsx_report(model, path):
-    """Write per-Node report sheets, leaving unavailable values blank.
+
+def _rendered_cell_value(
+    model: Mapping[str, Any],
+    row_name: str,
+    metric: str,
+    value: Any,
+    *,
+    for_xlsx: bool,
+) -> Any:
+    """Return a display value while preserving unavailable-versus-zero semantics."""
+    unavailable = (
+        row_name in _unsupported_rows()
+        or (
+            metric == "federated_platform_biobanks"
+            and not model.get(
+                "federated_platform",
+                SourceResult(False, "Federated Platform source unavailable"),
+            ).available
+        )
+    )
+    if unavailable:
+        return None if for_xlsx else "N/A"
+    return value if value is not None else (None if for_xlsx else "N/A")
+
+
+def _node_table_values(model: Mapping[str, Any], node: str, *, for_xlsx: bool) -> list[list[Any]]:
+    """Return fixed-order rendered values for one Node without recalculating metrics."""
+    rows = model["nodes"][node]
+    return [
+        [
+            row_name,
+            *(
+                _rendered_cell_value(
+                    model,
+                    row_name,
+                    metric,
+                    rows.get(row_name, {}).get(metric),
+                    for_xlsx=for_xlsx,
+                )
+                for _, _, metric, _ in METRIC_COLUMNS
+            ),
+        ]
+        for row_name in ROWS
+    ]
+
+
+def _format_stdout_table(model: Mapping[str, Any], node: str) -> list[str]:
+    """Format one Node table with deterministic two-line grouped headers."""
+    values = _node_table_values(model, node, for_xlsx=False)
+    groups = ["Category", *(group for group, _, _, _ in METRIC_COLUMNS)]
+    labels = ["", *(label for _, label, _, _ in METRIC_COLUMNS)]
+    widths = [
+        max(len(str(row[column])) for row in values + [groups, labels])
+        for column in range(len(groups))
+    ]
+
+    def line(row: list[Any]) -> str:
+        return " | ".join(str(value).ljust(widths[index]) for index, value in enumerate(row))
+
+    separator = "-+-".join("-" * width for width in widths)
+    return [line(groups), line(labels), separator, *(line(row) for row in values)]
+
+
+def render_stdout(model: Mapping[str, Any], stream=sys.stdout) -> None:
+    """Render deterministic, aligned Node statistics to a text stream.
 
     Args:
-        model: Result from :func:`build_report_model`.
-        path: Destination XLSX path.
+        model: Precomputed report model returned by :func:`build_report_model`.
+        stream: Text stream that receives the report, normally standard output.
+
+    Returns:
+        ``None`` after writing all Node blocks in normalized alphabetical order.
     """
-    with pd.ExcelWriter(path, engine="xlsxwriter", engine_kwargs={"options": {"strings_to_urls": False}}) as writer:
-        for node in sorted(model["nodes"]):
-            frame = pd.DataFrame(model["nodes"][node]).T.reindex(ROWS)
-            frame["federated_platform_biobanks"] = None
-            frame.to_excel(writer, sheet_name=node[:31] or "UNKNOWN")
-            sheet = writer.sheets[node[:31] or "UNKNOWN"]
-            start = len(frame) + 3
-            sheet.write(start, 0, "Problems: biobanks without collections or services")
-            sheet.write(start + 1, 0, len(model["problems"][node]))
-            sheet.write(start + 3, 0, "Policy version")
-            sheet.write(start + 3, 1, POLICY_VERSION)
+    for node in sorted(model["nodes"]):
+        print(f"Node {node}", file=stream)
+        for line in _format_stdout_table(model, node):
+            print(line, file=stream)
+        print(
+            f"Biobanks without collections or services: {len(model['problems'].get(node, []))}",
+            file=stream,
+        )
+        print(file=stream)
+
+
+def _safe_sheet_name(node: str) -> str:
+    """Return the deterministic Excel-compatible name for one normalized Node."""
+    sanitized = "".join("_" if character in EXCEL_INVALID_SHEET_CHARS else character for character in node)
+    sanitized = sanitized.strip() or "UNKNOWN"
+    return sanitized[:31]
+
+
+def _sheet_names(nodes) -> dict[str, str]:
+    """Map report Nodes to unique safe worksheet names.
+
+    Args:
+        nodes: Iterable of normalized report Node values.
+
+    Returns:
+        Mapping from each Node to its Excel-safe worksheet name.
+
+    Raises:
+        ValueError: Two distinct Node names sanitize to the same worksheet name.
+    """
+    result = {}
+    reverse = {}
+    for node in sorted(nodes):
+        sheet_name = _safe_sheet_name(node)
+        prior = reverse.get(sheet_name)
+        if prior is not None and prior != node:
+            raise ValueError(
+                f"Worksheet name collision: Nodes {prior!r} and {node!r} both map to {sheet_name!r}."
+            )
+        result[node] = sheet_name
+        reverse[sheet_name] = node
+    return result
+
+
+def _write_node_sheet(workbook, sheet, model: Mapping[str, Any], node: str) -> None:
+    """Write one grouped Node report sheet from already aggregated values."""
+    title_format = workbook.add_format({"bold": True, "align": "center", "valign": "vcenter", "border": 1, "bg_color": "#D9EAF7"})
+    header_format = workbook.add_format({"bold": True, "align": "center", "text_wrap": True, "border": 1, "bg_color": "#EDF3F8"})
+    row_format = workbook.add_format({"border": 1})
+    number_format = workbook.add_format({"border": 1, "num_format": "0"})
+    sheet.write(0, 0, "Category", title_format)
+    group_start = 1
+    metric_index = 0
+    while metric_index < len(METRIC_COLUMNS):
+        group = METRIC_COLUMNS[metric_index][0]
+        group_end_index = metric_index
+        while (
+            group_end_index + 1 < len(METRIC_COLUMNS)
+            and METRIC_COLUMNS[group_end_index + 1][0] == group
+        ):
+            group_end_index += 1
+        group_end = group_start + (group_end_index - metric_index)
+        sheet.merge_range(0, group_start, 0, group_end, group, title_format)
+        metric_index = group_end_index + 1
+        group_start = group_end + 1
+    for column, (_, label, _, _) in enumerate(METRIC_COLUMNS, start=1):
+        sheet.write(1, column, label, header_format)
+    for row_index, values in enumerate(_node_table_values(model, node, for_xlsx=True), start=2):
+        sheet.write(row_index, 0, values[0], row_format)
+        for column, value in enumerate(values[1:], start=1):
+            if value is None:
+                sheet.write_blank(row_index, column, None, row_format)
+            else:
+                sheet.write_number(row_index, column, value, number_format)
+    sheet.set_column(0, 0, 26)
+    sheet.set_column(1, len(METRIC_COLUMNS), 17)
+    sheet.freeze_panes(2, 1)
+
+    problem_row = 2 + len(ROWS) + 2
+    sheet.write(problem_row, 0, "Problems: biobanks without collections or services", title_format)
+    sheet.write(problem_row + 1, 0, "Count", header_format)
+    sheet.write_number(problem_row + 1, 1, len(model["problems"].get(node, [])), number_format)
+
+    legend_row = problem_row + 4
+    sheet.write(legend_row, 0, "Legend", title_format)
+    legends = (
+        ("Biobanks and Negotiator", "unique biobanks"),
+        ("Q-labels: organizations", "unique biobanks; accredited takes precedence over ERIC"),
+        ("Q-labels: collections", "unique collections grouped by parent-biobank category"),
+        ("Blank cells", "unavailable or unsupported, not zero"),
+        ("Negotiator", "actual representatives only; displayed states exclude biobanks without active collections"),
+        ("Unsupported categories", "currently fall into others"),
+        ("Problems", "active biobanks without collections or services"),
+    )
+    for offset, (label, meaning) in enumerate(legends, start=1):
+        sheet.write(legend_row + offset, 0, label, header_format)
+        sheet.write(legend_row + offset, 1, meaning)
+
+    metadata_row = legend_row + len(legends) + 3
+    metadata = {
+        "Policy version": POLICY_VERSION,
+        "Federated Platform source": model.get(
+            "federated_platform",
+            SourceResult(False, "Federated Platform source unavailable"),
+        ).reason,
+        **model.get("metadata", {}),
+    }
+    for offset, (label, value) in enumerate(metadata.items()):
+        sheet.write(metadata_row + offset, 0, label, header_format)
+        sheet.write(metadata_row + offset, 1, value)
+
+
+def write_xlsx_report(model: Mapping[str, Any], path) -> None:
+    """Atomically write grouped per-Node statistics sheets.
+
+    Args:
+        model: Precomputed report model returned by :func:`build_report_model`.
+        path: Destination XLSX path. Existing output is replaced only after a
+            complete workbook is successfully written.
+
+    Returns:
+        ``None`` after atomically publishing the workbook.
+
+    Raises:
+        ValueError: A Node cannot be mapped to a unique Excel worksheet name.
+        OSError: The destination directory or final atomic replacement fails.
+    """
+    destination = Path(path)
+    sheet_names = _sheet_names(model["nodes"])
+    temporary_file = None
+    try:
+        descriptor, temporary_file = tempfile.mkstemp(
+            prefix=f".{destination.stem}.", suffix=".xlsx", dir=destination.parent or Path(".")
+        )
+        os.close(descriptor)
+        with pd.ExcelWriter(
+            temporary_file,
+            engine="xlsxwriter",
+            engine_kwargs={"options": {"strings_to_urls": False}},
+        ) as writer:
+            for node in sorted(model["nodes"]):
+                sheet = writer.book.add_worksheet(sheet_names[node])
+                writer.sheets[sheet_names[node]] = sheet
+                _write_node_sheet(writer.book, sheet, model, node)
+        os.replace(temporary_file, destination)
+        temporary_file = None
+    finally:
+        if temporary_file is not None:
+            try:
+                os.unlink(temporary_file)
+            except FileNotFoundError:
+                pass
+
+
+def build_argument_parser():
+    """Build the import-safe command-line parser for this exporter.
+
+    Returns:
+        Parser with standard Directory, XLSX, logging, and cache arguments plus
+        the required Negotiator representatives workbook path.
+    """
+    parser = build_parser(description="Export per-Node biobank statistics.")
+    add_logging_arguments(parser)
+    add_directory_auth_arguments(parser)
+    add_xlsx_output_argument(parser)
+    add_no_stdout_argument(parser)
+    add_directory_schema_argument(parser, default="ERIC")
+    add_purge_cache_arguments(parser, ["directory"])
+    parser.add_argument("input_xlsx", help="Negotiator representatives XLSX")
+    return parser
 
 def main(argv=None, directory_factory=Directory):
-    parser = build_parser(description="Export per-Node biobank statistics.")
-    add_logging_arguments(parser); add_directory_auth_arguments(parser); add_xlsx_output_argument(parser)
-    add_no_stdout_argument(parser); add_directory_schema_argument(parser, default="ERIC"); add_purge_cache_arguments(parser, ["directory"])
-    parser.add_argument("input_xlsx", help="Negotiator representatives XLSX")
-    args = parser.parse_args(argv); configure_logging(args)
+    """Run the Node statistics exporter.
+
+    Args:
+        argv: Optional command-line argument sequence; ``None`` reads process arguments.
+        directory_factory: Callable constructing the Directory implementation.
+
+    Returns:
+        ``None`` after successful report rendering.
+    """
+    parser = build_argument_parser()
+    args = parser.parse_args(argv)
+    configure_logging(args)
     unsupported = ", ".join(rule.name for rule in CATEGORY_POLICY if not rule.supported)
     log.warning("Unsupported biobank categories currently fall into others: %s", unsupported)
-    directory = directory_factory(**build_directory_kwargs(args)); directory.loadNegotiatorRepresentatives(args.input_xlsx)
+    directory = directory_factory(**build_directory_kwargs(args))
+    directory.loadNegotiatorRepresentatives(args.input_xlsx)
     model = build_report_model(directory)
+    if args.verbose or args.debug:
+        for node in sorted(model["problems"]):
+            problem_ids = sorted(model["problems"][node])
+            if problem_ids:
+                log.info(
+                    "Biobanks without collections or services for Node %s: %s",
+                    node,
+                    ", ".join(problem_ids),
+                )
     if not args.nostdout: render_stdout(model)
     if args.outputXLSX:
         write_xlsx_report(model, args.outputXLSX[0])

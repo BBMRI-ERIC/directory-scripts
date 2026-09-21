@@ -29,6 +29,7 @@ CLI_SCRIPTS = [
     "exporter-institutions.py",
     "exporter-mission-cancer.py",
     "exporter-negotiator-orphans.py",
+    "exporter-nn-biobank-stats.py",
     "exporter-obesity.py",
     "exporter-pediatric.py",
     "exporter-quality-label.py",
