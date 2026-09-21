@@ -7,6 +7,7 @@ import logging
 import os
 import os.path
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -20,6 +21,28 @@ from nncontacts import NNContacts
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
 REPO_ROOT = Path(__file__).resolve().parent
+
+
+@dataclass(frozen=True)
+class NegotiatorResource:
+    """Normalized representatives registered for one Negotiator resource."""
+
+    resource_source_id: str
+    network_name: str
+    biobank_name: str
+    resource_name: str
+    representatives: frozenset[str]
+
+
+@dataclass(frozen=True)
+class NegotiatorCoverage:
+    """Actual direct Negotiator representative coverage for one biobank."""
+
+    biobank_id: str
+    active_collection_count: int
+    represented_collection_count: int
+    unrepresented_collection_count: int
+    status: str
 
 
 def _cache_root() -> Path:
@@ -126,6 +149,8 @@ class Directory:
             purgeCaches = list()
         self.__pp = pp
         self.__package = schema
+        self._negotiator_resources: Optional[dict[str, NegotiatorResource]] = None
+        self._negotiator_unmatched_resource_ids: tuple[str, ...] = ()
         self.only_withdrawn_entities = only_withdrawn_entities
         self.include_withdrawn_entities = include_withdrawn_entities or only_withdrawn_entities
         self._ai_checksum_snapshot = {}
@@ -1254,6 +1279,133 @@ class Directory:
             raise KeyError(f"Parent biobank {biobank_id!r} of collection {collectionID!r} is {reason}.")
         log.warning("Parent biobank %r of collection %r is %s.", biobank_id, collectionID, reason)
         return None
+
+    @staticmethod
+    def _normalize_negotiator_scalar(value: Any) -> str:
+        """Return a stripped scalar, treating null-like values as empty."""
+        return "" if value is None or pd.isna(value) else str(value).strip()
+
+    def hasNegotiatorData(self) -> bool:
+        """Return whether a Negotiator resource dataset has been loaded."""
+        return getattr(self, "_negotiator_resources", None) is not None
+
+    def setNegotiatorRepresentatives(self, data: dict[str, dict[str, Any]]) -> None:
+        """Normalize injected Negotiator resource mappings.
+
+        Args:
+            data: Resource mappings keyed by Directory collection ID.
+
+        Returns:
+            None. The instance retains an immutable normalized copy.
+        """
+        resources = {}
+        for resource_id, row in data.items():
+            resource_id = self._normalize_negotiator_scalar(resource_id)
+            if not resource_id:
+                continue
+            emails = frozenset(
+                email.strip().lower() for email in row.get("representatives", set())
+                if self._normalize_negotiator_scalar(email)
+            )
+            resources[resource_id] = NegotiatorResource(
+                resource_id,
+                self._normalize_negotiator_scalar(row.get("network_name")),
+                self._normalize_negotiator_scalar(row.get("biobank_name")),
+                self._normalize_negotiator_scalar(row.get("resource_name")),
+                emails,
+            )
+        self._negotiator_resources = resources
+        self._negotiator_unmatched_resource_ids = ()
+
+    def _require_negotiator_data(self) -> dict[str, NegotiatorResource]:
+        """Return loaded Negotiator data or raise a clear state error."""
+        resources = getattr(self, "_negotiator_resources", None)
+        if resources is None:
+            raise RuntimeError("Negotiator data have not been loaded.")
+        return resources
+
+    def getCollectionNegotiatorRepresentatives(self, collection_id: str) -> frozenset[str]:
+        """Return direct normalized representatives for a visible collection.
+
+        Args:
+            collection_id: Directory collection identifier.
+
+        Returns:
+            Immutable representative emails; empty when no resource row exists.
+        """
+        resource = self._require_negotiator_data().get(collection_id)
+        return resource.representatives if resource else frozenset()
+
+    def getNegotiatorResources(self) -> dict[str, NegotiatorResource]:
+        """Return a defensive mapping of normalized resource registrations."""
+        return dict(self._require_negotiator_data())
+
+    def getUnmatchedNegotiatorResourceIds(self) -> tuple[str, ...]:
+        """Return normalized resource IDs absent from the visible Directory scope."""
+        self._require_negotiator_data()
+        return tuple(getattr(self, "_negotiator_unmatched_resource_ids", ()))
+
+    def loadNegotiatorRepresentatives(self, path: str) -> None:
+        """Load and normalize the current Negotiator representatives XLSX.
+
+        Args:
+            path: XLSX path containing the required current Negotiator columns.
+
+        Returns:
+            None. Replaces the instance's optional Negotiator dataset.
+
+        Raises:
+            ValueError: The workbook lacks required columns.
+        """
+        table = pd.read_excel(path)
+        required = ("network_name", "biobank_name", "resource_name", "resource_source_id", "representatives_emails")
+        missing = [column for column in required if column not in table.columns]
+        if missing:
+            raise ValueError("Missing required columns: " + ", ".join(missing))
+        records: dict[str, dict[str, Any]] = {}
+        for _, row in table.iterrows():
+            resource_id = self._normalize_negotiator_scalar(row["resource_source_id"])
+            if not resource_id:
+                log.warning("Negotiator row without resource_source_id skipped.")
+                continue
+            current = records.setdefault(resource_id, {"representatives": set()})
+            for field in ("network_name", "biobank_name", "resource_name"):
+                value = self._normalize_negotiator_scalar(row[field])
+                if value and current.get(field) and current[field] != value:
+                    log.warning("Negotiator resource %s has conflicting metadata for %s; retaining first value.", resource_id, field)
+                elif value:
+                    current[field] = value
+            current["representatives"].update(
+                email.strip().lower() for email in self._normalize_negotiator_scalar(row["representatives_emails"]).split(";") if email.strip()
+            )
+        self.setNegotiatorRepresentatives(records)
+        unmatched = []
+        for resource_id in self._negotiator_resources:
+            if self.getParentBiobank(resource_id) is None:
+                unmatched.append(resource_id)
+        self._negotiator_unmatched_resource_ids = tuple(sorted(unmatched))
+
+    def getBiobankNegotiatorCoverage(self, biobank_id: str) -> NegotiatorCoverage:
+        """Return actual direct Negotiator coverage for one visible biobank.
+
+        Args:
+            biobank_id: Visible Directory biobank identifier.
+
+        Returns:
+            Coverage record using only direct non-empty representatives.
+        """
+        return self.getNegotiatorCoverage()[biobank_id]
+
+    def getNegotiatorCoverage(self) -> dict[str, NegotiatorCoverage]:
+        """Return actual direct representative coverage for visible biobanks."""
+        self._require_negotiator_data()
+        result = {}
+        for biobank in self.getBiobanks():
+            collection_ids = [c["id"] for c in self.getCollections() if c["biobank"]["id"] == biobank["id"]]
+            represented = sum(bool(self.getCollectionNegotiatorRepresentatives(cid)) for cid in collection_ids)
+            status = "no_collections" if not collection_ids else "fully" if represented == len(collection_ids) else "missing" if represented == 0 else "partially"
+            result[biobank["id"]] = NegotiatorCoverage(biobank["id"], len(collection_ids), represented, len(collection_ids) - represented, status)
+        return result
 
     def getCollectionContact(self, collectionID: str):
         """Return primary contact record for a collection id."""

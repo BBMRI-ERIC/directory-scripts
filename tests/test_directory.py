@@ -594,6 +594,30 @@ def test_get_parent_biobank_excludes_withdrawn_collection_in_active_scope():
         directory.getParentBiobank("col3", raise_on_missing=True)
 
 
+def test_negotiator_queries_require_loaded_state():
+    directory = _make_directory_stub()
+
+    assert directory.hasNegotiatorData() is False
+    with pytest.raises(RuntimeError, match="Negotiator data have not been loaded"):
+        directory.getNegotiatorCoverage()
+
+
+def test_set_negotiator_representatives_normalizes_immutable_sets():
+    directory = _make_directory_stub()
+
+    directory.setNegotiatorRepresentatives({
+        "col1": {
+            "network_name": "Network",
+            "biobank_name": "Biobank",
+            "resource_name": "Collection",
+            "representatives": {" REP@example.org ", "rep@example.org"},
+        }
+    })
+
+    assert directory.hasNegotiatorData() is True
+    assert directory.getCollectionNegotiatorRepresentatives("col1") == frozenset({"rep@example.org"})
+
+
 def test_directory_filters_withdrawn_entities_when_requested():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
