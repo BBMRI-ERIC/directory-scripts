@@ -31,17 +31,6 @@ cachesList = ['directory']
 pp = pprint.PrettyPrinter(indent=4)
 
 
-def parse_email_list(raw_value):
-    if raw_value is None or (isinstance(raw_value, float) and pd.isna(raw_value)):
-        return set()
-    emails = []
-    for item in str(raw_value).split(';'):
-        item = item.strip().lower()
-        if item:
-            emails.append(item)
-    return set(emails)
-
-
 def get_staging_area_from_id(collection_id):
     if not collection_id:
         return ""
@@ -119,41 +108,21 @@ if isinstance(qual_bb_df, pd.DataFrame) and not qual_bb_df.empty:
                 if biobank_id:
                     biobank_quality_ids.add(biobank_id)
 
-df_input = pd.read_excel(args.input_xlsx)
-required_columns = [
-    'network_name',
-    'biobank_name',
-    'resource_name',
-    'resource_source_id',
-    'representatives_emails',
-]
-missing_columns = [c for c in required_columns if c not in df_input.columns]
-if missing_columns:
-    raise ValueError("Missing required columns: " + ", ".join(missing_columns))
-
-rows_by_collection = {}
-reps_by_collection = {}
-for _, row in df_input.iterrows():
-    collection_id = row.get('resource_source_id')
-    if collection_id is None or (isinstance(collection_id, float) and pd.isna(collection_id)):
-        log.warning("Row without resource_source_id found, skipping.")
-        continue
-    collection_id = str(collection_id).strip()
-    reps = parse_email_list(row.get('representatives_emails'))
-    if collection_id in reps_by_collection:
-        log.warning("Duplicate resource_source_id in input: %s (merging representatives)", collection_id)
-        reps_by_collection[collection_id] = reps_by_collection[collection_id].union(reps)
-        existing = rows_by_collection[collection_id]
-        for key in ['network_name', 'biobank_name', 'resource_name']:
-            if not existing.get(key) and row.get(key):
-                existing[key] = row.get(key)
-    else:
-        rows_by_collection[collection_id] = {
-            'network_name': row.get('network_name') or "",
-            'biobank_name': row.get('biobank_name') or "",
-            'resource_name': row.get('resource_name') or "",
-        }
-        reps_by_collection[collection_id] = reps
+dir.loadNegotiatorRepresentatives(args.input_xlsx)
+resources = dir.getNegotiatorResources()
+coverage_by_biobank = dir.getNegotiatorCoverage()
+rows_by_collection = {
+    resource_id: {
+        'network_name': resource.network_name,
+        'biobank_name': resource.biobank_name,
+        'resource_name': resource.resource_name,
+    }
+    for resource_id, resource in resources.items()
+}
+reps_by_collection = {
+    resource_id: set(resource.representatives)
+    for resource_id, resource in resources.items()
+}
 
 collection_map_all = {}
 collection_map_active = {}
@@ -436,9 +405,9 @@ if args.outputXLSX:
             nn_groups.append({
                 'nn': nn,
                 'sum_biobanks': len(group),
-                'sum_biobanks_without_missing_reps': int(((active_collections > 0) & (group['collections_without_reps'] == 0)).sum()),
-                'sum_biobanks_missing_and_with_reps': int(((active_collections > 0) & (group['collections_without_reps'] != 0) & (group['collections_with_reps'] != 0)).sum()),
-                'sum_biobanks_without_reps': int(((active_collections > 0) & (group['collections_with_reps'] == 0)).sum()),
+                'sum_biobanks_without_missing_reps': int(sum(coverage_by_biobank[row.biobank_id].status == 'fully' for row in group.itertuples())),
+                'sum_biobanks_missing_and_with_reps': int(sum(coverage_by_biobank[row.biobank_id].status == 'partially' for row in group.itertuples())),
+                'sum_biobanks_without_reps': int(sum(coverage_by_biobank[row.biobank_id].status == 'missing' for row in group.itertuples())),
                 'sum_biobanks_without_collections': int((group['total_collections'] == 0).sum()),
                 'sum_collections_with_reps': int(group['collections_with_reps'].sum()),
                 'sum_collections_without_reps': int(group['collections_without_reps'].sum()),
@@ -453,9 +422,9 @@ if args.outputXLSX:
         totals = {
             'nn': 'TOTAL',
             'sum_biobanks': int(df_biobanks.shape[0]),
-            'sum_biobanks_without_missing_reps': int(((active_collections_all > 0) & (df_biobanks['collections_without_reps'] == 0)).sum()),
-            'sum_biobanks_missing_and_with_reps': int(((active_collections_all > 0) & (df_biobanks['collections_without_reps'] != 0) & (df_biobanks['collections_with_reps'] != 0)).sum()),
-            'sum_biobanks_without_reps': int(((active_collections_all > 0) & (df_biobanks['collections_with_reps'] == 0)).sum()),
+            'sum_biobanks_without_missing_reps': int(sum(item.status == 'fully' for item in coverage_by_biobank.values())),
+            'sum_biobanks_missing_and_with_reps': int(sum(item.status == 'partially' for item in coverage_by_biobank.values())),
+            'sum_biobanks_without_reps': int(sum(item.status == 'missing' for item in coverage_by_biobank.values())),
             'sum_biobanks_without_collections': int((df_biobanks['total_collections'] == 0).sum()),
             'sum_collections_with_reps': int(df_biobanks['collections_with_reps'].sum()),
             'sum_collections_without_reps': int(df_biobanks['collections_without_reps'].sum()),
