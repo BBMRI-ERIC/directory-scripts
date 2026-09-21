@@ -200,7 +200,11 @@ def test_parser_and_main_use_shared_cli_contract(tmp_path, monkeypatch, caplog):
     assert calls[0][1]["skip_graph_dag_validation"] is True
     assert calls[1] == ("load", "representatives.xlsx")
     assert sum("Unsupported biobank categories" in record.message for record in caplog.records) == 1
-    assert not any("AT-problem" in record.message for record in caplog.records)
+    assert any(
+        record.levelno == logging.WARNING
+        and "Node AT has 1 active biobank(s) without collections or services." in record.message
+        for record in caplog.records
+    )
 
     caplog.clear()
     caplog.set_level(logging.INFO, logger=module.__name__)

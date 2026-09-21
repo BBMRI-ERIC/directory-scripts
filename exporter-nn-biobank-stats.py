@@ -423,6 +423,14 @@ def main(argv=None, directory_factory=Directory):
     directory = directory_factory(**build_directory_kwargs(args))
     directory.loadNegotiatorRepresentatives(args.input_xlsx)
     model = build_report_model(directory)
+    for node in sorted(model["problems"]):
+        problem_ids = sorted(model["problems"][node])
+        if problem_ids:
+            log.warning(
+                "Node %s has %d active biobank(s) without collections or services.",
+                node,
+                len(problem_ids),
+            )
     if args.verbose or args.debug:
         for node in sorted(model["problems"]):
             problem_ids = sorted(model["problems"][node])
