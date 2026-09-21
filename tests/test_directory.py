@@ -618,6 +618,32 @@ def test_set_negotiator_representatives_normalizes_immutable_sets():
     assert directory.getCollectionNegotiatorRepresentatives("col1") == frozenset({"rep@example.org"})
 
 
+def test_negotiator_coverage_uses_direct_representatives_only():
+    directory = _make_directory_stub()
+    directory.setNegotiatorRepresentatives({"col1": {"representatives": {"a@example.org"}}})
+
+    coverage = directory.getBiobankNegotiatorCoverage("bb1")
+
+    assert coverage.status == "partially"
+    assert coverage.active_collection_count == 3
+    assert coverage.represented_collection_count == 1
+    assert coverage.unrepresented_collection_count == 2
+
+
+def test_load_negotiator_representatives_merges_duplicate_rows(tmp_path, caplog):
+    workbook = tmp_path / "representatives.xlsx"
+    pd.DataFrame([
+        {"network_name": "N", "biobank_name": "B", "resource_name": "C", "resource_source_id": "col1", "representatives_emails": "A@example.org; b@example.org"},
+        {"network_name": "Other", "biobank_name": "B", "resource_name": "C", "resource_source_id": "col1", "representatives_emails": "b@example.org;c@example.org"},
+    ]).to_excel(workbook, index=False)
+    directory = _make_directory_stub()
+
+    directory.loadNegotiatorRepresentatives(workbook)
+
+    assert directory.getCollectionNegotiatorRepresentatives("col1") == frozenset({"a@example.org", "b@example.org", "c@example.org"})
+    assert "conflicting metadata" in caplog.text
+
+
 def test_directory_filters_withdrawn_entities_when_requested():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
