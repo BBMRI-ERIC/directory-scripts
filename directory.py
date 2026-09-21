@@ -1213,6 +1213,48 @@ class Directory:
         collection = self.directoryGraph.nodes[collectionID]['data']
         return collection['biobank']['id']
 
+    def getParentBiobank(self, collectionID: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
+        """Return the visible parent biobank for a collection.
+
+        Args:
+            collectionID: Identifier of the collection whose owner is requested.
+            raise_on_missing: Raise KeyError instead of returning None when the
+                collection or its parent is unavailable in the current scope.
+
+        Returns:
+            The visible parent-biobank mapping, or None when an entity is
+            unavailable and raise_on_missing is false.
+
+        Raises:
+            KeyError: An entity is unavailable and raise_on_missing is true.
+            ValueError: The loaded collection has malformed ownership metadata.
+        """
+        collection = self._get_loaded_collection_by_id(collectionID)
+        if collection is None:
+            if raise_on_missing:
+                raise KeyError(f"Collection {collectionID!r} is not present in the loaded directory snapshot.")
+            log.warning("Collection %r is not present in the loaded directory snapshot.", collectionID)
+            return None
+        owner = collection.get("biobank")
+        if not isinstance(owner, dict) or not isinstance(owner.get("id"), str) or not owner["id"].strip():
+            raise ValueError(f"Collection {collectionID!r} has malformed biobank ownership metadata.")
+        if self._get_visible_collection_by_id(collectionID) is None:
+            if raise_on_missing:
+                raise KeyError(f"Collection {collectionID!r} is unavailable in the configured scope.")
+            log.warning("Collection %r is unavailable in the configured scope.", collectionID)
+            return None
+        biobank_id = owner["id"]
+        biobank = self.getBiobankById(biobank_id)
+        if biobank is not None:
+            return biobank
+        reason = ("not present in the loaded directory snapshot"
+                  if self._get_loaded_biobank_by_id(biobank_id) is None
+                  else "unavailable in the configured scope")
+        if raise_on_missing:
+            raise KeyError(f"Parent biobank {biobank_id!r} of collection {collectionID!r} is {reason}.")
+        log.warning("Parent biobank %r of collection %r is %s.", biobank_id, collectionID, reason)
+        return None
+
     def getCollectionContact(self, collectionID: str):
         """Return primary contact record for a collection id."""
         collection = self.directoryGraph.nodes[collectionID]['data']

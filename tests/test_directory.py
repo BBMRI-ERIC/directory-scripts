@@ -552,6 +552,48 @@ def test_get_list_of_entity_attribute_ids_accepts_mixed_emx2_shapes():
     assert Directory.getListOfEntityAttributeIds(entity, "order_of_magnitude") == ["3"]
 
 
+def test_get_parent_biobank_returns_visible_owner():
+    directory = _make_directory_stub()
+
+    assert directory.getParentBiobank("col1") == directory.biobanks[0]
+
+
+def test_get_parent_biobank_handles_missing_collection():
+    directory = _make_directory_stub()
+
+    assert directory.getParentBiobank("absent") is None
+    with pytest.raises(KeyError, match="absent"):
+        directory.getParentBiobank("absent", raise_on_missing=True)
+
+
+@pytest.mark.parametrize("bad_owner", [None, "bb1", {}, {"id": ""}, {"id": "  "}])
+def test_get_parent_biobank_rejects_malformed_ownership(bad_owner):
+    directory = _make_directory_stub()
+    directory.collections[0]["biobank"] = bad_owner
+
+    with pytest.raises(ValueError, match="col1"):
+        directory.getParentBiobank("col1")
+
+
+def test_get_parent_biobank_handles_missing_parent():
+    directory = _make_directory_stub()
+    directory.biobanks = directory.biobanks[1:]
+
+    assert directory.getParentBiobank("col1") is None
+    with pytest.raises(KeyError, match="bb1"):
+        directory.getParentBiobank("col1", raise_on_missing=True)
+
+
+def test_get_parent_biobank_excludes_withdrawn_collection_in_active_scope():
+    directory = _make_directory_stub()
+    directory.include_withdrawn_entities = False
+    directory.only_withdrawn_entities = False
+
+    assert directory.getParentBiobank("col3") is None
+    with pytest.raises(KeyError, match="col3"):
+        directory.getParentBiobank("col3", raise_on_missing=True)
+
+
 def test_directory_filters_withdrawn_entities_when_requested():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
