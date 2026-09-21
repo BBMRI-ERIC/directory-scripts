@@ -20,11 +20,26 @@ withdrawn-scope, and logging conventions documented in
 | `exporter-institutions.py` | Export juridical persons grouped by country. |
 | `exporter-mission-cancer.py` | Export cancer and pediatric-cancer collections. |
 | `exporter-negotiator-orphans.py` | Analyze Negotiator representative coverage and assignment candidates. |
+| `exporter-nn-biobank-stats.py` | Export per-National-Node biobank statistics from Directory and Negotiator evidence. |
 | `exporter-obesity.py` | Export obesity and pediatric-obesity collections. |
 | `exporter-pediatric.py` | Export pediatric and pediatric-only collections. |
 | `exporter-quality-label.py` | Export quality assessments for biobanks and collections. |
 
 ## Exporter details
+
+### `exporter-nn-biobank-stats.py`
+
+- **Purpose:** Summarize active Directory biobanks per National Node, including
+  collection-derived hospital/population classification and actual Negotiator coverage.
+- **Output:** Per-Node XLSX sheets (including virtual `EXT`) and aligned stdout.
+  Federated Platform cells are blank in XLSX and `N/A` on stdout until an inventory API exists.
+- **Classification:** The top-most supported collection frontier votes for
+  `HOSPITAL` and `POPULATION_BASED`; ties select hospital-integrated. Other
+  categories are currently unsupported and therefore fall into `others`.
+
+```bash
+python3 exporter-nn-biobank-stats.py representatives.xlsx -X nn-biobank-stats.xlsx
+```
 
 ### `exporter-all.py`
 
