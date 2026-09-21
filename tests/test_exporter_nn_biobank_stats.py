@@ -26,3 +26,21 @@ def test_frontier_prunes_mapped_parent_and_tie_uses_row_priority():
     assert result.category == "hospital-integrated"
     assert result.votes == {"hospital-integrated": 1, "population-based": 1}
     assert result.tie and result.mixed
+
+
+def test_report_model_keeps_federated_platform_unavailable():
+    module = _module()
+
+    class Directory:
+        def getNegotiatorCoverage(self):
+            return {"bb": type("Coverage", (), {"status": "fully"})()}
+        def getBiobanks(self): return [{"id": "bb"}]
+        def getBiobankNN(self, _): return "CZ"
+        def getCollections(self): return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
+        def getBiobankServices(self, _): return []
+        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+
+    model = module.build_report_model(Directory())
+    assert model["federated_platform"].available is False
+    assert model["nodes"]["CZ"]["hospital-integrated"]["negotiator_fully"] == 1
