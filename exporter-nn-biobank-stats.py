@@ -72,6 +72,7 @@ class BiobankClassification:
     mixed: bool
     tie: bool
     provisional: bool = False
+    fallback_reason: str | None = None
 
 @dataclass(frozen=True)
 class SourceResult:
@@ -91,22 +92,36 @@ def classify_biobank_collections(collections):
         collections: Active collection mappings belonging to one biobank.
 
     Returns:
-        Selected category, votes, frontier identifiers, and mixed/tie or
-        provisional-hierarchy indicators.
+        Selected category, votes, frontier identifiers, mixed/tie and
+        provisional-hierarchy indicators, and a reason whenever the result
+        falls back to ``others``.
     """
     by_id = {item["id"]: item for item in collections}
+    if not by_id:
+        return BiobankClassification(
+            "others", {}, (), False, False,
+            fallback_reason="no active collections",
+        )
     children = defaultdict(list)
     roots = set(by_id)
     for item in collections:
         parent = item.get("parent_collection", {}).get("id")
         if parent:
-            if parent not in by_id: return BiobankClassification("others", {}, (), False, False, True)
+            if parent not in by_id:
+                return BiobankClassification(
+                    "others", {}, (), False, False,
+                    provisional=True,
+                    fallback_reason=(
+                        f"parent collection {parent!r} is absent from biobank collection set"
+                    ),
+                )
             children[parent].append(item["id"]); roots.discard(item["id"])
     # Validate every component before pruning the supported voting frontier.
     states = {}
     def validate(cid):
         state = states.get(cid, 0)
-        if state == 1: raise ValueError("cycle")
+        if state == 1:
+            raise ValueError(f"collection hierarchy cycle detected at {cid!r}")
         if state == 2: return
         states[cid] = 1
         parent = by_id[cid].get("parent_collection", {}).get("id")
@@ -114,21 +129,33 @@ def classify_biobank_collections(collections):
         states[cid] = 2
     try:
         for cid in sorted(by_id): validate(cid)
-    except ValueError:
-        return BiobankClassification("others", {}, (), False, False, True)
+    except ValueError as error:
+        return BiobankClassification(
+            "others", {}, (), False, False,
+            provisional=True,
+            fallback_reason=str(error),
+        )
     mapped = {typ: rule.name for rule in CATEGORY_POLICY for typ in rule.types}
     votes, frontier = Counter(), []
     def walk(cid, stack):
-        if cid in stack: raise ValueError("cycle")
+        if cid in stack:
+            raise ValueError(f"collection hierarchy cycle detected at {cid!r}")
         item = by_id[cid]; categories = sorted({mapped[t] for t in _ids(item.get("type")) if t in mapped})
         if categories:
             votes.update(categories); frontier.append(cid); return
         for child in sorted(children[cid]): walk(child, stack | {cid})
     try:
         for root in sorted(roots): walk(root, set())
-    except ValueError:
-        return BiobankClassification("others", dict(votes), tuple(sorted(frontier)), bool(votes), False, True)
-    if not votes: return BiobankClassification("others", {}, (), False, False)
+    except ValueError as error:
+        return BiobankClassification(
+            "others", dict(votes), tuple(sorted(frontier)), bool(votes),
+            False, provisional=True, fallback_reason=str(error),
+        )
+    if not votes:
+        return BiobankClassification(
+            "others", {}, (), False, False,
+            fallback_reason="no supported category votes",
+        )
     order = [rule.name for rule in CATEGORY_POLICY]
     highest = max(votes.values()); winners = [name for name in order if votes[name] == highest]
     return BiobankClassification(winners[0], dict(votes), tuple(sorted(frontier)), len(votes) > 1, len(winners) > 1)
@@ -157,7 +184,11 @@ def build_report_model(directory):
         if classification.mixed:
             log.info("Mixed biobank %s: votes=%s, selected=%s, tie=%s, frontier=%s", bid, classification.votes, category, classification.tie, classification.frontier_ids)
         if classification.provisional:
-            log.warning("Provisional fallback to others for biobank %s due to hierarchy corruption.", bid)
+            log.warning(
+                "Provisional fallback to others for biobank %s: %s.",
+                bid,
+                classification.fallback_reason,
+            )
         classifications[bid] = (node, category)
         for row in ("total biobanks", category):
             values = result[node][row]; values["total_biobanks"] += 1; values["directory_biobanks"] += 1

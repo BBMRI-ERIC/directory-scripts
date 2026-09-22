@@ -31,6 +31,7 @@ def test_frontier_prunes_mapped_parent_and_tie_uses_row_priority():
     assert result.category == "hospital-integrated"
     assert result.votes == {"hospital-integrated": 1, "population-based": 1}
     assert result.tie and result.mixed
+    assert result.fallback_reason is None
 
 
 @pytest.mark.parametrize("cycle_length", [1, 2, 3])
@@ -48,6 +49,54 @@ def test_rootless_cycle_forces_provisional_others_fallback(cycle_length):
 
     assert result.category == "others"
     assert result.provisional is True
+    assert result.fallback_reason == "collection hierarchy cycle detected at 'cycle-0'"
+
+
+@pytest.mark.parametrize(
+    ("collections", "expected_reason", "provisional"),
+    [
+        ([], "no active collections", False),
+        ([{"id": "untyped"}], "no supported category votes", False),
+        (
+            [{"id": "child", "parent_collection": {"id": "missing"}}],
+            "parent collection 'missing' is absent from biobank collection set",
+            True,
+        ),
+    ],
+)
+def test_others_fallbacks_explain_their_reason(collections, expected_reason, provisional):
+    module = _module()
+
+    result = module.classify_biobank_collections(collections)
+
+    assert result.category == "others"
+    assert result.fallback_reason == expected_reason
+    assert result.provisional is provisional
+
+
+def test_provisional_warning_contains_specific_hierarchy_reason(caplog):
+    module = _module()
+
+    class Directory:
+        def getSchema(self): return "TEST"
+        def getNegotiatorCoverage(self):
+            return {"bb": type("Coverage", (), {"status": "fully"})()}
+        def getBiobanks(self): return [{"id": "bb"}]
+        def getBiobankNN(self, _): return "CZ"
+        def getCollections(self):
+            return [{
+                "id": "cycle-0",
+                "biobank": {"id": "bb"},
+                "parent_collection": {"id": "cycle-0"},
+            }]
+        def getBiobankServices(self, _): return []
+        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+
+    caplog.set_level(logging.WARNING)
+    module.build_report_model(Directory())
+
+    assert "collection hierarchy cycle detected at 'cycle-0'" in caplog.text
 
 
 def test_report_model_keeps_federated_platform_unavailable():

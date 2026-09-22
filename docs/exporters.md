@@ -70,8 +70,9 @@ withdrawn-scope, and logging conventions documented in
   affected by hierarchy corruption are provisional and should not be used as
   authoritative statistics. Every collection component is checked, including
   cycles disconnected from top-level collections; an affected biobank falls
-  back to provisional `others`. Workbook metadata records the actual schema
-  and whether DAG validation was skipped.
+  back to provisional `others`, and the warning identifies the missing parent
+  or cycle location. Workbook metadata records the actual schema and whether
+  DAG validation was skipped.
 
 ```bash
 python3 exporter-nn-biobank-stats.py representatives.xlsx -X nn-biobank-stats.xlsx
