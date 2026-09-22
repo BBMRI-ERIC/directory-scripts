@@ -20,11 +20,78 @@ withdrawn-scope, and logging conventions documented in
 | `exporter-institutions.py` | Export juridical persons grouped by country. |
 | `exporter-mission-cancer.py` | Export cancer and pediatric-cancer collections. |
 | `exporter-negotiator-orphans.py` | Analyze Negotiator representative coverage and assignment candidates. |
+| `exporter-nn-biobank-stats.py` | Export per-National-Node biobank statistics from Directory and Negotiator evidence. |
 | `exporter-obesity.py` | Export obesity and pediatric-obesity collections. |
 | `exporter-pediatric.py` | Export pediatric and pediatric-only collections. |
 | `exporter-quality-label.py` | Export quality assessments for biobanks and collections. |
 
 ## Exporter details
+
+### `exporter-nn-biobank-stats.py`
+
+- **Purpose:** Summarize active Directory biobanks per National Node, including
+  collection-derived biobank categories, actual Negotiator coverage, and
+  biobank- and collection-level quality labels.
+- **Input:** Select exactly one Negotiator registration source. Use
+  `--negotiator-representatives-xlsx` for the current representatives workbook,
+  whose first sheet must contain `network_name`, `biobank_name`,
+  `resource_name`, `resource_source_id`, and `representatives_emails`. Use
+  `--negotiator-orphans-xlsx` for output from
+  `exporter-negotiator-orphans.py`; only its `negotiator_collection_stats`
+  worksheet is read. The old positional workbook remains a deprecated alias
+  for `--negotiator-representatives-xlsx`. `--negotiator-api` is reserved and
+  currently exits with a not-implemented error. Only active Directory entities
+  are counted.
+- **Output:** Stdout prints alphabetically ordered Node tables. `-X` creates one
+  worksheet per Node, including virtual `EXT`, with the same aggregated values,
+  a problems table, legend, and provenance metadata.
+- **Classification:** A versioned category policy walks each biobank's
+  top-most supported collection frontier. `HOSPITAL` and
+  `POPULATION_BASED` cast votes; a supported parent stops traversal of its
+  descendants. A tie follows report-row order, so hospital-integrated wins
+  over population-based. Human biomonitoring, environmental, plant
+  biodiversity, domestic animals, wildlife animals, and museum categories
+  are not yet mapped; the exporter warns and currently assigns such holdings
+  to `others`.
+- **Availability:** Federated Platform inventory is not available in this
+  version. It is shown as `N/A` on stdout and blank in XLSX, which means
+  unavailable rather than zero. The same unavailable convention applies to
+  unsupported category rows and missing optional quality tables. Supported
+  categories with no members show numeric zero for available metrics.
+- **Negotiator:** Only direct, non-empty representative assignments count.
+  `fully`, `partially`, and `missing` partition biobanks with active
+  collections; `no_collections` is intentionally omitted from those columns.
+  Parent or same-biobank assignment candidates reported by
+  `exporter-negotiator-orphans.py` remain advisory and are never counted as
+  registrations. Accordingly, orphan-report columns such as `auto_by_parent`
+  and `auto_by_biobank` are ignored; only direct, non-empty
+  `representatives_emails` values count.
+  Resource IDs outside the active Directory scope are retained as unmatched
+  evidence, not counted as represented collections or biobanks.
+- **Quality labels:** Organization columns count unique biobanks and collection
+  columns count unique collections, grouped by the parent biobank's Node and
+  category. A label assessed as both levels is counted once as `Accredited`,
+  which takes precedence over `ERIC`.
+- **Problems and emergency mode:** The problems table counts active biobanks
+  with neither collections nor services; normal runs warn for each affected
+  Node, while `-v`/`-d` list IDs. `--emergency-skip-dag-checks` permits a
+  best-effort run through broken collection hierarchies, but classifications
+  affected by hierarchy corruption are provisional and should not be used as
+  authoritative statistics. Every collection component is checked, including
+  cycles disconnected from top-level collections; an affected biobank falls
+  back to provisional `others`, and the warning identifies the missing parent
+  or cycle location. Workbook metadata records the actual schema and whether
+  DAG validation was skipped.
+
+```bash
+python3 exporter-nn-biobank-stats.py \
+  --negotiator-representatives-xlsx representatives.xlsx \
+  -X nn-biobank-stats.xlsx
+
+python3 exporter-nn-biobank-stats.py \
+  --negotiator-orphans-xlsx negotiator-orphans.xlsx \
+  -X nn-biobank-stats.xlsx
+```
 
 ### `exporter-all.py`
 

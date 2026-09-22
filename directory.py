@@ -7,6 +7,7 @@ import logging
 import os
 import os.path
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -20,6 +21,36 @@ from nncontacts import NNContacts
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
 REPO_ROOT = Path(__file__).resolve().parent
+NEGOTIATOR_ORPHANS_SHEET = "negotiator_collection_stats"
+NEGOTIATOR_REPRESENTATIVE_COLUMNS = (
+    "network_name",
+    "biobank_name",
+    "resource_name",
+    "resource_source_id",
+    "representatives_emails",
+)
+
+
+@dataclass(frozen=True)
+class NegotiatorResource:
+    """Normalized representatives registered for one Negotiator resource."""
+
+    resource_source_id: str
+    network_name: str
+    biobank_name: str
+    resource_name: str
+    representatives: frozenset[str]
+
+
+@dataclass(frozen=True)
+class NegotiatorCoverage:
+    """Actual direct Negotiator representative coverage for one biobank."""
+
+    biobank_id: str
+    active_collection_count: int
+    represented_collection_count: int
+    unrepresented_collection_count: int
+    status: str
 
 
 def _cache_root() -> Path:
@@ -126,6 +157,9 @@ class Directory:
             purgeCaches = list()
         self.__pp = pp
         self.__package = schema
+        self.skip_graph_dag_validation = bool(skip_graph_dag_validation)
+        self._negotiator_resources: Optional[dict[str, NegotiatorResource]] = None
+        self._negotiator_unmatched_resource_ids: tuple[str, ...] = ()
         self.only_withdrawn_entities = only_withdrawn_entities
         self.include_withdrawn_entities = include_withdrawn_entities or only_withdrawn_entities
         self._ai_checksum_snapshot = {}
@@ -1042,8 +1076,8 @@ class Directory:
     def _get_loaded_biobank_by_id(self, biobankID: str) -> Optional[dict[str, Any]]:
         """Return a loaded biobank regardless of withdrawn scope, or None when absent."""
         if self.directoryGraph.has_node(biobankID):
-            biobank = self.directoryGraph.nodes[biobankID]['data']
-            if 'country' in biobank or 'contact' in biobank:
+            biobank = self.directoryGraph.nodes[biobankID].get('data')
+            if isinstance(biobank, dict) and ('country' in biobank or 'contact' in biobank):
                 return biobank
         return None
 
@@ -1212,6 +1246,291 @@ class Directory:
         """Return the parent biobank id of the given collection id."""
         collection = self.directoryGraph.nodes[collectionID]['data']
         return collection['biobank']['id']
+
+    def getParentBiobank(self, collectionID: str, raise_on_missing: bool = False) -> Optional[dict[str, Any]]:
+        """Return the visible parent biobank for a collection.
+
+        Args:
+            collectionID: Identifier of the collection whose owner is requested.
+            raise_on_missing: Raise KeyError instead of returning None when the
+                collection or its parent is unavailable in the current scope.
+
+        Returns:
+            The visible parent-biobank mapping, or None when an entity is
+            unavailable and raise_on_missing is false.
+
+        Raises:
+            KeyError: An entity is unavailable and raise_on_missing is true.
+            ValueError: The loaded collection has malformed ownership metadata.
+        """
+        if (not self.directoryGraph.has_node(collectionID)
+                or not any(item['id'] == collectionID for item in self.collections)):
+            if raise_on_missing:
+                raise KeyError(f"Collection {collectionID!r} is not present in the loaded directory snapshot.")
+            log.warning("Collection %r is not present in the loaded directory snapshot.", collectionID)
+            return None
+        collection = self.directoryGraph.nodes[collectionID].get("data")
+        if not isinstance(collection, dict):
+            raise ValueError(f"Collection {collectionID!r} has malformed graph data.")
+        owner = collection.get("biobank")
+        if not isinstance(owner, dict) or not isinstance(owner.get("id"), str) or not owner["id"].strip():
+            raise ValueError(f"Collection {collectionID!r} has malformed biobank ownership metadata.")
+        biobank_id = owner["id"]
+        loaded_biobank = self._get_loaded_biobank_by_id(biobank_id)
+        if loaded_biobank is None:
+            reason = "not present in the loaded directory snapshot"
+            if raise_on_missing:
+                raise KeyError(f"Parent biobank {biobank_id!r} of collection {collectionID!r} is {reason}.")
+            log.warning("Parent biobank %r of collection %r is %s.", biobank_id, collectionID, reason)
+            return None
+        if self._get_visible_collection_by_id(collectionID) is None:
+            if raise_on_missing:
+                raise KeyError(f"Collection {collectionID!r} is unavailable in the configured scope.")
+            log.warning("Collection %r is unavailable in the configured scope.", collectionID)
+            return None
+        biobank = self.getBiobankById(biobank_id)
+        if biobank is not None:
+            return biobank
+        reason = "unavailable in the configured scope"
+        if raise_on_missing:
+            raise KeyError(f"Parent biobank {biobank_id!r} of collection {collectionID!r} is {reason}.")
+        log.warning("Parent biobank %r of collection %r is %s.", biobank_id, collectionID, reason)
+        return None
+
+    @staticmethod
+    def _normalize_negotiator_scalar(value: Any) -> str:
+        """Return a stripped scalar, treating null-like values as empty."""
+        return "" if value is None or pd.isna(value) else str(value).strip()
+
+    def hasNegotiatorData(self) -> bool:
+        """Return whether a Negotiator resource dataset has been loaded.
+
+        Returns:
+            ``True`` after either supported loader has installed a normalized
+            resource dataset; otherwise ``False``.
+        """
+        return getattr(self, "_negotiator_resources", None) is not None
+
+    def setNegotiatorRepresentatives(self, data: dict[str, dict[str, Any]]) -> None:
+        """Normalize injected Negotiator resource mappings.
+
+        Args:
+            data: Resource mappings keyed by Directory collection ID. Each
+                value may contain ``network_name``, ``biobank_name``, and
+                ``resource_name`` scalar metadata plus ``representatives``,
+                an iterable of email-address strings (not a semicolon-delimited
+                string). Omitted metadata and null-like metadata become empty
+                strings; blank/null representatives are ignored and email
+                strings are stripped, lowercased, and deduplicated.
+
+        Returns:
+            None. Atomically replaces the normalized resource records and the
+            unmatched-ID list, using the current Directory visibility scope.
+            Resource records and their representative sets are immutable.
+
+        Raises:
+            ValueError: A matched collection has malformed ownership metadata;
+                the previous Negotiator dataset remains unchanged.
+        """
+        resources = {}
+        for resource_id, row in data.items():
+            resource_id = self._normalize_negotiator_scalar(resource_id)
+            if not resource_id:
+                continue
+            emails = frozenset(
+                email.strip().lower() for email in row.get("representatives", set())
+                if self._normalize_negotiator_scalar(email)
+            )
+            resources[resource_id] = NegotiatorResource(
+                resource_id,
+                self._normalize_negotiator_scalar(row.get("network_name")),
+                self._normalize_negotiator_scalar(row.get("biobank_name")),
+                self._normalize_negotiator_scalar(row.get("resource_name")),
+                emails,
+            )
+        unmatched = tuple(sorted(
+            resource_id for resource_id in resources
+            if self.getParentBiobank(resource_id) is None
+        ))
+        self._negotiator_resources = resources
+        self._negotiator_unmatched_resource_ids = unmatched
+
+    def _require_negotiator_data(self) -> dict[str, NegotiatorResource]:
+        """Return loaded Negotiator data or raise a clear state error."""
+        resources = getattr(self, "_negotiator_resources", None)
+        if resources is None:
+            raise RuntimeError("Negotiator data have not been loaded.")
+        return resources
+
+    def getCollectionNegotiatorRepresentatives(self, collection_id: str) -> frozenset[str]:
+        """Return direct normalized representatives for a visible collection.
+
+        Args:
+            collection_id: Directory collection identifier.
+
+        Returns:
+            Immutable representative emails; empty when no resource row exists
+            or the collection or its parent is absent or outside the current
+            Directory visibility scope.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+            ValueError: The loaded collection has malformed ownership metadata.
+        """
+        resources = self._require_negotiator_data()
+        if self.getParentBiobank(collection_id) is None:
+            return frozenset()
+        resource = resources.get(collection_id)
+        return resource.representatives if resource else frozenset()
+
+    def getNegotiatorResources(self) -> dict[str, NegotiatorResource]:
+        """Return a defensive mapping of normalized resource registrations.
+
+        Returns:
+            New mapping keyed by resource source ID. Its immutable values hold
+            normalized resource metadata and direct representative emails.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+        """
+        return dict(self._require_negotiator_data())
+
+    def getUnmatchedNegotiatorResourceIds(self) -> tuple[str, ...]:
+        """Return normalized resource IDs absent from the visible Directory scope.
+
+        Returns:
+            Sorted immutable resource IDs that could not be matched to a
+            visible Directory collection and parent biobank.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+        """
+        self._require_negotiator_data()
+        return tuple(getattr(self, "_negotiator_unmatched_resource_ids", ()))
+
+    def loadNegotiatorRepresentatives(self, path: str) -> None:
+        """Load and normalize the current Negotiator representatives XLSX.
+
+        Args:
+            path: XLSX path containing the required current Negotiator columns.
+
+        Returns:
+            None. Replaces the instance's optional Negotiator dataset.
+
+        Raises:
+            ValueError: The workbook lacks required columns.
+        """
+        table = pd.read_excel(path)
+        self._loadNegotiatorRepresentativesTable(
+            table,
+            source_name=f"Negotiator representatives workbook {str(path)!r}",
+        )
+
+    def loadNegotiatorOrphansReport(self, path: str) -> None:
+        """Load direct registrations from an orphan-export workbook.
+
+        The loader reads only the ``negotiator_collection_stats`` worksheet.
+        Advisory ``auto_by_parent`` and ``auto_by_biobank`` values are ignored;
+        only non-empty direct ``representatives_emails`` count as registrations.
+
+        Args:
+            path: XLSX path produced by ``exporter-negotiator-orphans.py``.
+
+        Returns:
+            None. Replaces the instance's optional Negotiator dataset.
+
+        Raises:
+            ValueError: The workbook lacks the required worksheet or columns.
+        """
+        with pd.ExcelFile(path) as workbook:
+            if NEGOTIATOR_ORPHANS_SHEET not in workbook.sheet_names:
+                raise ValueError(
+                    f"Negotiator orphan report {str(path)!r} has no "
+                    f"{NEGOTIATOR_ORPHANS_SHEET!r} worksheet."
+                )
+            table = pd.read_excel(workbook, sheet_name=NEGOTIATOR_ORPHANS_SHEET)
+        self._loadNegotiatorRepresentativesTable(
+            table,
+            source_name=(
+                f"Negotiator orphan report {str(path)!r} worksheet "
+                f"{NEGOTIATOR_ORPHANS_SHEET!r}"
+            ),
+        )
+
+    def _loadNegotiatorRepresentativesTable(
+        self,
+        table: pd.DataFrame,
+        source_name: str,
+    ) -> None:
+        """Normalize a validated representative table into Directory state.
+
+        Args:
+            table: Table containing direct Negotiator representative records.
+            source_name: Human-readable source description for validation errors.
+
+        Returns:
+            None. Atomically replaces normalized Negotiator state.
+
+        Raises:
+            ValueError: The table lacks required representative columns or a
+                matched collection has malformed ownership metadata.
+        """
+        missing = [
+            column
+            for column in NEGOTIATOR_REPRESENTATIVE_COLUMNS
+            if column not in table.columns
+        ]
+        if missing:
+            raise ValueError(
+                f"{source_name} is missing required columns: " + ", ".join(missing)
+            )
+        records: dict[str, dict[str, Any]] = {}
+        for _, row in table.iterrows():
+            resource_id = self._normalize_negotiator_scalar(row["resource_source_id"])
+            if not resource_id:
+                log.warning("Negotiator row without resource_source_id skipped.")
+                continue
+            current = records.setdefault(resource_id, {"representatives": set()})
+            for field in ("network_name", "biobank_name", "resource_name"):
+                value = self._normalize_negotiator_scalar(row[field])
+                if value and current.get(field) and current[field] != value:
+                    log.warning("Negotiator resource %s has conflicting metadata for %s; retaining first value.", resource_id, field)
+                elif value:
+                    current[field] = value
+            current["representatives"].update(
+                email.strip().lower() for email in self._normalize_negotiator_scalar(row["representatives_emails"]).split(";") if email.strip()
+            )
+        self.setNegotiatorRepresentatives(records)
+
+    def getBiobankNegotiatorCoverage(self, biobank_id: str) -> NegotiatorCoverage:
+        """Return actual direct Negotiator coverage for one visible biobank.
+
+        Args:
+            biobank_id: Visible Directory biobank identifier.
+
+        Returns:
+            Coverage record using only direct non-empty representatives.
+        """
+        return self.getNegotiatorCoverage()[biobank_id]
+
+    def getNegotiatorCoverage(self) -> dict[str, NegotiatorCoverage]:
+        """Return actual direct representative coverage for visible biobanks.
+
+        Returns:
+            Mapping from visible biobank ID to direct-only coverage counts and
+            one of ``fully``, ``partially``, ``missing``, or ``no_collections``.
+
+        Raises:
+            RuntimeError: Negotiator data have not been loaded.
+        """
+        self._require_negotiator_data()
+        result = {}
+        for biobank in self.getBiobanks():
+            collection_ids = [c["id"] for c in self.getCollections() if c["biobank"]["id"] == biobank["id"]]
+            represented = sum(bool(self.getCollectionNegotiatorRepresentatives(cid)) for cid in collection_ids)
+            status = "no_collections" if not collection_ids else "fully" if represented == len(collection_ids) else "missing" if represented == 0 else "partially"
+            result[biobank["id"]] = NegotiatorCoverage(biobank["id"], len(collection_ids), represented, len(collection_ids) - represented, status)
+        return result
 
     def getCollectionContact(self, collectionID: str):
         """Return primary contact record for a collection id."""
