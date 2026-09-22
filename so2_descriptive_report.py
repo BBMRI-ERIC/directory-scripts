@@ -2331,6 +2331,136 @@ def _standalone_tex(
     ])
 
 
+def _association_value(definition: AssociationHeatmapDefinition | Mapping[str, Any], field: str) -> Any:
+    """Return one association definition field from validated metadata.
+
+    Args:
+        definition: Validated immutable definition or its serialized payload form.
+        field: Definition field required by the renderer.
+
+    Returns:
+        The requested definition value.
+
+    Raises:
+        InputError: If serialized metadata does not provide the requested field.
+    """
+    if isinstance(definition, AssociationHeatmapDefinition):
+        return getattr(definition, field)
+    if field not in definition:
+        raise InputError(f"Association definition lacks {field!r}.")
+    return definition[field]
+
+
+def _association_heatmap_fragment(
+    definition: AssociationHeatmapDefinition | Mapping[str, Any], pair: Mapping[str, Any],
+) -> str:
+    """Render one zero-inclusive annotated association contingency heatmap.
+
+    Args:
+        definition: Validated association definition controlling title and axes.
+        pair: Validated aggregate pair payload with declared cells and denominator.
+
+    Returns:
+        PGFPlots/TikZ markup for the association heatmap and interpretation note.
+    """
+    row_categories = tuple(_association_value(definition, "row_categories"))
+    column_categories = tuple(_association_value(definition, "column_categories"))
+    cells = pair["cells"]
+    cell_rows = []
+    labels = []
+    for row_index, row_category in enumerate(row_categories, start=1):
+        for column_index, column_category in enumerate(column_categories, start=1):
+            count = int(cells[f"{row_category}|{column_category}"])
+            cell_rows.append(f"{column_index} {row_index} {count}")
+            labels.append(
+                rf"\node at (axis cs:{column_index},{row_index}) "
+                rf"{{\scriptsize ({_tex(row_category)}, {_tex(column_category)}): {count}}};"
+            )
+    x_labels = ",".join(_tex(category) for category in column_categories)
+    y_labels = ",".join(_tex(category) for category in row_categories)
+    title = _tex(_association_value(definition, "title"))
+    interpretation = _tex(_association_value(definition, "interpretation"))
+    row_axis = _tex(_association_value(definition, "row_question_id"))
+    column_axis = _tex(_association_value(definition, "column_question_id"))
+    denominator = int(pair["paired_denominator"])
+    return "\n".join([
+        rf"\subsection*{{{title}}}",
+        rf"\noindent Paired answering rows: {denominator}\par",
+        r"\begin{center}",
+        r"\begin{tikzpicture}",
+        r"\begin{axis}[",
+        r"width=0.82\linewidth, height=0.54\textheight,",
+        rf"xlabel={{Response to {column_axis}}}, ylabel={{Response to {row_axis}}},",
+        rf"xtick={{1,...,{len(column_categories)}}}, ytick={{1,...,{len(row_categories)}}},",
+        rf"xticklabels={{{x_labels}}}, yticklabels={{{y_labels}}},",
+        r"y dir=reverse, colorbar, colormap={associationSequential}{color(0cm)=(white); color(1cm)=(bbmriTeal)},",
+        r"point meta min=0,",
+        r"]",
+        r"\addplot[matrix plot*, mesh/cols=" + str(len(column_categories)) + r", point meta=explicit] table[row sep=\\,meta index=2] {",
+        *[f"{row} \\\\" for row in cell_rows],
+        r"};",
+        *labels,
+        r"\end{axis}",
+        r"\end{tikzpicture}",
+        r"\end{center}",
+        rf"\noindent\emph{{{interpretation} This panel describes submitted response rows, not causal association.}}\par",
+    ])
+
+
+def _association_conditional_summary_fragment(
+    definition: AssociationHeatmapDefinition | Mapping[str, Any], pair: Mapping[str, Any],
+) -> str:
+    """Render row-conditional count and percentage summaries for one association.
+
+    Args:
+        definition: Validated association definition controlling category order.
+        pair: Validated aggregate pair payload with zero-inclusive contingency cells.
+
+    Returns:
+        TeX summary rows using each displayed row's exact denominator.
+    """
+    if not _association_value(definition, "conditional_summary"):
+        return ""
+    row_categories = tuple(_association_value(definition, "row_categories"))
+    column_categories = tuple(_association_value(definition, "column_categories"))
+    cells = pair["cells"]
+    rows = [r"\noindent\textit{Conditional policy/workflow response by returned-data experience:}\par"]
+    for row_category in row_categories:
+        denominator = sum(int(cells[f"{row_category}|{column_category}"]) for column_category in column_categories)
+        values = []
+        for column_category in column_categories:
+            count = int(cells[f"{row_category}|{column_category}"])
+            percentage = 0.0 if denominator == 0 else 100 * count / denominator
+            values.append(
+                rf"({_tex(row_category)}, {_tex(column_category)}): "
+                rf"{count} / {denominator} ({percentage:.1f}\%)"
+            )
+        rows.append(rf"\noindent {'; '.join(values)}\par")
+    return "\n".join(rows)
+
+
+def _association_standalone_tex(
+    definition: AssociationHeatmapDefinition, pair: Mapping[str, Any],
+) -> str:
+    """Build a self-contained association panel chart document.
+
+    Args:
+        definition: Validated association definition represented by this chart.
+        pair: Validated aggregate pair payload.
+
+    Returns:
+        Standalone XeLaTeX document containing the panel and any conditional summary.
+    """
+    return "\n".join([
+        _preamble(),
+        r"\begin{document}",
+        _association_heatmap_fragment(definition, pair),
+        _association_conditional_summary_fragment(definition, pair),
+        r"\end{document}",
+        "",
+    ])
+
+
 def _payload_mapping(value: Any, path: str) -> Mapping[str, Any]:
     """Validate one object-shaped descriptive payload value.
 
@@ -2826,6 +2956,39 @@ def render_descriptive_tex(
     if max_piechart_ratio <= 0:
         raise InputError("max_piechart_ratio must be positive")
     questions = _validate_render_payload(payload)
+    association_definitions: tuple[AssociationHeatmapDefinition, ...] = ()
+    association_pairs: Mapping[str, Any] = {}
+    if "association_heatmap_definitions" in payload:
+        metadata = _payload_mapping(
+            payload["association_heatmap_definitions"], "association_heatmap_definitions"
+        )
+        association_definitions = tuple(
+            _association_definition_from_payload(
+                value, f"association_heatmap_definitions.definitions[{index}]"
+            )
+            for index, value in enumerate(metadata["definitions"])
+        )
+        association_pairs = _payload_mapping(
+            payload["association_heatmaps"], "association_heatmaps"
+        )
+    question_positions = {
+        str(question["question_id"]): position for position, question in enumerate(questions)
+    }
+    association_after_question: dict[str, list[AssociationHeatmapDefinition]] = {}
+    for definition in association_definitions:
+        if definition.mode != "default":
+            continue
+        positions = [
+            question_positions.get(definition.row_question_id),
+            question_positions.get(definition.column_question_id),
+        ]
+        if None in positions:
+            continue
+        later_question_id = max(
+            (definition.row_question_id, definition.column_question_id),
+            key=lambda question_id: question_positions[question_id],
+        )
+        association_after_question.setdefault(later_question_id, []).append(definition)
     fragments: dict[str, str] = {}
     chart_documents: dict[str, str] = {}
     chart_paths: dict[str, str] = {}
@@ -2960,6 +3123,29 @@ def render_descriptive_tex(
                     rf"\noindent Shared UpSet intersections: "
                     rf"\hyperref[upset-{definition_id}]{{see { _tex(definition_id) }}}.\par"
                 )
+        for definition in association_after_question.get(question_id, []):
+            pair = _payload_mapping(
+                association_pairs[definition.definition_id],
+                f"association_heatmaps.{definition.definition_id}",
+            )
+            key = f"association-{definition.definition_id}"
+            fragment = "\n".join(filter(None, [
+                _association_heatmap_fragment(definition, pair),
+                _association_conditional_summary_fragment(definition, pair),
+            ]))
+            fragments[key] = fragment
+            chart_documents[key] = _association_standalone_tex(definition, pair)
+            report.append(fragment)
+            if chart_dir is not None:
+                chart_pdf = Path(chart_dir) / f"{key}.pdf"
+                base = Path(report_path).parent if report_path is not None else Path.cwd()
+                chart_paths[key] = Path(os.path.relpath(chart_pdf, start=base)).as_posix()
+                report.extend([
+                    r"\noindent",
+                    r"\begingroup\raggedright\smaller[3]",
+                    rf"\url{{{_tex(chart_paths[key])}}}\par",
+                    r"\endgroup",
+                ])
     if upset_assets is not None:
         report.extend([r"\clearpage", r"\section{Shared UpSet charts}"])
         for definition_id, source_selectors in _UPSET_SHARED_DEFINITIONS.items():

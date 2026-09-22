@@ -1315,6 +1315,129 @@ def test_descriptive_payload_carries_validated_association_registry_provenance()
     module.validate_association_heatmap_payload(payload)
 
 
+def returned_data_definition():
+    """Return the approved returned-data panel definition for renderer tests."""
+    return replace(
+        controlled_association_definitions()[0],
+        title="Returned-data experience versus policy/workflow",
+        interpretation="Describes returned-data experience and policy/workflow responses.",
+    )
+
+
+def returned_data_pair():
+    """Return a complete 2x2 pair with fixed zero-inclusive cell order."""
+    return {
+        "row_categories": ["No", "Yes"],
+        "column_categories": ["No", "Yes"],
+        "cells": {"No|No": 8, "No|Yes": 34, "Yes|No": 66, "Yes|Yes": 40},
+        "paired_denominator": 148,
+        "diagnostics": {
+            "eligible_missing_rows": [],
+            "inapplicable_rows": [],
+            "out_of_route_rows": [],
+        },
+        "vectors": [],
+    }
+
+
+def association_render_payload():
+    """Return a renderer-valid payload containing only the safe pair vector fields."""
+    definition = replace(
+        returned_data_definition(),
+        definition_id="returned_data_policy",
+        row_question_id="q_001_returned_data",
+        column_question_id="q_002_policy_workflow",
+    )
+    payload = report_payload(
+        structured_report_question(
+            question_id="q_001_returned_data", column="Returned data",
+            label="Returned data", question_type="single_choice",
+        ),
+        structured_report_question(
+            question_id="q_002_policy_workflow", column="Policy/workflow",
+            label="Policy/workflow", question_type="single_choice",
+        ),
+    )
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "d" * 64,
+        "definitions_sha256": canonical_association_definitions_sha256((definition,)),
+        "definitions": [module._association_definition_payload(definition)],
+    }
+    payload["association_heatmaps"] = {
+        "returned_data_policy": {
+            "row_categories": ["No", "Yes"],
+            "column_categories": ["No", "Yes"],
+            "vectors": [{
+                "source_row": 5, "row_state": "answered", "row_value": "Yes",
+                "column_state": "answered", "column_value": "No",
+            }],
+            "cells": {"No|No": 0, "No|Yes": 0, "Yes|No": 1, "Yes|Yes": 0},
+            "paired_denominator": 1,
+            "diagnostics": {
+                "eligible_missing_rows": [],
+                "inapplicable_rows": [],
+                "out_of_route_rows": [],
+            },
+        },
+    }
+    return payload
+
+
+def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
+    """Heatmaps retain every declared category cell and their exact denominator."""
+    tex = module._association_heatmap_fragment(returned_data_definition(), returned_data_pair())
+
+    assert "Returned-data experience versus policy/workflow" in tex
+    assert "Paired answering rows: 148" in tex
+    assert "(Yes, No)" in tex
+    assert "0" in tex
+    assert "colormap" in tex
+
+
+def test_returned_data_pair_adds_conditional_percentages_with_group_sizes():
+    """Returned-data conditional rows use their displayed row denominators."""
+    tex = module._association_conditional_summary_fragment(
+        returned_data_definition(), returned_data_pair()
+    )
+
+    assert "34 / 42 (81.0\\%)" in tex
+    assert "40 / 106 (37.7\\%)" in tex
+
+
+def test_heatmap_axis_captions_follow_each_definition_not_returned_data_wording():
+    """Generic panels must not inherit the returned-data pair's semantic axis labels."""
+    tex = module._association_heatmap_fragment(
+        controlled_association_definitions()[1], returned_data_pair()
+    )
+
+    assert r"Response to routed\_column" in tex
+    assert r"Response to routed\_row" in tex
+    assert "Policy/workflow response" not in tex
+
+
+def test_contact_field_cannot_appear_in_association_tex_or_chart_paths():
+    """Association rendering exposes no contact-field identifier or content."""
+    rendered = module.render_descriptive_tex(association_render_payload(), chart_dir="charts")
+
+    assert "q_111" not in rendered.tex
+    assert "follow-up interview" not in rendered.tex
+    assert all("q_111" not in key for key in rendered.chart_paths)
+    assert "association-returned_data_policy" in rendered.chart_fragments
+    assert "association-returned_data_policy" in rendered.chart_documents
+    assert "association-returned_data_policy" in rendered.chart_paths
+    assert rendered.tex.index("Returned-data experience versus policy/workflow") > rendered.tex.index("Policy/workflow")
+
+
+@pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
+def test_real_xelatex_renders_minimal_association_chart_document(tmp_path):
+    """The registered association chart source is a self-contained XeLaTeX document."""
+    rendered = module.render_descriptive_tex(association_render_payload(), chart_dir="charts")
+
+    module.render_descriptive_pdf(rendered, tmp_path / "report.tex", None, tmp_path / "charts")
+
+    assert (tmp_path / "charts" / "association-returned_data_policy.pdf").read_bytes().startswith(b"%PDF")
+
+
 def test_production_schema_accounts_for_every_header():
     """The production registry classifies each current source header exactly once."""
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
