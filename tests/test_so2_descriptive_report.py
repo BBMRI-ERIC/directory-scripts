@@ -978,6 +978,7 @@ def production_questions_by_id():
 def test_production_association_registry_has_exact_default_and_exploratory_pairs():
     """The checked-in registry contains only the approved association pairs."""
     definitions = module.load_association_heatmap_registry(ASSOCIATION_REGISTRY)
+    module.validate_association_definitions(definitions, production_questions_by_id())
 
     assert [(item.row_question_id, item.column_question_id, item.mode) for item in definitions] == [
         (
