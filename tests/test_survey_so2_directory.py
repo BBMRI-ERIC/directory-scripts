@@ -89,6 +89,94 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
     assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
 
 
+def test_describe_passes_association_heatmap_registry_provenance_and_excludes_exploratory_pairs(tmp_path, monkeypatch):
+    """Describe embeds only default registry definitions unless explicitly opted in."""
+    module = load_module()
+    registry = tmp_path / "association-heatmaps.json"
+    registry.write_text("{}", encoding="utf-8")
+    output_json = tmp_path / "descriptive.json"
+    captured = {}
+
+    class DescriptiveStub:
+        class InputError(Exception):
+            pass
+
+        @staticmethod
+        def load_descriptive_schema(_path):
+            return {}
+
+        @staticmethod
+        def load_form_manifest_structure(_path):
+            return {}
+
+        @staticmethod
+        def read_descriptive_workbook(_path, _schema):
+            return Namespace(responses=__import__("pandas").DataFrame({
+                "Digital maturity": ["High"], "source_row": [5],
+            }))
+
+        @staticmethod
+        def load_association_heatmap_registry(_path):
+            return (
+                Namespace(mode="default"),
+                Namespace(mode="exploratory"),
+            )
+
+        @staticmethod
+        def validate_descriptive_schema(_schema, _headers):
+            return (Namespace(question_id="digital_maturity"),)
+
+        @staticmethod
+        def validate_association_definitions(definitions, _questions):
+            captured["validated"] = definitions
+
+        @staticmethod
+        def build_descriptive_payload(*_args, **kwargs):
+            captured.update(kwargs)
+            return {"payload_type": "so2_descriptive_statistics"}
+
+    monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(registry), "-o", str(output_json),
+    ])
+
+    assert args.include_exploratory_association_heatmaps is False
+    assert module.run_describe(args) == module.EXIT_OK
+    assert [definition.mode for definition in captured["validated"]] == ["default", "exploratory"]
+    assert [definition.mode for definition in captured["association_definitions"]] == ["default"]
+    assert captured["association_registry_sha256"] == __import__("hashlib").sha256(
+        registry.read_bytes()
+    ).hexdigest()
+
+
+def test_unknown_association_heatmap_registry_blocks_all_describe_publication(tmp_path):
+    """An unreadable registry fails before JSON, TeX, PDF, or chart publication."""
+    module = load_module()
+    output_json = tmp_path / "payload.json"
+    output_tex = tmp_path / "report.tex"
+    output_pdf = tmp_path / "report.pdf"
+    chart_dir = tmp_path / "charts"
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(tmp_path / "unknown.json"),
+        "-o", str(output_json), "--output-tex", str(output_tex),
+        "--output-pdf", str(output_pdf), "--output-chart-dir", str(chart_dir),
+    ])
+
+    with pytest.raises(module.InputError, match="association registry"):
+        module.run_describe(args)
+
+    assert not output_json.exists()
+    assert not output_tex.exists()
+    assert not output_pdf.exists()
+    assert not chart_dir.exists()
+
+
 def test_piechart_ratio_parser_accepts_positive_width_to_height_values():
     """The CLI ratio accepts conventional, wide, and tall chart proportions."""
     module = load_module()

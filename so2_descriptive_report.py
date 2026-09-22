@@ -2930,6 +2930,7 @@ def render_descriptive_tex(
     report_path: str | Path | None = None,
     include_contribution_tables: bool = False,
     include_parent_context: bool = False,
+    include_exploratory_association_heatmaps: bool = False,
     max_piechart_ratio: float = 4 / 3,
     upset_assets: Any | None = None,
 ) -> RenderedDescriptiveReport:
@@ -2943,6 +2944,9 @@ def render_descriptive_tex(
             evidence tables are included in the report body.
         include_parent_context: Whether free-text tables include complete raw parent
             answers. The default omits the parent-context column.
+        include_exploratory_association_heatmaps: Whether payload-embedded
+            exploratory association panels are included. The renderer never reads
+            a registry file.
         max_piechart_ratio: Maximum permitted horizontal-to-vertical pie ratio.
         upset_assets: Optional prevalidated external UpSet asset state.
 
@@ -2976,7 +2980,7 @@ def render_descriptive_tex(
     }
     association_after_question: dict[str, list[AssociationHeatmapDefinition]] = {}
     for definition in association_definitions:
-        if definition.mode != "default":
+        if definition.mode != "default" and not include_exploratory_association_heatmaps:
             continue
         positions = [
             question_positions.get(definition.row_question_id),

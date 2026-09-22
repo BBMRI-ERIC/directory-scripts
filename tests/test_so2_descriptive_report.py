@@ -1428,6 +1428,32 @@ def test_contact_field_cannot_appear_in_association_tex_or_chart_paths():
     assert rendered.tex.index("Returned-data experience versus policy/workflow") > rendered.tex.index("Policy/workflow")
 
 
+def test_renderer_includes_exploratory_association_heatmaps_only_when_requested():
+    """Exploratory association panels require the explicit renderer opt-in."""
+    payload = association_render_payload()
+    definition = replace(
+        module._association_definition_from_payload(
+            payload["association_heatmap_definitions"]["definitions"][0], "definition",
+        ),
+        mode="exploratory",
+    )
+    payload["association_heatmap_definitions"]["definitions"] = [
+        module._association_definition_payload(definition)
+    ]
+    payload["association_heatmap_definitions"]["definitions_sha256"] = (
+        module._association_definitions_sha256((definition,))
+    )
+
+    default_tex = module.render_descriptive_tex(payload, chart_dir=None).tex
+    exploratory_tex = module.render_descriptive_tex(
+        payload, chart_dir=None, include_exploratory_association_heatmaps=True,
+    ).tex
+
+    assert exploratory_tex.count(r"\begin{tikzpicture}") == (
+        default_tex.count(r"\begin{tikzpicture}") + 1
+    )
+
+
 @pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
 def test_real_xelatex_renders_minimal_association_chart_document(tmp_path):
     """The registered association chart source is a self-contained XeLaTeX document."""
