@@ -842,6 +842,8 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 
 ### SO2 descriptive statistics report
 
+- Association heatmaps are configured only through `survey-mappings/so2_2025_association_heatmaps.json`. Review each definition with its question IDs, form UIDs, category order, interpretation text, and regression evidence. The CLI validates the registry before publication; payloads record both the registry file hash and canonical definition digest. Do not add contact/free-text fields, including `q_111`, infer willingness from contact completion, or publish small-cell panels without a separately approved complementary-suppression policy.
+
 `survey-so2-directory.py` also provides a standalone descriptive-statistics
 workflow. It is intentionally separate from the Directory-consistency workflow
 above and must not be added as a section of its findings report.
