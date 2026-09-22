@@ -89,6 +89,19 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
     assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
 
 
+def test_piechart_ratio_parser_accepts_positive_width_to_height_values():
+    """The CLI ratio accepts conventional, wide, and tall chart proportions."""
+    module = load_module()
+
+    assert module._parse_piechart_ratio("4:3") == pytest.approx(4 / 3)
+    assert module._parse_piechart_ratio("16:9") == pytest.approx(16 / 9)
+    assert module._parse_piechart_ratio("1:2") == pytest.approx(1 / 2)
+
+    for value in ("4", "0:3", "1:0", "wide:tall"):
+        with pytest.raises(module.InputError):
+            module._parse_piechart_ratio(value)
+
+
 def test_describe_refuses_to_overwrite_existing_payload(tmp_path):
     """The primary descriptive JSON is a new output, not an overwrite target."""
     module = load_module()
@@ -160,10 +173,11 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
         @staticmethod
         def render_descriptive_tex(
             payload, chart_path, report_path=None, include_contribution_tables=False,
-            include_parent_context=False,
+            include_parent_context=False, max_piechart_ratio=4 / 3,
         ):
             assert include_contribution_tables is False
             assert include_parent_context is True
+            assert max_piechart_ratio == pytest.approx(16 / 9)
             assert Path(report_path) == output_tex
             relative = Path(__import__("os").path.relpath(
                 Path(chart_path) / "q.pdf", output_tex.parent
@@ -185,7 +199,7 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
         "-o", str(output_json),
         "--output-tex", str(output_tex),
         "--output-chart-dir", str(chart_dir),
-        "--include-parent-context",
+        "--include-parent-context", "--max-piechart-ratio", "16:9",
     ])
 
     assert module.run_describe(args) == module.EXIT_OK

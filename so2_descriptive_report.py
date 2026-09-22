@@ -30,6 +30,11 @@ class InputError(Exception):
 
 QuestionType = Literal["single_choice", "multi_choice", "ordinal", "free_text"]
 _QUESTION_TYPES = frozenset({"single_choice", "multi_choice", "ordinal", "free_text"})
+_UPSET_SINGLE_DEFINITIONS = ("q_009", "q_012", "q_018", "q_035", "q_042", "q_050")
+_UPSET_SHARED_DEFINITIONS = {
+    "q_042_q_044": ("q_042", "q_044"),
+    "q_035_q_050": ("q_035", "q_050"),
+}
 
 
 @dataclass(frozen=True)
@@ -245,7 +250,7 @@ def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
     }
     questions: dict[str, dict[str, Any]] = {}
 
-    def add_question(label: str, response_type: str, mandatory: bool, dependencies: list[dict[str, str]]) -> None:
+    def add_question(label: str, response_type: str, mandatory: bool, dependencies: list[dict[str, str]], matrix_parent: str | None = None, matrix_row: str | None = None) -> None:
         """Store one report-facing question after label uniqueness validation."""
         key = _form_label(label)
         if key in questions:
@@ -256,6 +261,8 @@ def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
             "response_type": response_type,
             "requiredness": "mandatory" if mandatory else "optional",
             "dependencies": dependencies,
+            "matrix_parent": matrix_parent,
+            "matrix_row": matrix_row,
         }
 
     for field in form.fields_by_uid.values():
@@ -274,7 +281,7 @@ def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
             for row in field.matrix_rows:
                 add_question(
                     f"{field.title}: {row.label}", response_types[field.field_type],
-                    field.mandatory, dependencies,
+                    field.mandatory, dependencies, field.title, row.label,
                 )
         else:
             add_question(field.title, response_types[field.field_type], field.mandatory, dependencies)
@@ -980,6 +987,65 @@ def _structured_question_payload(
     }
 
 
+def _canonical_upset_vectors(
+    question: QuestionDefinition,
+    responses: pd.DataFrame,
+    institution_column: str,
+    country_column: str,
+    source_row_column: str,
+    question_by_column: Mapping[str, QuestionDefinition],
+) -> list[dict[str, Any]]:
+    """Build source-of-truth respondent vectors for one multi-choice question.
+
+    Args:
+        question: Validated multi-choice question to serialize.
+        responses: Included survey response rows in source-row order.
+        institution_column: Source column identifying the reported institution.
+        country_column: Source column identifying the reported country.
+        source_row_column: Synthetic original-workbook row-number column.
+        question_by_column: Validated questions indexed by source column.
+
+    Returns:
+        One vector per included response with applicability state and declared selections.
+
+    Raises:
+        InputError: If a declared applicability rule is malformed or refers to an unknown question.
+    """
+    if question.question_type != "multi_choice":
+        raise InputError("Canonical UpSet vectors may only be built for multi_choice questions.")
+    applicable_values: frozenset[str] | None = None
+    parent_question: QuestionDefinition | None = None
+    applicability_column: str | None = None
+    if question.applicability is not None:
+        applicability_column = question.applicability.get("column")
+        values = question.applicability.get("values")
+        if not isinstance(applicability_column, str) or not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise InputError(f"Schema applicability for {question.column!r} must declare column and string values.")
+        parent_question = question_by_column.get(applicability_column)
+        if parent_question is None:
+            raise InputError(f"Schema applicability column is absent: {applicability_column!r}.")
+        applicable_values = frozenset(values)
+    vectors: list[dict[str, Any]] = []
+    for _, row in responses.iterrows():
+        state = "answered"
+        if applicability_column is not None and parent_question is not None and applicable_values is not None:
+            parent_value = row[applicability_column]
+            if _is_blank(parent_value) or not applicable_values.intersection(_structured_answers(parent_question, parent_value)[0]):
+                state = "inapplicable"
+        answers, _ = _structured_answers(question, row[question.column])
+        selected = [category for category in question.categories if category in answers]
+        if state == "answered" and not selected:
+            state = "missing"
+        vectors.append({
+            "source_row": int(row[source_row_column]),
+            "country": _display_value(row[country_column]),
+            "institution": _display_value(row[institution_column]),
+            "state": state,
+            "selected_categories": selected if state == "answered" else [],
+        })
+    return vectors
+
+
 def _free_text_question_payload(
     question: QuestionDefinition,
     responses: pd.DataFrame,
@@ -1105,12 +1171,13 @@ def build_descriptive_payload(
     question_by_column = {question.column: question for question in questions}
     form_questions = form_structure.get("questions", {}) if form_structure is not None else {}
     expected_form_types = {
-        "single_choice": frozenset({"Single Choice"}),
+        "single_choice": frozenset({"Single Choice", "Single Choice Matrix Question"}),
         "multi_choice": frozenset({"Multiple Choice"}),
         "ordinal": frozenset({"Single Choice", "Single Choice Matrix Question"}),
         "free_text": frozenset({"Free Text"}),
     }
     question_payloads = []
+    upset_vectors: dict[str, list[dict[str, Any]]] = {}
     for question in questions:
         form_question = form_questions.get(_form_label(question.column))
         if form_structure is not None and form_question is None:
@@ -1149,6 +1216,11 @@ def build_descriptive_payload(
                 **detail,
             }
         )
+        if question.question_type == "multi_choice":
+            upset_vectors[question.question_id] = _canonical_upset_vectors(
+                question, workbook.responses, institution_column, country_column,
+                source_row_column, question_by_column,
+            )
     return {
         "payload_type": "so2_descriptive_statistics",
         "payload_version": "1",
@@ -1169,6 +1241,7 @@ def build_descriptive_payload(
             "source_path": form_structure["source_path"],
             "source_sha256": form_structure["source_sha256"],
         },
+        "upset_vectors": upset_vectors,
         "questions": question_payloads,
     }
 
@@ -1507,12 +1580,13 @@ def _pie_label_height(lines: int) -> float:
     return 0.42 * lines + 0.16
 
 
-def _pie_label_layout(labels: Sequence[Mapping[str, Any]]) -> dict[int, tuple[str, float]]:
+def _pie_label_layout(labels: Sequence[Mapping[str, Any]], label_bound: float = _PIE_LABEL_BOUND) -> dict[int, tuple[str, float]]:
     """Place pie labels near their slice centers without exceeding pie height.
 
     Args:
         labels: Segment descriptors containing a stable ``index``, middle angle,
             and wrapped-line count.
+        label_bound: Maximum absolute vertical label center in TikZ coordinates.
 
     Returns:
         Mapping from segment index to its selected horizontal side and bounded
@@ -1530,7 +1604,7 @@ def _pie_label_layout(labels: Sequence[Mapping[str, Any]]) -> dict[int, tuple[st
     def occupied_height(items: Sequence[Mapping[str, Any]]) -> float:
         return sum(_pie_label_height(int(item["lines"])) for item in items) + max(0, len(items) - 1) * _PIE_LABEL_GAP
 
-    available = 2 * _PIE_LABEL_BOUND
+    available = 2 * label_bound
     for side in ("left", "right"):
         while occupied_height(groups[side]) > available:
             other = "left" if side == "right" else "right"
@@ -1558,8 +1632,8 @@ def _pie_label_layout(labels: Sequence[Mapping[str, Any]]) -> dict[int, tuple[st
         heights = [_pie_label_height(int(item["lines"])) for item in ordered]
         for item, height in zip(ordered, heights, strict=True):
             desired = _PIE_RADIUS * sin(radians(float(item["middle"])))
-            minimum = -_PIE_LABEL_BOUND + height / 2
-            maximum = _PIE_LABEL_BOUND - height / 2
+            minimum = -label_bound + height / 2
+            maximum = label_bound - height / 2
             center = min(max(desired, minimum), maximum)
             if centers:
                 center = max(center, centers[-1] + heights[len(centers) - 1] / 2 + _PIE_LABEL_GAP + height / 2)
@@ -1577,12 +1651,13 @@ def _pie_label_layout(labels: Sequence[Mapping[str, Any]]) -> dict[int, tuple[st
     return layout
 
 
-def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
+def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: float = 4 / 3) -> str:
     """Render a pie whose leader lines connect each segment to its label.
 
     Args:
         question: Validated categorical question payload with pie categories.
         answered_only: Whether the Missing category is excluded from this chart.
+        max_ratio: Maximum permitted horizontal-to-vertical chart ratio.
 
     Returns:
         Complete TikZ markup with labels near slice centers and within the pie's
@@ -1602,16 +1677,21 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
             r"\end{tikzpicture}",
         ])
     start = 0.0
-    colors = ("bbmriBlue", "bbmriTeal", "bbmriGold", "bbmriGray", "bbmriRed")
+    colors = (
+        "bbmriBlue", "bbmriTeal", "bbmriGold", "bbmriGray",
+        "bbmriGreen", "bbmriOrange",
+    )
     segments = []
+    non_missing_index = 0
     for index, category in enumerate(categories):
         count = int(category["count"])
         end = start + 360 * count / total
         middle = (start + end) / 2
-        color = (
-            "bbmriRed" if str(category["value"]).strip().casefold() == "missing"
-            else colors[index % len(colors)]
-        )
+        if str(category["value"]).strip().casefold() == "missing":
+            color = "bbmriRed"
+        else:
+            color = colors[non_missing_index % len(colors)]
+            non_missing_index += 1
         segments.append({
             "index": index, "category": category, "start": start, "end": end,
             "middle": middle, "color": color,
@@ -1619,7 +1699,20 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
             "lines": max(1, ceil(len(str(category["value"])) / 42)),
         })
         start = end
-    layout = _pie_label_layout(segments)
+    keyed_legend = False
+    max_label_bound = max(_PIE_LABEL_BOUND, min(5.0, 2.8 * (4 / 3) / max_ratio))
+    for label_bound in (_PIE_LABEL_BOUND, min(2.1, max_label_bound), max_label_bound):
+        try:
+            layout = _pie_label_layout(segments, label_bound)
+            break
+        except InputError:
+            continue
+    else:
+        keyed_legend = True
+        for segment in segments:
+            segment["label"] = rf"\#{segment['index'] + 1}"
+            segment["lines"] = 1
+        layout = _pie_label_layout(segments)
     slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
     for segment in segments:
         side, y = layout[segment["index"]]
@@ -1644,6 +1737,9 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool) -> str:
                 rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\scriptsize] at (-1.98,{y:.2f}) {{{segment['label']}}};",
             ])
     slices.append(r"\end{tikzpicture}")
+    if keyed_legend:
+        slices.append(r"\noindent\textit{Legend}\par")
+        slices.extend(rf"\noindent\#{segment['index'] + 1} -- {_tex(segment['category']['value'])}\par" for segment in segments)
     return "\n".join(slices)
 
 def _table(rows: Sequence[Sequence[str]], columns: str) -> str:
@@ -1774,6 +1870,7 @@ def _preamble() -> str:
 \KOMAoptions{parskip=half}
 \setlength{\parindent}{0pt}
 \usepackage{fontspec}
+\usepackage{libertine}
 \usepackage{relsize}
 \usepackage{longtable}
 \usepackage{booktabs}
@@ -1788,6 +1885,8 @@ def _preamble() -> str:
 \definecolor{bbmriGold}{HTML}{D8A000}
 \definecolor{bbmriGray}{HTML}{7A7A7A}
 \definecolor{bbmriRed}{HTML}{B63A3A}
+\definecolor{bbmriGreen}{HTML}{3F7F4C}
+\definecolor{bbmriOrange}{HTML}{C76D1E}
 """
 
 
@@ -1804,6 +1903,10 @@ def _response_structure_text(question: Mapping[str, Any]) -> str:
     if not isinstance(form, Mapping):
         return "Response type: unavailable (form structure not supplied); mandatory/optional: unavailable."
     response_type = str(form.get("response_type", "unavailable")).casefold()
+    response_type = {
+        "single choice matrix question": "single-choice matrix",
+        "multiple choice matrix question": "multiple-choice matrix",
+    }.get(response_type, response_type)
     requiredness = str(form.get("requiredness", "unavailable")).capitalize()
     dependencies = form.get("dependencies", [])
     result = f"Response type: {response_type}; {requiredness}."
@@ -2103,6 +2206,35 @@ def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str
                         f"{category_path}.excluded_from_chart must be boolean."
                     )
         validated_questions.append(question)
+    if "upset_vectors" not in payload:
+        return validated_questions
+    vectors = _payload_mapping(payload.get("upset_vectors"), "upset_vectors")
+    multi_choice_questions = {
+        str(question["question_id"]): question for question in validated_questions
+        if question["question_type"] == "multi_choice"
+    }
+    if set(vectors) != set(multi_choice_questions):
+        raise InputError("Descriptive statistics payload upset_vectors must cover exactly the multi-choice questions.")
+    for question_id, rows in vectors.items():
+        rows = _payload_array(rows, f"upset_vectors.{question_id}")
+        categories = {str(item["value"]) for item in multi_choice_questions[question_id]["categories"] if item["value"] != "Missing"}
+        source_rows: set[int] = set()
+        for index, vector_value in enumerate(rows):
+            vector = _payload_mapping(vector_value, f"upset_vectors.{question_id}[{index}]")
+            source_row = _payload_count(vector.get("source_row"), f"upset_vectors.{question_id}[{index}].source_row")
+            if source_row in source_rows:
+                raise InputError(f"Descriptive statistics payload upset_vectors.{question_id} has duplicate source_row {source_row}.")
+            source_rows.add(source_row)
+            for text_field in ("country", "institution"):
+                _payload_text(vector.get(text_field), f"upset_vectors.{question_id}[{index}].{text_field}")
+            state = vector.get("state")
+            if state not in {"answered", "missing", "inapplicable"}:
+                raise InputError(f"Descriptive statistics payload upset_vectors.{question_id}[{index}].state is invalid.")
+            selected = _payload_array(vector.get("selected_categories"), f"upset_vectors.{question_id}[{index}].selected_categories")
+            if len(selected) != len(set(selected)) or not all(isinstance(item, str) and item in categories for item in selected):
+                raise InputError(f"Descriptive statistics payload upset_vectors.{question_id}[{index}] has undeclared or duplicate selected categories.")
+            if (state == "answered") != bool(selected):
+                raise InputError(f"Descriptive statistics payload upset_vectors.{question_id}[{index}] has inconsistent state and selections.")
     return validated_questions
 
 
@@ -2112,6 +2244,8 @@ def render_descriptive_tex(
     report_path: str | Path | None = None,
     include_contribution_tables: bool = False,
     include_parent_context: bool = False,
+    max_piechart_ratio: float = 4 / 3,
+    upset_assets: Any | None = None,
 ) -> RenderedDescriptiveReport:
     """Render a self-contained report and reusable standalone chart documents.
 
@@ -2123,6 +2257,8 @@ def render_descriptive_tex(
             evidence tables are included in the report body.
         include_parent_context: Whether free-text tables include complete raw parent
             answers. The default omits the parent-context column.
+        max_piechart_ratio: Maximum permitted horizontal-to-vertical pie ratio.
+        upset_assets: Optional prevalidated external UpSet asset state.
 
     Returns:
         Report TeX, shared chart fragments, standalone documents, and chart paths.
@@ -2131,6 +2267,8 @@ def render_descriptive_tex(
         InputError: If the payload is malformed or chart metadata cannot be
             converted into stable filenames.
     """
+    if max_piechart_ratio <= 0:
+        raise InputError("max_piechart_ratio must be positive")
     questions = _validate_render_payload(payload)
     fragments: dict[str, str] = {}
     chart_documents: dict[str, str] = {}
@@ -2161,16 +2299,68 @@ def render_descriptive_tex(
         r"\noindent oAR: percentage of answering rows; oIR: percentage of included response rows.\par",
         r"\clearpage",
     ])
+    active_matrix_parent: str | None = None
+
+    def append_upset_pair(
+        definition_id: str,
+        heading: str,
+        anchor: bool = False,
+        source_selectors: Sequence[str] = (),
+    ) -> None:
+        """Append one validated figure pair or its explicit omission note.
+
+        Args:
+            definition_id: Approved UpSet definition identifier.
+            heading: TeX subsection title introducing the figure pair.
+            anchor: Whether to create a cross-reference target for shared figures.
+            source_selectors: Source question prefixes whose full labels are
+                printed below a shared figure title.
+
+        Returns:
+            ``None`` after appending report TeX fragments.
+        """
+        if upset_assets is None:
+            return
+        label = rf"\label{{upset-{definition_id}}}" if anchor else ""
+        report.append(rf"\subsection{{{_tex(heading)}}}{label}")
+        for selector in source_selectors:
+            source_question = next((
+                item for item in questions
+                if str(item["question_id"]).startswith(f"{selector}_")
+            ), None)
+            if source_question is None:
+                continue
+            report.append(rf"\noindent {_tex(selector)}: {_tex(source_question['label'])}\par")
+        if upset_assets.state == "empty":
+            report.append("UpSet charts omitted: no rendered assets.")
+            return
+        figure = upset_assets.figures[definition_id]
+        report.extend([
+            rf"\includegraphics[width=\linewidth]{{\detokenize{{{figure.upset_pdf}}}}}",
+            rf"\includegraphics[width=\linewidth]{{\detokenize{{{figure.deviation_pdf}}}}}",
+        ])
+
     for question in questions:
         for field in ("question_id", "label", "question_type", "categories", "population",
                       "contributions", "free_text_rows", "applicability"):
             if field not in question:
                 raise InputError(f"Descriptive statistics question lacks {field}: {question!r}.")
-        report.extend([r"\clearpage", rf"\section{{{_tex(question['label'])}}}"])
+        matrix_parent = question.get("form", {}).get("matrix_parent") if isinstance(question.get("form"), Mapping) else None
+        matrix_row = question.get("form", {}).get("matrix_row") if isinstance(question.get("form"), Mapping) else None
+        if matrix_parent:
+            if matrix_parent != active_matrix_parent:
+                report.extend([r"\clearpage", rf"\section{{{_tex(matrix_parent)}}}"])
+                report.append(rf"{_tex(_response_structure_text(question))}\par")
+                active_matrix_parent = matrix_parent
+            report.append(rf"\subsection{{{_tex(matrix_row or question['label'])}}}")
+        else:
+            report.extend([r"\clearpage", rf"\section{{{_tex(question['label'])}}}"])
+            active_matrix_parent = None
         population = question["population"]
         report.append(rf"\noindent\smaller[3] Question identifier: {_question_identifier(question['question_id'])}\normalsize\par\vspace{{0.35\baselineskip}}")
         report.append(rf"N/A/M (included/answered/missing): {population['N']} / {population['A']} / {population['M']}\par")
-        report.append(rf"{_tex(_response_structure_text(question))}\par")
+        if not matrix_parent:
+            report.append(rf"{_tex(_response_structure_text(question))}\par")
         if question["question_type"] == "free_text":
             report.append(
                 _question_tables(question, include_parent_context=include_parent_context)
@@ -2182,7 +2372,7 @@ def render_descriptive_tex(
         question_paths: list[str] = []
         for answered_only in variants:
             key = _chart_key(question, answered_only)
-            fragment = _pie_fragment(question, answered_only) if use_pie else _bar_fragment(question)
+            fragment = _pie_fragment(question, answered_only, max_piechart_ratio) if use_pie else _bar_fragment(question)
             fragments[key] = fragment
             chart_documents[key] = _standalone_tex(question, fragment, answered_only)
             report.append(fragment)
@@ -2204,6 +2394,23 @@ def render_descriptive_tex(
         ) if (question["question_type"] == "free_text" or include_contribution_tables) else ""
         if tables:
             report.append(tables)
+        question_id = str(question["question_id"])
+        matching_single = next((item for item in _UPSET_SINGLE_DEFINITIONS if question_id.startswith(f"{item}_")), None)
+        if matching_single is not None:
+            append_upset_pair(matching_single, "UpSet intersections")
+        for definition_id, source_selectors in _UPSET_SHARED_DEFINITIONS.items():
+            if any(question_id.startswith(f"{selector}_") for selector in source_selectors):
+                report.append(
+                    rf"\noindent Shared UpSet intersections: "
+                    rf"\hyperref[upset-{definition_id}]{{see { _tex(definition_id) }}}.\par"
+                )
+    if upset_assets is not None:
+        report.extend([r"\clearpage", r"\section{Shared UpSet charts}"])
+        for definition_id, source_selectors in _UPSET_SHARED_DEFINITIONS.items():
+            append_upset_pair(
+                definition_id, definition_id, anchor=True,
+                source_selectors=source_selectors,
+            )
     report.extend([r"\end{document}", ""])
     if chart_dir is not None and isinstance(payload, dict):
         payload["chart_paths"] = dict(chart_paths)

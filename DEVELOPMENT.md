@@ -935,7 +935,7 @@ above and must not be added as a section of its findings report.
   statistics and emits reusable chart fragments; TeX renders them in the report.
   Horizontal zero-based count bars are the default for category comparison and
   are mandatory for multi-choice questions: each selected value has a bar with its `n (percent oAR)` label, a fill-matching outline, adaptive label-row spacing, and explicit vertical margin below the final bar; `Missing` is a visually distinct separate bar
-  even when zero. Long categorical charts must fill the printable text height before splitting into continuation charts, while retaining an identical zero-based horizontal scale. Use pie charts only for small, readable, non-overlapping single-choice distributions. Every external pie label must have an explicit same-colour leader line and swatch, placed near the slice's vertical center while remaining within the pie's fixed vertical extent; rebalance an overloaded side only when needed. When such a pie-eligible question has missing
+  even when zero. Long categorical charts must fill the printable text height before splitting into continuation charts, while retaining an identical zero-based horizontal scale. Use pie charts only for small, readable, non-overlapping single-choice distributions. Every external pie label must have an explicit same-colour leader line and swatch, placed near the slice's vertical center while remaining within the pie's fixed vertical extent; rebalance an overloaded side only when needed. The `--max-piechart-ratio WIDTH:HEIGHT` command option defaults to `4:3` and limits the label layout's horizontal-to-vertical proportion; when full labels cannot fit under that limit, render numbered escaped labels and a complete legend below the pie. Single-choice matrix controls are one parent section with response type and mandatory/optional metadata, followed by row subsections with their individual pie charts and denominators. When such a pie-eligible question has missing
   responses, render two side-by-side pies: one including `Missing`, and one
   using only answered responses with its denominator labelled. Use ordered bars
   for ordinal questions; retain unobserved declared levels and place `Not
@@ -1052,6 +1052,22 @@ exactly one answer source, or both answer sources for strict cross-validation.
   dependencies, matrices, XML reference validation, XLSX mapping/value
   validation, semantic XML/XLSX equivalence, duplicate response multiplicity,
   mismatch publication rollback, and TeX/PDF metadata rendering.
+
+#### Optional descriptive UpSet assets
+
+`survey-mappings/so2_2025_upsets.json` is the sole approved registry for
+descriptive UpSet figures. Numeric selectors such as `q_009` resolve to exactly
+one full schema question identifier. `build_descriptive_payload` retains one
+canonical vector for every included response to each multi-choice question;
+rendered contribution rows are never used to reconstruct vectors. The vector
+contains source row, country, institution, state (`answered`, `missing`, or
+`inapplicable`), and declared selected categories.
+
+`export-descriptive-upset-r` emits CSV/R assets and an input manifest. A
+nonempty `describe --upset-assets-dir` must have matching input/output manifests,
+the exact canonical payload/registry hash, the complete approved definition set,
+and every declared PDF. Missing, stale, incomplete, or unsafe bundles fail before
+report publication. `describe` never modifies the supplied assets directory.
 
 ### Current fix-producing module labels
 

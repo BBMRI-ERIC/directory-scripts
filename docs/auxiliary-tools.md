@@ -114,7 +114,13 @@ unweighted and are not deduplicated to institutions, biobanks, or countries.
 `describe` requires the generated JSON form manifest so payloads and reports use
 its actual single-choice, multiple-choice, free-text, matrix, and requiredness
 metadata. Only explicit manifest regeneration decodes EUS Java serialization;
-ordinary reporting does not require that decoder.
+ordinary reporting does not require that decoder. Single-choice matrix controls
+are rendered as a parent section with one pie-chart subsection per matrix row;
+the parent reports the matrix response type and mandatory/optional status once.
+Use `--max-piechart-ratio WIDTH:HEIGHT` with either descriptive command to set
+the maximum pie-chart width:height ratio. It defaults to `4:3`; `16:9` permits
+wider charts and `1:2` permits taller charts. If full labels cannot fit within
+the selected proportion, the pie uses numbered labels with a full legend below.
 Structured-response contribution tables are omitted from the normal report; pass `--long-report` to either descriptive command to include grouped `Value | Country | Institutions` tables. Free-text response tables remain in both report forms. Explicit empty free-text placeholders are omitted, and HTTP(S) URLs are rendered as short hyperlinks. Contribution evidence retains the reported country, institution, and free-text answers; source-row provenance remains in the JSON payload rather than the readable tables. Free-text tables use ISO alpha-2 country codes and omit parent context by default. Pass `--include-parent-context` to show a `Parent context` column containing complete raw parent responses; it intentionally does not show the schema's semantically filtered subset, which would be incomplete context. The JSON retains both raw and semantic parent evidence, and a missing semantic trigger is diagnosed without omitting the text. Repeated normalized country/institution combinations are flagged as suspected repeated responses but are never removed. Treat generated
 JSON, TeX, PDFs, and chart directories as sensitive because they can contain
 institution names and free text.
@@ -129,6 +135,26 @@ JSON payload records its report-relative path. The report includes full source p
 free-text questions explicitly state `No text responses.` File outputs are new by default and all output paths must be distinct from inputs and from one another. `describe --overwrite` deliberately replaces its JSON, TeX, PDF, and chart-directory outputs after successful regeneration; it never permits an output to alias an input.
 Publication uses target-directory sibling stages and rolls back the invocation on
 write, compile, or publication failure.
+
+### Optional ComplexUpset figures
+
+The descriptive report can embed the approved eight multi-choice UpSet and
+observed-minus-expected deviation figures without making R a Termux runtime
+dependency. First generate the JSON payload, then create the external bundle:
+
+```bash
+python3 survey-so2-directory.py export-descriptive-upset-r \
+  -i so2-descriptive.json --output-dir so2-upsets
+```
+
+Run `so2-upsets/render-descriptive-upsets.R` in an R environment containing
+`ComplexUpset`, `ggplot2`, and `jsonlite`, for example through Debian proot.
+Finally rerun the normal `describe` command with
+`--upset-assets-dir so2-upsets`. An explicitly empty existing assets directory
+adds omission notes; a nonempty directory must contain a current completed
+bundle whose canonical hash matches the newly generated payload. The final PDF
+embeds the figures, while TeX references the sidecar PDFs and therefore needs
+the validated bundle retained for later recompilation.
 
 ## Other utilities
 

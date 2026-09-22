@@ -7,6 +7,7 @@ import json
 import inspect
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 
 import openpyxl
 import pandas as pd
@@ -975,7 +976,7 @@ def test_production_schema_narrative_barrier_columns_are_free_text_with_parents(
     """Other-barrier narrative answers remain text while retaining their matrix context."""
     questions = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))
 
-    assert questions[LEGAL_GDPR]["question_type"] == "ordinal"
+    assert questions[LEGAL_GDPR]["question_type"] == "single_choice"
     assert questions[OTHER_LEGAL]["question_type"] == "free_text"
     assert questions[OTHER_LEGAL]["categories"] == []
     assert questions[OTHER_LEGAL]["parent_columns"] == [
@@ -1002,7 +1003,7 @@ def test_production_schema_preserves_declared_zero_count_ordinal_category_order(
     """Declared ordinal storage bands remain ordered even when no response selects some bands."""
     question = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))[RETURNED_DATA_STORAGE]
 
-    assert question["question_type"] == "ordinal"
+    assert question["question_type"] == "single_choice"
     assert question["categories"] == [
         "I don't know",
         "<1TB",
@@ -1017,7 +1018,7 @@ def test_production_schema_semicolon_inside_declared_ordinal_is_not_split():
     """An ordinal label containing semicolons is not treated as a multi-choice answer."""
     question = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))[TRACEABILITY_READINESS]
 
-    assert question["question_type"] == "ordinal"
+    assert question["question_type"] == "single_choice"
     assert question.get("delimiter") is None
 
 
@@ -1122,6 +1123,26 @@ def test_single_choice_questions_render_two_denominator_aware_pies_without_metad
     assert "arc (" in rendered.tex
 
 
+def test_pie_uses_distinct_nonmissing_colours_before_any_palette_wraparound():
+    """Six observed answer categories do not reuse a colour before Missing red."""
+    question = structured_report_question(
+        question_type="single_choice",
+        population={"N": 7, "A": 6, "M": 1, "blank_rows": 1},
+        categories=[
+            {"value": f"Choice {index}", "count": 1, "percent_base": 6, "percent": 16.6667}
+            for index in range(1, 7)
+        ] + [{"value": "Missing", "count": 1, "percent_base": 7, "percent": 14.2857}],
+        pie_categories=[
+            {"value": f"Choice {index}", "count": 1, "percent_base": 6, "percent": 16.6667, "excluded_from_chart": False}
+            for index in range(1, 7)
+        ] + [{"value": "Missing", "count": 1, "percent_base": 7, "percent": 14.2857, "excluded_from_chart": False}],
+    )
+    fragment = module._pie_fragment(question, answered_only=False)
+    assert all(f"fill={colour}" in fragment for colour in (
+        "bbmriBlue", "bbmriTeal", "bbmriGold", "bbmriGray", "bbmriGreen", "bbmriOrange", "bbmriRed",
+    ))
+
+
 def test_fully_answered_single_choice_pie_omits_the_zero_missing_slice():
     """A complete single-choice response set does not receive a misleading Missing pie."""
     question = structured_report_question(
@@ -1193,6 +1214,31 @@ def payload_with_repeated_and_free_text():
 def rendered_payload():
     """Render one bar chart for filesystem publication tests."""
     return module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts")
+
+
+def test_upsets_are_placed_with_single_questions_and_shared_figures_are_referenced():
+    """Single figures are local while combined figures remain in one shared section."""
+    q009 = structured_report_question()
+    q042 = structured_report_question(question_id="q_042_national", label="National contribution")
+    q044 = structured_report_question(question_id="q_044_international", label="International contribution")
+    assets = SimpleNamespace(
+        state="complete",
+        figures={
+            "q_009": SimpleNamespace(upset_pdf="/tmp/q_009-upset.pdf", deviation_pdf="/tmp/q_009-deviation.pdf"),
+            "q_042": SimpleNamespace(upset_pdf="/tmp/q_042-upset.pdf", deviation_pdf="/tmp/q_042-deviation.pdf"),
+            "q_042_q_044": SimpleNamespace(upset_pdf="/tmp/q_042_q_044-upset.pdf", deviation_pdf="/tmp/q_042_q_044-deviation.pdf"),
+            "q_035_q_050": SimpleNamespace(upset_pdf="/tmp/q_035_q_050-upset.pdf", deviation_pdf="/tmp/q_035_q_050-deviation.pdf"),
+        },
+    )
+    tex = module.render_descriptive_tex(report_payload(q009, q042, q044), None, upset_assets=assets).tex
+
+    assert tex.index("q_009-upset.pdf") < tex.index(r"\section{National contribution}")
+    assert tex.count(r"\hyperref[upset-q_042_q_044]") == 2
+    assert tex.index(r"\section{Shared UpSet charts}") < tex.index("q_042_q_044-upset.pdf")
+    assert "q_009-upset.pdf" not in tex[tex.index(r"\section{Shared UpSet charts}"):]
+    shared_start = tex.index(r"\subsection{q\_042\_q\_044}")
+    assert r"q\_042: National contribution" in tex[shared_start:]
+    assert r"q\_044: International contribution" in tex[shared_start:]
 
 
 def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
@@ -2055,6 +2101,11 @@ def test_pie_leader_lines_use_radial_pie_arc_intersections():
     assert ":1.5) -- (-1.72," not in fragment
 
 
+def test_report_preamble_uses_libertine_typeface():
+    """Reports select Libertine consistently for XeLaTeX rendering."""
+    assert r"\usepackage{libertine}" in module._preamble()
+
+
 def test_response_structure_prints_concise_status_and_dependencies():
     """Report metadata shows a plain status plus readable routing evidence."""
     text = module._response_structure_text({"form": {
@@ -2077,3 +2128,46 @@ def test_manifest_structure_resolves_dependency_to_human_labels():
         "parent_question": "What type of institution do you work for? (Select all that apply)",
         "answer": "Other (please specify):",
     }]
+
+
+def test_render_rejects_non_positive_piechart_ratio():
+    """The renderer rejects invalid direct API ratios before layout arithmetic."""
+    with pytest.raises(module.InputError, match="max_piechart_ratio must be positive"):
+        module.render_descriptive_tex(single_choice_payload_with_missing(), None, max_piechart_ratio=0)
+
+
+def test_matrix_rows_render_as_subsections_under_one_parent_section():
+    """Single-choice matrix rows share their manifest parent section."""
+    payload = single_choice_payload_with_missing()
+    row = payload["questions"][0]
+    row["form"] = {"response_type": "Single Choice Matrix Question", "requiredness": "mandatory", "dependencies": [], "matrix_parent": "Barrier matrix", "matrix_row": "GDPR"}
+    tex = module.render_descriptive_tex(payload, None).tex
+    assert r"\section{Barrier matrix}" in tex
+    assert r"\subsection{GDPR}" in tex
+
+
+def test_matrix_rows_repeat_parent_metadata_only_once():
+    """Matrix parent metadata is printed once before its child pie sections."""
+    payload = single_choice_payload_with_missing()
+    first = payload["questions"][0]
+    first["form"] = {"response_type": "Single Choice Matrix Question", "requiredness": "mandatory", "dependencies": [], "matrix_parent": "Barrier matrix", "matrix_row": "GDPR"}
+    second = deepcopy(first)
+    second["question_id"] = "q_012_licensing"
+    second["label"] = "Barrier matrix: Licensing"
+    second["form"] = {**first["form"], "matrix_row": "Licensing"}
+    payload["questions"].append(second)
+
+    tex = module.render_descriptive_tex(payload, None).tex
+
+    assert tex.count(r"\section{Barrier matrix}") == 1
+    assert tex.count(r"Response type: single-choice matrix; Mandatory.") == 1
+    assert r"\subsection{GDPR}" in tex
+    assert r"\subsection{Licensing}" in tex
+
+
+def test_pie_overflow_uses_keyed_labels_and_full_legend():
+    """Unfit full pie labels fall back to escaped keys with complete evidence."""
+    q={"pie_categories":[{"value":"A very long category label "*8+str(i),"count":1,"excluded_from_chart":False} for i in range(8)]}
+    tex=module._pie_fragment(q,False)
+    assert r"\#1" in tex
+    assert r"\textit{Legend}" in tex

@@ -1,0 +1,13 @@
+{
+  "registry_version": "1",
+  "definitions": [
+    {"id": "q_009", "question_selectors": ["q_009"], "title": "Institution type"},
+    {"id": "q_012", "question_selectors": ["q_012"], "title": "Research fields"},
+    {"id": "q_018", "question_selectors": ["q_018"], "title": "Standards experience"},
+    {"id": "q_035", "question_selectors": ["q_035"], "title": "Available data technologies"},
+    {"id": "q_042", "question_selectors": ["q_042"], "title": "National or international data contribution"},
+    {"id": "q_050", "question_selectors": ["q_050"], "title": "Managed sample types"},
+    {"id": "q_042_q_044", "question_selectors": ["q_042", "q_044"], "title": "National and international data contribution"},
+    {"id": "q_035_q_050", "question_selectors": ["q_035", "q_050"], "title": "Available technologies and managed sample types"}
+  ]
+}
