@@ -1117,6 +1117,24 @@ def _association_definition_payload(definition: AssociationHeatmapDefinition) ->
     }
 
 
+def _association_definitions_sha256(
+    definitions: Sequence[AssociationHeatmapDefinition],
+) -> str:
+    """Return the deterministic provenance digest for serialized definitions.
+
+    Args:
+        definitions: Validated association definitions in rendering order.
+
+    Returns:
+        Lowercase SHA-256 over canonical JSON definition metadata.
+    """
+    serialized = [_association_definition_payload(definition) for definition in definitions]
+    canonical_json = json.dumps(
+        serialized, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    )
+    return sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
 def build_association_heatmap_payload(
     definitions: Sequence[AssociationHeatmapDefinition],
     responses: pd.DataFrame,
@@ -1578,6 +1596,9 @@ def build_descriptive_payload(
     if association_definitions:
         payload["association_heatmap_definitions"] = {
             "registry_sha256": association_registry_sha256,
+            "definitions_sha256": _association_definitions_sha256(
+                association_definitions
+            ),
             "definitions": [
                 _association_definition_payload(definition)
                 for definition in association_definitions
@@ -2394,6 +2415,15 @@ def _association_definition_from_payload(value: Any, path: str) -> AssociationHe
         InputError: If metadata is malformed.
     """
     definition = _payload_mapping(value, path)
+    expected_fields = {
+        "definition_id", "row_question_id", "column_question_id", "row_form_uid",
+        "column_form_uid", "row_categories", "column_categories", "mode", "title",
+        "interpretation", "conditional_summary",
+    }
+    if set(definition) != expected_fields:
+        raise InputError(
+            f"Descriptive statistics payload {path} has missing or unknown fields."
+        )
     mode = _payload_text(definition.get("mode"), f"{path}.mode")
     if mode not in {"default", "exploratory"}:
         raise InputError(f"Descriptive statistics payload {path}.mode is invalid.")
@@ -2435,14 +2465,11 @@ def _association_definition_from_payload(value: Any, path: str) -> AssociationHe
     )
 
 
-def validate_association_heatmap_payload(
-    payload: Mapping[str, Any], definitions: Sequence[AssociationHeatmapDefinition]
-) -> None:
-    """Validate serialized association vectors against their approved definitions.
+def validate_association_heatmap_payload(payload: Mapping[str, Any]) -> None:
+    """Validate serialized association vectors against build-time provenance.
 
     Args:
         payload: Complete descriptive report payload containing association keys.
-        definitions: Approved definitions expected by the renderer.
 
     Returns:
         ``None`` after every vector, cell, diagnostic, and embedded definition is valid.
@@ -2454,6 +2481,11 @@ def validate_association_heatmap_payload(
     metadata = _payload_mapping(
         payload.get("association_heatmap_definitions"), "association_heatmap_definitions"
     )
+    if set(metadata) != {"registry_sha256", "definitions_sha256", "definitions"}:
+        raise InputError(
+            "Descriptive statistics payload association_heatmap_definitions has "
+            "missing or unknown fields."
+        )
     registry_sha256 = _payload_text(
         metadata.get("registry_sha256"), "association_heatmap_definitions.registry_sha256"
     )
@@ -2461,17 +2493,27 @@ def validate_association_heatmap_payload(
         raise InputError(
             "Descriptive statistics payload association registry SHA-256 must be lowercase hexadecimal."
         )
+    definitions_sha256 = _payload_text(
+        metadata.get("definitions_sha256"),
+        "association_heatmap_definitions.definitions_sha256",
+    )
+    if re.fullmatch(r"[0-9a-f]{64}", definitions_sha256) is None:
+        raise InputError(
+            "Descriptive statistics payload association definition SHA-256 must be "
+            "lowercase hexadecimal."
+        )
     serialized_definitions = _payload_array(
         metadata.get("definitions"), "association_heatmap_definitions.definitions"
     )
-    payload_definitions = tuple(
+    definitions = tuple(
         _association_definition_from_payload(value, f"association_heatmap_definitions.definitions[{index}]")
         for index, value in enumerate(serialized_definitions)
     )
-    if tuple(_association_definition_payload(item) for item in payload_definitions) != tuple(
-        _association_definition_payload(item) for item in definitions
-    ):
-        raise InputError("Descriptive statistics payload association definitions do not match registry.")
+    if definitions_sha256 != _association_definitions_sha256(definitions):
+        raise InputError(
+            "Descriptive statistics payload association definition digest does not match "
+            "the embedded definitions."
+        )
     heatmaps = _payload_mapping(payload.get("association_heatmaps"), "association_heatmaps")
     expected_ids = {definition.definition_id for definition in definitions}
     if set(heatmaps) != expected_ids:
@@ -2719,18 +2761,7 @@ def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str
     if present_association_keys and present_association_keys != association_keys:
         raise InputError("Descriptive statistics payload association data is incomplete.")
     if present_association_keys:
-        metadata = _payload_mapping(
-            payload.get("association_heatmap_definitions"), "association_heatmap_definitions"
-        )
-        definitions = tuple(
-            _association_definition_from_payload(
-                value, f"association_heatmap_definitions.definitions[{index}]"
-            )
-            for index, value in enumerate(_payload_array(
-                metadata.get("definitions"), "association_heatmap_definitions.definitions"
-            ))
-        )
-        validate_association_heatmap_payload(payload, definitions)
+        validate_association_heatmap_payload(payload)
     if "upset_vectors" not in payload:
         return validated_questions
     vectors = _payload_mapping(payload.get("upset_vectors"), "upset_vectors")

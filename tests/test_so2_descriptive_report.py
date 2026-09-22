@@ -1,8 +1,10 @@
 """Tests for the self-contained SO2 descriptive-workbook reader."""
 
 from copy import deepcopy
+from dataclasses import replace
 import importlib
 from datetime import datetime
+from hashlib import sha256
 import json
 import inspect
 from pathlib import Path
@@ -1141,6 +1143,14 @@ def controlled_association_questions():
     }
 
 
+def canonical_association_definitions_sha256(definitions):
+    """Return the canonical association-definition digest expected by the renderer."""
+    serialized = [module._association_definition_payload(definition) for definition in definitions]
+    return sha256(
+        json.dumps(serialized, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
 def test_pairing_uses_original_source_row_and_preserves_missing_states():
     """Association vectors retain only source rows and do not pair by respondent context."""
     responses = pd.DataFrame([
@@ -1185,9 +1195,11 @@ def test_inapplicable_and_out_of_route_answers_are_not_complete_case_observation
 def test_renderer_rejects_unknown_association_category_and_mismatched_cell_total():
     """Serialized association data cannot drift from declared categories or vectors."""
     definitions = controlled_association_definitions()[:1]
+    definitions_sha256 = canonical_association_definitions_sha256(definitions)
     payload = report_payload()
     payload["association_heatmap_definitions"] = {
         "registry_sha256": "b" * 64,
+        "definitions_sha256": definitions_sha256,
         "definitions": [module._association_definition_payload(definitions[0])],
     }
     payload["association_heatmaps"] = module.build_association_heatmap_payload(
@@ -1207,6 +1219,58 @@ def test_renderer_rejects_unknown_association_category_and_mismatched_cell_total
 
     with pytest.raises(module.InputError, match="mismatched association cell total"):
         module.render_descriptive_tex(mismatched_total, None)
+
+
+def test_renderer_rejects_forged_association_definitions_with_stale_registry_digest():
+    """Internally consistent forged association data cannot replace recorded provenance."""
+    definitions = controlled_association_definitions()[:1]
+    definitions_sha256 = canonical_association_definitions_sha256(definitions)
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": definitions_sha256,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    forged_definitions = (replace(definitions[0], title="Forged association title"),)
+    forged = deepcopy(payload)
+    forged["association_heatmap_definitions"]["definitions"] = [
+        module._association_definition_payload(forged_definitions[0])
+    ]
+    forged["association_heatmaps"] = module.build_association_heatmap_payload(
+        forged_definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+
+    with pytest.raises(module.InputError, match="definition digest"):
+        module.render_descriptive_tex(forged, None)
+
+
+def test_renderer_rejects_mismatched_association_definition_digest():
+    """Canonical definition provenance must bind exactly to embedded definitions."""
+    definitions = controlled_association_definitions()[:1]
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": "f" * 64,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+
+    with pytest.raises(module.InputError, match="definition digest"):
+        module.render_descriptive_tex(payload, None)
 
 
 def test_descriptive_payload_carries_validated_association_registry_provenance():
@@ -1232,20 +1296,23 @@ def test_descriptive_payload_carries_validated_association_registry_provenance()
         "Returned data": "Yes", "Policy": "No",
     }])
     definitions = controlled_association_definitions()[:1]
+    registry_sha256 = "c" * 64
+    definitions_sha256 = canonical_association_definitions_sha256(definitions)
 
     payload = module.build_descriptive_payload(
-        workbook, schema, association_definitions=definitions, association_registry_sha256="c" * 64
+        workbook, schema, association_definitions=definitions, association_registry_sha256=registry_sha256
     )
 
     assert payload["association_heatmap_definitions"] == {
-        "registry_sha256": "c" * 64,
+        "registry_sha256": registry_sha256,
+        "definitions_sha256": definitions_sha256,
         "definitions": [module._association_definition_payload(definitions[0])],
     }
     assert payload["association_heatmaps"]["returned_data_policy"]["vectors"] == [{
         "source_row": 5, "row_state": "answered", "row_value": "Yes",
         "column_state": "answered", "column_value": "No",
     }]
-    module.validate_association_heatmap_payload(payload, definitions)
+    module.validate_association_heatmap_payload(payload)
 
 
 def test_production_schema_accounts_for_every_header():
