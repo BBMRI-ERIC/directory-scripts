@@ -17,6 +17,7 @@ import pytest
 module = importlib.import_module("so2_descriptive_report")
 WORKTREE = Path(__file__).resolve().parents[1]
 PRODUCTION_SCHEMA = WORKTREE / "survey-mappings" / "so2_2025_descriptive_report.json"
+ASSOCIATION_REGISTRY = WORKTREE / "survey-mappings" / "so2_2025_association_heatmaps.json"
 PRODUCTION_WORKBOOK = Path("/storage/emulated/0/BBMRI-ERIC/directory-scripts/Content_Export_SO2_2025_20260313.xlsx")
 LEGAL_GDPR = "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)"
 LEGAL_LICENSING = "What types of legal barriers have you faced?: Licensing restrictions"
@@ -934,6 +935,148 @@ def read_row_four_headers(workbook_path):
 def questions_by_column(schema):
     """Index raw schema questions by their explicit source header."""
     return {question["column"]: question for question in schema["questions"]}
+
+
+def write_association_registry(tmp_path, definitions):
+    """Write one controlled association registry for loader validation tests."""
+    path = tmp_path / "association-registry.json"
+    path.write_text(json.dumps({"schema_version": "1", "definitions": definitions}), encoding="utf-8")
+    return path
+
+
+def association_definition(**overrides):
+    """Return a syntactically valid association definition fixture."""
+    definition = {
+        "definition_id": "returned_data_policy",
+        "row_question_id": "q_094",
+        "column_question_id": "q_097",
+        "row_form_uid": "row-uid",
+        "column_form_uid": "column-uid",
+        "row_categories": ["No", "Yes"],
+        "column_categories": ["No", "Yes"],
+        "mode": "default",
+        "title": "Returned-data experience versus policy/workflow",
+        "interpretation": "Describes submitted response rows without implying causation.",
+        "conditional_summary": True,
+    }
+    definition.update(overrides)
+    return definition
+
+
+def production_questions_by_id():
+    """Return validated production questions indexed by their stable schema identifiers."""
+    schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
+    headers = [
+        *schema["columns"]["respondent_context"],
+        *schema["columns"]["administrative_exclusions"],
+        *(question["column"] for question in schema["questions"]),
+    ]
+    questions = module.validate_descriptive_schema(schema, headers)
+    return {question.question_id: question for question in questions}
+
+
+def test_production_association_registry_has_exact_default_and_exploratory_pairs():
+    """The checked-in registry contains only the approved association pairs."""
+    definitions = module.load_association_heatmap_registry(ASSOCIATION_REGISTRY)
+
+    assert [(item.row_question_id, item.column_question_id, item.mode) for item in definitions] == [
+        (
+            "q_058_how_would_you_rate_your_repository_s_technical_readiness_for_integrating",
+            "q_061_how_would_you_rate_your_biobank_s_quality_management_system_qms_readines",
+            "default",
+        ),
+        (
+            "q_085_do_you_currently_have_sufficient_it_personnel_e_g_0_2_fte_of_a_data_expe",
+            "q_086_does_your_organisation_have_the_necessary_infrastructure_to_host_and_mai",
+            "default",
+        ),
+        (
+            "q_053_are_sample_related_data_collected_in_an_automated_way_e_g_directly_from_",
+            "q_057_does_your_system_automatically_track_changes_made_to_traceability_or_pro",
+            "default",
+        ),
+        (
+            "q_094_have_data_been_previously_returned_to_you",
+            "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin",
+            "default",
+        ),
+        (
+            "q_063_what_types_of_legal_barriers_have_you_faced_data_protection_regulations_",
+            "q_066_what_types_of_legal_barriers_have_you_faced_cross_border_data_sharing_re",
+            "exploratory",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("definitions", "message"),
+    [
+        ([association_definition(), association_definition(definition_id="second")], "duplicate unordered question pair"),
+        ([association_definition(mode="unsupported")], "unknown mode"),
+        ([association_definition(title=" ")], "nonblank string"),
+    ],
+)
+def test_association_registry_loader_rejects_invalid_syntactic_definitions(
+    tmp_path, definitions, message
+):
+    """Registry loading validates only the JSON contract available without a schema."""
+    registry = write_association_registry(tmp_path, definitions)
+
+    with pytest.raises(module.InputError, match=message):
+        module.load_association_heatmap_registry(registry)
+
+
+def test_association_registry_validation_rejects_contact_question_uid_and_category_drift(tmp_path):
+    """Schema-aware validation rejects semantically unsafe or stale pair definitions."""
+    questions = production_questions_by_id()
+    registry = write_association_registry(
+        tmp_path,
+        [association_definition(
+            row_question_id="q_094_have_data_been_previously_returned_to_you",
+            column_question_id=(
+                "q_111_we_may_wish_to_follow_up_with_some_participants_to_learn_more_about_spec"
+            ),
+            row_form_uid="e06ab430-eccd-b2f5-b971-084cfba02604",
+            column_form_uid="bea118d8-b922-84c9-ceb1-9d3ec6ec9c5b",
+        )],
+    )
+    with pytest.raises(module.InputError, match="single_choice or ordinal"):
+        module.validate_association_definitions(
+            module.load_association_heatmap_registry(registry), questions
+        )
+
+    registry = write_association_registry(
+        tmp_path,
+        [association_definition(
+            row_question_id="q_094_have_data_been_previously_returned_to_you",
+            column_question_id=(
+                "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin"
+            ),
+            row_form_uid="stale-uid",
+            column_form_uid="dabf1c1e-bc95-b216-5d2a-90f5df380b63",
+        )],
+    )
+    with pytest.raises(module.InputError, match="form UID"):
+        module.validate_association_definitions(
+            module.load_association_heatmap_registry(registry), questions
+        )
+
+    registry = write_association_registry(
+        tmp_path,
+        [association_definition(
+            row_question_id="q_094_have_data_been_previously_returned_to_you",
+            column_question_id=(
+                "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin"
+            ),
+            row_form_uid="e06ab430-eccd-b2f5-b971-084cfba02604",
+            column_form_uid="dabf1c1e-bc95-b216-5d2a-90f5df380b63",
+            row_categories=["Yes", "No"],
+        )],
+    )
+    with pytest.raises(module.InputError, match="category sequence"):
+        module.validate_association_definitions(
+            module.load_association_heatmap_registry(registry), questions
+        )
 
 
 def test_production_schema_accounts_for_every_header():

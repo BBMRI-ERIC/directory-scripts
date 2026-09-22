@@ -60,6 +60,24 @@ class QuestionDefinition:
     )
     exclusive_categories: tuple[str, ...] = ()
     category_aliases: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+    form_uid: str = ""
+
+
+@dataclass(frozen=True)
+class AssociationHeatmapDefinition:
+    """Validated registry metadata for one approved association heatmap."""
+
+    definition_id: str
+    row_question_id: str
+    column_question_id: str
+    row_form_uid: str
+    column_form_uid: str
+    row_categories: tuple[str, ...]
+    column_categories: tuple[str, ...]
+    mode: Literal["default", "exploratory"]
+    title: str
+    interpretation: str
+    conditional_summary: bool
 
 
 @dataclass(frozen=True)
@@ -120,6 +138,151 @@ def load_descriptive_schema(path: str | Path) -> dict[str, Any]:
     if not isinstance(schema, dict):
         raise InputError("Descriptive schema root must be a JSON object.")
     return schema
+
+
+def load_association_heatmap_registry(path: str | Path) -> tuple[AssociationHeatmapDefinition, ...]:
+    """Load a syntactically valid versioned association-heatmap registry.
+
+    Args:
+        path: JSON registry path.
+
+    Returns:
+        Immutable association definitions in declared rendering order.
+
+    Raises:
+        InputError: If the registry cannot be read, is malformed, or violates
+            the registry's self-contained JSON contract. Question semantics are
+            intentionally checked separately by ``validate_association_definitions``.
+    """
+    registry_path = Path(path)
+    try:
+        with registry_path.open(encoding="utf-8") as registry_file:
+            registry = json.load(registry_file, object_pairs_hook=_reject_duplicate_json_keys)
+    except OSError as exc:
+        raise InputError(f"Could not read association registry {registry_path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise InputError(f"Invalid JSON in association registry {registry_path}: {exc}") from exc
+
+    root = _required_mapping(registry, "association registry")
+    if root.get("schema_version") != "1":
+        raise InputError(f"Unknown association registry version: {root.get('schema_version')!r}.")
+    definitions_raw = root.get("definitions")
+    if not isinstance(definitions_raw, list):
+        raise InputError("Association registry field definitions must be an array.")
+
+    definitions = []
+    definition_ids = set()
+    question_pairs = set()
+    required_fields = (
+        "definition_id", "row_question_id", "column_question_id", "row_form_uid",
+        "column_form_uid", "row_categories", "column_categories", "mode", "title",
+        "interpretation", "conditional_summary",
+    )
+    for position, raw_definition in enumerate(definitions_raw):
+        definition = _required_mapping(raw_definition, f"association definitions[{position}]")
+        for name in required_fields:
+            if name not in definition:
+                raise InputError(
+                    f"Association definition {position} is missing required field {name}."
+                )
+        definition_id = _required_text(
+            definition["definition_id"], f"association definitions[{position}].definition_id"
+        )
+        row_question_id = _required_text(
+            definition["row_question_id"], f"association definitions[{position}].row_question_id"
+        )
+        column_question_id = _required_text(
+            definition["column_question_id"],
+            f"association definitions[{position}].column_question_id",
+        )
+        if row_question_id == column_question_id:
+            raise InputError("Association definition must contain two different question IDs.")
+        if definition_id in definition_ids:
+            raise InputError(f"Association registry has duplicate definition ID {definition_id!r}.")
+        pair = tuple(sorted((row_question_id, column_question_id)))
+        if pair in question_pairs:
+            raise InputError("Association registry has duplicate unordered question pair.")
+        mode = _required_text(definition["mode"], f"association definitions[{position}].mode")
+        if mode not in {"default", "exploratory"}:
+            raise InputError(f"Association definition has unknown mode {mode!r}.")
+        conditional_summary = definition["conditional_summary"]
+        if not isinstance(conditional_summary, bool):
+            raise InputError(
+                f"Association definitions[{position}].conditional_summary must be boolean."
+            )
+        definitions.append(AssociationHeatmapDefinition(
+            definition_id=definition_id,
+            row_question_id=row_question_id,
+            column_question_id=column_question_id,
+            row_form_uid=_required_text(
+                definition["row_form_uid"], f"association definitions[{position}].row_form_uid"
+            ),
+            column_form_uid=_required_text(
+                definition["column_form_uid"],
+                f"association definitions[{position}].column_form_uid",
+            ),
+            row_categories=_text_sequence(
+                definition["row_categories"], f"association definitions[{position}].row_categories"
+            ),
+            column_categories=_text_sequence(
+                definition["column_categories"],
+                f"association definitions[{position}].column_categories",
+            ),
+            mode=mode,
+            title=_required_text(definition["title"], f"association definitions[{position}].title"),
+            interpretation=_required_text(
+                definition["interpretation"], f"association definitions[{position}].interpretation"
+            ),
+            conditional_summary=conditional_summary,
+        ))
+        definition_ids.add(definition_id)
+        question_pairs.add(pair)
+    return tuple(definitions)
+
+
+def validate_association_definitions(
+    definitions: Sequence[AssociationHeatmapDefinition],
+    questions_by_id: Mapping[str, QuestionDefinition],
+) -> None:
+    """Validate association definitions against already validated survey questions.
+
+    Args:
+        definitions: Syntactically valid association registry definitions.
+        questions_by_id: Validated descriptive questions indexed by their stable IDs.
+
+    Returns:
+        ``None`` after every definition matches the descriptive schema.
+
+    Raises:
+        InputError: If a question is unknown, unsuitable for an association,
+            prohibited, or differs in form UID or declared category order.
+    """
+    for definition in definitions:
+        for axis, question_id, form_uid, categories in (
+            ("row", definition.row_question_id, definition.row_form_uid, definition.row_categories),
+            ("column", definition.column_question_id, definition.column_form_uid,
+             definition.column_categories),
+        ):
+            question = questions_by_id.get(question_id)
+            if question is None:
+                raise InputError(
+                    f"Association definition {definition.definition_id!r} references unknown {axis} "
+                    f"question {question_id!r}."
+                )
+            if question.question_type not in {"single_choice", "ordinal"}:
+                raise InputError(
+                    f"Association {axis} question {question_id!r} must be single_choice or ordinal."
+                )
+            if question_id == "q_111" or question_id.startswith("q_111_"):
+                raise InputError("Association definitions must not include q_111 contact questions.")
+            if question.form_uid != form_uid:
+                raise InputError(
+                    f"Association {axis} question {question_id!r} has mismatched form UID."
+                )
+            if question.categories != categories:
+                raise InputError(
+                    f"Association {axis} question {question_id!r} has mismatched category sequence."
+                )
 
 
 def _form_label(value: str) -> str:
@@ -465,6 +628,10 @@ def _validate_question(question: Any, position: int) -> QuestionDefinition:
         applicability=applicability,
         exclusive_categories=exclusive_categories,
         category_aliases=MappingProxyType(category_aliases),
+        form_uid=(
+            _required_text(item["form_uid"], f"questions[{position}].form_uid")
+            if "form_uid" in item else ""
+        ),
     )
 
 
