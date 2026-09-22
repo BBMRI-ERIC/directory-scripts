@@ -1045,6 +1045,157 @@ def _structured_answers(
     return answers, duplicates
 
 
+def _association_axis_value(
+    question: QuestionDefinition,
+    response: Mapping[str, Any],
+    questions_by_id: Mapping[str, QuestionDefinition],
+) -> tuple[str, str | None]:
+    """Classify one association axis without retaining the submitted raw response.
+
+    Args:
+        question: Validated structured question used by this axis.
+        response: One source response row.
+        questions_by_id: Validated questions indexed by stable question ID.
+
+    Returns:
+        One of the four association row states and a declared category only for
+        an answered state.
+
+    Raises:
+        InputError: If a required response or applicability dependency is absent.
+    """
+    if question.column not in response:
+        raise InputError(f"Association response lacks question column {question.column!r}.")
+    raw_value = response[question.column]
+    if question.applicability is not None:
+        parent_column = question.applicability.get("column")
+        values = question.applicability.get("values")
+        if not isinstance(parent_column, str) or not isinstance(values, list) or not all(
+            isinstance(value, str) for value in values
+        ):
+            raise InputError(
+                f"Schema applicability for {question.column!r} must declare column and string values."
+            )
+        parent_question = next(
+            (item for item in questions_by_id.values() if item.column == parent_column), None
+        )
+        if parent_question is None or parent_column not in response:
+            raise InputError(f"Association applicability column is absent: {parent_column!r}.")
+        parent_value = response[parent_column]
+        parent_answers, _ = _structured_answers(parent_question, parent_value)
+        if _is_blank(parent_value):
+            return "missing", None
+        if not frozenset(values).intersection(parent_answers):
+            return ("inapplicable", None) if _is_blank(raw_value) else ("out_of_route", None)
+    answers, _ = _structured_answers(question, raw_value)
+    if len(answers) == 1 and answers[0] in question.categories:
+        return "answered", answers[0]
+    return "missing", None
+
+
+def _association_definition_payload(definition: AssociationHeatmapDefinition) -> dict[str, Any]:
+    """Serialize one validated association definition for a renderer payload.
+
+    Args:
+        definition: Validated association definition.
+
+    Returns:
+        JSON-serializable metadata preserving exact registry category order.
+    """
+    return {
+        "definition_id": definition.definition_id,
+        "row_question_id": definition.row_question_id,
+        "column_question_id": definition.column_question_id,
+        "row_form_uid": definition.row_form_uid,
+        "column_form_uid": definition.column_form_uid,
+        "row_categories": list(definition.row_categories),
+        "column_categories": list(definition.column_categories),
+        "mode": definition.mode,
+        "title": definition.title,
+        "interpretation": definition.interpretation,
+        "conditional_summary": definition.conditional_summary,
+    }
+
+
+def build_association_heatmap_payload(
+    definitions: Sequence[AssociationHeatmapDefinition],
+    responses: pd.DataFrame,
+    questions_by_id: Mapping[str, QuestionDefinition],
+    source_row_column: str,
+) -> dict[str, dict[str, Any]]:
+    """Build privacy-safe paired vectors and contingency cells for approved associations.
+
+    Args:
+        definitions: Schema-validated association definitions in report order.
+        responses: Included survey response rows.
+        questions_by_id: Validated questions indexed by stable question ID.
+        source_row_column: Column holding original workbook row numbers.
+
+    Returns:
+        Association data keyed by definition ID, containing category metadata,
+        source-row-only vectors, complete-case cells, and state diagnostics.
+
+    Raises:
+        InputError: If definitions, response columns, or source-row values are invalid.
+    """
+    if source_row_column not in responses.columns:
+        raise InputError(f"Association responses lack source-row column {source_row_column!r}.")
+    validate_association_definitions(definitions, questions_by_id)
+    pairs: dict[str, dict[str, Any]] = {}
+    for definition in definitions:
+        row_question = questions_by_id[definition.row_question_id]
+        column_question = questions_by_id[definition.column_question_id]
+        cells = {
+            f"{row_category}|{column_category}": 0
+            for row_category in definition.row_categories
+            for column_category in definition.column_categories
+        }
+        vectors: list[dict[str, Any]] = []
+        diagnostics = {
+            "eligible_missing_rows": [],
+            "inapplicable_rows": [],
+            "out_of_route_rows": [],
+        }
+        source_rows: set[int] = set()
+        for _, response in responses.iterrows():
+            source_row = _payload_count(response[source_row_column], source_row_column)
+            if source_row in source_rows:
+                raise InputError(f"Association responses have duplicate source row {source_row}.")
+            source_rows.add(source_row)
+            row_state, row_value = _association_axis_value(
+                row_question, response, questions_by_id
+            )
+            column_state, column_value = _association_axis_value(
+                column_question, response, questions_by_id
+            )
+            vector = {
+                "source_row": source_row,
+                "row_state": row_state,
+                "row_value": row_value,
+                "column_state": column_state,
+                "column_value": column_value,
+            }
+            vectors.append(vector)
+            states = {row_state, column_state}
+            if "missing" in states:
+                diagnostics["eligible_missing_rows"].append(source_row)
+            if "inapplicable" in states:
+                diagnostics["inapplicable_rows"].append(source_row)
+            if "out_of_route" in states:
+                diagnostics["out_of_route_rows"].append(source_row)
+            if row_state == column_state == "answered":
+                cells[f"{row_value}|{column_value}"] += 1
+        pairs[definition.definition_id] = {
+            "row_categories": list(definition.row_categories),
+            "column_categories": list(definition.column_categories),
+            "vectors": vectors,
+            "cells": cells,
+            "paired_denominator": sum(cells.values()),
+            "diagnostics": diagnostics,
+        }
+    return pairs
+
+
 def _structured_question_payload(
     question: QuestionDefinition,
     responses: pd.DataFrame,
@@ -1306,7 +1457,11 @@ def _free_text_question_payload(
 
 
 def build_descriptive_payload(
-    workbook: SurveyWorkbook, schema: Mapping[str, Any], form_structure: Mapping[str, Any] | None = None,
+    workbook: SurveyWorkbook,
+    schema: Mapping[str, Any],
+    form_structure: Mapping[str, Any] | None = None,
+    association_definitions: Sequence[AssociationHeatmapDefinition] = (),
+    association_registry_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Build a self-contained descriptive payload without Directory data.
 
@@ -1314,13 +1469,16 @@ def build_descriptive_payload(
         workbook: Validated source workbook and nonblank survey rows.
         schema: Validated complete descriptive registry.
         form_structure: Optional authoritative XML-derived question metadata.
+        association_definitions: Optional schema-validated association definitions.
+        association_registry_sha256: SHA-256 of the loaded association registry.
 
     Returns:
         JSON-serializable provenance, diagnostics, question counts, literal
         contribution rows, and free-text evidence.
 
     Raises:
-        InputError: If the schema or its explicit applicability rule is invalid.
+        InputError: If the schema, association registry provenance, or explicit
+            applicability rule is invalid.
     """
     root = _required_mapping(schema, "schema")
     output = _required_mapping(root["output"], "output")
@@ -1336,6 +1494,12 @@ def build_descriptive_payload(
         workbook.responses, institution_column, country_column, source_row_column
     )
     question_by_column = {question.column: question for question in questions}
+    questions_by_id = {question.question_id: question for question in questions}
+    if association_definitions and (
+        not isinstance(association_registry_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", association_registry_sha256) is None
+    ):
+        raise InputError("Association registry SHA-256 must be a lowercase hexadecimal digest.")
     form_questions = form_structure.get("questions", {}) if form_structure is not None else {}
     expected_form_types = {
         "single_choice": frozenset({"Single Choice", "Single Choice Matrix Question"}),
@@ -1388,7 +1552,7 @@ def build_descriptive_payload(
                 question, workbook.responses, institution_column, country_column,
                 source_row_column, question_by_column,
             )
-    return {
+    payload = {
         "payload_type": "so2_descriptive_statistics",
         "payload_version": "1",
         "provenance": {
@@ -1411,6 +1575,18 @@ def build_descriptive_payload(
         "upset_vectors": upset_vectors,
         "questions": question_payloads,
     }
+    if association_definitions:
+        payload["association_heatmap_definitions"] = {
+            "registry_sha256": association_registry_sha256,
+            "definitions": [
+                _association_definition_payload(definition)
+                for definition in association_definitions
+            ],
+        }
+        payload["association_heatmaps"] = build_association_heatmap_payload(
+            association_definitions, workbook.responses, questions_by_id, source_row_column
+        )
+    return payload
 
 
 @dataclass(frozen=True)
@@ -2204,6 +2380,171 @@ def _payload_count(value: Any, path: str) -> int:
     return value
 
 
+def _association_definition_from_payload(value: Any, path: str) -> AssociationHeatmapDefinition:
+    """Deserialize one association definition embedded in a report payload.
+
+    Args:
+        value: Candidate JSON definition metadata.
+        path: Payload path used in validation errors.
+
+    Returns:
+        Immutable association definition with exact serialized category order.
+
+    Raises:
+        InputError: If metadata is malformed.
+    """
+    definition = _payload_mapping(value, path)
+    mode = _payload_text(definition.get("mode"), f"{path}.mode")
+    if mode not in {"default", "exploratory"}:
+        raise InputError(f"Descriptive statistics payload {path}.mode is invalid.")
+    conditional_summary = definition.get("conditional_summary")
+    if not isinstance(conditional_summary, bool):
+        raise InputError(
+            f"Descriptive statistics payload {path}.conditional_summary must be boolean."
+        )
+    def categories(field: str) -> tuple[str, ...]:
+        values = _payload_array(definition.get(field), f"{path}.{field}")
+        if not values or not all(isinstance(item, str) and item.strip() for item in values):
+            raise InputError(
+                f"Descriptive statistics payload {path}.{field} must contain nonblank strings."
+            )
+        if len(values) != len(set(values)):
+            raise InputError(f"Descriptive statistics payload {path}.{field} has duplicate categories.")
+        return tuple(values)
+
+    return AssociationHeatmapDefinition(
+        definition_id=_payload_text(definition.get("definition_id"), f"{path}.definition_id"),
+        row_question_id=_payload_text(
+            definition.get("row_question_id"), f"{path}.row_question_id"
+        ),
+        column_question_id=_payload_text(
+            definition.get("column_question_id"), f"{path}.column_question_id"
+        ),
+        row_form_uid=_payload_text(definition.get("row_form_uid"), f"{path}.row_form_uid"),
+        column_form_uid=_payload_text(
+            definition.get("column_form_uid"), f"{path}.column_form_uid"
+        ),
+        row_categories=categories("row_categories"),
+        column_categories=categories("column_categories"),
+        mode=mode,
+        title=_payload_text(definition.get("title"), f"{path}.title"),
+        interpretation=_payload_text(
+            definition.get("interpretation"), f"{path}.interpretation"
+        ),
+        conditional_summary=conditional_summary,
+    )
+
+
+def validate_association_heatmap_payload(
+    payload: Mapping[str, Any], definitions: Sequence[AssociationHeatmapDefinition]
+) -> None:
+    """Validate serialized association vectors against their approved definitions.
+
+    Args:
+        payload: Complete descriptive report payload containing association keys.
+        definitions: Approved definitions expected by the renderer.
+
+    Returns:
+        ``None`` after every vector, cell, diagnostic, and embedded definition is valid.
+
+    Raises:
+        InputError: If association data is incomplete, includes identifying data,
+            or differs from the approved category and definition contract.
+    """
+    metadata = _payload_mapping(
+        payload.get("association_heatmap_definitions"), "association_heatmap_definitions"
+    )
+    registry_sha256 = _payload_text(
+        metadata.get("registry_sha256"), "association_heatmap_definitions.registry_sha256"
+    )
+    if re.fullmatch(r"[0-9a-f]{64}", registry_sha256) is None:
+        raise InputError(
+            "Descriptive statistics payload association registry SHA-256 must be lowercase hexadecimal."
+        )
+    serialized_definitions = _payload_array(
+        metadata.get("definitions"), "association_heatmap_definitions.definitions"
+    )
+    payload_definitions = tuple(
+        _association_definition_from_payload(value, f"association_heatmap_definitions.definitions[{index}]")
+        for index, value in enumerate(serialized_definitions)
+    )
+    if tuple(_association_definition_payload(item) for item in payload_definitions) != tuple(
+        _association_definition_payload(item) for item in definitions
+    ):
+        raise InputError("Descriptive statistics payload association definitions do not match registry.")
+    heatmaps = _payload_mapping(payload.get("association_heatmaps"), "association_heatmaps")
+    expected_ids = {definition.definition_id for definition in definitions}
+    if set(heatmaps) != expected_ids:
+        raise InputError("Descriptive statistics payload association_heatmaps must cover exactly the registry definitions.")
+    valid_states = {"answered", "missing", "inapplicable", "out_of_route"}
+    for definition in definitions:
+        path = f"association_heatmaps.{definition.definition_id}"
+        pair = _payload_mapping(heatmaps[definition.definition_id], path)
+        if pair.get("row_categories") != list(definition.row_categories):
+            raise InputError(f"Descriptive statistics payload {path} has mismatched row category order.")
+        if pair.get("column_categories") != list(definition.column_categories):
+            raise InputError(f"Descriptive statistics payload {path} has mismatched column category order.")
+        vectors = _payload_array(pair.get("vectors"), f"{path}.vectors")
+        expected_cells = {
+            f"{row_category}|{column_category}"
+            for row_category in definition.row_categories
+            for column_category in definition.column_categories
+        }
+        cells = _payload_mapping(pair.get("cells"), f"{path}.cells")
+        if set(cells) != expected_cells:
+            raise InputError(f"Descriptive statistics payload {path} has undeclared association category.")
+        cell_total = sum(_payload_count(value, f"{path}.cells.{key}") for key, value in cells.items())
+        if _payload_count(pair.get("paired_denominator"), f"{path}.paired_denominator") != cell_total:
+            raise InputError(f"Descriptive statistics payload {path} has mismatched association cell total.")
+        source_rows: set[int] = set()
+        computed_cells = {key: 0 for key in expected_cells}
+        computed_diagnostics = {
+            "eligible_missing_rows": [],
+            "inapplicable_rows": [],
+            "out_of_route_rows": [],
+        }
+        for index, value in enumerate(vectors):
+            vector_path = f"{path}.vectors[{index}]"
+            vector = _payload_mapping(value, vector_path)
+            if set(vector) != {
+                "source_row", "row_state", "row_value", "column_state", "column_value"
+            }:
+                raise InputError(f"Descriptive statistics payload {vector_path} has identifying or unknown fields.")
+            source_row = _payload_count(vector.get("source_row"), f"{vector_path}.source_row")
+            if source_row in source_rows:
+                raise InputError(f"Descriptive statistics payload {path} has duplicate source row {source_row}.")
+            source_rows.add(source_row)
+            states = []
+            for axis, categories in (("row", definition.row_categories), ("column", definition.column_categories)):
+                state = vector.get(f"{axis}_state")
+                value = vector.get(f"{axis}_value")
+                if state not in valid_states:
+                    raise InputError(f"Descriptive statistics payload {vector_path}.{axis}_state is invalid.")
+                if state == "answered":
+                    if value not in categories:
+                        raise InputError(f"Descriptive statistics payload {vector_path} has undeclared association category.")
+                elif value is not None:
+                    raise InputError(f"Descriptive statistics payload {vector_path}.{axis}_value must be null unless answered.")
+                states.append(state)
+            if "missing" in states:
+                computed_diagnostics["eligible_missing_rows"].append(source_row)
+            if "inapplicable" in states:
+                computed_diagnostics["inapplicable_rows"].append(source_row)
+            if "out_of_route" in states:
+                computed_diagnostics["out_of_route_rows"].append(source_row)
+            if states == ["answered", "answered"]:
+                computed_cells[f"{vector['row_value']}|{vector['column_value']}"] += 1
+        if dict(cells) != computed_cells:
+            raise InputError(f"Descriptive statistics payload {path} has cells inconsistent with vectors.")
+        diagnostics = _payload_mapping(pair.get("diagnostics"), f"{path}.diagnostics")
+        if set(diagnostics) != set(computed_diagnostics):
+            raise InputError(f"Descriptive statistics payload {path}.diagnostics is incomplete.")
+        for name, expected_rows in computed_diagnostics.items():
+            rows = _payload_array(diagnostics.get(name), f"{path}.diagnostics.{name}")
+            if rows != expected_rows or any(isinstance(row, bool) or not isinstance(row, int) for row in rows):
+                raise InputError(f"Descriptive statistics payload {path}.diagnostics.{name} is inconsistent.")
+
+
 def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
     """Validate the complete payload contract consumed by the renderer.
 
@@ -2373,6 +2714,23 @@ def _validate_render_payload(payload: Mapping[str, Any]) -> Sequence[Mapping[str
                         f"{category_path}.excluded_from_chart must be boolean."
                     )
         validated_questions.append(question)
+    association_keys = {"association_heatmap_definitions", "association_heatmaps"}
+    present_association_keys = association_keys.intersection(payload)
+    if present_association_keys and present_association_keys != association_keys:
+        raise InputError("Descriptive statistics payload association data is incomplete.")
+    if present_association_keys:
+        metadata = _payload_mapping(
+            payload.get("association_heatmap_definitions"), "association_heatmap_definitions"
+        )
+        definitions = tuple(
+            _association_definition_from_payload(
+                value, f"association_heatmap_definitions.definitions[{index}]"
+            )
+            for index, value in enumerate(_payload_array(
+                metadata.get("definitions"), "association_heatmap_definitions.definitions"
+            ))
+        )
+        validate_association_heatmap_payload(payload, definitions)
     if "upset_vectors" not in payload:
         return validated_questions
     vectors = _payload_mapping(payload.get("upset_vectors"), "upset_vectors")

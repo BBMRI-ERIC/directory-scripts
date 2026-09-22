@@ -1080,6 +1080,174 @@ def test_association_registry_validation_rejects_contact_question_uid_and_catego
         )
 
 
+def association_question(question_id, column, categories, applicability=None, form_uid=""):
+    """Return one controlled structured question for association-pair tests."""
+    return module.QuestionDefinition(
+        question_id=question_id,
+        column=column,
+        question_type="single_choice",
+        label=column,
+        categories=tuple(categories),
+        delimiter=None,
+        parent_columns=(),
+        applicability=applicability,
+        form_uid=form_uid,
+    )
+
+
+def controlled_association_definitions():
+    """Return approved controlled pairs with stable category order."""
+    return (
+        module.AssociationHeatmapDefinition(
+            definition_id="returned_data_policy",
+            row_question_id="returned_data",
+            column_question_id="policy",
+            row_form_uid="returned-data-uid",
+            column_form_uid="policy-uid",
+            row_categories=("No", "Yes"),
+            column_categories=("No", "Yes"),
+            mode="default",
+            title="Returned data versus policy",
+            interpretation="Describes submitted responses.",
+            conditional_summary=True,
+        ),
+        module.AssociationHeatmapDefinition(
+            definition_id="routed_pair",
+            row_question_id="routed_row",
+            column_question_id="routed_column",
+            row_form_uid="routed-row-uid",
+            column_form_uid="routed-column-uid",
+            row_categories=("No", "Yes"),
+            column_categories=("No", "Yes"),
+            mode="default",
+            title="Routed pair",
+            interpretation="Describes submitted responses.",
+            conditional_summary=False,
+        ),
+    )
+
+
+def controlled_association_questions():
+    """Return controlled pair questions including one independently routed axis."""
+    return {
+        "returned_data": association_question("returned_data", "Returned data", ["No", "Yes"], form_uid="returned-data-uid"),
+        "policy": association_question("policy", "Policy", ["No", "Yes"], form_uid="policy-uid"),
+        "routing": association_question("routing", "Routing", ["No", "Yes"]),
+        "routed_row": association_question(
+            "routed_row", "Routed row", ["No", "Yes"],
+            {"column": "Routing", "values": ["Yes"]}, "routed-row-uid",
+        ),
+        "routed_column": association_question("routed_column", "Routed column", ["No", "Yes"], form_uid="routed-column-uid"),
+    }
+
+
+def test_pairing_uses_original_source_row_and_preserves_missing_states():
+    """Association vectors retain only source rows and do not pair by respondent context."""
+    responses = pd.DataFrame([
+        {"source_row": 8, "Returned data": "Yes", "Policy": "Yes", "Country": "Austria", "Institution": "Alpha", "Free text": "private"},
+        {"source_row": 5, "Returned data": "No", "Policy": "Yes", "Country": "Belgium", "Institution": "Beta", "Free text": "private"},
+        {"source_row": 7, "Returned data": "Yes", "Policy": "", "Country": "Croatia", "Institution": "Gamma", "Free text": "private"},
+    ])
+
+    pair = module.build_association_heatmap_payload(
+        controlled_association_definitions()[:1], responses, controlled_association_questions(), "source_row"
+    )["returned_data_policy"]
+
+    assert pair["paired_denominator"] == 2
+    assert pair["cells"] == {"No|No": 0, "No|Yes": 1, "Yes|No": 0, "Yes|Yes": 1}
+    assert pair["diagnostics"]["eligible_missing_rows"] == [7]
+    assert pair["vectors"] == [
+        {"source_row": 8, "row_state": "answered", "row_value": "Yes", "column_state": "answered", "column_value": "Yes"},
+        {"source_row": 5, "row_state": "answered", "row_value": "No", "column_state": "answered", "column_value": "Yes"},
+        {"source_row": 7, "row_state": "answered", "row_value": "Yes", "column_state": "missing", "column_value": None},
+    ]
+
+
+def test_inapplicable_and_out_of_route_answers_are_not_complete_case_observations():
+    """A routed blank and routed answer remain distinct and are excluded from cells."""
+    responses = pd.DataFrame([
+        {"source_row": 2, "Routing": "Yes", "Routed row": "Yes", "Routed column": "No"},
+        {"source_row": 3, "Routing": "No", "Routed row": "", "Routed column": "Yes"},
+        {"source_row": 4, "Routing": "No", "Routed row": "Yes", "Routed column": "Yes"},
+    ])
+
+    pair = module.build_association_heatmap_payload(
+        controlled_association_definitions()[1:], responses, controlled_association_questions(), "source_row"
+    )["routed_pair"]
+
+    assert pair["paired_denominator"] == 1
+    assert pair["diagnostics"]["inapplicable_rows"] == [3]
+    assert pair["diagnostics"]["out_of_route_rows"] == [4]
+    assert pair["vectors"][1]["row_state"] == "inapplicable"
+    assert pair["vectors"][2]["row_state"] == "out_of_route"
+
+
+def test_renderer_rejects_unknown_association_category_and_mismatched_cell_total():
+    """Serialized association data cannot drift from declared categories or vectors."""
+    definitions = controlled_association_definitions()[:1]
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    unknown_category = deepcopy(payload)
+    unknown_category["association_heatmaps"]["returned_data_policy"]["cells"]["Yes|Maybe"] = 1
+
+    with pytest.raises(module.InputError, match="undeclared association category"):
+        module.render_descriptive_tex(unknown_category, None)
+
+    mismatched_total = deepcopy(payload)
+    mismatched_total["association_heatmaps"]["returned_data_policy"]["cells"]["Yes|No"] = 2
+
+    with pytest.raises(module.InputError, match="mismatched association cell total"):
+        module.render_descriptive_tex(mismatched_total, None)
+
+
+def test_descriptive_payload_carries_validated_association_registry_provenance():
+    """The renderer receives exact registry metadata with no responder context."""
+    schema = descriptive_schema({
+        "question_id": "returned_data",
+        "column": "Returned data",
+        "question_type": "single_choice",
+        "label": "Returned data",
+        "categories": ["No", "Yes"],
+        "form_uid": "returned-data-uid",
+    })
+    schema["questions"].append({
+        "question_id": "policy",
+        "column": "Policy",
+        "question_type": "single_choice",
+        "label": "Policy",
+        "categories": ["No", "Yes"],
+        "form_uid": "policy-uid",
+    })
+    workbook = descriptive_workbook([{
+        "Name of Institution": "Alpha", "Country": "Austria",
+        "Returned data": "Yes", "Policy": "No",
+    }])
+    definitions = controlled_association_definitions()[:1]
+
+    payload = module.build_descriptive_payload(
+        workbook, schema, association_definitions=definitions, association_registry_sha256="c" * 64
+    )
+
+    assert payload["association_heatmap_definitions"] == {
+        "registry_sha256": "c" * 64,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    assert payload["association_heatmaps"]["returned_data_policy"]["vectors"] == [{
+        "source_row": 5, "row_state": "answered", "row_value": "Yes",
+        "column_state": "answered", "column_value": "No",
+    }]
+    module.validate_association_heatmap_payload(payload, definitions)
+
+
 def test_production_schema_accounts_for_every_header():
     """The production registry classifies each current source header exactly once."""
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
