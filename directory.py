@@ -21,6 +21,14 @@ from nncontacts import NNContacts
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
 REPO_ROOT = Path(__file__).resolve().parent
+NEGOTIATOR_ORPHANS_SHEET = "negotiator_collection_stats"
+NEGOTIATOR_REPRESENTATIVE_COLUMNS = (
+    "network_name",
+    "biobank_name",
+    "resource_name",
+    "resource_source_id",
+    "representatives_emails",
+)
 
 
 @dataclass(frozen=True)
@@ -1413,10 +1421,69 @@ class Directory:
             ValueError: The workbook lacks required columns.
         """
         table = pd.read_excel(path)
-        required = ("network_name", "biobank_name", "resource_name", "resource_source_id", "representatives_emails")
-        missing = [column for column in required if column not in table.columns]
+        self._loadNegotiatorRepresentativesTable(
+            table,
+            source_name=f"Negotiator representatives workbook {str(path)!r}",
+        )
+
+    def loadNegotiatorOrphansReport(self, path: str) -> None:
+        """Load direct registrations from an orphan-export workbook.
+
+        The loader reads only the ``negotiator_collection_stats`` worksheet.
+        Advisory ``auto_by_parent`` and ``auto_by_biobank`` values are ignored;
+        only non-empty direct ``representatives_emails`` count as registrations.
+
+        Args:
+            path: XLSX path produced by ``exporter-negotiator-orphans.py``.
+
+        Returns:
+            None. Replaces the instance's optional Negotiator dataset.
+
+        Raises:
+            ValueError: The workbook lacks the required worksheet or columns.
+        """
+        with pd.ExcelFile(path) as workbook:
+            if NEGOTIATOR_ORPHANS_SHEET not in workbook.sheet_names:
+                raise ValueError(
+                    f"Negotiator orphan report {str(path)!r} has no "
+                    f"{NEGOTIATOR_ORPHANS_SHEET!r} worksheet."
+                )
+            table = pd.read_excel(workbook, sheet_name=NEGOTIATOR_ORPHANS_SHEET)
+        self._loadNegotiatorRepresentativesTable(
+            table,
+            source_name=(
+                f"Negotiator orphan report {str(path)!r} worksheet "
+                f"{NEGOTIATOR_ORPHANS_SHEET!r}"
+            ),
+        )
+
+    def _loadNegotiatorRepresentativesTable(
+        self,
+        table: pd.DataFrame,
+        source_name: str,
+    ) -> None:
+        """Normalize a validated representative table into Directory state.
+
+        Args:
+            table: Table containing direct Negotiator representative records.
+            source_name: Human-readable source description for validation errors.
+
+        Returns:
+            None. Atomically replaces normalized Negotiator state.
+
+        Raises:
+            ValueError: The table lacks required representative columns or a
+                matched collection has malformed ownership metadata.
+        """
+        missing = [
+            column
+            for column in NEGOTIATOR_REPRESENTATIVE_COLUMNS
+            if column not in table.columns
+        ]
         if missing:
-            raise ValueError("Missing required columns: " + ", ".join(missing))
+            raise ValueError(
+                f"{source_name} is missing required columns: " + ", ".join(missing)
+            )
         records: dict[str, dict[str, Any]] = {}
         for _, row in table.iterrows():
             resource_id = self._normalize_negotiator_scalar(row["resource_source_id"])

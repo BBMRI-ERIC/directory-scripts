@@ -59,6 +59,7 @@ operation.
     infer ownership by slicing IDs or matching names.
   - owns optional normalized Negotiator data when loaded through
     `loadNegotiatorRepresentatives(path)` or
+    `loadNegotiatorOrphansReport(path)`, or injected through
     `setNegotiatorRepresentatives(data)`. Consumers must check
     `hasNegotiatorData()` where optional loading is intended; otherwise the
     query methods deliberately raise a clear `RuntimeError`. The public query
@@ -68,7 +69,7 @@ operation.
     `getBiobankNegotiatorCoverage(biobank_id)`, and
     `getNegotiatorCoverage()`. Returned registrations and representative sets
     are immutable/defensive views.
-    Both loaders compute unmatched IDs against the configured visibility
+    Both XLSX loaders and the injected setter compute unmatched IDs against the configured visibility
     scope and replace resource records and unmatched IDs atomically. Direct
     representative queries must not expose registrations for absent or
     out-of-scope collections or owners; raw registrations remain available
@@ -96,6 +97,10 @@ operation.
   - keep unavailable source/category/quality data distinct from real zeroes,
     use direct Directory ownership traversal, and atomically replace XLSX
     output only after a complete workbook has been written.
+  - Negotiator registration sources are explicit and mutually exclusive:
+    current representatives XLSX, orphan-export XLSX, or the reserved future
+    API mode. Orphan-export loading is fixed to `negotiator_collection_stats`
+    and must never count advisory `auto_by_*` assignments as registrations.
   - validate every hierarchy component before selecting the voting frontier;
     a rootless cycle must cause provisional `others`, not disappear from the
     classification. Initialize supported empty categories with zero counts.

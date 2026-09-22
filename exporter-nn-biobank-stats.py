@@ -80,11 +80,6 @@ class SourceResult:
     available: bool
     reason: str
 
-def _ids(value):
-    if isinstance(value, dict): value = value.get("id")
-    if isinstance(value, list): return {str(item.get("id", item)) for item in value}
-    return {str(value)} if value else set()
-
 def classify_biobank_collections(collections):
     """Classify a biobank from its top-most supported collection frontier.
 
@@ -140,7 +135,12 @@ def classify_biobank_collections(collections):
     def walk(cid, stack):
         if cid in stack:
             raise ValueError(f"collection hierarchy cycle detected at {cid!r}")
-        item = by_id[cid]; categories = sorted({mapped[t] for t in _ids(item.get("type")) if t in mapped})
+        item = by_id[cid]
+        collection_types = Directory.getListOfEntityAttributeIds(item, "type")
+        normalized_types = {str(value) for value in collection_types}
+        categories = sorted({
+            mapped[value] for value in normalized_types if value in mapped
+        })
         if categories:
             votes.update(categories); frontier.append(cid); return
         for child in sorted(children[cid]): walk(child, stack | {cid})
@@ -477,7 +477,8 @@ def build_argument_parser():
 
     Returns:
         Parser with standard Directory, XLSX, logging, and cache arguments plus
-        the required Negotiator representatives workbook path.
+        explicit Negotiator registration-source options and a deprecated
+        positional alias for the representatives workbook.
     """
     parser = build_parser(description="Export per-Node biobank statistics.")
     add_logging_arguments(parser)
@@ -486,8 +487,63 @@ def build_argument_parser():
     add_no_stdout_argument(parser)
     add_directory_schema_argument(parser, default="ERIC")
     add_purge_cache_arguments(parser, ["directory"])
-    parser.add_argument("input_xlsx", help="Negotiator representatives XLSX")
+    parser.add_argument(
+        "input_xlsx",
+        nargs="?",
+        help=(
+            "deprecated positional alias for --negotiator-representatives-xlsx"
+        ),
+    )
+    source_group = parser.add_argument_group(
+        "Negotiator registration source (choose exactly one)"
+    )
+    source_group.add_argument(
+        "--negotiator-representatives-xlsx",
+        metavar="FILE",
+        help="current Negotiator representatives XLSX",
+    )
+    source_group.add_argument(
+        "--negotiator-orphans-xlsx",
+        metavar="FILE",
+        help=(
+            "XLSX produced by exporter-negotiator-orphans.py; reads the "
+            "negotiator_collection_stats worksheet"
+        ),
+    )
+    source_group.add_argument(
+        "--negotiator-api",
+        action="store_true",
+        help="future Negotiator API source (not implemented)",
+    )
     return parser
+
+
+def _select_negotiator_source(args, parser):
+    """Validate and return the single configured Negotiator source.
+
+    Args:
+        args: Parsed command-line namespace.
+        parser: Argument parser used to report actionable usage errors.
+
+    Returns:
+        A ``(source_kind, path, legacy_alias)`` tuple. ``path`` is ``None``
+        only for the reserved API source, which currently raises a parser error.
+    """
+    sources = []
+    if args.input_xlsx:
+        sources.append(("representatives", args.input_xlsx, True))
+    if args.negotiator_representatives_xlsx:
+        sources.append(("representatives", args.negotiator_representatives_xlsx, False))
+    if args.negotiator_orphans_xlsx:
+        sources.append(("orphans", args.negotiator_orphans_xlsx, False))
+    if args.negotiator_api:
+        sources.append(("api", None, False))
+    if len(sources) != 1:
+        parser.error("select exactly one Negotiator registration source")
+    source_kind, path, legacy_alias = sources[0]
+    if source_kind == "api":
+        parser.error("Negotiator API registration source is not implemented yet")
+    return source_kind, path, legacy_alias
 
 def main(argv=None, directory_factory=Directory):
     """Run the Node statistics exporter.
@@ -501,11 +557,20 @@ def main(argv=None, directory_factory=Directory):
     """
     parser = build_argument_parser()
     args = parser.parse_args(argv)
+    source_kind, source_path, legacy_alias = _select_negotiator_source(args, parser)
     configure_logging(args)
+    if legacy_alias:
+        log.warning(
+            "The positional Negotiator workbook is deprecated; use "
+            "--negotiator-representatives-xlsx instead."
+        )
     unsupported = ", ".join(rule.name for rule in CATEGORY_POLICY if not rule.supported)
     log.warning("Unsupported biobank categories currently fall into others: %s", unsupported)
     directory = directory_factory(**build_directory_kwargs(args))
-    directory.loadNegotiatorRepresentatives(args.input_xlsx)
+    if source_kind == "representatives":
+        directory.loadNegotiatorRepresentatives(source_path)
+    else:
+        directory.loadNegotiatorOrphansReport(source_path)
     model = build_report_model(directory)
     for node in sorted(model["problems"]):
         problem_ids = sorted(model["problems"][node])

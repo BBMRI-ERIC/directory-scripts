@@ -32,9 +32,16 @@ withdrawn-scope, and logging conventions documented in
 - **Purpose:** Summarize active Directory biobanks per National Node, including
   collection-derived biobank categories, actual Negotiator coverage, and
   biobank- and collection-level quality labels.
-- **Input:** The positional Negotiator workbook must contain
-  `network_name`, `biobank_name`, `resource_name`, `resource_source_id`, and
-  `representatives_emails`. Only active Directory entities are counted.
+- **Input:** Select exactly one Negotiator registration source. Use
+  `--negotiator-representatives-xlsx` for the current representatives workbook,
+  whose first sheet must contain `network_name`, `biobank_name`,
+  `resource_name`, `resource_source_id`, and `representatives_emails`. Use
+  `--negotiator-orphans-xlsx` for output from
+  `exporter-negotiator-orphans.py`; only its `negotiator_collection_stats`
+  worksheet is read. The old positional workbook remains a deprecated alias
+  for `--negotiator-representatives-xlsx`. `--negotiator-api` is reserved and
+  currently exits with a not-implemented error. Only active Directory entities
+  are counted.
 - **Output:** Stdout prints alphabetically ordered Node tables. `-X` creates one
   worksheet per Node, including virtual `EXT`, with the same aggregated values,
   a problems table, legend, and provenance metadata.
@@ -56,7 +63,9 @@ withdrawn-scope, and logging conventions documented in
   collections; `no_collections` is intentionally omitted from those columns.
   Parent or same-biobank assignment candidates reported by
   `exporter-negotiator-orphans.py` remain advisory and are never counted as
-  registrations.
+  registrations. Accordingly, orphan-report columns such as `auto_by_parent`
+  and `auto_by_biobank` are ignored; only direct, non-empty
+  `representatives_emails` values count.
   Resource IDs outside the active Directory scope are retained as unmatched
   evidence, not counted as represented collections or biobanks.
 - **Quality labels:** Organization columns count unique biobanks and collection
@@ -75,7 +84,13 @@ withdrawn-scope, and logging conventions documented in
   DAG validation was skipped.
 
 ```bash
-python3 exporter-nn-biobank-stats.py representatives.xlsx -X nn-biobank-stats.xlsx
+python3 exporter-nn-biobank-stats.py \
+  --negotiator-representatives-xlsx representatives.xlsx \
+  -X nn-biobank-stats.xlsx
+
+python3 exporter-nn-biobank-stats.py \
+  --negotiator-orphans-xlsx negotiator-orphans.xlsx \
+  -X nn-biobank-stats.xlsx
 ```
 
 ### `exporter-all.py`

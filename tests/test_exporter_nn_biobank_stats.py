@@ -34,6 +34,17 @@ def test_frontier_prunes_mapped_parent_and_tie_uses_row_priority():
     assert result.fallback_reason is None
 
 
+def test_classifier_accepts_string_list_collection_types():
+    module = _module()
+
+    result = module.classify_biobank_collections([
+        {"id": "hospital", "type": ["HOSPITAL"]},
+    ])
+
+    assert result.category == "hospital-integrated"
+    assert result.votes == {"hospital-integrated": 1}
+
+
 @pytest.mark.parametrize("cycle_length", [1, 2, 3])
 def test_rootless_cycle_forces_provisional_others_fallback(cycle_length):
     module = _module()
@@ -390,6 +401,80 @@ def test_parser_and_main_use_shared_cli_contract(tmp_path, monkeypatch, caplog):
     caplog.set_level(logging.INFO, logger=module.__name__)
     module.main(["representatives.xlsx", "-N", "-v"], FakeDirectory)
     assert any("AT-problem" in record.message for record in caplog.records)
+
+
+@pytest.mark.parametrize(
+    ("source_args", "expected_call"),
+    [
+        (
+            ["--negotiator-representatives-xlsx", "representatives.xlsx"],
+            ("representatives", "representatives.xlsx"),
+        ),
+        (
+            ["--negotiator-orphans-xlsx", "orphans.xlsx"],
+            ("orphans", "orphans.xlsx"),
+        ),
+    ],
+)
+def test_main_selects_explicit_negotiator_xlsx_source(
+    source_args, expected_call, monkeypatch
+):
+    module = _module()
+    calls = []
+
+    class FakeDirectory:
+        def __init__(self, **kwargs):
+            calls.append(("directory", kwargs))
+
+        def loadNegotiatorRepresentatives(self, path):
+            calls.append(("representatives", path))
+
+        def loadNegotiatorOrphansReport(self, path):
+            calls.append(("orphans", path))
+
+    monkeypatch.setattr(
+        module, "build_report_model", lambda directory: _model(module, ("AT",))
+    )
+
+    module.main([*source_args, "-N"], FakeDirectory)
+
+    assert calls[1] == expected_call
+
+
+@pytest.mark.parametrize(
+    "source_args",
+    [
+        [],
+        ["legacy.xlsx", "--negotiator-orphans-xlsx", "orphans.xlsx"],
+        [
+            "--negotiator-representatives-xlsx", "representatives.xlsx",
+            "--negotiator-orphans-xlsx", "orphans.xlsx",
+        ],
+    ],
+)
+def test_main_requires_exactly_one_negotiator_source(source_args, capsys):
+    module = _module()
+
+    with pytest.raises(SystemExit):
+        module.main([*source_args, "-N"])
+
+    assert "exactly one Negotiator registration source" in capsys.readouterr().err
+
+
+def test_main_rejects_reserved_negotiator_api_before_directory_loading(capsys):
+    module = _module()
+    constructed = False
+
+    class FakeDirectory:
+        def __init__(self, **kwargs):
+            nonlocal constructed
+            constructed = True
+
+    with pytest.raises(SystemExit):
+        module.main(["--negotiator-api", "-N"], FakeDirectory)
+
+    assert constructed is False
+    assert "not implemented" in capsys.readouterr().err
 
 
 def test_main_does_not_publish_xlsx_after_loader_failure(tmp_path):

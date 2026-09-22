@@ -719,6 +719,66 @@ def test_load_negotiator_representatives_merges_duplicate_rows(tmp_path, caplog)
     assert "conflicting metadata" in caplog.text
 
 
+def test_load_negotiator_orphans_report_uses_collection_stats_sheet(tmp_path):
+    workbook = tmp_path / "orphans.xlsx"
+    with pd.ExcelWriter(workbook) as writer:
+        pd.DataFrame([{"summary_only": 1}]).to_excel(
+            writer, sheet_name="nn_summary", index=False
+        )
+        pd.DataFrame([
+            {
+                "network_name": "N",
+                "biobank_name": "B",
+                "resource_name": "C1",
+                "resource_source_id": "col1",
+                "representatives_emails": "Rep@example.org",
+                "auto_by_parent": False,
+                "auto_by_biobank": False,
+            },
+            {
+                "network_name": "N",
+                "biobank_name": "B",
+                "resource_name": "C2",
+                "resource_source_id": "col2",
+                "representatives_emails": "",
+                "auto_by_parent": True,
+                "auto_by_biobank": True,
+            },
+        ]).to_excel(
+            writer, sheet_name="negotiator_collection_stats", index=False
+        )
+    directory = _make_directory_stub()
+
+    directory.loadNegotiatorOrphansReport(workbook)
+
+    assert directory.getCollectionNegotiatorRepresentatives("col1") == frozenset({
+        "rep@example.org"
+    })
+    assert directory.getCollectionNegotiatorRepresentatives("col2") == frozenset()
+
+
+def test_load_negotiator_orphans_report_requires_collection_stats_sheet(tmp_path):
+    workbook = tmp_path / "orphans.xlsx"
+    pd.DataFrame([{"summary_only": 1}]).to_excel(
+        workbook, sheet_name="nn_summary", index=False
+    )
+    directory = _make_directory_stub()
+
+    with pytest.raises(ValueError, match="negotiator_collection_stats"):
+        directory.loadNegotiatorOrphansReport(workbook)
+
+
+def test_load_negotiator_orphans_report_validates_collection_stats_columns(tmp_path):
+    workbook = tmp_path / "orphans.xlsx"
+    pd.DataFrame([{"resource_source_id": "col1"}]).to_excel(
+        workbook, sheet_name="negotiator_collection_stats", index=False
+    )
+    directory = _make_directory_stub()
+
+    with pytest.raises(ValueError, match="representatives_emails"):
+        directory.loadNegotiatorOrphansReport(workbook)
+
+
 def test_directory_filters_withdrawn_entities_when_requested():
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
