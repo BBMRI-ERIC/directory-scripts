@@ -36,6 +36,7 @@ from oomutils import estimate_count_from_oom_or_none
 
 DEFAULT_MAPPING_FILE = Path("survey-mappings/so2_2025_directory_mapping.json")
 DEFAULT_OBJECTIVES_MAPPING_FILE = Path("survey-mappings/so2_2025_question_to_strategic_objectives.json")
+DEFAULT_UPSET_REGISTRY = Path("survey-mappings/so2_2025_upsets.json")
 
 EXIT_OK = 0
 EXIT_RUNTIME_ERROR = 1
@@ -341,6 +342,21 @@ def build_cli() -> argparse.ArgumentParser:
         help="Include complete raw parent answers in free-text evidence tables.",
     )
     describe.add_argument("--overwrite", action="store_true", help="Replace existing describe outputs after successful regeneration.")
+    describe.add_argument("--max-piechart-ratio", default="4:3", help="Maximum pie-chart width:height ratio (for example 4:3 or 16:9).")
+    describe.add_argument(
+        "--upset-assets-dir",
+        help="Optional validated external ComplexUpset asset directory to embed in the report.",
+    )
+
+    export_upset = subparsers.add_parser(
+        "export-descriptive-upset-r",
+        help="Write optional ComplexUpset CSV/R assets from a descriptive payload.",
+    )
+    add_logging_arguments(export_upset)
+    export_upset.add_argument("-i", "--input-json", required=True, help="Descriptive-statistics payload JSON produced by describe.")
+    export_upset.add_argument("--output-dir", required=True, help="New output directory for CSV/R UpSet assets.")
+    export_upset.add_argument("--upset-registry", default=str(DEFAULT_UPSET_REGISTRY), help="Approved UpSet-definition registry JSON.")
+    export_upset.add_argument("--overwrite", action="store_true", help="Replace an existing output bundle after successful regeneration.")
 
     render_descriptive = subparsers.add_parser("render-descriptive-report", help="Render TeX/PDF from a descriptive-statistics payload.")
     add_logging_arguments(render_descriptive)
@@ -352,6 +368,10 @@ def build_cli() -> argparse.ArgumentParser:
     render_descriptive.add_argument(
         "--include-parent-context", action="store_true",
         help="Include complete raw parent answers in free-text evidence tables.",
+    )
+    render_descriptive.add_argument(
+        "--max-piechart-ratio", default="4:3",
+        help="Maximum pie-chart width:height ratio (for example 4:3 or 16:9).",
     )
     export = subparsers.add_parser("export-update-plan", help="Export qcheck-updater-compatible JSON from findings.")
     add_logging_arguments(export)
@@ -3843,6 +3863,27 @@ def _load_descriptive_report_module() -> Any:
     return so2_descriptive_report
 
 
+def _parse_piechart_ratio(value: str) -> float:
+    """Parse a positive width-to-height pie-chart ratio.
+
+    Args:
+        value: Ratio text in ``WIDTH:HEIGHT`` form.
+
+    Returns:
+        Positive width divided by height.
+
+    Raises:
+        InputError: If the ratio is malformed or non-positive.
+    """
+    try:
+        width, height = (float(part) for part in value.split(":", 1))
+    except (ValueError, AttributeError) as exc:
+        raise InputError("--max-piechart-ratio must use WIDTH:HEIGHT, for example 4:3") from exc
+    if width <= 0 or height <= 0:
+        raise InputError("--max-piechart-ratio values must be positive")
+    return width / height
+
+
 def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespace, input_paths: list[str | Path]) -> None:
     """Render a validated descriptive payload through the shared output pipeline.
 
@@ -3860,14 +3901,24 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
     _require_new_or_empty_chart_dir(args.output_chart_dir, getattr(args, "overwrite", False))
     _require_new_descriptive_file_outputs([tex_path, args.output_pdf], getattr(args, "overwrite", False))
     descriptive = _load_descriptive_report_module()
+    upset_assets = None
+    upset_assets_dir = getattr(args, "upset_assets_dir", None)
+    if upset_assets_dir is not None:
+        try:
+            from so2_descriptive_upsets import validate_upset_asset_bundle
+            upset_assets = validate_upset_asset_bundle(payload, DEFAULT_UPSET_REGISTRY, upset_assets_dir)
+        except Exception as exc:
+            raise InputError(str(exc)) from exc
     try:
-        rendered = descriptive.render_descriptive_tex(
-            payload,
-            args.output_chart_dir,
-            report_path=tex_path,
-            include_contribution_tables=getattr(args, "long_report", False),
-            include_parent_context=getattr(args, "include_parent_context", False),
-        )
+        render_kwargs = {
+            "report_path": tex_path,
+            "include_contribution_tables": getattr(args, "long_report", False),
+            "include_parent_context": getattr(args, "include_parent_context", False),
+            "max_piechart_ratio": _parse_piechart_ratio(getattr(args, "max_piechart_ratio", "4:3")),
+        }
+        if upset_assets is not None:
+            render_kwargs["upset_assets"] = upset_assets
+        rendered = descriptive.render_descriptive_tex(payload, args.output_chart_dir, **render_kwargs)
         descriptive.render_descriptive_pdf(
             rendered, tex_path, args.output_pdf, args.output_chart_dir,
             overwrite=getattr(args, "overwrite", False),
@@ -3941,6 +3992,8 @@ def run_describe(args: argparse.Namespace) -> int:
             output_chart_dir=args.output_chart_dir,
             long_report=args.long_report,
             include_parent_context=getattr(args, "include_parent_context", False),
+            max_piechart_ratio=args.max_piechart_ratio,
+            upset_assets_dir=getattr(args, "upset_assets_dir", None),
             overwrite=args.overwrite,
         )
         _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema, args.form_json])
@@ -3969,6 +4022,31 @@ def run_describe(args: argparse.Namespace) -> int:
                 f"{exc}; cleanup could not remove partial descriptive outputs: {details}"
             ) from exc
         raise
+    return EXIT_OK
+
+
+def run_export_descriptive_upset_r(args: argparse.Namespace) -> int:
+    """Write an external optional ComplexUpset bundle from descriptive JSON.
+
+    Args:
+        args: Parsed command options containing payload, registry, and output paths.
+
+    Returns:
+        Successful process status.
+
+    Raises:
+        InputError: If the payload, registry, or output directory is invalid.
+    """
+    try:
+        payload = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise InputError("Descriptive-statistics payload root must be an object.")
+        descriptive = _load_descriptive_report_module()
+        descriptive._validate_render_payload(payload)
+        from so2_descriptive_upsets import InputError as UpSetInputError, write_upset_r_bundle
+        write_upset_r_bundle(payload, args.upset_registry, args.output_dir, args.overwrite)
+    except (OSError, json.JSONDecodeError, UpSetInputError) as exc:
+        raise InputError(str(exc)) from exc
     return EXIT_OK
 
 
@@ -4069,6 +4147,8 @@ def main() -> int:
             return run_describe(args)
         if args.command == "render-descriptive-report":
             return run_render_descriptive_report(args)
+        if args.command == "export-descriptive-upset-r":
+            return run_export_descriptive_upset_r(args)
         raise InputError(f"Unsupported command {args.command!r}.")
     except InputError as exc:
         logging.error("%s", exc)
