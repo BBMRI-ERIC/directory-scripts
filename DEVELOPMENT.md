@@ -97,6 +97,9 @@ operation.
   - keep unavailable source/category/quality data distinct from real zeroes,
     use direct Directory ownership traversal, and atomically replace XLSX
     output only after a complete workbook has been written.
+- `exporter-flourish-nn.py`
+  - owns direct Flourish `Points` export. Country point metadata is checked-in data, not a runtime XLSX template. Member/observer staging areas are included by default; EXT content is included only through its explicit switches and is assigned to reported country under the documented rules.
+  - collection type figures are non-exclusive selected-collection observations. Column G must begin with `<br>`, omit zero counts, and end with the country catalogue link.
   - Negotiator registration sources are explicit and mutually exclusive:
     current representatives XLSX, orphan-export XLSX, or the reserved future
     API mode. Orphan-export loading is fixed to `negotiator_collection_stats`
@@ -842,7 +845,7 @@ Practical rule: if you are going to commit, start with `review-and-commit`; this
 
 ### SO2 descriptive statistics report
 
-- Association heatmaps are configured only through `survey-mappings/so2_2025_association_heatmaps.json`. Review each definition with its question IDs, form UIDs, category order, interpretation text, and regression evidence. The CLI validates the registry before publication; payloads record both the registry file hash and canonical definition digest. Do not add contact/free-text fields, including `q_111`, infer willingness from contact completion, or publish small-cell panels without a separately approved complementary-suppression policy.
+- Association heatmaps are configured only through `survey-mappings/so2_2025_association_heatmaps.json`. Review each definition with its question IDs, form UIDs, category order, interpretation text, and regression evidence. The CLI validates the registry before publication; payloads record both the registry file hash and canonical definition digest. Exact `No`/`Yes` axes display those answers directly and use wrapped report-question labels as semantic axis titles; longer axes use numeric keys with a bounded legend. Do not add contact/free-text fields, including `q_111`, infer willingness from contact completion, or publish small-cell panels without a separately approved complementary-suppression policy.
 
 `survey-so2-directory.py` also provides a standalone descriptive-statistics
 workflow. It is intentionally separate from the Directory-consistency workflow

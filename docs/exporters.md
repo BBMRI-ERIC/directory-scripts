@@ -17,6 +17,7 @@ withdrawn-scope, and logging conventions documented in
 | `exporter-covid.py` | Export COVID-relevant collections and biobanks. |
 | `exporter-ecraid.py` | Export collections and institutions relevant to ECRAID. |
 | `exporter-fact-sheet-emulation.py` | Identify collection families that may historically emulate fact sheets and report migration candidates. |
+| `exporter-flourish-nn.py` | Export National-Node/country collection statistics for a Flourish points map. |
 | `exporter-institutions.py` | Export juridical persons grouped by country. |
 | `exporter-mission-cancer.py` | Export cancer and pediatric-cancer collections. |
 | `exporter-negotiator-orphans.py` | Analyze Negotiator representative coverage and assignment candidates. |
@@ -26,6 +27,18 @@ withdrawn-scope, and logging conventions documented in
 | `exporter-quality-label.py` | Export quality assessments for biobanks and collections. |
 
 ## Exporter details
+
+### `exporter-flourish-nn.py`
+
+- **Purpose:** Generate a `Points` worksheet directly for Flourish, with map coordinates, organisation and collection totals, and HTML collection-type summaries linked to the Directory catalogue.
+- **Scope:** Default runs include member/observer staging areas. `--include-ext` adds `EXT` records reported in a member/observer country to that country; `--include-all-countries` also outputs non-member reported countries. Standard `-w` and `--only-withdrawn` options select withdrawn content.
+- **Output:** `-X flourish-points.xlsx` writes the seven logical columns `Name`, `Longitude`, `Latitude`, `Geographic regions`, `Organisations`, `Collections`, and `Collection types`. Stdout provides the same country-sorted totals and type counts.
+
+```bash
+python3 exporter-flourish-nn.py -X flourish-points.xlsx
+python3 exporter-flourish-nn.py --include-ext -X flourish-points.xlsx
+python3 exporter-flourish-nn.py --include-all-countries -w -X flourish-points.xlsx
+```
 
 ### `exporter-nn-biobank-stats.py`
 
