@@ -59,6 +59,13 @@ def write_descriptive_form_manifest(tmp_path: Path) -> Path:
     return path
 
 
+def write_empty_association_registry(tmp_path: Path) -> Path:
+    """Write a valid registry for tests that intentionally have no association panels."""
+    path = tmp_path / "empty-association-registry.json"
+    path.write_text(json.dumps({"schema_version": "1", "definitions": []}), encoding="utf-8")
+    return path
+
+
 
 def write_descriptive_workbook(tmp_path: Path) -> Path:
     path = tmp_path / "descriptive.xlsx"
@@ -82,6 +89,7 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -104,6 +112,10 @@ def test_describe_passes_association_heatmap_registry_provenance_and_excludes_ex
         @staticmethod
         def load_descriptive_schema(_path):
             return {}
+
+        @staticmethod
+        def load_association_heatmap_registry(_path):
+            return ()
 
         @staticmethod
         def load_form_manifest_structure(_path):
@@ -177,6 +189,58 @@ def test_unknown_association_heatmap_registry_blocks_all_describe_publication(tm
     assert not chart_dir.exists()
 
 
+def test_default_registry_schema_mismatch_blocks_describe_publication(tmp_path, monkeypatch):
+    """A loaded default registry must not be silently discarded on schema mismatch."""
+    module = load_module()
+    output_json = tmp_path / "payload.json"
+
+    class DescriptiveStub:
+        class InputError(Exception):
+            pass
+
+        @staticmethod
+        def load_descriptive_schema(_path):
+            return {"output": {"source_row_column": "source_row"}}
+
+        @staticmethod
+        def load_form_manifest_structure(_path):
+            return {}
+
+        @staticmethod
+        def read_descriptive_workbook(_path, _schema):
+            return Namespace(responses=__import__("pandas").DataFrame({"source_row": [5]}))
+
+        @staticmethod
+        def validate_descriptive_schema(_schema, _headers):
+            return (Namespace(question_id="unrelated"),)
+
+        @staticmethod
+        def validate_association_definitions(_definitions, _questions):
+            raise DescriptiveStub.InputError("schema mismatch")
+
+        @staticmethod
+        def build_descriptive_payload(_workbook, _schema, _form_structure, **_kwargs):
+            return {"payload_type": "so2_descriptive_statistics"}
+
+    monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
+    monkeypatch.setattr(
+        module,
+        "_load_association_heatmap_registry",
+        lambda *_args: ((Namespace(mode="default"),), "a" * 64),
+    )
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "-o", str(output_json),
+    ])
+
+    with pytest.raises(module.InputError, match="schema mismatch"):
+        module.run_describe(args)
+
+    assert not output_json.exists()
+
+
 def test_piechart_ratio_parser_accepts_positive_width_to_height_values():
     """The CLI ratio accepts conventional, wide, and tall chart proportions."""
     module = load_module()
@@ -217,6 +281,7 @@ def test_describe_overwrite_replaces_existing_json(tmp_path):
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json), "--overwrite",
     ])
 
@@ -243,15 +308,29 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return {}
 
         @staticmethod
+        def load_association_heatmap_registry(_path):
+            return ()
+
+        @staticmethod
         def load_form_manifest_structure(_path):
             return object()
 
         @staticmethod
         def read_descriptive_workbook(_path, _schema):
-            return object()
+            return Namespace(responses=__import__("pandas").DataFrame({"source_row": [5]}))
 
         @staticmethod
-        def build_descriptive_payload(_workbook, _schema, _form_structure):
+        def validate_descriptive_schema(_schema, _headers):
+            return ()
+
+        @staticmethod
+        def validate_association_definitions(definitions, _questions):
+            assert definitions == ()
+
+        @staticmethod
+        def build_descriptive_payload(_workbook, _schema, _form_structure, **kwargs):
+            assert kwargs["association_definitions"] == ()
+            assert len(kwargs["association_registry_sha256"]) == 64
             return {
                 "payload_type": "so2_descriptive_statistics",
                 "payload_version": "1",
@@ -261,10 +340,12 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
         @staticmethod
         def render_descriptive_tex(
             payload, chart_path, report_path=None, include_contribution_tables=False,
-            include_parent_context=False, max_piechart_ratio=4 / 3,
+            include_parent_context=False, include_exploratory_association_heatmaps=False,
+            max_piechart_ratio=4 / 3,
         ):
             assert include_contribution_tables is False
             assert include_parent_context is True
+            assert include_exploratory_association_heatmaps is False
             assert max_piechart_ratio == pytest.approx(16 / 9)
             assert Path(report_path) == output_tex
             relative = Path(__import__("os").path.relpath(
@@ -284,6 +365,7 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(output_tex),
         "--output-chart-dir", str(chart_dir),
@@ -312,6 +394,7 @@ def test_describe_wraps_payload_write_failure_as_input_error(tmp_path, monkeypat
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -479,6 +562,7 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(tmp_path / "descriptive.tex"),
     ])
@@ -503,6 +587,7 @@ def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monk
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(output_tex),
     ])
