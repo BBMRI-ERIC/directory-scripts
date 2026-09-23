@@ -189,6 +189,34 @@ def test_unknown_association_heatmap_registry_blocks_all_describe_publication(tm
     assert not chart_dir.exists()
 
 
+def test_describe_refuses_association_registry_as_output(tmp_path):
+    """The association registry is an input and must never be overwritten."""
+    module = load_module()
+    registry = write_empty_association_registry(tmp_path)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(registry),
+        "-o", str(registry), "--overwrite",
+    ])
+
+    with pytest.raises(module.InputError, match="must not overwrite input"):
+        module.run_describe(args)
+
+
+def test_render_descriptive_cli_accepts_exploratory_association_opt_in(tmp_path):
+    """Rerendering can retain exploratory panels already present in a payload."""
+    module = load_module()
+    args = module.build_cli().parse_args([
+        "render-descriptive-report", "-i", str(tmp_path / "payload.json"),
+        "--output-tex", str(tmp_path / "report.tex"),
+        "--include-exploratory-association-heatmaps",
+    ])
+
+    assert args.include_exploratory_association_heatmaps is True
+
+
 def test_default_registry_schema_mismatch_blocks_describe_publication(tmp_path, monkeypatch):
     """A loaded default registry must not be silently discarded on schema mismatch."""
     module = load_module()
@@ -356,9 +384,14 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return object()
 
         @staticmethod
-        def render_descriptive_pdf(_rendered, tex_path, _pdf_path, _chart_dir, overwrite=False):
+        def render_descriptive_pdf(
+            _rendered, tex_path, _pdf_path, _chart_dir, overwrite=False,
+            additional_text_outputs=None,
+        ):
             assert overwrite is False
             Path(tex_path).write_text("report", encoding="utf-8")
+            for target, text in (additional_text_outputs or {}).items():
+                Path(target).write_text(text, encoding="utf-8")
 
     monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
     args = module.build_cli().parse_args([
@@ -578,8 +611,8 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
     assert not output_json.exists()
 
 
-def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monkeypatch):
-    """A final payload-write error rolls back every newly rendered artifact."""
+def test_describe_delegates_payload_publication_to_the_render_transaction(tmp_path, monkeypatch):
+    """Rendered reports receive JSON as a transaction member rather than a later write."""
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     output_tex = tmp_path / "descriptive.tex"
@@ -592,20 +625,18 @@ def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monk
         "--output-tex", str(output_tex),
     ])
 
-    def fake_render(_payload, render_args, _input_paths):
+    def fake_render(_payload, render_args, _input_paths, additional_json_output):
         Path(render_args.output_tex).write_text("rendered", encoding="utf-8")
-
-    def fail_json(*_args, **_kwargs):
-        raise module.InputError("simulated payload write failure")
+        assert additional_json_output == output_json
+        raise module.InputError("simulated publication failure")
 
     monkeypatch.setattr(module, "_render_descriptive_payload", fake_render)
-    monkeypatch.setattr(module, "write_json", fail_json)
 
-    with pytest.raises(module.InputError, match="simulated payload write failure"):
+    with pytest.raises(module.InputError, match="simulated publication failure"):
         module.run_describe(args)
 
     assert not output_json.exists()
-    assert not output_tex.exists()
+    assert output_tex.read_text(encoding="utf-8") == "rendered"
 
 
 def test_public_descriptive_cli_apis_document_contracts():

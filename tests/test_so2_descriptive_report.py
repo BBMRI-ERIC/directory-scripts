@@ -1017,6 +1017,7 @@ def test_production_association_registry_has_exact_default_and_exploratory_pairs
         ([association_definition(), association_definition(definition_id="second")], "duplicate unordered question pair"),
         ([association_definition(mode="unsupported")], "unknown mode"),
         ([association_definition(title=" ")], "nonblank string"),
+        ([association_definition(row_categories=["No|maybe", "Yes"])], "must not contain"),
     ],
 )
 def test_association_registry_loader_rejects_invalid_syntactic_definitions(
@@ -1273,6 +1274,45 @@ def test_renderer_rejects_mismatched_association_definition_digest():
         module.render_descriptive_tex(payload, None)
 
 
+def test_renderer_rejects_contact_definition_and_pair_identifying_fields():
+    """Rerendered association payloads cannot introduce contact axes or extra data."""
+    definitions = controlled_association_definitions()[:1]
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": canonical_association_definitions_sha256(
+            (replace(definitions[0], column_question_id="q_111_contact"),)
+        ),
+        "definitions": [module._association_definition_payload(
+            replace(definitions[0], column_question_id="q_111_contact")
+        )],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    with pytest.raises(module.InputError, match="must not include q_111"):
+        module.render_descriptive_tex(payload, None)
+
+    valid = report_payload()
+    valid["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": canonical_association_definitions_sha256(definitions),
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    valid["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    valid["association_heatmaps"]["returned_data_policy"]["institution"] = "forbidden"
+    with pytest.raises(module.InputError, match="missing or unknown fields"):
+        module.render_descriptive_tex(valid, None)
+
+
 def test_descriptive_payload_carries_validated_association_registry_provenance():
     """The renderer receives exact registry metadata with no responder context."""
     schema = descriptive_schema({
@@ -1385,12 +1425,17 @@ def association_render_payload():
 
 def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
     """Heatmaps retain every declared category cell and their exact denominator."""
-    tex = module._association_heatmap_fragment(returned_data_definition(), returned_data_pair())
+    pair = returned_data_pair()
+    pair["cells"]["No|No"] = 0
+    tex = module._association_heatmap_fragment(returned_data_definition(), pair)
 
     assert "Returned-data experience versus policy/workflow" in tex
     assert "Paired answering rows: 148" in tex
-    assert "(Yes, No)" in tex
-    assert "0" in tex
+    assert r"xticklabels={1,2}" in tex
+    assert r"\scriptsize 0" in tex
+    assert r"\textbf{Key:} R = row response; C = column response." in tex
+    assert r"R1 & No \\\\" in tex
+    assert r"C1 & No \\\\" in tex
     assert "colormap" in tex
 
 
@@ -1410,8 +1455,8 @@ def test_heatmap_axis_captions_follow_each_definition_not_returned_data_wording(
         controlled_association_definitions()[1], returned_data_pair()
     )
 
-    assert r"Response to routed\_column" in tex
-    assert r"Response to routed\_row" in tex
+    assert "xlabel={Column response}" in tex
+    assert "ylabel={Row response}" in tex
     assert "Policy/workflow response" not in tex
 
 
@@ -2429,6 +2474,40 @@ def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
 
     assert report_tex.read_text(encoding="utf-8") == "previous report"
     assert report_pdf.read_bytes() == b"previous PDF"
+
+
+def test_pdf_render_restores_existing_additional_text_output_when_publication_fails(
+    tmp_path, monkeypatch,
+):
+    """One transaction restores a prior payload when its final promotion fails."""
+    real_replace = module.os.replace
+    fail_once = True
+
+    def fail_payload_publication(source, destination):
+        nonlocal fail_once
+        if Path(destination).name == "descriptive.json" and fail_once:
+            fail_once = False
+            raise OSError("simulated payload publication failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(module.os, "replace", fail_payload_publication)
+    report_tex = tmp_path / "report.tex"
+    output_json = tmp_path / "descriptive.json"
+    report_tex.write_text("previous report", encoding="utf-8")
+    output_json.write_text('{"previous": true}\n', encoding="utf-8")
+
+    with pytest.raises(module.InputError, match="simulated payload publication failure"):
+        module.render_descriptive_pdf(
+            rendered_payload(),
+            report_tex,
+            None,
+            None,
+            overwrite=True,
+            additional_text_outputs={output_json: '{"current": true}\n'},
+        )
+
+    assert report_tex.read_text(encoding="utf-8") == "previous report"
+    assert output_json.read_text(encoding="utf-8") == '{"previous": true}\n'
 
 
 def test_pdf_render_reports_chart_publication_and_restoration_failures(

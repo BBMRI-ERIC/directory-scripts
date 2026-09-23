@@ -235,6 +235,8 @@ def load_association_heatmap_registry(path: str | Path) -> tuple[AssociationHeat
             ),
             conditional_summary=conditional_summary,
         ))
+        if any("|" in category for category in (*definitions[-1].row_categories, *definitions[-1].column_categories)):
+            raise InputError("Association category values must not contain '|'.")
         definition_ids.add(definition_id)
         question_pairs.add(pair)
     return tuple(definitions)
@@ -2372,25 +2374,27 @@ def _association_heatmap_fragment(
         for column_index, column_category in enumerate(column_categories, start=1):
             count = int(cells[f"{row_category}|{column_category}"])
             cell_rows.append(f"{column_index} {row_index} {count}")
-            labels.append(
-                rf"\node at (axis cs:{column_index},{row_index}) "
-                rf"{{\scriptsize ({_tex(row_category)}, {_tex(column_category)}): {count}}};"
-            )
-    x_labels = ",".join(_tex(category) for category in column_categories)
-    y_labels = ",".join(_tex(category) for category in row_categories)
+            labels.append(rf"\node at (axis cs:{column_index},{row_index}) {{\scriptsize {count}}};")
+    x_labels = ",".join(str(index) for index in range(1, len(column_categories) + 1))
+    y_labels = ",".join(str(index) for index in range(1, len(row_categories) + 1))
     title = _tex(_association_value(definition, "title"))
     interpretation = _tex(_association_value(definition, "interpretation"))
-    row_axis = _tex(_association_value(definition, "row_question_id"))
-    column_axis = _tex(_association_value(definition, "column_question_id"))
     denominator = int(pair["paired_denominator"])
+    legend_rows = [
+        rf"R{index} & {_tex(category)} \\\\"
+        for index, category in enumerate(row_categories, start=1)
+    ] + [
+        rf"C{index} & {_tex(category)} \\\\"
+        for index, category in enumerate(column_categories, start=1)
+    ]
     return "\n".join([
         rf"\subsection*{{{title}}}",
         rf"\noindent Paired answering rows: {denominator}\par",
         r"\begin{center}",
         r"\begin{tikzpicture}",
         r"\begin{axis}[",
-        r"width=0.82\linewidth, height=0.54\textheight,",
-        rf"xlabel={{Response to {column_axis}}}, ylabel={{Response to {row_axis}}},",
+        r"width=0.82\linewidth, height=0.44\textheight,",
+        r"xlabel={Column response}, ylabel={Row response},",
         rf"xtick={{1,...,{len(column_categories)}}}, ytick={{1,...,{len(row_categories)}}},",
         rf"xticklabels={{{x_labels}}}, yticklabels={{{y_labels}}},",
         r"y dir=reverse, colorbar, colormap={associationSequential}{color(0cm)=(white); color(1cm)=(bbmriTeal)},",
@@ -2403,6 +2407,12 @@ def _association_heatmap_fragment(
         r"\end{axis}",
         r"\end{tikzpicture}",
         r"\end{center}",
+        r"\begin{flushleft}\smaller[3]",
+        r"\begin{tabular}{@{}r p{0.86\linewidth}@{}}",
+        r"\multicolumn{2}{@{}l}{\textbf{Key:} R = row response; C = column response.} \\",
+        *legend_rows,
+        r"\end{tabular}",
+        r"\end{flushleft}\normalsize",
         rf"\noindent\emph{{{interpretation} This panel describes submitted response rows, not causal association.}}\par",
     ])
 
@@ -2639,6 +2649,14 @@ def validate_association_heatmap_payload(payload: Mapping[str, Any]) -> None:
         _association_definition_from_payload(value, f"association_heatmap_definitions.definitions[{index}]")
         for index, value in enumerate(serialized_definitions)
     )
+    if any(
+        question_id == "q_111" or question_id.startswith("q_111_")
+        for definition in definitions
+        for question_id in (definition.row_question_id, definition.column_question_id)
+    ):
+        raise InputError(
+            "Descriptive statistics payload association definitions must not include q_111 contact questions."
+        )
     if definitions_sha256 != _association_definitions_sha256(definitions):
         raise InputError(
             "Descriptive statistics payload association definition digest does not match "
@@ -2652,6 +2670,10 @@ def validate_association_heatmap_payload(payload: Mapping[str, Any]) -> None:
     for definition in definitions:
         path = f"association_heatmaps.{definition.definition_id}"
         pair = _payload_mapping(heatmaps[definition.definition_id], path)
+        if set(pair) != {
+            "row_categories", "column_categories", "vectors", "cells", "paired_denominator", "diagnostics",
+        }:
+            raise InputError(f"Descriptive statistics payload {path} has missing or unknown fields.")
         if pair.get("row_categories") != list(definition.row_categories):
             raise InputError(f"Descriptive statistics payload {path} has mismatched row category order.")
         if pair.get("column_categories") != list(definition.column_categories):
@@ -3288,6 +3310,7 @@ def render_descriptive_pdf(
     pdf_path: str | Path | None,
     chart_dir: str | Path | None,
     overwrite: bool = False,
+    additional_text_outputs: Mapping[Path, str] | None = None,
 ) -> None:
     """Compile and transactionally publish a descriptive report and charts.
 
@@ -3297,6 +3320,9 @@ def render_descriptive_pdf(
         pdf_path: Optional target for the compiled report PDF.
         chart_dir: Optional output directory for standalone chart PDFs.
         overwrite: Whether existing outputs may be replaced after successful staging.
+        additional_text_outputs: Optional final text files to stage and publish in
+            the same transaction as report artifacts. Each mapping key is a final
+            path and its value is the complete UTF-8 text content.
 
     Returns:
         None.
@@ -3308,9 +3334,20 @@ def render_descriptive_pdf(
     target_tex = Path(tex_path)
     target_pdf = Path(pdf_path) if pdf_path is not None else None
     target_charts = Path(chart_dir) if chart_dir is not None else None
+    extra_text_outputs = dict(additional_text_outputs or {})
+    if target_tex in extra_text_outputs or target_pdf in extra_text_outputs:
+        raise InputError("Additional text output duplicates a report file target.")
+    if target_charts in extra_text_outputs:
+        raise InputError("Additional text output duplicates the chart directory target.")
+    if any(target.is_dir() for target in extra_text_outputs):
+        raise InputError("Additional text outputs must be file paths.")
     if target_charts is not None:
         _require_new_or_empty_chart_dir(target_charts, overwrite)
-    targets = [target_tex, *(path for path in (target_pdf, target_charts) if path is not None)]
+    targets = [
+        target_tex,
+        *(path for path in (target_pdf, target_charts) if path is not None),
+        *extra_text_outputs,
+    ]
     if any(not target.parent.exists() for target in targets):
         raise InputError("Output parent directory does not exist.")
     with tempfile.TemporaryDirectory(prefix="so2-report-") as report_temporary, \
@@ -3338,6 +3375,11 @@ def render_descriptive_pdf(
             if target_pdf is not None and report_pdf is not None:
                 staged_pdf = _stage_publication_file(target_pdf, source=report_pdf)
                 publication_stages.append(staged_pdf)
+            staged_extra_text = {
+                target: _stage_publication_file(target, text=text)
+                for target, text in extra_text_outputs.items()
+            }
+            publication_stages.extend(staged_extra_text.values())
         except OSError as exc:
             _discard_publication_stages(publication_stages)
             raise InputError(f"Could not stage descriptive report outputs: {exc}") from exc
@@ -3387,6 +3429,8 @@ def render_descriptive_pdf(
                 replace_file(staged_pdf, target_pdf)
             if target_charts is not None and publish_charts is not None:
                 replace_directory(publish_charts, target_charts)
+            for target, source in staged_extra_text.items():
+                replace_file(source, target)
         except OSError as exc:
             rollback_failures: list[OSError] = []
             for target in reversed(published):

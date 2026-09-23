@@ -378,6 +378,10 @@ def build_cli() -> argparse.ArgumentParser:
     render_descriptive.add_argument("--output-tex", help="Optional path for the rendered TeX report; defaults next to the input JSON when rendering PDF or charts.")
     render_descriptive.add_argument("--output-pdf", help="Optional path for the rendered PDF report.")
     render_descriptive.add_argument("--output-chart-dir", help="Optional new or empty directory for rendered chart PDFs.")
+    render_descriptive.add_argument(
+        "--include-exploratory-association-heatmaps", action="store_true",
+        help="Include exploratory association panels already present in the payload.",
+    )
     render_descriptive.add_argument("--long-report", action="store_true", help="Include grouped structured-response contribution tables.")
     render_descriptive.add_argument(
         "--include-parent-context", action="store_true",
@@ -3925,13 +3929,21 @@ def _load_association_heatmap_registry(descriptive: Any, path: str | Path) -> tu
     return definitions, sha256(registry_bytes).hexdigest()
 
 
-def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespace, input_paths: list[str | Path]) -> None:
+def _render_descriptive_payload(
+    payload: dict[str, Any],
+    args: argparse.Namespace,
+    input_paths: list[str | Path],
+    additional_json_output: Path | None = None,
+) -> None:
     """Render a validated descriptive payload through the shared output pipeline.
 
     Args:
         payload: JSON-serializable report or analysis payload.
         args: Parsed command-line options for the active subcommand.
         input_paths: Protected input paths for render output validation.
+        additional_json_output: Optional JSON target to serialize only after
+            rendering has added chart paths, then publish atomically with the
+            TeX, PDF, and chart outputs.
 
     Returns:
         ``None`` after requested report artifacts are rendered."""
@@ -3963,9 +3975,18 @@ def _render_descriptive_payload(payload: dict[str, Any], args: argparse.Namespac
         if upset_assets is not None:
             render_kwargs["upset_assets"] = upset_assets
         rendered = descriptive.render_descriptive_tex(payload, args.output_chart_dir, **render_kwargs)
+        additional_text_outputs = None
+        if additional_json_output is not None:
+            try:
+                additional_text_outputs = {
+                    additional_json_output: json.dumps(payload, indent=2, ensure_ascii=True) + "\n",
+                }
+            except (TypeError, ValueError) as exc:
+                raise InputError(f"Could not serialize descriptive JSON: {exc}") from exc
         descriptive.render_descriptive_pdf(
             rendered, tex_path, args.output_pdf, args.output_chart_dir,
             overwrite=getattr(args, "overwrite", False),
+            additional_text_outputs=additional_text_outputs,
         )
     except descriptive.InputError as exc:
         raise InputError(str(exc)) from exc
@@ -4011,15 +4032,11 @@ def run_describe(args: argparse.Namespace) -> int:
         if render_requested else None
     )
     _require_distinct_descriptive_outputs(
-        [args.survey_file, args.descriptive_schema, args.form_json],
+        [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry],
         [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
     )
     _require_new_or_empty_chart_dir(args.output_chart_dir, args.overwrite)
     _require_new_descriptive_file_outputs([args.output_json, derived_tex_path, args.output_pdf], args.overwrite)
-    chart_target = (
-        Path(args.output_chart_dir) if args.output_chart_dir is not None else None
-    )
-    chart_dir_was_empty = chart_target is not None and chart_target.exists()
     descriptive = _load_descriptive_report_module()
     try:
         schema = descriptive.load_descriptive_schema(args.descriptive_schema)
@@ -4063,32 +4080,14 @@ def run_describe(args: argparse.Namespace) -> int:
             upset_assets_dir=getattr(args, "upset_assets_dir", None),
             overwrite=args.overwrite,
         )
-        _render_descriptive_payload(payload, render_args, [args.survey_file, args.descriptive_schema, args.form_json])
-    try:
+        _render_descriptive_payload(
+            payload,
+            render_args,
+            [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry],
+            Path(args.output_json),
+        )
+    else:
         write_json(args.output_json, payload)
-    except InputError as exc:
-        cleanup_failures: list[OSError] = []
-        for output_path in (args.output_json, derived_tex_path, args.output_pdf):
-            if output_path is None:
-                continue
-            try:
-                Path(output_path).unlink(missing_ok=True)
-            except OSError as cleanup_exc:
-                cleanup_failures.append(cleanup_exc)
-        if chart_target is not None:
-            try:
-                if chart_target.exists():
-                    shutil.rmtree(chart_target)
-                if chart_dir_was_empty:
-                    chart_target.mkdir()
-            except OSError as cleanup_exc:
-                cleanup_failures.append(cleanup_exc)
-        if cleanup_failures:
-            details = "; ".join(str(failure) for failure in cleanup_failures)
-            raise InputError(
-                f"{exc}; cleanup could not remove partial descriptive outputs: {details}"
-            ) from exc
-        raise
     return EXIT_OK
 
 
