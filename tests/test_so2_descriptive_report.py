@@ -1431,12 +1431,29 @@ def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
 
     assert "Returned-data experience versus policy/workflow" in tex
     assert "Paired answering rows: 148" in tex
-    assert r"xticklabels={1,2}" in tex
+    assert r"xticklabels={No,Yes}" in tex
     assert r"\scriptsize 0" in tex
-    assert r"\textbf{Key:} R = row response; C = column response." in tex
-    assert r"R1 & No \\\\" in tex
-    assert r"C1 & No \\\\" in tex
+    assert r"\textbf{Key:} R = row response; C = column response." not in tex
     assert "colormap" in tex
+
+
+def test_binary_heatmap_uses_answer_ticks_and_wrapped_question_axis_titles():
+    """Yes/no panels show their answers directly and name both questions on the axes."""
+    tex = module._association_heatmap_fragment(
+        returned_data_definition(),
+        returned_data_pair(),
+        {
+            "returned_data": "Have data been returned to your repository?",
+            "policy": "Do you have a policy for returned data?",
+        },
+    )
+
+    assert r"xticklabels={No,Yes}" in tex
+    assert r"yticklabels={No,Yes}" in tex
+    assert r"xlabel={\parbox[c]{0.72\linewidth}{\centering Do you have a policy for returned data?}}" in tex
+    assert r"ylabel={\parbox[c]{0.36\textheight}{\raggedleft Have data been returned to your repository?}}" in tex
+    assert r"R1 & No \\" not in tex
+    assert r"C1 & No \\" not in tex
 
 
 def test_returned_data_pair_adds_conditional_percentages_with_group_sizes():
@@ -1455,8 +1472,8 @@ def test_heatmap_axis_captions_follow_each_definition_not_returned_data_wording(
         controlled_association_definitions()[1], returned_data_pair()
     )
 
-    assert "xlabel={Column response}" in tex
-    assert "ylabel={Row response}" in tex
+    assert r"xlabel={\parbox[c]{0.72\linewidth}{\centering Column response}}" in tex
+    assert r"ylabel={\parbox[c]{0.36\textheight}{\raggedleft Row response}}" in tex
     assert "Policy/workflow response" not in tex
 
 
@@ -1471,6 +1488,11 @@ def test_contact_field_cannot_appear_in_association_tex_or_chart_paths():
     assert "association-returned_data_policy" in rendered.chart_documents
     assert "association-returned_data_policy" in rendered.chart_paths
     assert rendered.tex.index("Returned-data experience versus policy/workflow") > rendered.tex.index("Policy/workflow")
+    association_chart = rendered.chart_fragments["association-returned_data_policy"]
+    assert r"xticklabels={No,Yes}" in association_chart
+    assert r"yticklabels={No,Yes}" in association_chart
+    assert r"\centering Policy/workflow" in association_chart
+    assert r"\raggedleft Returned data" in association_chart
 
 
 def test_renderer_includes_exploratory_association_heatmaps_only_when_requested():
@@ -1859,7 +1881,7 @@ def test_bar_tex_locks_every_bar_to_its_category_row_and_reserves_label_space():
     assert "ymax=" in fragment
     assert "scale only axis" in fragment
     assert "yticklabel style={text width=" in fragment
-    assert "anchor=west,font=\\scriptsize" in fragment
+    assert "anchor=west,font=\\sffamily\\scriptsize" in fragment
 
 
 def test_report_tex_is_self_contained_and_displays_required_semantics():
@@ -2710,7 +2732,21 @@ def test_pie_leader_lines_use_radial_pie_arc_intersections():
 
 def test_report_preamble_uses_libertine_typeface():
     """Reports select Libertine consistently for XeLaTeX rendering."""
-    assert r"\usepackage{libertine}" in module._preamble()
+    preamble = module._preamble()
+    assert r"\usepackage{libertine}" in preamble
+    assert r"\tikzset{every picture/.append style={font=\sffamily}}" in preamble
+    assert r"\pgfplotsset{every axis/.append style={font=\sffamily}}" in preamble
+
+
+def test_tikz_annotations_keep_sans_serif_when_using_small_fonts():
+    """Explicit TikZ font-size styles must not discard the chart sans-serif family."""
+    pie = module._pie_fragment({"pie_categories": [{"value": "Yes", "count": 1, "percent": 100, "excluded_from_chart": False}]}, False, 4 / 3)
+    bar = module._bar_fragment(structured_report_question())
+    heatmap = module._association_heatmap_fragment(returned_data_definition(), returned_data_pair())
+
+    assert r"font=\sffamily\scriptsize" in pie
+    assert r"font=\sffamily\scriptsize" in bar
+    assert r"{\sffamily\scriptsize 8}" in heatmap
 
 
 def test_response_structure_prints_concise_status_and_dependencies():

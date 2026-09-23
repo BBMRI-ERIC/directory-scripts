@@ -71,7 +71,7 @@ JSON rather than hard-coding uncertain respondent matches.
 
 ## SO2 descriptive statistics
 
-Association heatmaps use the checked-in `survey-mappings/so2_2025_association_heatmaps.json` registry. They describe paired submitted response rows only; their denominator is not a count of unique institutions and does not establish causality. Contact and free-text fields, including `q_111`, are excluded. `--include-exploratory-association-heatmaps` enables only explicitly marked exploratory panels. Do not publish small-cell panels until a complementary-suppression policy is approved.
+Association heatmaps use the checked-in `survey-mappings/so2_2025_association_heatmaps.json` registry. They describe paired submitted response rows only; their denominator is not a count of unique institutions and does not establish causality. Exact `No`/`Yes` axes use direct answer labels and wrapped question titles; longer answer sets use numeric keys with a bounded legend. Contact and free-text fields, including `q_111`, are excluded. `--include-exploratory-association-heatmaps` enables only explicitly marked exploratory panels. Do not publish small-cell panels until a complementary-suppression policy is approved.
 
 `survey-so2-directory.py describe` and `render-descriptive-report` are a
 standalone, Directory-free workflow. They do not load Directory data, request

@@ -1862,7 +1862,7 @@ def _bar_axis(
             f"{{({count},{position:.2f})}};"
         )
         labels.append(
-            f"\\node[anchor=west,font=\\scriptsize,align=left] "
+            f"\\node[anchor=west,font=\\sffamily\\scriptsize,align=left] "
             f"at (axis cs:{count + 0.08},{position:.2f}) "
             f"{{{_bar_end_label(category)}}};"
         )
@@ -1878,7 +1878,7 @@ def _bar_axis(
         r"scale only axis, height=" + f"{max(3.0, _BAR_AXIS_COORDINATE_HEIGHT_CM * cursor + _BAR_AXIS_BASE_HEIGHT_CM):.1f}cm,",
         f"ytick={{{','.join(ticks)}}}, yticklabels={{{tick_labels}}},",
         r"xlabel={Count}, y dir=reverse, axis x line*=bottom, axis y line*=left,",
-        r"yticklabel style={text width=0.40\textwidth,align=right,font=\scriptsize},",
+        r"yticklabel style={text width=0.40\textwidth,align=right,font=\sffamily\scriptsize},",
         r"enlarge x limits={upper,value=0.14}, clip=false]",
         *rows,
         *labels,
@@ -2079,7 +2079,7 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: f
             segment["label"] = rf"\#{segment['index'] + 1}"
             segment["lines"] = 1
         layout = _pie_label_layout(segments)
-    slices = [r"\begin{tikzpicture}", rf"\node[above] at (0,1.9) {{{title}}};"]
+    slices = [r"\begin{tikzpicture}", rf"\node[above,font=\sffamily] at (0,1.9) {{{title}}};"]
     for segment in segments:
         side, y = layout[segment["index"]]
         slices.append(
@@ -2094,13 +2094,13 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: f
             slices.extend([
                 rf"\draw[{segment['color']},dashed,thin] ({contact_angle:.3f}:1.5) -- ({swatch_x:.2f},{y:.2f});",
                 rf"\fill[{segment['color']}] (1.76,{y - 0.06:.2f}) rectangle (1.90,{y + 0.06:.2f});",
-                rf"\node[anchor=west,align=left,text width=0.40\linewidth,font=\scriptsize] at (1.98,{y:.2f}) {{{segment['label']}}};",
+                rf"\node[anchor=west,align=left,text width=0.40\linewidth,font=\sffamily\scriptsize] at (1.98,{y:.2f}) {{{segment['label']}}};",
             ])
         else:
             slices.extend([
                 rf"\draw[{segment['color']},dashed,thin] ({contact_angle:.3f}:1.5) -- ({swatch_x:.2f},{y:.2f});",
                 rf"\fill[{segment['color']}] (-1.90,{y - 0.06:.2f}) rectangle (-1.76,{y + 0.06:.2f});",
-                rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\scriptsize] at (-1.98,{y:.2f}) {{{segment['label']}}};",
+                rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\sffamily\scriptsize] at (-1.98,{y:.2f}) {{{segment['label']}}};",
             ])
     slices.append(r"\end{tikzpicture}")
     if keyed_legend:
@@ -2246,6 +2246,8 @@ def _preamble() -> str:
 \usepackage{tikz}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
+\tikzset{every picture/.append style={font=\sffamily}}
+\pgfplotsset{every axis/.append style={font=\sffamily}}
 \definecolor{bbmriBlue}{HTML}{005A9C}
 \definecolor{bbmriTeal}{HTML}{008C95}
 \definecolor{bbmriGold}{HTML}{D8A000}
@@ -2354,19 +2356,26 @@ def _association_value(definition: AssociationHeatmapDefinition | Mapping[str, A
 
 
 def _association_heatmap_fragment(
-    definition: AssociationHeatmapDefinition | Mapping[str, Any], pair: Mapping[str, Any],
+    definition: AssociationHeatmapDefinition | Mapping[str, Any],
+    pair: Mapping[str, Any],
+    question_labels: Mapping[str, str] | None = None,
 ) -> str:
     """Render one zero-inclusive annotated association contingency heatmap.
 
     Args:
         definition: Validated association definition controlling title and axes.
         pair: Validated aggregate pair payload with declared cells and denominator.
+        question_labels: Optional human-readable labels indexed by question ID.
+            Exact yes/no axes use these labels as their wrapped semantic titles.
 
     Returns:
         PGFPlots/TikZ markup for the association heatmap and interpretation note.
     """
     row_categories = tuple(_association_value(definition, "row_categories"))
     column_categories = tuple(_association_value(definition, "column_categories"))
+    question_labels = question_labels or {}
+    row_is_yes_no = frozenset(row_categories) == {"No", "Yes"}
+    column_is_yes_no = frozenset(column_categories) == {"No", "Yes"}
     cells = pair["cells"]
     cell_rows = []
     labels = []
@@ -2374,19 +2383,39 @@ def _association_heatmap_fragment(
         for column_index, column_category in enumerate(column_categories, start=1):
             count = int(cells[f"{row_category}|{column_category}"])
             cell_rows.append(f"{column_index} {row_index} {count}")
-            labels.append(rf"\node at (axis cs:{column_index},{row_index}) {{\scriptsize {count}}};")
-    x_labels = ",".join(str(index) for index in range(1, len(column_categories) + 1))
-    y_labels = ",".join(str(index) for index in range(1, len(row_categories) + 1))
+            labels.append(rf"\node at (axis cs:{column_index},{row_index}) {{\sffamily\scriptsize {count}}};")
+    x_labels = ",".join(
+        _tex(category) for category in column_categories
+    ) if column_is_yes_no else ",".join(
+        str(index) for index in range(1, len(column_categories) + 1)
+    )
+    y_labels = ",".join(
+        _tex(category) for category in row_categories
+    ) if row_is_yes_no else ",".join(
+        str(index) for index in range(1, len(row_categories) + 1)
+    )
+    row_axis_label = _tex(question_labels.get(
+        _association_value(definition, "row_question_id"), "Row response",
+    ))
+    column_axis_label = _tex(question_labels.get(
+        _association_value(definition, "column_question_id"), "Column response",
+    ))
     title = _tex(_association_value(definition, "title"))
     interpretation = _tex(_association_value(definition, "interpretation"))
     denominator = int(pair["paired_denominator"])
-    legend_rows = [
+    legend_rows = ([] if row_is_yes_no else [
         rf"R{index} & {_tex(category)} \\\\"
         for index, category in enumerate(row_categories, start=1)
-    ] + [
+    ]) + ([] if column_is_yes_no else [
         rf"C{index} & {_tex(category)} \\\\"
         for index, category in enumerate(column_categories, start=1)
-    ]
+    ])
+    axis_options = (
+        r"xlabel={\parbox[c]{0.72\linewidth}{\centering " + column_axis_label + r"}}, "
+        r"ylabel={\parbox[c]{0.36\textheight}{\raggedleft " + row_axis_label + r"}},"
+    ) if row_is_yes_no or column_is_yes_no else (
+        r"xlabel={Column response}, ylabel={Row response},"
+    )
     return "\n".join([
         rf"\subsection*{{{title}}}",
         rf"\noindent Paired answering rows: {denominator}\par",
@@ -2394,7 +2423,7 @@ def _association_heatmap_fragment(
         r"\begin{tikzpicture}",
         r"\begin{axis}[",
         r"width=0.82\linewidth, height=0.44\textheight,",
-        r"xlabel={Column response}, ylabel={Row response},",
+        axis_options,
         rf"xtick={{1,...,{len(column_categories)}}}, ytick={{1,...,{len(row_categories)}}},",
         rf"xticklabels={{{x_labels}}}, yticklabels={{{y_labels}}},",
         r"y dir=reverse, colorbar, colormap={associationSequential}{color(0cm)=(white); color(1cm)=(bbmriTeal)},",
@@ -2407,12 +2436,14 @@ def _association_heatmap_fragment(
         r"\end{axis}",
         r"\end{tikzpicture}",
         r"\end{center}",
-        r"\begin{flushleft}\smaller[3]",
-        r"\begin{tabular}{@{}r p{0.86\linewidth}@{}}",
-        r"\multicolumn{2}{@{}l}{\textbf{Key:} R = row response; C = column response.} \\",
-        *legend_rows,
-        r"\end{tabular}",
-        r"\end{flushleft}\normalsize",
+        *([] if not legend_rows else [
+            r"\begin{flushleft}\smaller[3]",
+            r"\begin{tabular}{@{}r p{0.86\linewidth}@{}}",
+            r"\multicolumn{2}{@{}l}{\textbf{Key:} R = row response; C = column response.} \\",
+            *legend_rows,
+            r"\end{tabular}",
+            r"\end{flushleft}\normalsize",
+        ]),
         rf"\noindent\emph{{{interpretation} This panel describes submitted response rows, not causal association.}}\par",
     ])
 
@@ -2450,13 +2481,16 @@ def _association_conditional_summary_fragment(
 
 
 def _association_standalone_tex(
-    definition: AssociationHeatmapDefinition, pair: Mapping[str, Any],
+    definition: AssociationHeatmapDefinition,
+    pair: Mapping[str, Any],
+    question_labels: Mapping[str, str],
 ) -> str:
     """Build a self-contained association panel chart document.
 
     Args:
         definition: Validated association definition represented by this chart.
         pair: Validated aggregate pair payload.
+        question_labels: Human-readable labels indexed by association question ID.
 
     Returns:
         Standalone XeLaTeX document containing the panel and any conditional summary.
@@ -2464,7 +2498,7 @@ def _association_standalone_tex(
     return "\n".join([
         _preamble(),
         r"\begin{document}",
-        _association_heatmap_fragment(definition, pair),
+        _association_heatmap_fragment(definition, pair, question_labels),
         _association_conditional_summary_fragment(definition, pair),
         r"\end{document}",
         "",
@@ -3000,6 +3034,10 @@ def render_descriptive_tex(
     question_positions = {
         str(question["question_id"]): position for position, question in enumerate(questions)
     }
+    association_question_labels = {
+        str(question["question_id"]): str(question["label"])
+        for question in questions
+    }
     association_after_question: dict[str, list[AssociationHeatmapDefinition]] = {}
     for definition in association_definitions:
         if definition.mode != "default" and not include_exploratory_association_heatmaps:
@@ -3156,11 +3194,13 @@ def render_descriptive_tex(
             )
             key = f"association-{definition.definition_id}"
             fragment = "\n".join(filter(None, [
-                _association_heatmap_fragment(definition, pair),
+                _association_heatmap_fragment(definition, pair, association_question_labels),
                 _association_conditional_summary_fragment(definition, pair),
             ]))
             fragments[key] = fragment
-            chart_documents[key] = _association_standalone_tex(definition, pair)
+            chart_documents[key] = _association_standalone_tex(
+                definition, pair, association_question_labels,
+            )
             report.append(fragment)
             if chart_dir is not None:
                 chart_pdf = Path(chart_dir) / f"{key}.pdf"
