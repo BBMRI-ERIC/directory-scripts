@@ -1434,6 +1434,10 @@ def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
     assert r"xticklabels={No,Yes}" in tex
     assert r"\scriptsize 0" in tex
     assert r"\textbf{Key:} R = row response; C = column response." not in tex
+    assert (
+        r"colorbar style={tick label style={font=\sffamily,/pgf/number format/assume math mode=true}}"
+        in tex
+    )
     assert "colormap" in tex
 
 

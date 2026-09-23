@@ -2426,7 +2426,7 @@ def _association_heatmap_fragment(
         axis_options,
         rf"xtick={{1,...,{len(column_categories)}}}, ytick={{1,...,{len(row_categories)}}},",
         rf"xticklabels={{{x_labels}}}, yticklabels={{{y_labels}}},",
-        r"y dir=reverse, colorbar, colormap={associationSequential}{color(0cm)=(white); color(1cm)=(bbmriTeal)},",
+        r"y dir=reverse, colorbar, colorbar style={tick label style={font=\sffamily,/pgf/number format/assume math mode=true}}, colormap={associationSequential}{color(0cm)=(white); color(1cm)=(bbmriTeal)},",
         r"point meta min=0,",
         r"]",
         r"\addplot[matrix plot*, mesh/cols=" + str(len(column_categories)) + r", point meta=explicit] table[row sep=\\,meta index=2] {",
