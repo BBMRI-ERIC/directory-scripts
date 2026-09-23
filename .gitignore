@@ -3,6 +3,8 @@
 /data-check-cache/*
 # python bytecode caches
 __pycache__/
+# isolated local Git worktrees
+/.worktrees/
 # ignore setup of environment variables
 .env
 # generated map renders
