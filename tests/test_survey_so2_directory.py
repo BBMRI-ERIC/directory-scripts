@@ -59,6 +59,13 @@ def write_descriptive_form_manifest(tmp_path: Path) -> Path:
     return path
 
 
+def write_empty_association_registry(tmp_path: Path) -> Path:
+    """Write a valid registry for tests that intentionally have no association panels."""
+    path = tmp_path / "empty-association-registry.json"
+    path.write_text(json.dumps({"schema_version": "1", "definitions": []}), encoding="utf-8")
+    return path
+
+
 
 def write_descriptive_workbook(tmp_path: Path) -> Path:
     path = tmp_path / "descriptive.xlsx"
@@ -82,11 +89,184 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
     ])
 
     assert module.run_describe(args) == module.EXIT_OK
     assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
+
+
+def test_describe_passes_association_heatmap_registry_provenance_and_excludes_exploratory_pairs(tmp_path, monkeypatch):
+    """Describe embeds only default registry definitions unless explicitly opted in."""
+    module = load_module()
+    registry = tmp_path / "association-heatmaps.json"
+    registry.write_text("{}", encoding="utf-8")
+    output_json = tmp_path / "descriptive.json"
+    captured = {}
+
+    class DescriptiveStub:
+        class InputError(Exception):
+            pass
+
+        @staticmethod
+        def load_descriptive_schema(_path):
+            return {}
+
+        @staticmethod
+        def load_association_heatmap_registry(_path):
+            return ()
+
+        @staticmethod
+        def load_form_manifest_structure(_path):
+            return {}
+
+        @staticmethod
+        def read_descriptive_workbook(_path, _schema):
+            return Namespace(responses=__import__("pandas").DataFrame({
+                "Digital maturity": ["High"], "source_row": [5],
+            }))
+
+        @staticmethod
+        def load_association_heatmap_registry(_path):
+            return (
+                Namespace(mode="default"),
+                Namespace(mode="exploratory"),
+            )
+
+        @staticmethod
+        def validate_descriptive_schema(_schema, _headers):
+            return (Namespace(question_id="digital_maturity"),)
+
+        @staticmethod
+        def validate_association_definitions(definitions, _questions):
+            captured["validated"] = definitions
+
+        @staticmethod
+        def build_descriptive_payload(*_args, **kwargs):
+            captured.update(kwargs)
+            return {"payload_type": "so2_descriptive_statistics"}
+
+    monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(registry), "-o", str(output_json),
+    ])
+
+    assert args.include_exploratory_association_heatmaps is False
+    assert module.run_describe(args) == module.EXIT_OK
+    assert [definition.mode for definition in captured["validated"]] == ["default", "exploratory"]
+    assert [definition.mode for definition in captured["association_definitions"]] == ["default"]
+    assert captured["association_registry_sha256"] == __import__("hashlib").sha256(
+        registry.read_bytes()
+    ).hexdigest()
+
+
+def test_unknown_association_heatmap_registry_blocks_all_describe_publication(tmp_path):
+    """An unreadable registry fails before JSON, TeX, PDF, or chart publication."""
+    module = load_module()
+    output_json = tmp_path / "payload.json"
+    output_tex = tmp_path / "report.tex"
+    output_pdf = tmp_path / "report.pdf"
+    chart_dir = tmp_path / "charts"
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(tmp_path / "unknown.json"),
+        "-o", str(output_json), "--output-tex", str(output_tex),
+        "--output-pdf", str(output_pdf), "--output-chart-dir", str(chart_dir),
+    ])
+
+    with pytest.raises(module.InputError, match="association registry"):
+        module.run_describe(args)
+
+    assert not output_json.exists()
+    assert not output_tex.exists()
+    assert not output_pdf.exists()
+    assert not chart_dir.exists()
+
+
+def test_describe_refuses_association_registry_as_output(tmp_path):
+    """The association registry is an input and must never be overwritten."""
+    module = load_module()
+    registry = write_empty_association_registry(tmp_path)
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(registry),
+        "-o", str(registry), "--overwrite",
+    ])
+
+    with pytest.raises(module.InputError, match="must not overwrite input"):
+        module.run_describe(args)
+
+
+def test_render_descriptive_cli_accepts_exploratory_association_opt_in(tmp_path):
+    """Rerendering can retain exploratory panels already present in a payload."""
+    module = load_module()
+    args = module.build_cli().parse_args([
+        "render-descriptive-report", "-i", str(tmp_path / "payload.json"),
+        "--output-tex", str(tmp_path / "report.tex"),
+        "--include-exploratory-association-heatmaps",
+    ])
+
+    assert args.include_exploratory_association_heatmaps is True
+
+
+def test_default_registry_schema_mismatch_blocks_describe_publication(tmp_path, monkeypatch):
+    """A loaded default registry must not be silently discarded on schema mismatch."""
+    module = load_module()
+    output_json = tmp_path / "payload.json"
+
+    class DescriptiveStub:
+        class InputError(Exception):
+            pass
+
+        @staticmethod
+        def load_descriptive_schema(_path):
+            return {"output": {"source_row_column": "source_row"}}
+
+        @staticmethod
+        def load_form_manifest_structure(_path):
+            return {}
+
+        @staticmethod
+        def read_descriptive_workbook(_path, _schema):
+            return Namespace(responses=__import__("pandas").DataFrame({"source_row": [5]}))
+
+        @staticmethod
+        def validate_descriptive_schema(_schema, _headers):
+            return (Namespace(question_id="unrelated"),)
+
+        @staticmethod
+        def validate_association_definitions(_definitions, _questions):
+            raise DescriptiveStub.InputError("schema mismatch")
+
+        @staticmethod
+        def build_descriptive_payload(_workbook, _schema, _form_structure, **_kwargs):
+            return {"payload_type": "so2_descriptive_statistics"}
+
+    monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
+    monkeypatch.setattr(
+        module,
+        "_load_association_heatmap_registry",
+        lambda *_args: ((Namespace(mode="default"),), "a" * 64),
+    )
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "-o", str(output_json),
+    ])
+
+    with pytest.raises(module.InputError, match="schema mismatch"):
+        module.run_describe(args)
+
+    assert not output_json.exists()
 
 
 def test_piechart_ratio_parser_accepts_positive_width_to_height_values():
@@ -129,6 +309,7 @@ def test_describe_overwrite_replaces_existing_json(tmp_path):
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json), "--overwrite",
     ])
 
@@ -155,15 +336,29 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return {}
 
         @staticmethod
+        def load_association_heatmap_registry(_path):
+            return ()
+
+        @staticmethod
         def load_form_manifest_structure(_path):
             return object()
 
         @staticmethod
         def read_descriptive_workbook(_path, _schema):
-            return object()
+            return Namespace(responses=__import__("pandas").DataFrame({"source_row": [5]}))
 
         @staticmethod
-        def build_descriptive_payload(_workbook, _schema, _form_structure):
+        def validate_descriptive_schema(_schema, _headers):
+            return ()
+
+        @staticmethod
+        def validate_association_definitions(definitions, _questions):
+            assert definitions == ()
+
+        @staticmethod
+        def build_descriptive_payload(_workbook, _schema, _form_structure, **kwargs):
+            assert kwargs["association_definitions"] == ()
+            assert len(kwargs["association_registry_sha256"]) == 64
             return {
                 "payload_type": "so2_descriptive_statistics",
                 "payload_version": "1",
@@ -173,10 +368,12 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
         @staticmethod
         def render_descriptive_tex(
             payload, chart_path, report_path=None, include_contribution_tables=False,
-            include_parent_context=False, max_piechart_ratio=4 / 3,
+            include_parent_context=False, include_exploratory_association_heatmaps=False,
+            max_piechart_ratio=4 / 3,
         ):
             assert include_contribution_tables is False
             assert include_parent_context is True
+            assert include_exploratory_association_heatmaps is False
             assert max_piechart_ratio == pytest.approx(16 / 9)
             assert Path(report_path) == output_tex
             relative = Path(__import__("os").path.relpath(
@@ -187,15 +384,21 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return object()
 
         @staticmethod
-        def render_descriptive_pdf(_rendered, tex_path, _pdf_path, _chart_dir, overwrite=False):
+        def render_descriptive_pdf(
+            _rendered, tex_path, _pdf_path, _chart_dir, overwrite=False,
+            additional_text_outputs=None,
+        ):
             assert overwrite is False
             Path(tex_path).write_text("report", encoding="utf-8")
+            for target, text in (additional_text_outputs or {}).items():
+                Path(target).write_text(text, encoding="utf-8")
 
     monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(output_tex),
         "--output-chart-dir", str(chart_dir),
@@ -224,6 +427,7 @@ def test_describe_wraps_payload_write_failure_as_input_error(tmp_path, monkeypat
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
     ])
 
@@ -391,6 +595,7 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(tmp_path / "descriptive.tex"),
     ])
@@ -406,8 +611,8 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
     assert not output_json.exists()
 
 
-def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monkeypatch):
-    """A final payload-write error rolls back every newly rendered artifact."""
+def test_describe_delegates_payload_publication_to_the_render_transaction(tmp_path, monkeypatch):
+    """Rendered reports receive JSON as a transaction member rather than a later write."""
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     output_tex = tmp_path / "descriptive.tex"
@@ -415,24 +620,23 @@ def test_describe_removes_rendered_outputs_if_payload_write_fails(tmp_path, monk
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
         "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
         "-o", str(output_json),
         "--output-tex", str(output_tex),
     ])
 
-    def fake_render(_payload, render_args, _input_paths):
+    def fake_render(_payload, render_args, _input_paths, additional_json_output):
         Path(render_args.output_tex).write_text("rendered", encoding="utf-8")
-
-    def fail_json(*_args, **_kwargs):
-        raise module.InputError("simulated payload write failure")
+        assert additional_json_output == output_json
+        raise module.InputError("simulated publication failure")
 
     monkeypatch.setattr(module, "_render_descriptive_payload", fake_render)
-    monkeypatch.setattr(module, "write_json", fail_json)
 
-    with pytest.raises(module.InputError, match="simulated payload write failure"):
+    with pytest.raises(module.InputError, match="simulated publication failure"):
         module.run_describe(args)
 
     assert not output_json.exists()
-    assert not output_tex.exists()
+    assert output_tex.read_text(encoding="utf-8") == "rendered"
 
 
 def test_public_descriptive_cli_apis_document_contracts():

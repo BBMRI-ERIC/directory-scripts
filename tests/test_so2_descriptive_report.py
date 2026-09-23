@@ -1,8 +1,10 @@
 """Tests for the self-contained SO2 descriptive-workbook reader."""
 
 from copy import deepcopy
+from dataclasses import replace
 import importlib
 from datetime import datetime
+from hashlib import sha256
 import json
 import inspect
 from pathlib import Path
@@ -17,6 +19,7 @@ import pytest
 module = importlib.import_module("so2_descriptive_report")
 WORKTREE = Path(__file__).resolve().parents[1]
 PRODUCTION_SCHEMA = WORKTREE / "survey-mappings" / "so2_2025_descriptive_report.json"
+ASSOCIATION_REGISTRY = WORKTREE / "survey-mappings" / "so2_2025_association_heatmaps.json"
 PRODUCTION_WORKBOOK = Path("/storage/emulated/0/BBMRI-ERIC/directory-scripts/Content_Export_SO2_2025_20260313.xlsx")
 LEGAL_GDPR = "What types of legal barriers have you faced?: Data protection regulations (e.g., GDPR)"
 LEGAL_LICENSING = "What types of legal barriers have you faced?: Licensing restrictions"
@@ -934,6 +937,576 @@ def read_row_four_headers(workbook_path):
 def questions_by_column(schema):
     """Index raw schema questions by their explicit source header."""
     return {question["column"]: question for question in schema["questions"]}
+
+
+def write_association_registry(tmp_path, definitions):
+    """Write one controlled association registry for loader validation tests."""
+    path = tmp_path / "association-registry.json"
+    path.write_text(json.dumps({"schema_version": "1", "definitions": definitions}), encoding="utf-8")
+    return path
+
+
+def association_definition(**overrides):
+    """Return a syntactically valid association definition fixture."""
+    definition = {
+        "definition_id": "returned_data_policy",
+        "row_question_id": "q_094",
+        "column_question_id": "q_097",
+        "row_form_uid": "row-uid",
+        "column_form_uid": "column-uid",
+        "row_categories": ["No", "Yes"],
+        "column_categories": ["No", "Yes"],
+        "mode": "default",
+        "title": "Returned-data experience versus policy/workflow",
+        "interpretation": "Describes submitted response rows without implying causation.",
+        "conditional_summary": True,
+    }
+    definition.update(overrides)
+    return definition
+
+
+def production_questions_by_id():
+    """Return validated production questions indexed by their stable schema identifiers."""
+    schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
+    headers = [
+        *schema["columns"]["respondent_context"],
+        *schema["columns"]["administrative_exclusions"],
+        *(question["column"] for question in schema["questions"]),
+    ]
+    questions = module.validate_descriptive_schema(schema, headers)
+    return {question.question_id: question for question in questions}
+
+
+def test_production_association_registry_has_exact_default_and_exploratory_pairs():
+    """The checked-in registry contains only the approved association pairs."""
+    definitions = module.load_association_heatmap_registry(ASSOCIATION_REGISTRY)
+    module.validate_association_definitions(definitions, production_questions_by_id())
+
+    assert [(item.row_question_id, item.column_question_id, item.mode) for item in definitions] == [
+        (
+            "q_058_how_would_you_rate_your_repository_s_technical_readiness_for_integrating",
+            "q_061_how_would_you_rate_your_biobank_s_quality_management_system_qms_readines",
+            "default",
+        ),
+        (
+            "q_085_do_you_currently_have_sufficient_it_personnel_e_g_0_2_fte_of_a_data_expe",
+            "q_086_does_your_organisation_have_the_necessary_infrastructure_to_host_and_mai",
+            "default",
+        ),
+        (
+            "q_053_are_sample_related_data_collected_in_an_automated_way_e_g_directly_from_",
+            "q_057_does_your_system_automatically_track_changes_made_to_traceability_or_pro",
+            "default",
+        ),
+        (
+            "q_094_have_data_been_previously_returned_to_you",
+            "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin",
+            "default",
+        ),
+        (
+            "q_063_what_types_of_legal_barriers_have_you_faced_data_protection_regulations_",
+            "q_066_what_types_of_legal_barriers_have_you_faced_cross_border_data_sharing_re",
+            "exploratory",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("definitions", "message"),
+    [
+        ([association_definition(), association_definition(definition_id="second")], "duplicate unordered question pair"),
+        ([association_definition(mode="unsupported")], "unknown mode"),
+        ([association_definition(title=" ")], "nonblank string"),
+        ([association_definition(row_categories=["No|maybe", "Yes"])], "must not contain"),
+    ],
+)
+def test_association_registry_loader_rejects_invalid_syntactic_definitions(
+    tmp_path, definitions, message
+):
+    """Registry loading validates only the JSON contract available without a schema."""
+    registry = write_association_registry(tmp_path, definitions)
+
+    with pytest.raises(module.InputError, match=message):
+        module.load_association_heatmap_registry(registry)
+
+
+def test_association_registry_validation_rejects_contact_question_uid_and_category_drift(tmp_path):
+    """Schema-aware validation rejects semantically unsafe or stale pair definitions."""
+    questions = production_questions_by_id()
+    registry = write_association_registry(
+        tmp_path,
+        [association_definition(
+            row_question_id="q_094_have_data_been_previously_returned_to_you",
+            column_question_id=(
+                "q_111_we_may_wish_to_follow_up_with_some_participants_to_learn_more_about_spec"
+            ),
+            row_form_uid="e06ab430-eccd-b2f5-b971-084cfba02604",
+            column_form_uid="bea118d8-b922-84c9-ceb1-9d3ec6ec9c5b",
+        )],
+    )
+    with pytest.raises(module.InputError, match="single_choice or ordinal"):
+        module.validate_association_definitions(
+            module.load_association_heatmap_registry(registry), questions
+        )
+
+    registry = write_association_registry(
+        tmp_path,
+        [association_definition(
+            row_question_id="q_094_have_data_been_previously_returned_to_you",
+            column_question_id=(
+                "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin"
+            ),
+            row_form_uid="stale-uid",
+            column_form_uid="dabf1c1e-bc95-b216-5d2a-90f5df380b63",
+        )],
+    )
+    with pytest.raises(module.InputError, match="form UID"):
+        module.validate_association_definitions(
+            module.load_association_heatmap_registry(registry), questions
+        )
+
+    registry = write_association_registry(
+        tmp_path,
+        [association_definition(
+            row_question_id="q_094_have_data_been_previously_returned_to_you",
+            column_question_id=(
+                "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin"
+            ),
+            row_form_uid="e06ab430-eccd-b2f5-b971-084cfba02604",
+            column_form_uid="dabf1c1e-bc95-b216-5d2a-90f5df380b63",
+            row_categories=["Yes", "No"],
+        )],
+    )
+    with pytest.raises(module.InputError, match="category sequence"):
+        module.validate_association_definitions(
+            module.load_association_heatmap_registry(registry), questions
+        )
+
+
+def association_question(question_id, column, categories, applicability=None, form_uid=""):
+    """Return one controlled structured question for association-pair tests."""
+    return module.QuestionDefinition(
+        question_id=question_id,
+        column=column,
+        question_type="single_choice",
+        label=column,
+        categories=tuple(categories),
+        delimiter=None,
+        parent_columns=(),
+        applicability=applicability,
+        form_uid=form_uid,
+    )
+
+
+def controlled_association_definitions():
+    """Return approved controlled pairs with stable category order."""
+    return (
+        module.AssociationHeatmapDefinition(
+            definition_id="returned_data_policy",
+            row_question_id="returned_data",
+            column_question_id="policy",
+            row_form_uid="returned-data-uid",
+            column_form_uid="policy-uid",
+            row_categories=("No", "Yes"),
+            column_categories=("No", "Yes"),
+            mode="default",
+            title="Returned data versus policy",
+            interpretation="Describes submitted responses.",
+            conditional_summary=True,
+        ),
+        module.AssociationHeatmapDefinition(
+            definition_id="routed_pair",
+            row_question_id="routed_row",
+            column_question_id="routed_column",
+            row_form_uid="routed-row-uid",
+            column_form_uid="routed-column-uid",
+            row_categories=("No", "Yes"),
+            column_categories=("No", "Yes"),
+            mode="default",
+            title="Routed pair",
+            interpretation="Describes submitted responses.",
+            conditional_summary=False,
+        ),
+    )
+
+
+def controlled_association_questions():
+    """Return controlled pair questions including one independently routed axis."""
+    return {
+        "returned_data": association_question("returned_data", "Returned data", ["No", "Yes"], form_uid="returned-data-uid"),
+        "policy": association_question("policy", "Policy", ["No", "Yes"], form_uid="policy-uid"),
+        "routing": association_question("routing", "Routing", ["No", "Yes"]),
+        "routed_row": association_question(
+            "routed_row", "Routed row", ["No", "Yes"],
+            {"column": "Routing", "values": ["Yes"]}, "routed-row-uid",
+        ),
+        "routed_column": association_question("routed_column", "Routed column", ["No", "Yes"], form_uid="routed-column-uid"),
+    }
+
+
+def canonical_association_definitions_sha256(definitions):
+    """Return the canonical association-definition digest expected by the renderer."""
+    serialized = [module._association_definition_payload(definition) for definition in definitions]
+    return sha256(
+        json.dumps(serialized, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def test_pairing_uses_original_source_row_and_preserves_missing_states():
+    """Association vectors retain only source rows and do not pair by respondent context."""
+    responses = pd.DataFrame([
+        {"source_row": 8, "Returned data": "Yes", "Policy": "Yes", "Country": "Austria", "Institution": "Alpha", "Free text": "private"},
+        {"source_row": 5, "Returned data": "No", "Policy": "Yes", "Country": "Belgium", "Institution": "Beta", "Free text": "private"},
+        {"source_row": 7, "Returned data": "Yes", "Policy": "", "Country": "Croatia", "Institution": "Gamma", "Free text": "private"},
+    ])
+
+    pair = module.build_association_heatmap_payload(
+        controlled_association_definitions()[:1], responses, controlled_association_questions(), "source_row"
+    )["returned_data_policy"]
+
+    assert pair["paired_denominator"] == 2
+    assert pair["cells"] == {"No|No": 0, "No|Yes": 1, "Yes|No": 0, "Yes|Yes": 1}
+    assert pair["diagnostics"]["eligible_missing_rows"] == [7]
+    assert pair["vectors"] == [
+        {"source_row": 8, "row_state": "answered", "row_value": "Yes", "column_state": "answered", "column_value": "Yes"},
+        {"source_row": 5, "row_state": "answered", "row_value": "No", "column_state": "answered", "column_value": "Yes"},
+        {"source_row": 7, "row_state": "answered", "row_value": "Yes", "column_state": "missing", "column_value": None},
+    ]
+
+
+def test_inapplicable_and_out_of_route_answers_are_not_complete_case_observations():
+    """A routed blank and routed answer remain distinct and are excluded from cells."""
+    responses = pd.DataFrame([
+        {"source_row": 2, "Routing": "Yes", "Routed row": "Yes", "Routed column": "No"},
+        {"source_row": 3, "Routing": "No", "Routed row": "", "Routed column": "Yes"},
+        {"source_row": 4, "Routing": "No", "Routed row": "Yes", "Routed column": "Yes"},
+    ])
+
+    pair = module.build_association_heatmap_payload(
+        controlled_association_definitions()[1:], responses, controlled_association_questions(), "source_row"
+    )["routed_pair"]
+
+    assert pair["paired_denominator"] == 1
+    assert pair["diagnostics"]["inapplicable_rows"] == [3]
+    assert pair["diagnostics"]["out_of_route_rows"] == [4]
+    assert pair["vectors"][1]["row_state"] == "inapplicable"
+    assert pair["vectors"][2]["row_state"] == "out_of_route"
+
+
+def test_renderer_rejects_unknown_association_category_and_mismatched_cell_total():
+    """Serialized association data cannot drift from declared categories or vectors."""
+    definitions = controlled_association_definitions()[:1]
+    definitions_sha256 = canonical_association_definitions_sha256(definitions)
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": definitions_sha256,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    unknown_category = deepcopy(payload)
+    unknown_category["association_heatmaps"]["returned_data_policy"]["cells"]["Yes|Maybe"] = 1
+
+    with pytest.raises(module.InputError, match="undeclared association category"):
+        module.render_descriptive_tex(unknown_category, None)
+
+    mismatched_total = deepcopy(payload)
+    mismatched_total["association_heatmaps"]["returned_data_policy"]["cells"]["Yes|No"] = 2
+
+    with pytest.raises(module.InputError, match="mismatched association cell total"):
+        module.render_descriptive_tex(mismatched_total, None)
+
+
+def test_renderer_rejects_forged_association_definitions_with_stale_registry_digest():
+    """Internally consistent forged association data cannot replace recorded provenance."""
+    definitions = controlled_association_definitions()[:1]
+    definitions_sha256 = canonical_association_definitions_sha256(definitions)
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": definitions_sha256,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    forged_definitions = (replace(definitions[0], title="Forged association title"),)
+    forged = deepcopy(payload)
+    forged["association_heatmap_definitions"]["definitions"] = [
+        module._association_definition_payload(forged_definitions[0])
+    ]
+    forged["association_heatmaps"] = module.build_association_heatmap_payload(
+        forged_definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+
+    with pytest.raises(module.InputError, match="definition digest"):
+        module.render_descriptive_tex(forged, None)
+
+
+def test_renderer_rejects_mismatched_association_definition_digest():
+    """Canonical definition provenance must bind exactly to embedded definitions."""
+    definitions = controlled_association_definitions()[:1]
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": "f" * 64,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+
+    with pytest.raises(module.InputError, match="definition digest"):
+        module.render_descriptive_tex(payload, None)
+
+
+def test_renderer_rejects_contact_definition_and_pair_identifying_fields():
+    """Rerendered association payloads cannot introduce contact axes or extra data."""
+    definitions = controlled_association_definitions()[:1]
+    payload = report_payload()
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": canonical_association_definitions_sha256(
+            (replace(definitions[0], column_question_id="q_111_contact"),)
+        ),
+        "definitions": [module._association_definition_payload(
+            replace(definitions[0], column_question_id="q_111_contact")
+        )],
+    }
+    payload["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    with pytest.raises(module.InputError, match="must not include q_111"):
+        module.render_descriptive_tex(payload, None)
+
+    valid = report_payload()
+    valid["association_heatmap_definitions"] = {
+        "registry_sha256": "b" * 64,
+        "definitions_sha256": canonical_association_definitions_sha256(definitions),
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    valid["association_heatmaps"] = module.build_association_heatmap_payload(
+        definitions,
+        pd.DataFrame([{"source_row": 5, "Returned data": "Yes", "Policy": "No"}]),
+        controlled_association_questions(),
+        "source_row",
+    )
+    valid["association_heatmaps"]["returned_data_policy"]["institution"] = "forbidden"
+    with pytest.raises(module.InputError, match="missing or unknown fields"):
+        module.render_descriptive_tex(valid, None)
+
+
+def test_descriptive_payload_carries_validated_association_registry_provenance():
+    """The renderer receives exact registry metadata with no responder context."""
+    schema = descriptive_schema({
+        "question_id": "returned_data",
+        "column": "Returned data",
+        "question_type": "single_choice",
+        "label": "Returned data",
+        "categories": ["No", "Yes"],
+        "form_uid": "returned-data-uid",
+    })
+    schema["questions"].append({
+        "question_id": "policy",
+        "column": "Policy",
+        "question_type": "single_choice",
+        "label": "Policy",
+        "categories": ["No", "Yes"],
+        "form_uid": "policy-uid",
+    })
+    workbook = descriptive_workbook([{
+        "Name of Institution": "Alpha", "Country": "Austria",
+        "Returned data": "Yes", "Policy": "No",
+    }])
+    definitions = controlled_association_definitions()[:1]
+    registry_sha256 = "c" * 64
+    definitions_sha256 = canonical_association_definitions_sha256(definitions)
+
+    payload = module.build_descriptive_payload(
+        workbook, schema, association_definitions=definitions, association_registry_sha256=registry_sha256
+    )
+
+    assert payload["association_heatmap_definitions"] == {
+        "registry_sha256": registry_sha256,
+        "definitions_sha256": definitions_sha256,
+        "definitions": [module._association_definition_payload(definitions[0])],
+    }
+    assert payload["association_heatmaps"]["returned_data_policy"]["vectors"] == [{
+        "source_row": 5, "row_state": "answered", "row_value": "Yes",
+        "column_state": "answered", "column_value": "No",
+    }]
+    module.validate_association_heatmap_payload(payload)
+
+
+def returned_data_definition():
+    """Return the approved returned-data panel definition for renderer tests."""
+    return replace(
+        controlled_association_definitions()[0],
+        title="Returned-data experience versus policy/workflow",
+        interpretation="Describes returned-data experience and policy/workflow responses.",
+    )
+
+
+def returned_data_pair():
+    """Return a complete 2x2 pair with fixed zero-inclusive cell order."""
+    return {
+        "row_categories": ["No", "Yes"],
+        "column_categories": ["No", "Yes"],
+        "cells": {"No|No": 8, "No|Yes": 34, "Yes|No": 66, "Yes|Yes": 40},
+        "paired_denominator": 148,
+        "diagnostics": {
+            "eligible_missing_rows": [],
+            "inapplicable_rows": [],
+            "out_of_route_rows": [],
+        },
+        "vectors": [],
+    }
+
+
+def association_render_payload():
+    """Return a renderer-valid payload containing only the safe pair vector fields."""
+    definition = replace(
+        returned_data_definition(),
+        definition_id="returned_data_policy",
+        row_question_id="q_001_returned_data",
+        column_question_id="q_002_policy_workflow",
+    )
+    payload = report_payload(
+        structured_report_question(
+            question_id="q_001_returned_data", column="Returned data",
+            label="Returned data", question_type="single_choice",
+        ),
+        structured_report_question(
+            question_id="q_002_policy_workflow", column="Policy/workflow",
+            label="Policy/workflow", question_type="single_choice",
+        ),
+    )
+    payload["association_heatmap_definitions"] = {
+        "registry_sha256": "d" * 64,
+        "definitions_sha256": canonical_association_definitions_sha256((definition,)),
+        "definitions": [module._association_definition_payload(definition)],
+    }
+    payload["association_heatmaps"] = {
+        "returned_data_policy": {
+            "row_categories": ["No", "Yes"],
+            "column_categories": ["No", "Yes"],
+            "vectors": [{
+                "source_row": 5, "row_state": "answered", "row_value": "Yes",
+                "column_state": "answered", "column_value": "No",
+            }],
+            "cells": {"No|No": 0, "No|Yes": 0, "Yes|No": 1, "Yes|Yes": 0},
+            "paired_denominator": 1,
+            "diagnostics": {
+                "eligible_missing_rows": [],
+                "inapplicable_rows": [],
+                "out_of_route_rows": [],
+            },
+        },
+    }
+    return payload
+
+
+def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
+    """Heatmaps retain every declared category cell and their exact denominator."""
+    pair = returned_data_pair()
+    pair["cells"]["No|No"] = 0
+    tex = module._association_heatmap_fragment(returned_data_definition(), pair)
+
+    assert "Returned-data experience versus policy/workflow" in tex
+    assert "Paired answering rows: 148" in tex
+    assert r"xticklabels={1,2}" in tex
+    assert r"\scriptsize 0" in tex
+    assert r"\textbf{Key:} R = row response; C = column response." in tex
+    assert r"R1 & No \\\\" in tex
+    assert r"C1 & No \\\\" in tex
+    assert "colormap" in tex
+
+
+def test_returned_data_pair_adds_conditional_percentages_with_group_sizes():
+    """Returned-data conditional rows use their displayed row denominators."""
+    tex = module._association_conditional_summary_fragment(
+        returned_data_definition(), returned_data_pair()
+    )
+
+    assert "34 / 42 (81.0\\%)" in tex
+    assert "40 / 106 (37.7\\%)" in tex
+
+
+def test_heatmap_axis_captions_follow_each_definition_not_returned_data_wording():
+    """Generic panels must not inherit the returned-data pair's semantic axis labels."""
+    tex = module._association_heatmap_fragment(
+        controlled_association_definitions()[1], returned_data_pair()
+    )
+
+    assert "xlabel={Column response}" in tex
+    assert "ylabel={Row response}" in tex
+    assert "Policy/workflow response" not in tex
+
+
+def test_contact_field_cannot_appear_in_association_tex_or_chart_paths():
+    """Association rendering exposes no contact-field identifier or content."""
+    rendered = module.render_descriptive_tex(association_render_payload(), chart_dir="charts")
+
+    assert "q_111" not in rendered.tex
+    assert "follow-up interview" not in rendered.tex
+    assert all("q_111" not in key for key in rendered.chart_paths)
+    assert "association-returned_data_policy" in rendered.chart_fragments
+    assert "association-returned_data_policy" in rendered.chart_documents
+    assert "association-returned_data_policy" in rendered.chart_paths
+    assert rendered.tex.index("Returned-data experience versus policy/workflow") > rendered.tex.index("Policy/workflow")
+
+
+def test_renderer_includes_exploratory_association_heatmaps_only_when_requested():
+    """Exploratory association panels require the explicit renderer opt-in."""
+    payload = association_render_payload()
+    definition = replace(
+        module._association_definition_from_payload(
+            payload["association_heatmap_definitions"]["definitions"][0], "definition",
+        ),
+        mode="exploratory",
+    )
+    payload["association_heatmap_definitions"]["definitions"] = [
+        module._association_definition_payload(definition)
+    ]
+    payload["association_heatmap_definitions"]["definitions_sha256"] = (
+        module._association_definitions_sha256((definition,))
+    )
+
+    default_tex = module.render_descriptive_tex(payload, chart_dir=None).tex
+    exploratory_tex = module.render_descriptive_tex(
+        payload, chart_dir=None, include_exploratory_association_heatmaps=True,
+    ).tex
+
+    assert exploratory_tex.count(r"\begin{tikzpicture}") == (
+        default_tex.count(r"\begin{tikzpicture}") + 1
+    )
+
+
+@pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
+def test_real_xelatex_renders_minimal_association_chart_document(tmp_path):
+    """The registered association chart source is a self-contained XeLaTeX document."""
+    rendered = module.render_descriptive_tex(association_render_payload(), chart_dir="charts")
+
+    module.render_descriptive_pdf(rendered, tmp_path / "report.tex", None, tmp_path / "charts")
+
+    assert (tmp_path / "charts" / "association-returned_data_policy.pdf").read_bytes().startswith(b"%PDF")
 
 
 def test_production_schema_accounts_for_every_header():
@@ -1901,6 +2474,40 @@ def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
 
     assert report_tex.read_text(encoding="utf-8") == "previous report"
     assert report_pdf.read_bytes() == b"previous PDF"
+
+
+def test_pdf_render_restores_existing_additional_text_output_when_publication_fails(
+    tmp_path, monkeypatch,
+):
+    """One transaction restores a prior payload when its final promotion fails."""
+    real_replace = module.os.replace
+    fail_once = True
+
+    def fail_payload_publication(source, destination):
+        nonlocal fail_once
+        if Path(destination).name == "descriptive.json" and fail_once:
+            fail_once = False
+            raise OSError("simulated payload publication failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(module.os, "replace", fail_payload_publication)
+    report_tex = tmp_path / "report.tex"
+    output_json = tmp_path / "descriptive.json"
+    report_tex.write_text("previous report", encoding="utf-8")
+    output_json.write_text('{"previous": true}\n', encoding="utf-8")
+
+    with pytest.raises(module.InputError, match="simulated payload publication failure"):
+        module.render_descriptive_pdf(
+            rendered_payload(),
+            report_tex,
+            None,
+            None,
+            overwrite=True,
+            additional_text_outputs={output_json: '{"current": true}\n'},
+        )
+
+    assert report_tex.read_text(encoding="utf-8") == "previous report"
+    assert output_json.read_text(encoding="utf-8") == '{"previous": true}\n'
 
 
 def test_pdf_render_reports_chart_publication_and_restoration_failures(

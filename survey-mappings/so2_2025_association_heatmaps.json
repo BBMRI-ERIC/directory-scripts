@@ -1,0 +1,70 @@
+{
+  "schema_version": "1",
+  "definitions": [
+    {
+      "definition_id": "technical_readiness_qms",
+      "row_question_id": "q_058_how_would_you_rate_your_repository_s_technical_readiness_for_integrating",
+      "column_question_id": "q_061_how_would_you_rate_your_biobank_s_quality_management_system_qms_readines",
+      "row_form_uid": "3f2beac1-d1a6-52fd-a3c1-1ea6936470c5",
+      "column_form_uid": "4c85a988-ffad-b209-cd80-3145ffaff595",
+      "row_categories": ["Not started or fully manual: No digital traceability systems in place; tracking and data linkage are done manually or not at all.", "Basic digital tools in use: Processes rely on spreadsheets or limited tools; traceability is possible but unstructured or inconsistent.", "Partially digital, some key limitations: A digital system is in place (e.g., LIMS or custom DB), but linkage across data types is incomplete or metadata is not standardized.", "Mostly digital with minor gaps: Most traceability processes are digital; structured data is used for key steps, and linkage to clinical/research data is possible with little effort.", "Fully digital and interoperable: All associated data are managed through integrated, structured systems (e.g. BIMS), with routine linkage to clinical and research data; metadata standards (e.g. SPREC, MIABIS) and data protection compliant workflows are in place."],
+      "column_categories": ["Our QMS does not currently address traceability of samples and associated data in a structured or digital way.", "Limited alignment between QMS and digital traceability requirements.", "Our QMS includes some relevant procedures, but coverage is partial or outdated.", "Most processes are covered, with minor gaps or updates needed.", "Our QMS fully supports digital traceability, including SOPs, documentation practices, data quality controls and audit mechanisms across the full data lifecycle."],
+      "mode": "default",
+      "title": "Technical readiness versus QMS readiness",
+      "interpretation": "Shows the joint distribution of submitted readiness assessments without implying causation.",
+      "conditional_summary": false
+    },
+    {
+      "definition_id": "personnel_infrastructure",
+      "row_question_id": "q_085_do_you_currently_have_sufficient_it_personnel_e_g_0_2_fte_of_a_data_expe",
+      "column_question_id": "q_086_does_your_organisation_have_the_necessary_infrastructure_to_host_and_mai",
+      "row_form_uid": "5782b565-f9ff-6b47-91f4-37175391f3bc",
+      "column_form_uid": "26e0963a-64ae-c9b3-97a0-6ee31b26d7f8",
+      "row_categories": ["I would need a consultation to better understand the requirements", "No", "Yes"],
+      "column_categories": ["I need a consultation to really understand the requirements and to answer", "Yes", "No"],
+      "mode": "default",
+      "title": "IT personnel versus local infrastructure",
+      "interpretation": "Shows submitted assessments of personnel and infrastructure together without implying causation.",
+      "conditional_summary": false
+    },
+    {
+      "definition_id": "collection_automation_audit",
+      "row_question_id": "q_053_are_sample_related_data_collected_in_an_automated_way_e_g_directly_from_",
+      "column_question_id": "q_057_does_your_system_automatically_track_changes_made_to_traceability_or_pro",
+      "row_form_uid": "d4e6e60f-ae7b-7054-4fa4-ddc47b317cc8",
+      "column_form_uid": "00aeed55-75a3-1b69-e5bc-0f64ee559f3c",
+      "row_categories": ["No", "Partially yes", "Yes"],
+      "column_categories": ["Changes are not systematically tracked", "Changes are tracked manually (e.g. logbooks, EXCEL notes)", "Changes are tracked automatically (e.g. by a BIMS or LIMS audit trail)"],
+      "mode": "default",
+      "title": "Automated collection versus change tracking",
+      "interpretation": "Shows submitted automation and tracking assessments together without implying causation.",
+      "conditional_summary": false
+    },
+    {
+      "definition_id": "returned_data_policy",
+      "row_question_id": "q_094_have_data_been_previously_returned_to_you",
+      "column_question_id": "q_097_do_you_have_a_policy_or_workflow_for_returned_data_from_researchers_usin",
+      "row_form_uid": "e06ab430-eccd-b2f5-b971-084cfba02604",
+      "column_form_uid": "dabf1c1e-bc95-b216-5d2a-90f5df380b63",
+      "row_categories": ["No", "Yes"],
+      "column_categories": ["No", "Yes"],
+      "mode": "default",
+      "title": "Returned-data experience versus policy/workflow",
+      "interpretation": "Shows submitted response rows without implying willingness, causation, or a policy effect.",
+      "conditional_summary": true
+    },
+    {
+      "definition_id": "legal_barriers_exploratory",
+      "row_question_id": "q_063_what_types_of_legal_barriers_have_you_faced_data_protection_regulations_",
+      "column_question_id": "q_066_what_types_of_legal_barriers_have_you_faced_cross_border_data_sharing_re",
+      "row_form_uid": "6cd68a79-ea45-7df3-576f-eca26a00e911",
+      "column_form_uid": "26eff812-9189-0d19-6194-da6c96e9fc92",
+      "row_categories": ["never", "rarely", "occasionally", "frequently"],
+      "column_categories": ["never", "rarely", "occasionally", "frequently"],
+      "mode": "exploratory",
+      "title": "Data-protection versus cross-border legal barriers",
+      "interpretation": "Exploratorily shows submitted legal-barrier frequencies without implying causation.",
+      "conditional_summary": false
+    }
+  ]
+}
