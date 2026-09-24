@@ -61,6 +61,15 @@ COUNTRIES = {
 
 
 def _norm(value):
+    """Normalize identity text for conservative case-insensitive comparison.
+
+    Args:
+        value: String to normalize with Unicode NFC, case folding, whitespace
+            splitting, and single-space joining.
+
+    Returns:
+        Normalized comparison text. Non-string values are not accepted.
+    """
     return " ".join(unicodedata.normalize("NFC", value).casefold().split())
 
 
@@ -69,6 +78,15 @@ _COUNTRY_ALIASES = {_norm(name): code for code, names in COUNTRIES.items()
 
 
 def _usable_identity(group):
+    """Return whether a Directory legal-name group can support a match.
+
+    Args:
+        group: Group mapping containing a ``name`` juridical-person value.
+
+    Returns:
+        ``False`` for blank, email-like, or known placeholder names; ``True``
+        for other normalized names.
+    """
     name = _norm(group["name"])
     return bool(name and "@" not in name and name not in {
         "unknown", "other", "none", "n/a", "na", "not available", "not provided",
@@ -77,6 +95,19 @@ def _usable_identity(group):
 
 
 def _string(value, label, *, empty=False):
+    """Validate a required string while retaining its exact source value.
+
+    Args:
+        value: Candidate value.
+        label: Field description included in validation errors.
+        empty: Whether an empty or whitespace-only string is permitted.
+
+    Returns:
+        The original string without stripping or normalization.
+
+    Raises:
+        ValueError: If ``value`` is not a string or is disallowed blank text.
+    """
     if not isinstance(value, str) or (not empty and not value.strip()):
         raise ValueError(f"{label} must be a {'possibly empty ' if empty else 'nonempty '}string")
     return value
@@ -108,10 +139,28 @@ def country_code(value):
 
 
 def _subject(name, country):
+    """Fingerprint a Directory juridical-person name and country identity.
+
+    Args:
+        name: Legal-person name normalized inside this function for comparison.
+        country: Country string resolved through known aliases when possible.
+
+    Returns:
+        SHA-256 subject key for the normalized name and country pair.
+    """
     return fingerprint([_norm(name), country_code(country) or _norm(country)])
 
 
 def _identity(org):
+    """Fingerprint the identity-bearing fields of one EOSC organisation.
+
+    Args:
+        org: Mapping with required ``name`` and ``country`` plus optional
+            ``acronym``.
+
+    Returns:
+        SHA-256 digest of normalized name, acronym, and resolved country.
+    """
     return fingerprint([_norm(org["name"]), _norm(org.get("acronym", "")),
                         country_code(org["country"]) or _norm(org["country"])])
 
@@ -196,6 +245,10 @@ def validate_registry(registry):
 
     Args:
         registry: Parsed registry object.
+
+    Returns:
+        None. Validation is read-only and records no approvals.
+
     Raises:
         ValueError: Invalid schema, duplicate review IDs or invalid decisions.
     """
@@ -241,26 +294,88 @@ def validate_registry(registry):
 
 
 def _context(group, ids):
+    """Fingerprint selected current biobank context for stale-evidence checks.
+
+    Args:
+        group: Directory legal-identity group containing ``biobanks`` mappings.
+        ids: Biobank IDs to fingerprint in sorted order.
+
+    Returns:
+        Mapping from each requested ID to its context digest, or ``None`` when
+        that ID is no longer present in the group.
+    """
     return {bid: fingerprint(group["biobanks"][bid]) if bid in group["biobanks"] else None
             for bid in sorted(ids)}
 
 
 def _valid(item, group):
+    """Return whether a decision still matches subject and biobank evidence.
+
+    Args:
+        item: Registry decision with identity and context fingerprints.
+        group: Current Directory legal-identity group.
+
+    Returns:
+        ``True`` only when the subject digest and every recorded context digest
+        still match current data.
+    """
     return (item["identity_fingerprint"] == group["identity_fingerprint"]
             and item.get("context", {}) == _context(group, item.get("context", {})))
 
 
 def _records(registry, group):
+    """Select registry decisions belonging to one Directory subject group.
+
+    Args:
+        registry: Validated registry with decisions in audit order.
+        group: Directory group whose stable ``key`` identifies the subject.
+
+    Returns:
+        Matching decision mappings in original registry order.
+    """
     return [x for x in registry["decisions"] if x["subject_key"] == group["key"]]
 
 
 def _assessment_state(records, group, orgs):
+    """Evaluate current coverage, matches, rejections, and unresolved attempts.
+
+    Args:
+        records: One subject's registry decisions in audit order.
+        group: Current Directory group used to reject stale subject/context data.
+        orgs: Current EOSC catalogue keyed by organisation ID.
+
+    Returns:
+        Six-item tuple containing current match decisions, covered target IDs,
+        rejected target IDs, subject-level blocked state, unresolved decisions,
+        and target IDs with current inconclusive attempts.
+    """
+
     def substantive(item):
+        """Return target evidence that constitutes a decision conclusion.
+
+        Args:
+            item: Registry decision for this subject.
+
+        Returns:
+            Only the matched target for match decisions; otherwise all reviewed
+            targets.
+        """
         if item["decision"] == "match":
             return {item["target_id"]: item["reviewed_targets"][item["target_id"]]}
         return item["reviewed_targets"]
 
     def current(item, oid, digest):
+        """Return whether subject and EOSC target evidence remain current.
+
+        Args:
+            item: Decision carrying subject/context fingerprints.
+            oid: EOSC organisation ID under assessment.
+            digest: Recorded EOSC identity fingerprint for ``oid``.
+
+        Returns:
+            ``True`` when subject context is valid and the current catalogue
+            contains the same target identity fingerprint.
+        """
         return (_valid(item, group) and oid in orgs
                 and orgs[oid]["identity_fingerprint"] == digest)
 
@@ -311,10 +426,32 @@ def _assessment_state(records, group, orgs):
 
 
 def _current_matches(records, group, orgs):
+    """Return only current match decisions from a subject assessment.
+
+    Args:
+        records: One subject's registry decisions.
+        group: Current Directory subject group.
+        orgs: Current EOSC catalogue.
+
+    Returns:
+        Current match decisions, including preserved prior approvals when the
+        positive assessment sequence remains uninterrupted.
+    """
     return _assessment_state(records, group, orgs)[0]
 
 
 def _exact(group, orgs, rejected=()):
+    """Find conservative exact-name targets in the same recognized country.
+
+    Args:
+        group: Directory group supplying name and country.
+        orgs: EOSC catalogue keyed by organisation ID.
+        rejected: Target IDs excluded by current negative evidence.
+
+    Returns:
+        Catalogue IDs whose normalized name and known country exactly match.
+        Short, email-like, generic, or unknown-country subjects return empty.
+    """
     name = _norm(group["name"])
     if len(name) < 10 or "@" in name or name in {"not available", "not provided", "university hospital"}:
         return []
@@ -433,6 +570,15 @@ def render_review_markdown(packet):
         Markdown with instructions, response contract, catalogue and cases.
     """
     def block(value):
+        """Render JSON as a Markdown-indented literal block.
+
+        Args:
+            value: JSON-compatible packet fragment.
+
+        Returns:
+            Pretty JSON with four spaces prefixed to every line, preventing
+            embedded source text from escaping the Markdown code block.
+        """
         # Four-space indentation cannot be escaped by source Markdown fences.
         return "\n".join("    " + line for line in json.dumps(value, ensure_ascii=False, indent=2).splitlines())
     lines = ["# EOSC organisation identity review", "", packet["task"], "",
@@ -731,7 +877,15 @@ _EXCEL_ERROR_VALUES = frozenset(
 
 
 def _normalise_heading(value: Any) -> str:
-    """Return a case-insensitive heading key without spacing or punctuation."""
+    """Normalize a worksheet heading for alias recognition.
+
+    Args:
+        value: Cell value; non-strings are not headings.
+
+    Returns:
+        Unicode-NFKC, case-folded text containing only alphanumeric characters,
+        or an empty string for non-text values.
+    """
     if not isinstance(value, str):
         return ""
     value = unicodedata.normalize("NFKC", value).casefold()
@@ -739,22 +893,58 @@ def _normalise_heading(value: Any) -> str:
 
 
 def _is_blank(value: Any) -> bool:
-    """Return whether a source value is empty or whitespace-only."""
+    """Return whether a worksheet value is absent or blank text.
+
+    Args:
+        value: Cached or literal cell value.
+
+    Returns:
+        ``True`` only for ``None`` or a whitespace-only string.
+    """
     return value is None or (isinstance(value, str) and not value.strip())
 
 
 def _is_excel_error(value: Any) -> bool:
-    """Return whether a value is an Excel error literal, not identity data."""
+    """Return whether text is one of the recognized Excel error literals.
+
+    Args:
+        value: Cached or literal cell value.
+
+    Returns:
+        ``True`` for case-insensitive, whitespace-trimmed Excel error tokens;
+        native error objects and other values return ``False``.
+    """
     return isinstance(value, str) and value.strip().upper() in _EXCEL_ERROR_VALUES
 
 
 def _is_external(value: Any) -> bool:
-    """Return whether a source identifier marks an external row."""
+    """Return whether an identifier cell marks an external source row.
+
+    Args:
+        value: Organisation-ID cell value.
+
+    Returns:
+        ``True`` only for text equal to ``external`` after trimming and case
+        folding.
+    """
     return isinstance(value, str) and value.strip().casefold() == "external"
 
 
 def _identifier_text(value: Any, *, row_number: int) -> str:
-    """Convert a non-empty spreadsheet identifier to its stable text form."""
+    """Convert a nonempty worksheet organisation ID to stable text.
+
+    Args:
+        value: String, integer, or integral float organisation identifier.
+        row_number: One-based source row included in validation errors.
+
+    Returns:
+        Trimmed string ID; integers and integral floats are rendered without a
+        decimal suffix.
+
+    Raises:
+        ValueError: If the value is boolean, blank, nonintegral numeric, or not
+            text/numeric.
+    """
     if isinstance(value, bool):
         raise ValueError(f"Invalid Organisation ID at row {row_number}: boolean value")
     if isinstance(value, int):
@@ -775,14 +965,29 @@ def _identifier_text(value: Any, *, row_number: int) -> str:
 
 
 def _text_value(value: Any) -> str:
-    """Return a required organisation field as text without normalising it."""
+    """Convert a required worksheet field to unnormalized text.
+
+    Args:
+        value: Validated nonblank cell value.
+
+    Returns:
+        Original string object or ``str(value)`` for another scalar type.
+    """
     if isinstance(value, str):
         return value
     return str(value)
 
 
 def _heading_role(value: Any) -> str | None:
-    """Classify a supported source heading, if it is recognisable."""
+    """Classify a membership-workbook heading by supported aliases.
+
+    Args:
+        value: Candidate heading cell.
+
+    Returns:
+        Canonical role for organisation ID, name, acronym, country, membership
+        type/status, or contributor; otherwise ``None``.
+    """
     key = _normalise_heading(value)
     if key in {"organisationid", "organizationid"}:
         return "organisation_id"
@@ -818,7 +1023,22 @@ def _heading_role(value: Any) -> str | None:
 
 
 def _select_sheet(workbook, *, sheet: str | None, sheet_index: int | None):
-    """Select one worksheet using the public one-based selection contract."""
+    """Select exactly one worksheet by name, one-based index, or default.
+
+    Args:
+        workbook: Openpyxl workbook containing candidate worksheets.
+        sheet: Exact worksheet title, mutually exclusive with ``sheet_index``.
+        sheet_index: Positive one-based position, or ``None`` for the first
+            worksheet when no name is supplied.
+
+    Returns:
+        Selected openpyxl worksheet owned by the caller's workbook.
+
+    Raises:
+        ValueError: If selectors conflict, the workbook is empty, the name is
+            absent, or the index is boolean, noninteger, nonpositive, or beyond
+            the worksheet count.
+    """
     if sheet is not None and sheet_index is not None:
         raise ValueError("sheet and sheet_index are mutually exclusive")
     if not workbook.worksheets:
@@ -840,7 +1060,17 @@ def _select_sheet(workbook, *, sheet: str | None, sheet_index: int | None):
 
 
 def _workbook_sha256(path: Path) -> str:
-    """Return the SHA-256 digest of a workbook file."""
+    """Hash an XLSX file in bounded binary chunks.
+
+    Args:
+        path: Workbook path opened read-only.
+
+    Returns:
+        Lowercase hexadecimal SHA-256 digest of the exact file bytes.
+
+    Raises:
+        OSError: If the file cannot be opened or read.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
@@ -849,7 +1079,15 @@ def _workbook_sha256(path: Path) -> str:
 
 
 def _formula_coordinates(worksheet) -> set[tuple[int, int]]:
-    """Return one-based coordinates of occupied formula cells."""
+    """Collect formula-cell positions from an openpyxl worksheet.
+
+    Args:
+        worksheet: Formula-mode sheet to scan through its occupied dimensions.
+
+    Returns:
+        Set of one-based ``(row, column)`` coordinates whose data type is
+        formula.
+    """
     return {
         (cell.row, cell.column)
         for row in worksheet.iter_rows()
@@ -863,19 +1101,39 @@ def read_membership(
 ) -> dict[str, Any]:
     """Read one EOSC-A membership worksheet into a validated literal snapshot.
 
+    The worksheet defaults to the first tab unless an exact name or positive
+    one-based index is selected. Column A must contain exactly one recognized
+    Organisation/Organization ID header. That header row must also contain one
+    unambiguous name, country, membership-type, and membership-status heading;
+    acronym and one or more contributor columns are optional. Heading matching
+    is Unicode/case/punctuation insensitive and accepts the aliases recognized
+    by ``_heading_role``.
+
+    Formula and cached-value views are opened together. Membership identities
+    use cached values, reject missing required caches and Excel-error literals,
+    skip blank-ID and ``external`` rows, normalize integral numeric IDs to text,
+    and reject duplicates. Blank country is retained as unknown with a warning.
+    Every source row is preserved as literal/cached data for values-only export;
+    formulas themselves are never copied into the returned rows.
+
     Args:
         path: XLSX input path.
         sheet: Exact worksheet name to select.
         sheet_index: One-based worksheet index to select.
 
     Returns:
-        A dictionary containing validated organisation records, all worksheet
-        rows as literal or cached values, formula coordinates, and source
-        provenance.
+        Caller-owned dictionary containing validated organisation records, all
+        selected-sheet rows as literal/cached values, one-based formula
+        coordinates, selected sheet/header metadata, contributor columns,
+        resolved source path, and exact workbook SHA-256. Both workbook handles
+        are closed before return and the source file is never modified.
 
     Raises:
-        ValueError: If worksheet selection, headings, identity values, or IDs
-            are missing or ambiguous.
+        ValueError: If worksheet selection, headers, identity values, cached
+            formula values, or IDs are missing, invalid, duplicated, or
+            ambiguous.
+        OSError: If the source cannot be read.
+        zipfile.BadZipFile: If the path is not a readable XLSX archive.
     """
     from openpyxl import load_workbook
     from openpyxl.utils import get_column_letter
@@ -1110,14 +1368,33 @@ def read_membership(
 
 
 def _write_literal(cell, value: Any) -> None:
-    """Write a value without allowing strings beginning with ``=`` to become formulas."""
+    """Write one openpyxl cell as a literal, never an injected formula.
+
+    Args:
+        cell: Destination cell object mutated in place.
+        value: Source or summary value assigned to the cell.
+
+    Returns:
+        None. Text beginning with ``=`` is explicitly marked as string data.
+    """
     cell.value = value
     if isinstance(value, str) and value.startswith("="):
         cell.data_type = "s"
 
 
 def _validate_cell_lengths(rows: Iterable[Iterable[Any]], sheet_name: str) -> None:
-    """Reject values Excel cannot represent instead of silently truncating them."""
+    """Reject text exceeding Excel's per-cell character limit.
+
+    Args:
+        rows: Row iterables scanned without mutation using one-based positions.
+        sheet_name: Worksheet label included in any error coordinate.
+
+    Returns:
+        None. Non-string values and strings within the limit are accepted.
+
+    Raises:
+        ValueError: If any text value exceeds 32,767 characters.
+    """
     from openpyxl.utils import get_column_letter
 
     for row_number, row in enumerate(rows, start=1):
@@ -1130,7 +1407,18 @@ def _validate_cell_lengths(rows: Iterable[Iterable[Any]], sheet_name: str) -> No
 
 
 def _format_header(worksheet, row_number: int, column_count: int) -> None:
-    """Apply restrained header formatting and a filter to a worksheet."""
+    """Format a worksheet header and establish navigation controls.
+
+    Args:
+        worksheet: Openpyxl worksheet mutated in place.
+        row_number: One-based header row styled and used for freeze/filter
+            placement.
+        column_count: Number of header cells included from column A.
+
+    Returns:
+        None. Header cells become bold, blue-filled, top-aligned, and wrapped;
+        panes freeze below the row and the auto-filter spans through max row.
+    """
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
@@ -1147,14 +1435,31 @@ def _format_header(worksheet, row_number: int, column_count: int) -> None:
 
 
 def _unique_source_sheet_name(source_name: str) -> str:
-    """Choose a valid source-sheet name that does not conflict with the summary."""
+    """Avoid a case-insensitive collision with the fixed summary sheet name.
+
+    Args:
+        source_name: Original selected worksheet title.
+
+    Returns:
+        ``Source`` when the title equals ``Matched institutions`` ignoring case;
+        otherwise the original title.
+    """
     if source_name.casefold() != SUMMARY_SHEET_NAME.casefold():
         return source_name
     return "Source"
 
 
 def _biobank_ids_text(value: Any) -> str:
-    """Render a match's biobank ID collection as one comma-separated cell."""
+    """Render a match's biobank IDs as one summary-cell string.
+
+    Args:
+        value: ``None``, an already formatted string, an iterable of IDs, or a
+            noniterable scalar.
+
+    Returns:
+        Empty text for ``None``, unchanged text for strings, comma-joined item
+        text for iterables, or scalar text when iteration is unsupported.
+    """
     if value is None:
         return ""
     if isinstance(value, str):
@@ -1166,7 +1471,18 @@ def _biobank_ids_text(value: Any) -> str:
 
 
 def _validate_matches(matches: list[Mapping[str, Any]]) -> None:
-    """Validate the small match interface before creating any output."""
+    """Validate required match mappings before creating workbook artifacts.
+
+    Args:
+        matches: Materialized match records for the summary sheet.
+
+    Returns:
+        None. Extra keys and value types are retained for later serialization.
+
+    Raises:
+        ValueError: If an item is not a mapping or lacks organisation ID, EOSC
+            name, Directory juridical person, or biobank IDs.
+    """
     required = {
         "organisation_id",
         "eosc_name",
@@ -1186,7 +1502,22 @@ def _validate_matches(matches: list[Mapping[str, Any]]) -> None:
 def _validate_written_workbook(
     path: Path, source_sheet_name: str, source_rows: list[list[Any]]
 ) -> None:
-    """Reopen a staged workbook and verify its essential values-only contract."""
+    """Reopen a staged workbook and verify its values-only publication contract.
+
+    Args:
+        path: Temporary XLSX path opened read-only for validation.
+        source_sheet_name: Expected second worksheet title.
+        source_rows: Expected literal source grid after contributor annotations.
+
+    Returns:
+        None. The workbook is always closed after checking exact sheet order,
+        summary headers, source row count/cell values, and absence of formulas.
+
+    Raises:
+        ValueError: If structure, literals, or formula-free requirements differ.
+        OSError: If the staged workbook cannot be read.
+        zipfile.BadZipFile: If the staged file is not a valid XLSX archive.
+    """
     from openpyxl import load_workbook
     from openpyxl.utils import get_column_letter
 
@@ -1225,7 +1556,21 @@ def _validate_written_workbook(
 
 
 def _publish_without_overwrite(temporary_path: Path, destination: Path) -> None:
-    """Publish a validated temporary file atomically without replacing a file."""
+    """Atomically publish a staged file without replacing an existing path.
+
+    Args:
+        temporary_path: Validated file in the destination directory. On hard-
+            link success it remains until caller cleanup; ``renameat2`` moves it.
+        destination: New final path that must remain absent through publication.
+
+    Returns:
+        None after a hard-link or Linux ``renameat2(RENAME_NOREPLACE)`` publish.
+
+    Raises:
+        FileExistsError: If another process creates ``destination`` first.
+        OSError: If publication fails or the platform provides no supported
+            atomic no-overwrite primitive.
+    """
     unsupported_link_errors = {
         error_number
         for error_number in (errno.EOPNOTSUPP, errno.ENOSYS, errno.EPERM)
@@ -1289,16 +1634,36 @@ def write_matches_xlsx(
 ) -> None:
     """Write a fresh, values-only summary and source rendition workbook.
 
+    The output has exactly two sheets: ``Matched institutions`` first and a
+    literal rendition of the selected source sheet second. Summary rows contain
+    the four documented match columns. For every matched organisation ID, the
+    source rendition places ``EOSC Node BBMRI-ERIC`` in the first blank,
+    non-formula recognized contributor column; if none is available, it adds
+    one ``Node Contributor`` column shared by all affected rows. Cached formula
+    values are copied as literals, and strings beginning with ``=`` remain text.
+
     Args:
         workbook: The dictionary returned by :func:`read_membership`.
         matches: Match mappings requiring ``organisation_id``, ``eosc_name``,
             ``directory_juridical_person``, and ``biobank_ids``.
         path: New XLSX destination. Existing files and source aliases are rejected.
 
+    Returns:
+        None. The workbook is staged in the destination directory, reopened and
+        validated, then atomically published without overwrite. The temporary
+        file is deleted in the ``finally`` cleanup on success or failure. This
+        helper never prompts and has no dry-run mode; validation failure leaves
+        no intended destination when cleanup succeeds, while a successful
+        publish creates the complete local workbook.
+
     Raises:
         ValueError: If the destination is unsafe, the match interface is
-            invalid, or source values exceed Excel's cell limit.
+            invalid, source snapshot fields are malformed, or source/summary
+            values exceed Excel's cell limit.
         FileExistsError: If a destination appears during atomic publication.
+        OSError: If staging, validation, publication, or cleanup cannot access
+            the filesystem. A cleanup failure after successful publication can
+            report an error even though the complete destination already exists.
     """
     from openpyxl import Workbook
     from openpyxl.styles import Alignment
@@ -1467,7 +1832,32 @@ def write_matches_xlsx(
 # Command-line interface and Directory orchestration.
 
 def _load_json(path):
+    """Load strict UTF-8 JSON without duplicate keys or non-finite numbers.
+
+    Args:
+        path: Registry, packet, response, or legacy proposal JSON path.
+
+    Returns:
+        Parsed caller-owned JSON value.
+
+    Raises:
+        ValueError: If an object repeats a key or contains NaN/Infinity syntax.
+        json.JSONDecodeError: If the file is not valid JSON.
+        OSError: If the path cannot be opened or read.
+    """
+
     def unique_object(pairs):
+        """Build one JSON object while rejecting duplicate member names.
+
+        Args:
+            pairs: Ordered key/value pairs emitted by ``json.load``.
+
+        Returns:
+            Dictionary retaining parsed pair order.
+
+        Raises:
+            ValueError: If a key occurs more than once in the same object.
+        """
         result = {}
         for key, value in pairs:
             if key in result:
@@ -1476,6 +1866,17 @@ def _load_json(path):
         return result
 
     def invalid_constant(value):
+        """Reject a JSON parser extension for a non-finite numeric constant.
+
+        Args:
+            value: Literal name such as ``NaN`` or ``Infinity``.
+
+        Returns:
+            None. The function always raises instead of returning a value.
+
+        Raises:
+            ValueError: For every supplied non-finite constant.
+        """
         raise ValueError(f"Non-finite JSON value: {value}")
 
     with Path(path).open(encoding="utf-8") as stream:
@@ -1483,10 +1884,36 @@ def _load_json(path):
 
 
 def _json_text(value):
+    """Serialize a JSON-compatible value as stable human-readable text.
+
+    Args:
+        value: Registry, packet, or diagnostic structure to serialize.
+
+    Returns:
+        Two-space-indented UTF-8-compatible JSON text with Unicode retained and
+        one trailing newline.
+
+    Raises:
+        ValueError: If the structure contains a non-finite number.
+        TypeError: If a value is not JSON serializable.
+    """
     return json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
 
 
 def _check_output_paths(paths):
+    """Validate that planned outputs are distinct, new, and publishable.
+
+    Args:
+        paths: Path-like output names. Relative paths remain relative for
+            creation but are resolved for alias detection.
+
+    Returns:
+        New list of ``Path`` objects in input order.
+
+    Raises:
+        ValueError: If resolved targets collide, a target or symlink already
+            exists, or a target parent is not an existing directory.
+    """
     paths = [Path(path) for path in paths]
     if len({path.resolve() for path in paths}) != len(paths):
         raise ValueError("Output paths must be distinct")
@@ -1499,6 +1926,23 @@ def _check_output_paths(paths):
 
 
 def _write_new_texts(outputs):
+    """Create a group of UTF-8 text outputs with best-effort rollback.
+
+    Args:
+        outputs: Sequence of ``(path, (label, content))`` pairs. Labels are
+            ignored; content is written exactly using exclusive file creation.
+
+    Returns:
+        None after all new files are closed successfully. Paths are validated
+        together before the first write.
+
+    Raises:
+        ValueError: If output paths collide, exist, or lack a parent directory.
+        OSError: If exclusive creation, writing, closing, or rollback deletion
+            fails. When any write fails, every file already created by this call
+            is deleted before the original failure is re-raised where cleanup
+            succeeds. Existing files are never overwritten.
+    """
     paths = _check_output_paths([path for path, _ in outputs])
     created = []
     try:
@@ -1514,7 +1958,13 @@ def _write_new_texts(outputs):
 
 
 def create_parser():
-    """Return the offline argparse interface for exports and review operations."""
+    """Build the CLI for workbook exports and registry review operations.
+
+    Returns:
+        Parser containing shared Directory/cache/logging options, exact workbook
+        sheet selection, mutually exclusive review actions, review filters,
+        new-file outputs, eligibility policy, and write-action dry-run.
+    """
     parser = build_parser(description=__doc__)
     add_logging_arguments(parser)
     add_directory_auth_arguments(parser)
@@ -1549,11 +1999,31 @@ def create_parser():
 def main(argv=None, *, directory_factory=None):
     """Execute the CLI with lazy Directory loading and optional test injection.
 
+    Every mode reads and validates the selected membership sheet, loads the
+    current Directory snapshot through the shared cache-aware API, groups active
+    biobanks, and validates the current or empty registry. Directory access is
+    read-only; the tool never changes Directory or EOSC source data and never
+    prompts. Cache purging may delete/refill the configured local Directory
+    runtime cache even for dry-run.
+
+    Migration, AI-response import, and approval write one new registry only
+    after validation. Their ``--dry-run`` performs the same workbook, Directory,
+    JSON, staleness, conflict, and approval checks but skips that local output.
+    AI-review preparation writes a new JSON packet and Markdown prompt as an
+    exclusive pair with cleanup if the second write fails. Normal export may
+    publish one new values-only XLSX, one new diagnostic JSON, and/or TSV stdout;
+    output paths must be distinct, nonexisting, and separate from the source.
+    Registry/JSON text writes use exclusive creation with best-effort rollback;
+    XLSX uses validated same-directory staging and atomic no-overwrite publish.
+
     Args:
-        argv: Argument strings, or None to read sys.argv.
+        argv: Argument strings, or ``None`` to read ``sys.argv``.
         directory_factory: Optional Directory-compatible factory for tests.
+
     Returns:
-        Zero on success. argparse reports usage/input errors with exit status 2.
+        Zero after validation or requested outputs complete. Argparse reports
+        invalid option combinations and handled workbook, JSON, filesystem, or
+        data-contract failures with exit status 2.
     """
     parser = create_parser()
     args = parser.parse_args(argv)

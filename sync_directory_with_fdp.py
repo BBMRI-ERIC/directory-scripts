@@ -68,9 +68,19 @@ COLLECTION_TYPES_ONTOLOGIES = {
 
 
 def get_missing_biobanks(session, reset, **kwargs):
-    """
-    It gets the data from the source Molgenis and filters the one that are already it the destination Molgenis.
-    If reset flag is True it doesn't filter the biobanks to add
+    """Read source biobanks and select records absent from the FDP target.
+
+    Args:
+        session: Molgenis session able to read both Directory and FDP entities.
+        reset: Whether to return every source biobank without reading existing
+            FDP biobank identifiers.
+        **kwargs: Additional source ``session.get`` options, such as ``q``,
+            ``attributes``, and ``expand``; keys are passed through unchanged.
+
+    Returns:
+        Source biobank mappings in server order. Reset mode returns all fetched
+        records; incremental mode excludes IDs already stored as
+        ``fdp_Biobank.identifier``. This function performs remote reads only.
     """
     print("Getting source entities from {}".format(BBMRI_BIOBANK_ENTITY))
     source_records = session.get(BBMRI_BIOBANK_ENTITY, **kwargs)
@@ -95,12 +105,18 @@ def get_missing_biobanks(session, reset, **kwargs):
 
 
 def create_records(session, entity, records):
-    """
-    Send converted data to the destination
+    """Add converted FDP records to one entity in batches of at most 1,000.
 
-    :params session: Molgenis session to use
-    :params entity: the name of Molgenis entity type of the records to add
-    :params records: lists of dictionary with data of the FDP entity to add
+    Args:
+        session: Authenticated Molgenis session receiving remote additions.
+        entity: FDP entity name passed to ``add_all``.
+        records: Record dictionaries to send in input order.
+
+    Returns:
+        None. Successful IDs/responses are accumulated only for the final count.
+        A ``MolgenisRequestError`` is printed per failed batch and processing
+        continues with later batches. There is no prompt, dry-run, retry, or
+        rollback, so earlier batch additions remain applied.
     """
     created_records = []
     for i in range(0, len(records), 1000):
@@ -113,12 +129,17 @@ def create_records(session, entity, records):
 
 
 def delete_records(session, entity, records_ids):
-    """
-    Delete records in the destination Molgenis. Used when reset flag is True
+    """Delete destination FDP identifiers in batches of at most 1,000.
 
-    :params session: Molgenis session to use
-    :params entity: the name of Molgenis entity type of the records to delete
-    :params records_ids: the ids of the records of type :entity: to delete
+    Args:
+        session: Authenticated Molgenis session performing remote deletions.
+        entity: FDP entity name passed to ``delete_list``.
+        records_ids: Entity identifiers to delete in input order.
+
+    Returns:
+        None. Successful responses are counted for output. A
+        ``MolgenisRequestError`` is printed per failed batch and deletion
+        continues, without prompt, dry-run, retry, or rollback.
     """
     removed_records = []
     for i in range(0, len(records_ids), 1000):
@@ -132,15 +153,28 @@ def delete_records(session, entity, records_ids):
 
 
 def get_country(country):
-    """
-    Returns the country code correspondent to the country in input
+    """Convert the Directory's UK country code for FDP output.
+
+    Args:
+        country: Directory country code.
+
+    Returns:
+        ``GB`` for exact input ``UK``; every other value is returned unchanged.
     """
     return 'GB' if country == 'UK' else country
 
 
 def get_disease_ontology_code(disease_code):
-    """
-    Returns the IRI of the disease code to use in the FDP
+    """Expand a supported Directory disease code into an ontology IRI.
+
+    Args:
+        disease_code: Diagnosis identifier containing ``ORPHA:`` or
+            ``urn:miriam:icd:``.
+
+    Returns:
+        Identifier with the recognized marker replaced by its ORDO or ICD-10
+        IRI prefix, prioritizing ORPHA when both markers occur; otherwise
+        ``None``.
     """
     if ORPHA_DIRECTORY_PREFIX in disease_code:
         return disease_code.replace(ORPHA_DIRECTORY_PREFIX, ORPHA_ONTOLOGY_PREFIX)
@@ -149,21 +183,33 @@ def get_disease_ontology_code(disease_code):
 
 
 def get_collection_type_ontology_code(collection_type):
-    """
-    Return the IRI of the collection type
+    """Look up the configured ontology IRI for a Directory collection type.
 
-    :params collection_type: the collection type code in the directory
+    Args:
+        collection_type: Exact Directory collection-type code.
+
+    Returns:
+        Configured ontology IRI, or ``None`` for unmapped and intentionally
+        unsupported type codes.
     """
     return COLLECTION_TYPES_ONTOLOGIES.get(collection_type, None)
 
 
 def get_contact_record(session, contact_id):
-    """
-    Gets the contact data of the contact with id :contact_id: from the source Molgenis and
-    returns the FDP corresponding FDP record
+    """Read one Directory contact and convert it to an FDP contact tuple.
 
-    :params session: Molgenis session to use
-    :params contact_id: the id of the contact in the Directory
+    Args:
+        session: Molgenis session used for the source contact read.
+        contact_id: Exact Directory person identifier.
+
+    Returns:
+        Seven-item tuple of identifier, ``mailto:`` email, optional whitespace-
+        stripped ``tel:`` phone, first name, last name, prefix, and suffix.
+        Missing optional keys become ``None``; the required email is not
+        normalized.
+
+    Raises:
+        KeyError: If the returned contact lacks required ``id`` or ``email``.
     """
     contact = session.get_by_id(BBMRI_CONTACT_ENTITY, contact_id)
     return (
@@ -178,15 +224,26 @@ def get_contact_record(session, contact_id):
 
 
 def get_records_to_add(biobank_data, session, directory_prefix):
-    """
-    It generates the FDP records related to a biobank from the representation of the biobank in the Directory.
-    It returns a dictionary with data for entities:
-    fdp_Biobank: data of the Biobank as organization
-    fdp_BiobankOrganization: data of the Jurystic Person that manage the Biobank
-    fdp_Collection: list of collections of the biobank
-    fdp_Contacts: contact of the biobank and the collections to add
-    fdp_IRI: codes of diseases and collection types (if not already present in the destination)
-    fdp_DataService: data related to the Data service, if present
+    """Convert one expanded Directory biobank into FDP entity payloads.
+
+    Args:
+        biobank_data: Expanded source record with required ID, name, country,
+            juridical person, and collections; contacts, descriptions, ages,
+            diagnoses, types, sizes, and record services supply optional fields.
+        session: Molgenis session used for source contact/service reads and FDP
+            IRI existence checks. Missing IRIs are not written here.
+        directory_prefix: Public Directory URL prefix used to build landing-page
+            and collection IRI values.
+
+    Returns:
+        Mapping with one biobank and legal-person record plus collection lists,
+        contact tuples, missing supported ontology-IRI tuples, and data-service
+        records. ``issued`` and ``modified`` timestamps are generated at
+        conversion time. No remote mutation occurs.
+
+    Raises:
+        KeyError: If required expanded biobank, collection, contact, or service
+            fields are absent.
     """
 
     missing_iris = []
@@ -291,11 +348,39 @@ def get_records_to_add(biobank_data, session, directory_prefix):
 
 
 def get_collections_in_catalog(session):
+    """Read collection identifiers from the fixed BBMRI FDP catalog.
+
+    Args:
+        session: Molgenis session used to fetch catalog ``bbmri-directory``.
+
+    Returns:
+        Collection ``identifier`` values in catalog order.
+
+    Raises:
+        KeyError: If the catalog response lacks ``collection`` or an item lacks
+            ``identifier``.
+    """
     catalog = session.get_by_id(FDP_CATALOG, 'bbmri-directory', attributes='collection')
     return [c['identifier'] for c in catalog['collection']]
 
 
 def reset_catalog(session, collections_to_update):
+    """Remove incoming collection IDs from the catalog before reset writes.
+
+    Args:
+        session: Authenticated Molgenis session reading and updating the FDP
+            catalog.
+        collections_to_update: Converted collection mappings whose ``IRI``
+            final path components identify catalog entries to remove.
+
+    Returns:
+        None. The catalog's ``collection`` field is updated remotely once,
+        retaining prior identifiers not present in this synchronization batch.
+        There is no prompt, dry-run, or rollback.
+
+    Raises:
+        KeyError: If a converted collection lacks ``IRI``.
+    """
     collections_in_catalog = get_collections_in_catalog(session)
     collections_to_update_ids = list([c['IRI'].split('/')[-1] for c in collections_to_update])
     for c in collections_in_catalog[:]:
@@ -305,6 +390,19 @@ def reset_catalog(session, collections_to_update):
 
 
 def update_catalog(session, new_collections):
+    """Union newly created collection IDs into the fixed FDP catalog.
+
+    Args:
+        session: Authenticated Molgenis session reading and updating the catalog.
+        new_collections: Converted collection mappings containing ``identifier``.
+
+    Returns:
+        None. A set union is written remotely to the catalog, so collection
+        ordering is not preserved. There is no prompt, dry-run, or rollback.
+
+    Raises:
+        KeyError: If a new collection lacks ``identifier``.
+    """
     prev_collections = get_collections_in_catalog(session)
 
     collections = set(prev_collections + [c['identifier'] for c in new_collections])
@@ -313,8 +411,34 @@ def update_catalog(session, new_collections):
 
 
 def sync(session, directory_prefix, reset, **kwargs):
-    """
-    Main function that gets the data of the missing biobanks, convert it and upload the new records.
+    """Convert selected Directory biobanks and mutate their FDP representation.
+
+    Incremental mode ignores source biobanks whose IDs already exist in
+    ``fdp_Biobank``. Reset mode processes every selected source biobank, first
+    removes its incoming collection IDs from the catalog, and then deletes only
+    converted biobank, legal-person, collection, data-service, and contact IDs;
+    existing IRI records are deliberately not deleted. Converted entities are
+    then added in dependency order and the new collection identifiers are
+    unioned back into catalog ``bbmri-directory``.
+
+    Args:
+        session: Authenticated Molgenis session spanning source Directory and
+            destination FDP entities.
+        directory_prefix: Public Directory URL prefix for emitted FDP links.
+        reset: Whether to delete matching destination records before addition.
+        **kwargs: Additional source-biobank query options forwarded to
+            ``session.get``; the CLI supplies ``q`` while this function adds
+            fixed ``attributes`` and ``expand`` selections.
+
+    Returns:
+        None. The function performs remote reads and writes only; it creates no
+        local files. It has no confirmation or dry-run mode. Batch add/delete
+        request errors are printed and processing continues, so partial reset
+        or creation is possible. Catalog updates and successful earlier batches
+        have no transaction or rollback if a later step fails.
+
+    Raises:
+        KeyError: If required expanded Directory or catalog fields are absent.
     """
     # it gets the missing biobanks
     missing_biobanks = get_missing_biobanks(session, reset=reset, attributes=BIOBANKS_ATTRIBUTES,

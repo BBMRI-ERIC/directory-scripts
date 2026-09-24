@@ -68,6 +68,12 @@ class UpdateConflict(Exception):
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for listing or applying a QC fix plan.
+
+    Returns:
+        Parser defining plan path, schema/authentication, selection filters,
+        interactive safety controls, dry-run, and replacement authorization.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Read a QC update-plan JSON file exported by data-check.py, filter the selected "
@@ -132,6 +138,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def configure_logging(args: argparse.Namespace) -> None:
+    """Configure tool and HTTP-client logging from parsed CLI flags.
+
+    Args:
+        args: Parsed arguments containing ``quiet`` and ``debug`` booleans.
+
+    Returns:
+        None. Root logging is configured to ERROR, DEBUG, or INFO, while noisy
+        HTTP libraries are constrained to WARNING.
+    """
     level = "ERROR" if args.quiet else ("DEBUG" if args.debug else "INFO")
     logging.basicConfig(level=level, format=" %(levelname)s: %(name)s: %(message)s")
     logging.getLogger("requests").setLevel(logging.WARNING)
@@ -139,6 +154,19 @@ def configure_logging(args: argparse.Namespace) -> None:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    """Validate local plan access and safe CLI-mode combinations.
+
+    Args:
+        args: Parsed CLI namespace. Debug mode mutates ``verbose`` to true.
+
+    Returns:
+        None. List mode needs no Directory credentials; apply and dry-run modes
+        require a target plus token or username/password authentication.
+
+    Raises:
+        InputError: If the plan is missing, force is combined with list or
+            dry-run, or Directory connection credentials are incomplete.
+    """
     if args.debug:
         args.verbose = True
     if not Path(args.input).exists():
@@ -158,6 +186,18 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def confirm_action(prompt: str, *, force: bool) -> None:
+    """Require an affirmative terminal response unless force is enabled.
+
+    Args:
+        prompt: Operation-specific text written to standard error.
+        force: Whether to return without prompting.
+
+    Returns:
+        None. In interactive mode, only ``y`` or ``yes`` permits continuation.
+
+    Raises:
+        OperationAborted: If stdin is not a TTY or approval is declined.
+    """
     if force:
         return
     if not sys.stdin.isatty():
@@ -172,7 +212,20 @@ def confirm_action(prompt: str, *, force: bool) -> None:
 
 
 def prompt_yes_no(prompt: str, *, default_no: bool = True) -> bool:
-    """Prompt the user for a yes/no decision and return the answer."""
+    """Read a yes/no decision from an interactive terminal.
+
+    Args:
+        prompt: Decision text written to standard error.
+        default_no: Whether an empty response means no; when false, an empty
+            response means yes.
+
+    Returns:
+        ``True`` for ``y``/``yes`` or the affirmative empty default; otherwise
+        ``False``.
+
+    Raises:
+        OperationAborted: If standard input is not a TTY.
+    """
     if not sys.stdin.isatty():
         raise OperationAborted(
             "Interactive confirmation required but stdin is not a TTY. Use --force to proceed."
@@ -187,7 +240,19 @@ def prompt_yes_no(prompt: str, *, default_no: bool = True) -> bool:
 
 
 def prompt_review_decision(prompt: str, *, allow_ignore: bool = True) -> str:
-    """Prompt for yes/no and optional ignore, returning ``yes``, ``no``, or ``ignore``."""
+    """Read an update selection, optionally accepting false-positive ignore.
+
+    Args:
+        prompt: Update-specific decision text written to standard error.
+        allow_ignore: Whether ``i`` and ``ignore`` produce an ignore decision.
+
+    Returns:
+        ``yes`` for explicit approval, ``ignore`` for an allowed ignore input,
+        and ``no`` for every other response including blank input.
+
+    Raises:
+        OperationAborted: If standard input is not a TTY.
+    """
     if not sys.stdin.isatty():
         raise OperationAborted(
             "Interactive confirmation required but stdin is not a TTY. Use --force to proceed."
@@ -209,7 +274,24 @@ def _record_false_positive_suppression(
     path: Path | None = None,
     added_by: str = "",
 ) -> list[str]:
-    """Persist coupled warning/fix suppressions for one ignored update."""
+    """Persist warning-and-fix suppressions for an ignored update's checks.
+
+    Args:
+        update: Reviewed proposal supplying entity identity, source check IDs,
+            and the human explanation included in suppression reasons.
+        path: Suppression JSON destination, or ``None`` for the repository
+            default. Existing entries and their order are retained.
+        added_by: Optional reviewer identity stored on newly created entries.
+
+    Returns:
+        Source check IDs for which new canonical entries were written. Existing
+        ``(check_id, entity_id)`` pairs are skipped.
+
+    Raises:
+        ValueError: If existing suppression data or a new entry violates the
+            suppression model. File read/write errors propagate; a successful
+            write replaces the local JSON file through the shared serializer.
+    """
     path = DEFAULT_WARNING_SUPPRESSIONS_PATH if path is None else path
     result = load_warning_suppressions_detailed(path, warn=logging.warning)
     entries = list(result.entries)
@@ -242,6 +324,14 @@ def _record_false_positive_suppression(
 
 
 def _split_csv_values(raw_values: list[str] | str | None) -> set[str]:
+    """Normalize one or repeated comma-delimited CLI filter values.
+
+    Args:
+        raw_values: Single string, repeated strings, or ``None``.
+
+    Returns:
+        Unique nonblank values with surrounding whitespace removed.
+    """
     if raw_values is None:
         return set()
     if isinstance(raw_values, str):
@@ -256,7 +346,16 @@ def _split_csv_values(raw_values: list[str] | str | None) -> set[str]:
 
 
 def _module_filter_matches(update: EntityFixProposal, requested_modules: set[str]) -> bool:
-    """Return True when requested module names match update modules or check prefixes."""
+    """Match requested modules against a proposal and its check-ID prefixes.
+
+    Args:
+        update: Proposal supplying its module and source check IDs.
+        requested_modules: Exact case-sensitive module/check-prefix filters.
+
+    Returns:
+        ``True`` when no filter was supplied or any requested value equals the
+        proposal module or text before ``:`` in a source check ID.
+    """
     if not requested_modules:
         return True
     candidates = {update.module}
@@ -267,6 +366,15 @@ def _module_filter_matches(update: EntityFixProposal, requested_modules: set[str
 
 
 def _confidence_filter(args: argparse.Namespace) -> set[str]:
+    """Resolve explicit or mode-dependent confidence levels to include.
+
+    Args:
+        args: Parsed arguments containing ``confidence`` and ``list``.
+
+    Returns:
+        Requested confidence names; ``all`` expands to all three supported
+        values. List mode defaults to all, while apply mode excludes uncertain.
+    """
     if args.confidence:
         requested = {value.strip() for value in args.confidence.split(",") if value.strip()}
         if "all" in requested:
@@ -278,6 +386,15 @@ def _confidence_filter(args: argparse.Namespace) -> set[str]:
 
 
 def _load_eric_directory(args: argparse.Namespace) -> Directory:
+    """Load the public ERIC snapshot needed for hierarchy-root filtering.
+
+    Args:
+        args: Parsed target, token, and debug settings. The snapshot includes
+            withdrawn entities so selection matches exported plans.
+
+    Returns:
+        Initialized read-only ``Directory`` abstraction for schema ERIC.
+    """
     pp = PrettyPrinter(indent=2)
     directory_kwargs = dict(
         schema="ERIC",
@@ -292,6 +409,20 @@ def _load_eric_directory(args: argparse.Namespace) -> Directory:
 
 
 def _entity_ids_for_root(directory: Directory, root_id: str) -> set[str]:
+    """Expand a biobank or collection hierarchy root to selectable entity IDs.
+
+    Args:
+        directory: Loaded ERIC snapshot used for graph traversal.
+        root_id: Biobank or collection ID. Contact IDs are forbidden.
+
+    Returns:
+        Root ID plus all collection descendants; for a biobank, also includes
+        the collection graph nodes reachable from that biobank.
+
+    Raises:
+        InputError: If a contact is supplied as the hierarchy root.
+        KeyError: If the requested biobank or collection is not loaded.
+    """
     if ":contactID:" in root_id:
         raise InputError("Contacts are not supported as hierarchy roots for update selection.")
     if ":collection:" in root_id:
@@ -304,6 +435,21 @@ def _entity_ids_for_root(directory: Directory, root_id: str) -> set[str]:
 
 
 def _filter_updates(args: argparse.Namespace, payload: dict, directory: Directory | None) -> list[EntityFixProposal]:
+    """Parse and select fix proposals using every configured CLI filter.
+
+    Args:
+        args: Entity, hierarchy, staging-area, check, update, module, and
+            confidence filter settings.
+        payload: Loaded fix-plan mapping whose ``updates`` list is inspected.
+        directory: ERIC snapshot required only when ``root_id`` is set.
+
+    Returns:
+        Proposals satisfying all active filters, preserving plan order.
+
+    Raises:
+        InputError: If hierarchy-root expansion rejects the root.
+        ValueError: If an update record cannot be parsed as a fix proposal.
+    """
     entity_filter = args.entity_id
     root_filter = args.root_id
     root_entities = _entity_ids_for_root(directory, root_filter) if root_filter else None
@@ -335,12 +481,34 @@ def _filter_updates(args: argparse.Namespace, payload: dict, directory: Director
 
 
 def _normalize_scalar(value):
+    """Normalize blank scalar storage to the updater's missing-value marker.
+
+    Args:
+        value: Live or planned scalar value.
+
+    Returns:
+        ``None`` for ``None`` or an empty string; otherwise the original value.
+    """
     if value in (None, ""):
         return None
     return value
 
 
 def _normalize_live_row_value(row: dict, field: str):
+    """Normalize one live Directory field according to its comparison type.
+
+    Args:
+        row: Live Biobanks or Collections record mapping.
+        field: Field whose scalar, integer, multivalue, DUO, or fact-ID rules
+            determine normalization.
+
+    Returns:
+        Missing scalar as ``None``, integer as ``int``, multivalue as parsed
+        values, DUO values with canonical separators, or sorted fact-row IDs.
+
+    Raises:
+        ValueError: If a populated integer field cannot be converted to int.
+    """
     if field == FACT_ROW_DELETE_FIELD:
         return _canonical_field_value(field, row.get(field))
     value = row.get(field)
@@ -357,7 +525,21 @@ def _normalize_live_row_value(row: dict, field: str):
 
 
 def _canonical_field_value(field: str, value):
-    """Return a comparison-stable value for one field."""
+    """Return a comparison-stable representation for one update field.
+
+    Args:
+        field: Field selecting fact-ID, multivalue, DUO, integer, or scalar
+            normalization.
+        value: Live, expected, or proposed field representation.
+
+    Returns:
+        Sorted string lists for fact and multivalue fields, normalized integer
+        or scalar values otherwise. Empty values become an empty list or
+        ``None`` according to field type.
+
+    Raises:
+        ValueError: If a populated integer cannot be converted to int.
+    """
     if field == FACT_ROW_DELETE_FIELD:
         if value in (None, ""):
             return []
@@ -381,6 +563,15 @@ def _canonical_field_value(field: str, value):
 
 
 def _render_value(value) -> str:
+    """Render a normalized value for review output.
+
+    Args:
+        value: Scalar or list value to display.
+
+    Returns:
+        Comma-separated list text, ``<empty>`` for blank values, or ``str`` of
+        any other scalar.
+    """
     if isinstance(value, list):
         return ", ".join(str(item) for item in value) if value else "<empty>"
     if value in (None, ""):
@@ -389,12 +580,30 @@ def _render_value(value) -> str:
 
 
 def _render_field_value(field: str, value) -> str:
-    """Return a display-stable value for one field."""
+    """Render a field after applying its canonical comparison rules.
+
+    Args:
+        field: Field name selecting canonicalization behavior.
+        value: Live, expected, proposed, or effective field value.
+
+    Returns:
+        Stable human-readable text suitable for list and review displays.
+    """
     return _render_value(_canonical_field_value(field, value))
 
 
 def _effective_field_value(field: str, current_value, update: EntityFixProposal):
-    """Return the effective post-update value for display/review purposes."""
+    """Calculate the post-update value shown during list and review.
+
+    Args:
+        field: Field changed by the proposal.
+        current_value: Export-time or live value used as the starting point.
+        update: Proposal defining append, delete-rows, or replacement behavior.
+
+    Returns:
+        Remaining fact IDs after deletion, deduplicated merged values for a
+        multivalue append, or the proposal value for all other modes.
+    """
     if update.mode == FACT_ROW_DELETE_MODE and field == FACT_ROW_DELETE_FIELD:
         current_ids = list(_canonical_field_value(field, current_value))
         drop_ids = set(_canonical_field_value(field, update.proposed_value))
@@ -409,7 +618,17 @@ def _effective_field_value(field: str, current_value, update: EntityFixProposal)
 
 
 def _has_live_value_mismatch(update: EntityFixProposal, live_value) -> bool:
-    """Return whether live data still matches the exported expected value."""
+    """Return whether live state differs materially from exported expectations.
+
+    Args:
+        update: Proposal containing expected current values and field semantics.
+        live_value: Freshly normalized value from the target schema.
+
+    Returns:
+        For row deletion, ``True`` only when an expected fact ID is absent;
+        extra live facts are allowed. Other fields require canonical equality,
+        so ordering and equivalent DUO separators do not cause mismatches.
+    """
     if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
         # For delete_rows fixes, expected_current_value carries rows expected to be deleted.
         # Additional fact rows may legitimately exist; mismatch matters only when any expected
@@ -423,6 +642,18 @@ def _has_live_value_mismatch(update: EntityFixProposal, live_value) -> bool:
 
 
 def _merge_updates(selected_updates: list[EntityFixProposal]) -> tuple[list[EntityFixProposal], list[str]]:
+    """Merge compatible same-field proposals and isolate conflicts.
+
+    Args:
+        selected_updates: Filtered proposals in plan order. Compatible append
+            and fact-row deletion proposals may be consolidated into their
+            first proposal object.
+
+    Returns:
+        Pair of applicable proposals and human-readable conflict messages.
+        Conflicting exclusive groups, modes, expected values, target values,
+        or confidence/value pairs are omitted from the applicable list.
+    """
     grouped = defaultdict(list)
     conflicts = []
     for update in selected_updates:
@@ -565,6 +796,16 @@ def _merge_updates(selected_updates: list[EntityFixProposal]) -> tuple[list[Enti
 
 
 def _list_updates(selected_updates: list[EntityFixProposal], *, verbose: bool) -> None:
+    """Print selected proposals grouped by entity without reading live data.
+
+    Args:
+        selected_updates: Proposals to render using export-time values.
+        verbose: Whether to include each proposal's detailed rationale.
+
+    Returns:
+        None. Human-readable output is written to standard output; no local or
+        remote data is changed.
+    """
     by_entity = defaultdict(list)
     for update in selected_updates:
         by_entity[update.entity_id].append(update)
@@ -603,7 +844,24 @@ def _review_updates_interactively(
     mismatch_update_keys: set[tuple[str, str, str]] | None = None,
     suppression_added_by: str = "",
 ) -> list[EntityFixProposal]:
-    """Return the subset of updates approved interactively by the user."""
+    """Review proposals individually and return explicit approvals.
+
+    Args:
+        updates: Non-blocked proposals offered in review order.
+        live_values: Values keyed by entity ID, field, and update ID.
+        verbose: Whether to show detailed rationale.
+        mismatch_update_keys: Updates requiring an additional stale-value note.
+        suppression_added_by: Reviewer identity recorded for ignore decisions.
+
+    Returns:
+        Proposals answered ``yes``. ``no`` skips only that proposal; ``ignore``
+        also writes coupled warning/fix suppression entries for its source check
+        IDs to the default local suppression JSON. No Directory writes occur.
+
+    Raises:
+        OperationAborted: If review requires input but stdin is not a TTY.
+        ValueError: If suppression data for an ignore decision is invalid.
+    """
     mismatch_update_keys = mismatch_update_keys or set()
     approved_updates = []
     total = len(updates)
@@ -664,6 +922,22 @@ def _fetch_target_rows(
     entity_type: str,
     entity_ids: list[str],
 ) -> tuple[pd.DataFrame, dict[str, dict]]:
+    """Read complete entity table data and resolve selected live rows.
+
+    Args:
+        session: Authenticated Directory client used only for a table read.
+        schema: Target staging schema.
+        entity_type: Supported ``BIOBANK`` or ``COLLECTION`` type.
+        entity_ids: Exact IDs whose first matching row is returned.
+
+    Returns:
+        Pair of the complete table frame and a mapping from requested IDs to
+        row dictionaries. Empty IDs avoid the remote read and return empties.
+
+    Raises:
+        InputError: If the entity type is unsupported or any requested ID is
+            absent from the target schema.
+    """
     if not entity_ids:
         return pd.DataFrame(), {}
     table_name = ENTITY_TABLES.get(entity_type)
@@ -682,6 +956,15 @@ def _fetch_target_rows(
 
 
 def _resolve_column_case_insensitive(df: pd.DataFrame, column_name: str) -> str | None:
+    """Resolve a data-frame column while preserving its source spelling.
+
+    Args:
+        df: Data frame providing column labels.
+        column_name: Exact or case-insensitive name to find.
+
+    Returns:
+        Exact source label, preferring an exact match, or ``None``.
+    """
     if column_name in df.columns:
         return column_name
     lower_name = column_name.lower()
@@ -696,6 +979,22 @@ def _fetch_collection_fact_ids(
     schema: str,
     collection_ids: list[str],
 ) -> tuple[pd.DataFrame, dict[str, list[str]]]:
+    """Read CollectionFacts and group current fact IDs by selected collection.
+
+    Args:
+        session: Authenticated Directory client used only for a table read.
+        schema: Target staging schema containing CollectionFacts.
+        collection_ids: Collections whose current fact rows are needed.
+
+    Returns:
+        Complete CollectionFacts frame and a mapping from each requested
+        collection to sorted string fact IDs. No IDs avoid the remote read;
+        an empty table maps every requested collection to an empty list.
+
+    Raises:
+        InputError: If nonempty CollectionFacts data lacks case-insensitive
+            ``id`` or ``collection`` columns.
+    """
     if not collection_ids:
         return pd.DataFrame(), {}
     table_df = session.get(table="CollectionFacts", schema=schema, as_df=True)
@@ -713,6 +1012,21 @@ def _fetch_collection_fact_ids(
 
 
 def _apply_update_to_row(row: dict, update: EntityFixProposal) -> dict:
+    """Apply one supported metadata proposal to a copied entity row.
+
+    Args:
+        row: Live Biobanks or Collections row; the input mapping is not mutated.
+        update: Proposal specifying field, mode, and proposed value.
+
+    Returns:
+        Copied row with append/replace/clear multivalue serialization or scalar
+        set/replace/flag behavior applied. DUO IDs retain the live separator
+        style and equivalent terms are deduplicated.
+
+    Raises:
+        InputError: If fact deletion is sent through row mutation or the mode is
+            unsupported for the field kind.
+    """
     updated = dict(row)
     if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
         raise InputError("delete_rows updates are not applied through collection row mutation.")
@@ -748,6 +1062,21 @@ def _apply_update_to_row(row: dict, update: EntityFixProposal) -> dict:
 
 
 def _schema_consistency_warning(args: argparse.Namespace, selected_updates: list[EntityFixProposal]) -> None:
+    """Warn and confirm when selected staging areas imply another schema.
+
+    Args:
+        args: Parsed target schema and force setting.
+        selected_updates: Proposals whose staging-area codes determine expected
+            node schema names.
+
+    Returns:
+        None. Matching or unavailable expectations cause no prompt. A mismatch
+        requires ``y``/``yes`` unless force is active; no data is written here.
+
+    Raises:
+        OperationAborted: If mismatch approval is declined or stdin is not a
+            TTY in non-force mode.
+    """
     staging_areas = {update.staging_area for update in selected_updates if update.staging_area}
     expected_schemas = {NNContacts.expected_schema_name(code) for code in staging_areas if code}
     if expected_schemas and args.schema not in expected_schemas:
@@ -764,6 +1093,36 @@ def _schema_consistency_warning(args: argparse.Namespace, selected_updates: list
 
 
 def run_updater(args: argparse.Namespace) -> int:
+    """List, review, simulate, or remotely apply selected QC fix proposals.
+
+    The plan checksum is advisory through ``load_fix_plan`` diagnostics. List
+    mode prints export-time values without connecting. Apply and dry-run modes
+    read fresh Biobanks, Collections, and applicable CollectionFacts rows,
+    reject unsupported entities, merge compatible proposals, warn per stale
+    value, and require per-update review plus a final confirmation unless force
+    is active. Replace-required proposals need explicit replacement authority.
+
+    Dry-run performs the same live reads and interactive review, including
+    possible local false-positive suppression writes for ``ignore``, but stops
+    before Directory mutations. A real apply saves changed full-width biobank
+    and collection rows, then deletes only explicitly approved fact IDs. These
+    independent remote calls are not transactional and have no rollback; a
+    later failure may leave earlier writes applied.
+
+    Args:
+        args: Validated parser namespace containing plan, filters, target,
+            authentication, review mode, and replacement authorization.
+
+    Returns:
+        ``EXIT_OK`` when listing succeeds, nothing is selected/approved, dry-run
+        completes, or all remote writes complete.
+
+    Raises:
+        InputError: If plan selections, entity types, live rows, table columns,
+            or update modes cannot be safely applied.
+        OperationAborted: If any required confirmation cannot be obtained.
+        ValueError: If the plan or suppression entries fail model validation.
+    """
     plan = load_fix_plan(args.input)
     for issue in plan.issues:
         logging.warning("%s", issue)
@@ -836,6 +1195,19 @@ def run_updater(args: argparse.Namespace) -> int:
         )
 
         def _live_value_for_update(update: EntityFixProposal):
+            """Return the current target value for one merged proposal.
+
+            Args:
+                update: Proposal identifying entity type, entity ID, and field.
+
+            Returns:
+                Canonical fact-ID list for row deletion or normalized live
+                metadata from the fetched collection or biobank row.
+
+            Raises:
+                InputError: If the proposal's entity was not fetched from the
+                    target schema.
+            """
             if update.mode == FACT_ROW_DELETE_MODE and update.field == FACT_ROW_DELETE_FIELD:
                 return _canonical_field_value(
                     update.field,
@@ -990,6 +1362,13 @@ def run_updater(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    """Parse the CLI and convert expected refusals or input errors to exit codes.
+
+    Returns:
+        0 for success, 2 for user-facing input failures, or 3 for declined and
+        Ctrl+C operations. Unexpected failures propagate for a visible
+        traceback and nonzero interpreter exit.
+    """
     parser = build_parser()
     args = parser.parse_args()
     configure_logging(args)

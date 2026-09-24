@@ -34,6 +34,15 @@ SHARED_HELPER_PATHS = (
     "fact_sheet_utils.py",
     "xlsxutils.py",
 )
+WRITE_TOOL_PATHS = (
+    "directory-tables-modifier.py",
+    "qcheck-updater.py",
+    "collection-factsheet-descriptor-updater.py",
+    "warning-suppressions-manage.py",
+    "importer-ecrin-mdr.py",
+    "sync_directory_with_fdp.py",
+    "eosc-organisation-matcher.py",
+)
 SECTION_PATTERN = re.compile(
     r"^(Args|Returns|Yields|Attributes|Raises):\s*$", re.MULTILINE
 )
@@ -701,6 +710,19 @@ def test_shared_helpers_have_no_contract_violations() -> None:
         contracts.
     """
     paths = [REPO_ROOT / name for name in SHARED_HELPER_PATHS]
+    assert {path.name: violations_for_path(path) for path in paths} == {
+        path.name: [] for path in paths
+    }
+
+
+def test_write_capable_tools_have_no_contract_violations() -> None:
+    """Verify Task 3 maintenance CLIs have complete explicit contracts.
+
+    Returns:
+        None. The test fails with per-file diagnostics when parser, prompt,
+        file, or remote-side-effect helpers lack documentation.
+    """
+    paths = [REPO_ROOT / name for name in WRITE_TOOL_PATHS]
     assert {path.name: violations_for_path(path) for path in paths} == {
         path.name: [] for path in paths
     }

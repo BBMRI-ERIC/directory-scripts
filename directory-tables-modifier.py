@@ -122,10 +122,14 @@ COLLECTION_FACTS_TABLE = "CollectionFacts"
 
 
 class InputError(Exception):
+    """Report invalid CLI settings, file shapes, filters, or table inputs."""
+
     pass
 
 
 class OperationAborted(Exception):
+    """Report refusal or inability to obtain required interactive approval."""
+
     pass
 
 
@@ -137,10 +141,34 @@ TSV_QUOTING_MAP = {
 
 
 def is_collection_facts_table(table_name):
+    """Return whether a table name denotes the CollectionFacts table.
+
+    Args:
+        table_name: Candidate table name; surrounding whitespace and letter
+            case are ignored.
+
+    Returns:
+        ``True`` only for ``CollectionFacts`` after normalization.
+    """
     return str(table_name).strip().lower() == COLLECTION_FACTS_TABLE.lower()
 
 
 def read_tsv_as_dataframe(file_path):
+    """Read a UTF-8 TSV file using the configured quoting controls.
+
+    Args:
+        file_path: TSV or tab-delimited input path. All fields are retained as
+            strings, empty fields stay empty, and a UTF-8 BOM is accepted.
+
+    Returns:
+        Data frame containing the header-defined columns and source rows.
+
+    Raises:
+        ValueError: If the configured quote or escape character is not exactly
+            one character. Parser and filesystem failures from pandas propagate
+            unchanged.
+        KeyError: If the configured quoting mode is not supported.
+    """
     if tsvQuoteChar is not None and len(tsvQuoteChar) != 1:
         raise ValueError("tsvQuoteChar must be a single character.")
     if tsvEscapeChar is not None and len(tsvEscapeChar) != 1:
@@ -164,6 +192,15 @@ def read_tsv_as_dataframe(file_path):
 
 
 def read_csv_as_dataframe(file_path):
+    """Read a UTF-8 CSV file without inferring nulls or numeric types.
+
+    Args:
+        file_path: CSV input path. The global separator override replaces the
+            default comma when configured, and a UTF-8 BOM is accepted.
+
+    Returns:
+        Data frame whose values are strings and whose empty cells remain empty.
+    """
     effective_separator = get_effective_separator("csv")
     return pd.read_csv(
         file_path,
@@ -176,14 +213,41 @@ def read_csv_as_dataframe(file_path):
 
 
 def is_tsv(file_path):
+    """Return whether a path has a recognized TSV filename suffix.
+
+    Args:
+        file_path: Path-like value whose final suffix is inspected.
+
+    Returns:
+        ``True`` for case-insensitive ``.tsv`` or ``.tab`` suffixes.
+    """
     return Path(file_path).suffix.lower() in {".tsv", ".tab"}
 
 
 def is_csv(file_path):
+    """Return whether a path has a CSV filename suffix.
+
+    Args:
+        file_path: Path-like value whose final suffix is inspected.
+
+    Returns:
+        ``True`` for a case-insensitive ``.csv`` suffix.
+    """
     return Path(file_path).suffix.lower() == ".csv"
 
 
 def detect_format(file_path, explicit_format):
+    """Resolve a delimited-file format from an override or filename suffix.
+
+    Args:
+        file_path: Input or output path used for suffix-based detection.
+        explicit_format: ``csv``, ``tsv``, ``auto``, or a false value. A
+            concrete format takes precedence over the path suffix.
+
+    Returns:
+        ``csv`` or ``tsv`` when resolved; otherwise ``None`` for an unknown
+        suffix in automatic mode.
+    """
     if explicit_format and explicit_format != "auto":
         return explicit_format
     if is_tsv(file_path):
@@ -194,6 +258,16 @@ def detect_format(file_path, explicit_format):
 
 
 def load_dataframe_for_file(file_path, file_format):
+    """Load a CSV or TSV path with the matching configured parser.
+
+    Args:
+        file_path: Delimited input file to read.
+        file_format: Resolved ``csv`` or ``tsv`` format name.
+
+    Returns:
+        Parsed string-valued data frame, or ``None`` when ``file_format`` is
+        neither supported format.
+    """
     if file_format == "tsv":
         return read_tsv_as_dataframe(file_path)
     if file_format == "csv":
@@ -202,6 +276,15 @@ def load_dataframe_for_file(file_path, file_format):
 
 
 def get_effective_separator(file_format):
+    """Return the configured separator or the resolved format default.
+
+    Args:
+        file_format: ``tsv`` for a tab default; every other value uses comma.
+
+    Returns:
+        Global separator override when present, otherwise tab for TSV and comma
+        for CSV.
+    """
     if separator:
         return separator
     if file_format == "tsv":
@@ -210,6 +293,16 @@ def get_effective_separator(file_format):
 
 
 def log_records(action, table, df):
+    """Log record counts and, in verbose mode, complete row dictionaries.
+
+    Args:
+        action: Human-readable action placed before count and row messages.
+        table: Directory table name included in the summary.
+        df: Records being described, or ``None`` when parsing was unavailable.
+
+    Returns:
+        None. This helper only emits log records and never changes the frame.
+    """
     if df is None:
         logging.info("%s records for table %s (record details unavailable).", action, table)
         return
@@ -221,6 +314,16 @@ def log_records(action, table, df):
 
 
 def parse_collection_ids(values):
+    """Expand repeated and comma-separated collection filter arguments.
+
+    Args:
+        values: CLI values, each optionally containing comma-separated IDs;
+            false and blank elements are discarded.
+
+    Returns:
+        Collection IDs in caller order with surrounding whitespace removed.
+        Duplicates are intentionally retained.
+    """
     if not values:
         return []
     parsed = []
@@ -235,6 +338,19 @@ def parse_collection_ids(values):
 
 
 def resolve_id_column(df, override=None):
+    """Resolve an explicit or conventional record-ID column in a data frame.
+
+    Args:
+        df: Data frame whose column labels are searched case-insensitively.
+        override: Requested ID column name, or ``None`` to look for ``id``.
+
+    Returns:
+        The exact source column label, or ``None`` when the conventional
+        ``id`` column is absent and no override was required.
+
+    Raises:
+        InputError: If an explicit override does not name an existing column.
+    """
     if override:
         column_name = resolve_column_case_insensitive(df, override)
         if column_name is None:
@@ -247,6 +363,20 @@ def resolve_id_column(df, override=None):
 
 
 def resolve_collection_column(df, override=None):
+    """Resolve an explicit or conventional collection-reference column.
+
+    Args:
+        df: Data frame whose column labels are searched case-insensitively.
+        override: Requested collection column, or ``None`` to use
+            ``collection`` when available.
+
+    Returns:
+        The exact source column label, or ``None`` when the conventional column
+        is absent and no override was supplied.
+
+    Raises:
+        InputError: If an explicit override does not name an existing column.
+    """
     if override:
         column_name = resolve_column_case_insensitive(df, override)
         if column_name is None:
@@ -259,6 +389,15 @@ def resolve_collection_column(df, override=None):
 
 
 def resolve_column_case_insensitive(df, column_name):
+    """Find a data-frame column while preserving its original spelling.
+
+    Args:
+        df: Data frame providing column labels.
+        column_name: Exact or case-insensitive column name to find.
+
+    Returns:
+        Matching original column label, preferring an exact match, or ``None``.
+    """
     if column_name in df.columns:
         return column_name
     target = column_name.lower()
@@ -269,12 +408,38 @@ def resolve_column_case_insensitive(df, column_name):
 
 
 def get_table_columns(session, schema, table):
+    """Return columns declared by Directory schema metadata for one table.
+
+    Args:
+        session: Active Directory client used for a metadata read only.
+        schema: Schema containing the table.
+        table: Table name selected by exact metadata name.
+
+    Returns:
+        Column names in server metadata order.
+        Metadata lookup failures, including an absent table, propagate from the
+        client or the returned metadata object.
+    """
     schema_metadata = session.get_schema_metadata(schema)
     table_meta = schema_metadata.get_table(by="name", value=table)
     return [col.name for col in table_meta.columns]
 
 
 def fetch_existing_ids(session, schema, table, id_column):
+    """Fetch the current string IDs used to summarize an import or deletion.
+
+    Args:
+        session: Active Directory client used to read the complete table.
+        schema: Schema containing the table.
+        table: Table to inspect.
+        id_column: Explicit ID column name, or ``None`` for conventional
+            case-insensitive ``id`` resolution.
+
+    Returns:
+        Set of current IDs converted to strings, or ``None`` when the table
+        read fails or an ID column cannot be resolved. Failures are logged and
+        deliberately do not prevent the eventual operation.
+    """
     try:
         table_df = session.get(table=table, schema=schema, as_df=True)
     except Exception as exc:
@@ -292,6 +457,18 @@ def fetch_existing_ids(session, schema, table, id_column):
 
 
 def report_column_mismatches(session, schema, table, df):
+    """Compare input columns with live table metadata and log differences.
+
+    Args:
+        session: Active Directory client used for the metadata read.
+        schema: Schema containing the target table.
+        table: Target table name.
+        df: Parsed input records whose headers are compared exactly.
+
+    Returns:
+        None. Metadata failures and extra or missing columns are warnings or
+        informational diagnostics; this function never writes remotely.
+    """
     try:
         columns = get_table_columns(session, schema, table)
     except Exception as exc:
@@ -310,6 +487,23 @@ def report_column_mismatches(session, schema, table, df):
 
 
 def summarize_import(session, schema, table, df, id_column):
+    """Describe how parsed import IDs relate to records already on the server.
+
+    Args:
+        session: Active Directory client used for metadata and table reads.
+        schema: Target schema for the proposed import.
+        table: Target table for the proposed import.
+        df: Parsed import frame, or ``None`` when no row summary is possible.
+        id_column: Optional explicit ID column name.
+
+    Returns:
+        ``None`` for an unavailable frame; otherwise a mapping with input row
+        count, new and existing ID lists, and an availability flag. The ID
+        lists are ``None`` when current server IDs cannot be read.
+
+    Raises:
+        InputError: If the explicitly requested ID column is absent.
+    """
     if df is None:
         return None
     report_column_mismatches(session, schema, table, df)
@@ -351,6 +545,25 @@ def summarize_import(session, schema, table, df, id_column):
 
 
 def summarize_sync_scope(schema, table, current_scope_df, target_scope_df, id_column, scope_label):
+    """Calculate and log ID-level changes for a selected synchronization scope.
+
+    Args:
+        schema: Schema containing the synchronized table.
+        table: Table being synchronized.
+        current_scope_df: Current server rows selected for replacement.
+        target_scope_df: Parsed input rows that will replace that scope.
+        id_column: Optional explicit ID column used in both frames.
+        scope_label: Human-readable ``full table`` or ``filtered scope`` label.
+
+    Returns:
+        Mapping containing current and target row counts, sorted IDs to delete,
+        add, or update, and the supplied scope label. ID lists remain empty if
+        either frame has no resolvable conventional ID column.
+
+    Raises:
+        InputError: If an explicit ID-column override is missing from either
+            frame.
+    """
     current_count = len(current_scope_df.index)
     target_count = len(target_scope_df.index)
 
@@ -394,6 +607,21 @@ def summarize_sync_scope(schema, table, current_scope_df, target_scope_df, id_co
 
 
 def summarize_delete(session, schema, table, df, id_column):
+    """Log which deletion-file IDs are present or absent on the server.
+
+    Args:
+        session: Active Directory client used for metadata and table reads.
+        schema: Schema containing the target table.
+        table: Table from which records may later be deleted.
+        df: Parsed candidate rows, or ``None`` when details are unavailable.
+        id_column: Optional explicit ID column name.
+
+    Returns:
+        None. This helper performs reads and logging only; it never deletes.
+
+    Raises:
+        InputError: If no usable ID column exists in the deletion frame.
+    """
     if df is None:
         return
     report_column_mismatches(session, schema, table, df)
@@ -417,6 +645,20 @@ def summarize_delete(session, schema, table, df, id_column):
 
 
 def confirm_action(prompt):
+    """Require an affirmative terminal response unless force mode is active.
+
+    Args:
+        prompt: Operation-specific warning written to standard error before the
+            literal ``[y/N]`` suffix.
+
+    Returns:
+        None. Force mode returns without reading input; otherwise only ``y`` or
+        ``yes`` permits the caller to continue.
+
+    Raises:
+        OperationAborted: If standard input is not a TTY or the user supplies
+            any response other than ``y`` or ``yes``.
+    """
     if force:
         return
     if not sys.stdin.isatty():
@@ -429,6 +671,24 @@ def confirm_action(prompt):
 
 
 def apply_filters(df, id_regex, collections, id_column, collection_column, context):
+    """Select rows by record-ID regex and exact collection membership.
+
+    Args:
+        df: Source data frame; filtering returns pandas views/copies without
+            mutating this object.
+        id_regex: Optional regular expression searched anywhere in string IDs.
+        collections: Collection IDs accepted by exact string equality.
+        id_column: Optional explicit ID column for regex filtering.
+        collection_column: Optional explicit collection-reference column.
+        context: Operation label included in input-error messages.
+
+    Returns:
+        Rows satisfying every configured filter, preserving their source index.
+
+    Raises:
+        InputError: If the regex is invalid or a required filter column cannot
+            be resolved.
+    """
     filtered = df
     if id_regex:
         try:
@@ -448,6 +708,22 @@ def apply_filters(df, id_regex, collections, id_column, collection_column, conte
 
 
 def partition_sync_input_rows(df, id_regex, collections, id_column, collection_column):
+    """Split synchronization input into selected and ignored rows.
+
+    Args:
+        df: Complete parsed synchronization input.
+        id_regex: Optional record-ID regular expression.
+        collections: Optional exact collection-ID allowlist.
+        id_column: Optional explicit record-ID column.
+        collection_column: Optional explicit collection-reference column.
+
+    Returns:
+        Pair of matching rows and nonmatching rows. With no filters, the first
+        item is the original frame and the second is an empty same-shape slice.
+
+    Raises:
+        InputError: If filter syntax or required columns are invalid.
+    """
     if not (id_regex or collections):
         return df, df.iloc[0:0]
     matching = apply_filters(
@@ -463,6 +739,19 @@ def partition_sync_input_rows(df, id_regex, collections, id_column, collection_c
 
 
 def _coerce_numeric_column(df, column_name, context):
+    """Convert one input column to numbers and reject any nonnumeric cell.
+
+    Args:
+        df: CollectionFacts input frame.
+        column_name: Donor or sample count column to convert.
+        context: ``import`` or ``sync`` label used in the error message.
+
+    Returns:
+        Numeric pandas series aligned to the source frame index.
+
+    Raises:
+        InputError: If one or more cells cannot be parsed as numbers.
+    """
     numeric_values = pd.to_numeric(df[column_name], errors="coerce")
     invalid_mask = numeric_values.isna()
     if invalid_mask.any():
@@ -474,6 +763,24 @@ def _coerce_numeric_column(df, column_name, context):
 
 
 def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, context):
+    """Remove CollectionFacts rows with positive counts below configured k.
+
+    Args:
+        df: Parsed CollectionFacts input. Zero counts are retained.
+        k_donors_threshold: Donor threshold, or ``None`` to skip donor checks.
+        k_samples_threshold: Sample threshold, or ``None`` to skip sample
+            checks.
+        context: ``import`` or ``sync`` label used in diagnostics.
+
+    Returns:
+        Pair of retained rows and statistics. Statistics are ``None`` when both
+        thresholds are disabled; otherwise they include donor, sample, overlap,
+        total-skipped, remaining, and threshold values.
+
+    Raises:
+        InputError: If an enabled count column is absent or contains a
+            nonnumeric value.
+    """
     if k_donors_threshold is None and k_samples_threshold is None:
         return df, None
     donors_mask = pd.Series(False, index=df.index)
@@ -527,6 +834,20 @@ def apply_k_anonymity_filters(df, k_donors_threshold, k_samples_threshold, *, co
 
 
 def export_table_data(df, output_path, file_format):
+    """Write a data frame to a configured CSV or TSV destination.
+
+    Args:
+        df: Records and headers to serialize without the pandas index.
+        output_path: Destination path, which pandas creates or overwrites.
+        file_format: ``csv`` for nonnumeric-field quoting; any other resolved
+            value uses TSV-style quote, escape, and doublequote settings.
+
+    Returns:
+        None. The complete UTF-8 file is written locally before returning.
+
+    Raises:
+        OSError: If the destination cannot be created or replaced.
+    """
     effective_separator = get_effective_separator(file_format)
     if file_format == "csv":
         df.to_csv(output_path, index=False, encoding="utf-8", sep=effective_separator, quoting=csv.QUOTE_NONNUMERIC)
@@ -544,6 +865,18 @@ def export_table_data(df, output_path, file_format):
 
 
 def export_internal_sync_backup(df):
+    """Persist an all-column synchronization-scope backup in a temporary TSV.
+
+    Args:
+        df: Current server scope to serialize with every field quoted.
+
+    Returns:
+        Path to a newly created UTF-8 temporary file. The caller owns cleanup;
+        failed rollback deliberately keeps this file for manual recovery.
+
+    Raises:
+        OSError: If the temporary file cannot be created or written.
+    """
     backup_file = tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".tsv",
@@ -564,6 +897,14 @@ def export_internal_sync_backup(df):
 
 
 def load_internal_sync_backup(backup_path):
+    """Read a tool-created synchronization backup without type conversion.
+
+    Args:
+        backup_path: UTF-8, tab-delimited backup whose fields were all quoted.
+
+    Returns:
+        String-valued data frame with blank cells preserved as empty strings.
+    """
     return pd.read_csv(
         backup_path,
         sep="\t",
@@ -576,6 +917,21 @@ def load_internal_sync_backup(backup_path):
 
 
 def save_table_with_national_node_fallback(session, schema, table_name, data):
+    """Save table rows and retry a missing-national-node rejection once.
+
+    Args:
+        session: Authenticated Directory client receiving remote writes.
+        schema: Target staging schema and fallback national-node value.
+        table_name: Table receiving inserts or replacements by record ID.
+        data: Data frame to submit. It is copied before adding a fallback
+            ``national_node`` column.
+
+    Returns:
+        None. A successful call has written ``data`` remotely. There is no
+        dry-run or prompt here; callers must enforce those controls. A failure
+        unrelated to missing ``national_node``, or a failed retry, propagates
+        the client error without rollback.
+    """
     try:
         session.save_table(table=table_name, schema=schema, data=data)
     except Exception as exc:
@@ -594,6 +950,22 @@ def save_table_with_national_node_fallback(session, schema, table_name, data):
 
 
 def delete_scope_rows(session, schema, table_name, scope_df, id_column):
+    """Delete exactly the ID column of a selected remote table scope.
+
+    Args:
+        session: Authenticated Directory client performing the deletion.
+        schema: Schema containing the target records.
+        table_name: Table from which IDs are deleted.
+        scope_df: Selected live rows. An empty frame causes no remote call.
+        id_column: Explicit ID-column override, or ``None`` for ``id``.
+
+    Returns:
+        None. Nonempty input causes an immediate remote deletion; this helper
+        does not prompt, implement dry-run, create a backup, or roll back.
+
+    Raises:
+        InputError: If a nonempty scope has no usable ID column.
+    """
     if scope_df.empty:
         return
     delete_id_column = resolve_id_column(scope_df, id_column)
@@ -618,6 +990,30 @@ def restore_sync_scope_from_backup(
     id_column,
     collection_column,
 ):
+    """Attempt to replace a damaged synchronization scope from its backup.
+
+    Args:
+        session: Authenticated Directory client receiving rollback mutations.
+        schema: Schema containing the synchronized table.
+        table_name: Table being restored.
+        backup_path: Tool-created all-column TSV for the pre-sync scope.
+        scope_is_filtered: Whether rollback must replace only selected rows.
+        id_regex_value: ID regex used to reselect the live filtered scope.
+        collection_filters: Collection IDs used to reselect that scope.
+        id_column: Optional record-ID column override.
+        collection_column: Optional collection-reference column override.
+
+    Returns:
+        None. Full-table rollback truncates the live table; filtered rollback
+        rereads and deletes the current matching IDs. Both then save every
+        backup row. It neither prompts nor honors dry-run because it is invoked
+        only after an already-approved write failed.
+
+    Raises:
+        InputError: If filtered rollback cannot resolve a required filter or ID
+            column. Read, truncate, delete, parse, and save failures otherwise
+            propagate to the caller, which retains the backup file.
+    """
     backup_df = load_internal_sync_backup(backup_path)
     if not scope_is_filtered:
         session.truncate(table_name, schema)
@@ -638,6 +1034,34 @@ def restore_sync_scope_from_backup(
 
 # Function
 async def sync_directory():
+    """Execute the selected import, synchronization, deletion, or export.
+
+    The function authenticates and selects the configured schema before any
+    action. Imports add or replace IDs but do not delete absent rows. CSV/TSV
+    inputs may be filtered, gain a missing ``national_node``, and have unsafe
+    positive sub-k CollectionFacts rows removed. Dry-run skips remote import,
+    sync, and delete writes, but still performs reads and may write an explicit
+    ``--export-on-delete`` backup. Unless force mode is active, imports that
+    would write, every sync, and every nonempty delete require ``y``/``yes``.
+
+    Synchronization is non-atomic: a full scope is truncated and a filtered
+    scope is deleted before target rows are saved. It writes a temporary
+    all-column TSV first and attempts to restore the old scope on import
+    failure. A successful rollback removes that temporary file and re-raises
+    the import error; failed rollback raises ``RuntimeError`` and leaves the
+    backup path on disk. Standalone imports and deletes have no rollback.
+
+    Returns:
+        ``EXIT_OK`` after all selected work completes. Exports write or
+        overwrite the requested local CSV/TSV, including during dry-run.
+
+    Raises:
+        InputError: If formats, filters, required columns, or parsed rows are
+            invalid for the selected operation.
+        OperationAborted: If required interactive approval is unavailable or
+            declined.
+        RuntimeError: If both synchronization import and rollback fail.
+    """
     # Set up the logger
     log_level = "ERROR" if quiet else ("DEBUG" if debug else "INFO")
     logging.basicConfig(level=log_level, format=" %(levelname)s: %(name)s: %(message)s")
@@ -1046,11 +1470,36 @@ async def sync_directory():
             
 # Main
 def setup_logging():
+    """Configure root logging from quiet, debug, and default CLI modes.
+
+    Returns:
+        None. Quiet mode selects ERROR, debug selects DEBUG, and other runs use
+        INFO with the tool's standard level/name/message format.
+    """
     log_level = "ERROR" if quiet else ("DEBUG" if debug else "INFO")
     logging.basicConfig(level=log_level, format=" %(levelname)s: %(name)s: %(message)s")
 
 
 def validate_inputs():
+    """Validate global CLI settings before opening a Directory session.
+
+    Validation requires a table and usable target/authentication settings,
+    constrains k-anonymity filtering to CollectionFacts import/sync, checks
+    local input existence and output parent directories, and enforces safe
+    filter-only deletion combinations. Selecting ERIC logs a warning and asks
+    for separate approval unless force mode is active. No remote or local data
+    file is changed here.
+
+    Returns:
+        None. The validated separator may be normalized back into the global
+        configuration.
+
+    Raises:
+        InputError: If modeled settings, action combinations, thresholds,
+            paths, table selection, or deletion filters are invalid.
+        OperationAborted: If the user declines the special ERIC-schema prompt
+            or no interactive terminal is available.
+    """
     global separator
     try:
         settings = TableModifierSettingsModel.parse_obj(
@@ -1140,6 +1589,13 @@ def validate_inputs():
 
 
 def main():
+    """Run the CLI and translate validation, refusal, and runtime failures.
+
+    Returns:
+        None. The function terminates through ``sys.exit`` with 0 on success,
+        2 for invalid input, 3 for declined/Ctrl+C operations, and 1 for other
+        failures. Error details are logged without a traceback.
+    """
     setup_logging()
     try:
         validate_inputs()

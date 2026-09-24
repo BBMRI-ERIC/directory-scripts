@@ -66,10 +66,18 @@ BBMRI_AKI_ID_PREFIX = "bbmri-eric:akiID:"
 
 
 def create_output_dir(output_dir):
-    """
-    Checks whether the directory to store the csv files exists. If not, it creates it
+    """Resolve and, when absent, create the top-level CSV output directory.
 
-    :return: the abspath of the directory
+    Args:
+        output_dir: Absolute path or path relative to the current directory.
+
+    Returns:
+        Absolute path string for the existing or newly created directory.
+
+    Raises:
+        OSError: If the single directory cannot be created. Parent directories
+            are not created recursively, and an existing path is not verified
+            to be a directory.
     """
     if not os.path.isabs(output_dir):
         absdir = os.path.abspath(os.path.join(os.path.curdir, output_dir))
@@ -82,8 +90,17 @@ def create_output_dir(output_dir):
 
 
 def file_exist(file_argument):
-    """
-    ArgumentParser validator to check whether the input file exist
+    """Validate that an argparse file argument names an existing path.
+
+    Args:
+        file_argument: Path string supplied for ``--input-file``.
+
+    Returns:
+        The unchanged path string when it exists; directories also satisfy this
+        existence-only check.
+
+    Raises:
+        argparse.ArgumentTypeError: If the path does not exist.
     """
     if os.path.exists(file_argument):
         return file_argument
@@ -91,8 +108,20 @@ def file_exist(file_argument):
 
 
 def get_studies_collections_link(input_file):
-    """
-    Reads the csv file and generates a dictionary with the mapping between the mdr study and the bbmri collection
+    """Read ECRIN-study to Directory-collection links from a CSV file.
+
+    Args:
+        input_file: CSV path whose header must contain exact ``mdr_id``,
+            ``mdr_title``, and ``collection_id`` columns.
+
+    Returns:
+        Mapping from ``(mdr_id, mdr_title)`` to collection IDs normalized as
+        ``bbmri-eric:ID:<collection_id>``. A later duplicate study/title row
+        replaces the earlier mapping.
+
+    Raises:
+        KeyError: If a required column is absent from a data row.
+        OSError: If the CSV cannot be opened or read.
     """
     with open(input_file) as f:
         reader = csv.DictReader(f)
@@ -105,8 +134,19 @@ def get_studies_collections_link(input_file):
 
 
 def get_age_unit(min_age, max_age):
-    """
-    Maps age unit values of the MDR to the ones in the BBMRI Directory.
+    """Map ECRIN age-unit metadata to a Directory ontology value.
+
+    Args:
+        min_age: Minimum-age mapping with ``unit_name``, or a false value.
+        max_age: Maximum-age mapping with ``unit_name``, or a false value.
+
+    Returns:
+        ``YEAR``, ``MONTH``, or ``WEEK`` for supported ECRIN units; ``None``
+        when both ages are absent or the selected unit is unknown.
+
+    Raises:
+        AssertionError: If both age bounds exist but use different units.
+        KeyError: If a supplied age mapping lacks ``unit_name``.
     """
     mapping = {
         "Years": "YEAR",
@@ -121,6 +161,18 @@ def get_age_unit(min_age, max_age):
 
 
 def get_sex_value(ecrin_gender_eligibility):
+    """Translate an ECRIN gender-eligibility label to Directory sex values.
+
+    Args:
+        ecrin_gender_eligibility: Exact ECRIN label ``Male``, ``Female``,
+            ``Not provided``, or ``All``.
+
+    Returns:
+        One Directory sex code, or ``[MALE, FEMALE]`` for ``All``.
+
+    Raises:
+        KeyError: If the ECRIN label is not one of the four supported values.
+    """
     return {
         "Male": "MALE",
         "Female": "FEMALE",
@@ -130,11 +182,23 @@ def get_sex_value(ecrin_gender_eligibility):
 
 
 def get_study_details_from_ecrin_mdr(mdr_id):
-    """
-    Gets the details of the study with id :mdr_id: from the ECRIN MDR
+    """Fetch and normalize one study from the ECRIN MDR HTTP API.
 
-    :param mdr_id: the id of the study
-    :return: a dict with the study details if the study was found, None otherwise
+    Args:
+        mdr_id: ECRIN study identifier appended directly to both API URLs.
+
+    Returns:
+        The primary response's ``full_study`` mapping on HTTP 200. Otherwise a
+        reduced mapping is built from the first JSON-encoded record returned by
+        the alternative endpoint on HTTP 200. Returns ``None`` when both
+        endpoints return non-200 responses.
+
+    Raises:
+        requests.exceptions.RequestException: If either HTTP request fails. No
+            timeout or retry is configured.
+        KeyError: If a successful response lacks a required field.
+        IndexError: If the alternative successful response contains no record.
+        json.JSONDecodeError: If returned JSON or its embedded record is invalid.
     """
     logger.debug("Getting study details")
     res = requests.get(f"{ECRIN_STUDY_API_ENDPOINT}/{mdr_id}")
@@ -159,13 +223,25 @@ def get_study_details_from_ecrin_mdr(mdr_id):
 
 
 def create_records(mdr_data, mdr_title, national_node):
-    """
-    Creates the records to be stored in EMX2
+    """Build Directory AlsoKnownIn and Studies rows from ECRIN metadata.
 
-    In particular, it creates two records:
-     - study, with data of the ECRIN MDR study
-     - also_known_in, to link the newly created study to its record in ECRIN MDR.
-    It also updates the collections linked to the study with the reference to the newly created study
+    Args:
+        mdr_data: Normalized study mapping with ID, display title, description,
+            type, enrolment, gender eligibility, and optional age bounds.
+        mdr_title: Title from the input-link CSV; this becomes ``Studies.title``
+            instead of the MDR display title.
+        national_node: Node code embedded in generated IDs and stored on both
+            records.
+
+    Returns:
+        Pair ``(also_known_in, study)``. Invalid or blank enrolment becomes
+        ``None``; ``All`` sex is serialized as ``MALE,FEMALE``; age values and
+        their shared mapped unit are copied without remote or local writes.
+
+    Raises:
+        KeyError: If required MDR fields are absent or gender eligibility is
+            unsupported.
+        AssertionError: If minimum and maximum ages use different units.
     """
 
     also_known_id = f"{BBMRI_AKI_ID_PREFIX}{national_node}_{mdr_data["id"]}"  # internal bbmri id of the "also_known_entity" corresponding to the study
@@ -205,6 +281,17 @@ def create_records(mdr_data, mdr_title, national_node):
 
 
 def get_collection_data_from_directory(eric_client, schema, collection_id):
+    """Fetch the first exact-ID Collections record from a Directory schema.
+
+    Args:
+        eric_client: Active EMX2 client used for a remote table query.
+        schema: Schema containing the source Collections table.
+        collection_id: Canonical collection ID interpolated into ``id==...``.
+
+    Returns:
+        First returned collection mapping, or ``None`` after logging the ID when
+        the response list is empty.
+    """
     try:
         return eric_client.get(table="Collections", query_filter=f"id=={collection_id}", schema=schema)[0]
     except IndexError:
@@ -212,6 +299,32 @@ def get_collection_data_from_directory(eric_client, schema, collection_id):
 
 
 async def save_and_upload_files_to_directory(emx2_client, entities_by_national_node, schema, upload_data, output_dir):
+    """Write node-grouped CSVs and optionally upload them to node schemas.
+
+    Args:
+        emx2_client: Active EMX2 client used for optional file uploads.
+        entities_by_national_node: Nested mapping from node code to entity name
+            and nonempty record lists with uniform keys.
+        schema: Base schema name combined with ``-<node>`` for uploads.
+        upload_data: Whether to upload the three fixed CSV filenames after
+            writing each node directory.
+        output_dir: Existing top-level directory receiving one subdirectory per
+            non-UK node.
+
+    Returns:
+        None. For every node except ``UK``, creates its directory if absent and
+        overwrites each entity CSV with headers taken from the first record.
+        When uploads are enabled, sends ``AlsoKnownIn.csv``, ``Studies.csv``,
+        and ``Collections.csv`` in that order to ``<schema>-<node>``. There is
+        no prompt, dry-run, cleanup, transaction, or rollback; partial local
+        files and earlier remote uploads remain after a later failure.
+
+    Raises:
+        IndexError: If an entity record list is empty when headers are derived.
+        OSError: If a node directory or CSV cannot be created or overwritten.
+        SystemExit: With status ``-1`` after a ``PyclientException`` from any
+            upload; the client message and filename are logged first.
+    """
     for nn, entities in entities_by_national_node.items():
         if nn != "UK":
             nn_dir = f"{output_dir}/{nn}"
@@ -236,6 +349,40 @@ async def save_and_upload_files_to_directory(emx2_client, entities_by_national_n
 
 
 async def main(input_file, url, username, password, token, schema, output_dir, upload_data):
+    """Import linked ECRIN studies into generated CSVs and optional schemas.
+
+    The input CSV is reduced to one collection per unique MDR ID/title pair.
+    The client uses a token when supplied, otherwise signs in only when both
+    username and password are present; missing authentication is allowed for
+    local-file generation and any server permissions fail at the client call.
+    Collections are read from ``schema``, cached by ID, and mutated so each
+    successfully resolved study ID is appended to the existing comma-delimited
+    ``studies`` value. Missing MDR studies or collections are logged and skipped.
+
+    Args:
+        input_file: CSV with exact ``mdr_id``, ``mdr_title``, and
+            ``collection_id`` headers.
+        url: EMX2 Directory base URL for collection reads and optional uploads.
+        username: Optional username used only when no token is supplied and a
+            password is also present.
+        password: Optional password paired with ``username``.
+        token: Optional access token, preferred over username/password.
+        schema: Source schema for collection reads and base name for destination
+            ``<schema>-<national_node>`` uploads.
+        output_dir: Existing output directory for node subdirectories and CSVs.
+        upload_data: Whether generated files are also uploaded remotely.
+
+    Returns:
+        None. Local CSV generation always occurs for non-UK resolved nodes;
+        remote writes occur only when ``upload_data`` is true. No confirmation,
+        dry-run, duplicate-study prevention, rollback, or local cleanup exists.
+
+    Raises:
+        SystemExit: If an optional upload is rejected by the EMX2 client.
+        OSError: If input or generated CSV files cannot be read or written.
+        requests.exceptions.RequestException: If an ECRIN API request fails.
+        KeyError: If required CSV, ECRIN, or Directory fields are absent.
+    """
     studies_collections = get_studies_collections_link(input_file)
 
     with client.Client(url=url) as emx2_client:

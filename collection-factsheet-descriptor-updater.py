@@ -49,6 +49,12 @@ class OperationAborted(Exception):
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the collection fact-sheet descriptor updater CLI parser.
+
+    Returns:
+        Parser defining ERIC source selection, staging-schema authentication,
+        replacement authority, logging, dry-run, and confirmation controls.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Analyze one collection in the ERIC schema of the configured Directory target, "
@@ -134,6 +140,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def confirm_action(prompt: str, *, force: bool) -> None:
+    """Require explicit terminal approval unless force mode is enabled.
+
+    Args:
+        prompt: Schema-mismatch or final-write question sent to standard error.
+        force: Whether to approve without reading stdin.
+
+    Returns:
+        None. Interactive continuation requires ``y`` or ``yes``.
+
+    Raises:
+        OperationAborted: If stdin is not a TTY or the response is not
+            affirmative.
+    """
     if force:
         return
     if not sys.stdin.isatty():
@@ -148,6 +167,15 @@ def confirm_action(prompt: str, *, force: bool) -> None:
 
 
 def configure_logging(args: argparse.Namespace) -> None:
+    """Configure root and HTTP logging from quiet/debug CLI flags.
+
+    Args:
+        args: Parsed namespace containing ``quiet`` and ``debug``.
+
+    Returns:
+        None. Root logging uses ERROR, DEBUG, or INFO; HTTP libraries use
+        WARNING.
+    """
     level = "ERROR" if args.quiet else ("DEBUG" if args.debug else "INFO")
     logging.basicConfig(level=level, format=" %(levelname)s: %(name)s: %(message)s")
     logging.getLogger("requests").setLevel(logging.WARNING)
@@ -155,6 +183,19 @@ def configure_logging(args: argparse.Namespace) -> None:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    """Validate collection, schema, target, and write authentication settings.
+
+    Args:
+        args: Parsed namespace containing collection ID, target schema, target
+            URL, and token or username/password credentials.
+
+    Returns:
+        None. Validation performs no Directory reads or writes.
+
+    Raises:
+        InputError: If required identifiers, target settings, or credentials do
+            not satisfy the shared updater settings model.
+    """
     try:
         FactsheetUpdaterSettingsModel.parse_obj(
             {
@@ -181,6 +222,20 @@ def fetch_target_collection_row(
     schema: str,
     collection_id: str,
 ) -> tuple[pd.DataFrame, pd.Series]:
+    """Read Collections from a staging schema and select one exact ID.
+
+    Args:
+        session: Authenticated Directory client used for the table read.
+        schema: Staging schema containing the writable Collections table.
+        collection_id: Exact collection ID to select.
+
+    Returns:
+        Pair of the complete Collections frame and the first matching row. The
+        returned series retains every table column needed for a full-width save.
+
+    Raises:
+        InputError: If the collection is absent from the target schema.
+    """
     table_df = session.get(table="Collections", schema=schema, as_df=True)
     row_df = table_df[table_df["id"].astype(str) == collection_id]
     if row_df.empty:
@@ -191,6 +246,14 @@ def fetch_target_collection_row(
 
 
 def render_change_value(value) -> str:
+    """Render descriptor values for concise proposal logging.
+
+    Args:
+        value: Descriptor list, scalar, or blank value.
+
+    Returns:
+        Comma-joined list text, ``<empty>`` for empty values, or scalar text.
+    """
     if isinstance(value, list):
         return ",".join(value) if value else "<empty>"
     if value in (None, ""):
@@ -205,6 +268,20 @@ def log_proposal(
     *,
     verbose: bool,
 ) -> None:
+    """Log proposed descriptor changes and optional fact-derived evidence.
+
+    Args:
+        collection_id: Collection receiving the proposed staging update.
+        schema: Target staging schema shown in the summary.
+        proposal: Descriptor proposal containing ``changes``, derived
+            ``fact_values``, all-star presence, and notes.
+        verbose: Whether to log derived diagnoses, materials, sex, all-star
+            presence, and proposal notes in addition to changed fields.
+
+    Returns:
+        None. This function only emits logs and does not change local or remote
+        data.
+    """
     logging.info("Proposed descriptor updates for %s in schema %s:", collection_id, schema)
     for change in proposal["changes"]:
         logging.info(
@@ -224,10 +301,51 @@ def log_proposal(
 
 
 def build_target_collection_for_proposal(target_row: pd.Series) -> dict:
+    """Convert the live staging row to the proposal helper's mapping shape.
+
+    Args:
+        target_row: Full-width Collections row fetched from the target schema.
+
+    Returns:
+        New dictionary containing the row's columns and live values.
+    """
     return target_row.to_dict()
 
 
 def update_collection_from_facts(args: argparse.Namespace) -> int:
+    """Derive ERIC fact descriptors and optionally update one staging row.
+
+    The source side purges and refreshes the local Directory cache for a public
+    ERIC snapshot without signing in, verifies the collection, and requires at
+    least one CollectionFacts row. Thus dry-run may still replace that runtime
+    cache even though it creates no report or update file.
+    The write side authenticates separately, reads the exact collection from
+    the requested staging schema, and derives changes against that live row.
+    Without ``--replace-existing``, multivalue diagnosis, material, and sex
+    descriptors are append-only; numeric all-star totals may still be replaced
+    according to the shared proposal helper.
+
+    A collection-prefix/schema mismatch requires its own ``y``/``yes`` prompt
+    unless force is active. Dry-run logs the concrete proposal and returns
+    before the final prompt and remote save. A real update prompts once more,
+    then saves one full-width Collections row. The save has no rollback; client
+    read, authentication, cache, and write failures propagate unchanged.
+
+    Args:
+        args: Validated target, collection, schema, authentication, replacement,
+            dry-run, force, and logging settings.
+
+    Returns:
+        ``EXIT_OK`` when no change is needed, dry-run completes, or the remote
+        Collections save succeeds.
+
+    Raises:
+        InputError: If ERIC has no fact rows or the target schema lacks the
+            collection.
+        OperationAborted: If required mismatch or write approval is unavailable
+            or declined.
+        KeyError: If the collection is absent from the fresh ERIC snapshot.
+    """
     pp = PrettyPrinter(indent=2)
     if args.debug:
         logging.debug("Preparing live ERIC analysis snapshot for %s.", args.collection_id)
@@ -318,6 +436,12 @@ def update_collection_from_facts(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    """Run the CLI and map expected validation or refusal failures to status.
+
+    Returns:
+        0 on success, 2 for invalid input, or 3 for declined/Ctrl+C operations.
+        Unexpected Directory and filesystem failures propagate visibly.
+    """
     parser = build_parser()
     args = parser.parse_args()
     if args.debug:
