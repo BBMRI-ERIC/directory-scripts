@@ -1,3 +1,5 @@
+"""Test oomutils behavior."""
+
 import pytest
 
 from oomutils import (
@@ -14,6 +16,11 @@ from oomutils import (
 
 
 def test_normalize_oom_value_supports_scalar_and_wrapped_values():
+    """Verify normalize oom value supports scalar and wrapped values.
+
+    Returns:
+        None. Verifies normalize oom value supports scalar and wrapped values.
+    """
     assert normalize_oom_value(2) == 2
     assert normalize_oom_value("3") == 3
     assert normalize_oom_value({"id": "4"}) == 4
@@ -21,6 +28,14 @@ def test_normalize_oom_value_supports_scalar_and_wrapped_values():
 
 
 def test_default_oom_policy_uses_lower_bound(monkeypatch):
+    """Verify default oom policy uses lower bound.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies default oom policy uses lower bound.
+    """
     monkeypatch.delenv(ENV_OOM_UPPER_BOUND_COEFFICIENT, raising=False)
 
     assert get_oom_upper_bound_coefficient() == DEFAULT_OOM_UPPER_BOUND_COEFFICIENT
@@ -29,6 +44,14 @@ def test_default_oom_policy_uses_lower_bound(monkeypatch):
 
 
 def test_configurable_oom_policy_uses_upper_bound_coefficient(monkeypatch):
+    """Verify configurable oom policy uses upper bound coefficient.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies configurable oom policy uses upper bound coefficient.
+    """
     monkeypatch.setenv(ENV_OOM_UPPER_BOUND_COEFFICIENT, "0.3")
 
     assert get_oom_upper_bound_coefficient() == 0.3
@@ -38,6 +61,14 @@ def test_configurable_oom_policy_uses_upper_bound_coefficient(monkeypatch):
 
 
 def test_invalid_oom_policy_rejected(monkeypatch):
+    """Verify invalid oom policy rejected.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies invalid oom policy rejected.
+    """
     monkeypatch.setenv(ENV_OOM_UPPER_BOUND_COEFFICIENT, "0")
 
     with pytest.raises(ValueError):
@@ -45,6 +76,14 @@ def test_invalid_oom_policy_rejected(monkeypatch):
 
 
 def test_oom_interval_consistency_is_independent_of_estimate_policy(monkeypatch):
+    """Verify oom interval consistency is independent of estimate policy.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies oom interval consistency is independent of estimate policy.
+    """
     monkeypatch.setenv(ENV_OOM_UPPER_BOUND_COEFFICIENT, "0.3")
 
     assert get_oom_interval(2) == (100, 1000)

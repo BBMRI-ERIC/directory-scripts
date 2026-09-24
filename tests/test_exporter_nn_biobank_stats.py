@@ -9,6 +9,11 @@ from openpyxl import load_workbook
 import pytest
 
 def _module():
+    """Load the Node-statistics exporter module for unit tests.
+
+    Returns:
+        Imported exporter-nn-biobank-stats.py module, registered as nn_stats in sys.modules.
+    """
     path = Path(__file__).parents[1] / "exporter-nn-biobank-stats.py"
     spec = importlib.util.spec_from_file_location("nn_stats", path)
     module = importlib.util.module_from_spec(spec)
@@ -17,11 +22,21 @@ def _module():
     return module
 
 def test_policy_has_only_initial_supported_mappings():
+    """Verify policy has only initial supported mappings.
+
+    Returns:
+        None. Verifies policy has only initial supported mappings.
+    """
     module = _module()
     assert module.POLICY_VERSION
     assert {rule.name for rule in module.CATEGORY_POLICY if rule.types} == {"hospital-integrated", "population-based"}
 
 def test_frontier_prunes_mapped_parent_and_tie_uses_row_priority():
+    """Verify frontier prunes mapped parent and tie uses row priority.
+
+    Returns:
+        None. Verifies frontier prunes mapped parent and tie uses row priority.
+    """
     module = _module()
     result = module.classify_biobank_collections([
         {"id": "hospital", "type": {"id": "HOSPITAL"}},
@@ -35,6 +50,11 @@ def test_frontier_prunes_mapped_parent_and_tie_uses_row_priority():
 
 
 def test_classifier_accepts_string_list_collection_types():
+    """Verify classifier accepts string list collection types.
+
+    Returns:
+        None. Verifies classifier accepts string list collection types.
+    """
     module = _module()
 
     result = module.classify_biobank_collections([
@@ -47,6 +67,14 @@ def test_classifier_accepts_string_list_collection_types():
 
 @pytest.mark.parametrize("cycle_length", [1, 2, 3])
 def test_rootless_cycle_forces_provisional_others_fallback(cycle_length):
+    """Verify rootless cycle forces provisional others fallback.
+
+    Args:
+        cycle_length: Number of nodes in the rootless collection hierarchy cycle.
+
+    Returns:
+        None. Verifies rootless cycle forces provisional others fallback.
+    """
     module = _module()
 
     result = module.classify_biobank_collections([
@@ -76,6 +104,16 @@ def test_rootless_cycle_forces_provisional_others_fallback(cycle_length):
     ],
 )
 def test_others_fallbacks_explain_their_reason(collections, expected_reason, provisional):
+    """Verify others fallbacks explain their reason.
+
+    Args:
+        collections: Synthetic collection records used to assert the reported fallback reason.
+        expected_reason: Exact fallback_reason string expected for the collection votes, not the displayed category.
+        provisional: Expected provisional flag for the fallback classification.
+
+    Returns:
+        None. Verifies others fallbacks explain their reason.
+    """
     module = _module()
 
     result = module.classify_biobank_collections(collections)
@@ -86,23 +124,85 @@ def test_others_fallbacks_explain_their_reason(collections, expected_reason, pro
 
 
 def test_provisional_warning_contains_specific_hierarchy_reason(caplog):
+    """Verify provisional warning contains specific hierarchy reason.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies provisional warning contains specific hierarchy reason.
+    """
     module = _module()
 
     class Directory:
-        def getSchema(self): return "TEST"
+        """Provide directory used to isolate the tested behavior.
+        """
+        def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
+            return "TEST"
         def getNegotiatorCoverage(self):
+            """Return fixture Negotiator coverage classification mapping.
+
+            Returns:
+                The fixture Negotiator coverage classification mapping.
+            """
             return {"bb": type("Coverage", (), {"status": "fully"})()}
-        def getBiobanks(self): return [{"id": "bb"}]
-        def getBiobankNN(self, _): return "CZ"
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return [{"id": "bb"}]
+        def getBiobankNN(self, _):
+            """Return fixture national-node code for the requested biobank.
+
+            Args:
+                _: Biobank identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested biobank.
+            """
+            return "CZ"
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [{
                 "id": "cycle-0",
                 "biobank": {"id": "bb"},
                 "parent_collection": {"id": "cycle-0"},
             }]
-        def getBiobankServices(self, _): return []
-        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
-        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+        def getBiobankServices(self, _):
+            """Return fixture services associated with the requested biobank.
+
+            Args:
+                _: Ignored caller value; this fixture always represents a biobank without services.
+
+            Returns:
+                The fixture services associated with the requested biobank.
+            """
+            return []
+        def getBiobankQualityInfo(self):
+            """Return fixture biobank-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture biobank-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self):
+            """Return fixture collection-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture collection-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
 
     caplog.set_level(logging.WARNING)
     module.build_report_model(Directory())
@@ -111,18 +211,78 @@ def test_provisional_warning_contains_specific_hierarchy_reason(caplog):
 
 
 def test_report_model_keeps_federated_platform_unavailable():
+    """Verify report model keeps federated platform unavailable.
+
+    Returns:
+        None. Verifies report model keeps federated platform unavailable.
+    """
     module = _module()
 
     class Directory:
-        def getSchema(self): return "TEST"
+        """Provide directory used to isolate the tested behavior.
+        """
+        def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
+            return "TEST"
         def getNegotiatorCoverage(self):
+            """Return fixture Negotiator coverage classification mapping.
+
+            Returns:
+                The fixture Negotiator coverage classification mapping.
+            """
             return {"bb": type("Coverage", (), {"status": "fully"})()}
-        def getBiobanks(self): return [{"id": "bb"}]
-        def getBiobankNN(self, _): return "CZ"
-        def getCollections(self): return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
-        def getBiobankServices(self, _): return []
-        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
-        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return [{"id": "bb"}]
+        def getBiobankNN(self, _):
+            """Return fixture national-node code for the requested biobank.
+
+            Args:
+                _: Biobank identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested biobank.
+            """
+            return "CZ"
+        def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
+            return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
+        def getBiobankServices(self, _):
+            """Return fixture services associated with the requested biobank.
+
+            Args:
+                _: Ignored caller value; this fixture always represents a biobank without services.
+
+            Returns:
+                The fixture services associated with the requested biobank.
+            """
+            return []
+        def getBiobankQualityInfo(self):
+            """Return fixture biobank-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture biobank-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self):
+            """Return fixture collection-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture collection-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
 
     model = module.build_report_model(Directory())
     assert model["federated_platform"].available is False
@@ -130,22 +290,79 @@ def test_report_model_keeps_federated_platform_unavailable():
 
 
 def test_report_model_initializes_empty_supported_categories_to_zero():
+    """Verify report model initializes empty supported categories to zero.
+
+    Returns:
+        None. Verifies report model initializes empty supported categories to zero.
+    """
     module = _module()
 
     class Directory:
+        """Provide directory used to isolate the tested behavior.
+        """
         skip_graph_dag_validation = False
 
-        def getSchema(self): return "TEST"
+        def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
+            return "TEST"
         def getNegotiatorCoverage(self):
+            """Return fixture Negotiator coverage classification mapping.
+
+            Returns:
+                The fixture Negotiator coverage classification mapping.
+            """
             return {"bb": type("Coverage", (), {"status": "fully"})()}
-        def getBiobanks(self): return [{"id": "bb"}]
-        def getBiobankNN(self, _): return "CZ"
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return [{"id": "bb"}]
+        def getBiobankNN(self, _):
+            """Return fixture national-node code for the requested biobank.
+
+            Args:
+                _: Biobank identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested biobank.
+            """
+            return "CZ"
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
-        def getBiobankServices(self, _): return []
+        def getBiobankServices(self, _):
+            """Return fixture services associated with the requested biobank.
+
+            Args:
+                _: Ignored caller value; this fixture always represents a biobank without services.
+
+            Returns:
+                The fixture services associated with the requested biobank.
+            """
+            return []
         def getBiobankQualityInfo(self):
+            """Return fixture biobank-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture biobank-quality DataFrame used by the exporter.
+            """
             return __import__("pandas").DataFrame(columns=["biobank", "assess_level_bio"])
         def getCollectionQualityInfo(self):
+            """Return fixture collection-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture collection-quality DataFrame used by the exporter.
+            """
             return __import__("pandas").DataFrame(columns=["collection", "assess_level_col"])
 
     model = module.build_report_model(Directory())
@@ -170,17 +387,60 @@ def test_report_model_initializes_empty_supported_categories_to_zero():
 
 
 def test_report_metadata_records_real_emergency_state():
+    """Verify report metadata records real emergency state.
+
+    Returns:
+        None. Verifies report metadata records real emergency state.
+    """
     module = _module()
 
     class Directory:
+        """Provide directory used to isolate the tested behavior.
+        """
         skip_graph_dag_validation = True
 
-        def getSchema(self): return "STAGING"
-        def getNegotiatorCoverage(self): return {}
-        def getBiobanks(self): return []
-        def getCollections(self): return []
-        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
-        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+        def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
+            return "STAGING"
+        def getNegotiatorCoverage(self):
+            """Return fixture Negotiator coverage classification mapping.
+
+            Returns:
+                The fixture Negotiator coverage classification mapping.
+            """
+            return {}
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return []
+        def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
+            return []
+        def getBiobankQualityInfo(self):
+            """Return fixture biobank-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture biobank-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self):
+            """Return fixture collection-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture collection-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
 
     model = module.build_report_model(Directory())
 
@@ -191,18 +451,78 @@ def test_report_metadata_records_real_emergency_state():
 
 
 def test_missing_quality_tables_are_unavailable_not_zero():
+    """Verify missing quality tables are unavailable not zero.
+
+    Returns:
+        None. Verifies missing quality tables are unavailable not zero.
+    """
     module = _module()
 
     class Directory:
-        def getSchema(self): return "TEST"
+        """Provide directory used to isolate the tested behavior.
+        """
+        def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
+            return "TEST"
         def getNegotiatorCoverage(self):
+            """Return fixture Negotiator coverage classification mapping.
+
+            Returns:
+                The fixture Negotiator coverage classification mapping.
+            """
             return {"bb": type("Coverage", (), {"status": "fully"})()}
-        def getBiobanks(self): return [{"id": "bb"}]
-        def getBiobankNN(self, _): return "CZ"
-        def getCollections(self): return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
-        def getBiobankServices(self, _): return []
-        def getBiobankQualityInfo(self): return __import__("pandas").DataFrame()
-        def getCollectionQualityInfo(self): return __import__("pandas").DataFrame()
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return [{"id": "bb"}]
+        def getBiobankNN(self, _):
+            """Return fixture national-node code for the requested biobank.
+
+            Args:
+                _: Biobank identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested biobank.
+            """
+            return "CZ"
+        def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
+            return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
+        def getBiobankServices(self, _):
+            """Return fixture services associated with the requested biobank.
+
+            Args:
+                _: Ignored caller value; this fixture always represents a biobank without services.
+
+            Returns:
+                The fixture services associated with the requested biobank.
+            """
+            return []
+        def getBiobankQualityInfo(self):
+            """Return fixture biobank-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture biobank-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
+        def getCollectionQualityInfo(self):
+            """Return fixture collection-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture collection-quality DataFrame used by the exporter.
+            """
+            return __import__("pandas").DataFrame()
 
     model = module.build_report_model(Directory())
 
@@ -213,19 +533,77 @@ def test_missing_quality_tables_are_unavailable_not_zero():
 
 
 def test_empty_quality_tables_with_required_columns_remain_numeric_zero():
+    """Verify empty quality tables with required columns remain numeric zero.
+
+    Returns:
+        None. Verifies empty quality tables with required columns remain numeric zero.
+    """
     module = _module()
 
     class Directory:
-        def getSchema(self): return "TEST"
+        """Provide directory used to isolate the tested behavior.
+        """
+        def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
+            return "TEST"
         def getNegotiatorCoverage(self):
+            """Return fixture Negotiator coverage classification mapping.
+
+            Returns:
+                The fixture Negotiator coverage classification mapping.
+            """
             return {"bb": type("Coverage", (), {"status": "fully"})()}
-        def getBiobanks(self): return [{"id": "bb"}]
-        def getBiobankNN(self, _): return "CZ"
-        def getCollections(self): return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
-        def getBiobankServices(self, _): return []
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return [{"id": "bb"}]
+        def getBiobankNN(self, _):
+            """Return fixture national-node code for the requested biobank.
+
+            Args:
+                _: Biobank identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested biobank.
+            """
+            return "CZ"
+        def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
+            return [{"id": "c", "biobank": {"id": "bb"}, "type": {"id": "HOSPITAL"}}]
+        def getBiobankServices(self, _):
+            """Return fixture services associated with the requested biobank.
+
+            Args:
+                _: Ignored caller value; this fixture always represents a biobank without services.
+
+            Returns:
+                The fixture services associated with the requested biobank.
+            """
+            return []
         def getBiobankQualityInfo(self):
+            """Return fixture biobank-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture biobank-quality DataFrame used by the exporter.
+            """
             return __import__("pandas").DataFrame(columns=["biobank", "assess_level_bio"])
         def getCollectionQualityInfo(self):
+            """Return fixture collection-quality DataFrame used by the exporter.
+
+            Returns:
+                The fixture collection-quality DataFrame used by the exporter.
+            """
             return __import__("pandas").DataFrame(columns=["collection", "assess_level_col"])
 
     model = module.build_report_model(Directory())
@@ -237,6 +615,11 @@ def test_empty_quality_tables_with_required_columns_remain_numeric_zero():
 
 
 def test_stdout_marks_unavailable_federated_platform():
+    """Verify stdout marks unavailable federated platform.
+
+    Returns:
+        None. Verifies stdout marks unavailable federated platform.
+    """
     module = _module()
     model = {"nodes": {"EXT": {"total biobanks": {metric: 0 for metric in module.METRICS}}}, "problems": {"EXT": ["bb"]}}
     buffer = io.StringIO()
@@ -246,7 +629,15 @@ def test_stdout_marks_unavailable_federated_platform():
 
 
 def _model(module, nodes=("AT", "EXT")):
-    """Create a complete report fixture with zero and unavailable values."""
+    """Create a complete report fixture with zero and unavailable values.
+
+    Args:
+        module: Loaded module whose source or behavior is inspected by the helper.
+        nodes: Directory-node fixture used to build the statistics model.
+
+    Returns:
+        Report dictionary with independent per-node row metrics, unavailable FP status, problem IDs, and ERIC provenance.
+    """
     metrics = {
         metric: 0
         for metric in module.METRICS
@@ -279,6 +670,11 @@ def _model(module, nodes=("AT", "EXT")):
 
 
 def test_stdout_is_alphabetical_aligned_and_distinguishes_unavailable_values():
+    """Verify stdout is alphabetical aligned and distinguishes unavailable values.
+
+    Returns:
+        None. Verifies stdout is alphabetical aligned and distinguishes unavailable values.
+    """
     module = _module()
     buffer = io.StringIO()
 
@@ -296,6 +692,14 @@ def test_stdout_is_alphabetical_aligned_and_distinguishes_unavailable_values():
 
 
 def test_xlsx_has_grouped_headers_blanks_and_metadata(tmp_path):
+    """Verify xlsx has grouped headers blanks and metadata.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies xlsx has grouped headers blanks and metadata.
+    """
     module = _module()
     output = tmp_path / "report.xlsx"
 
@@ -327,6 +731,14 @@ def test_xlsx_has_grouped_headers_blanks_and_metadata(tmp_path):
 
 
 def test_xlsx_sanitizes_long_node_names_and_rejects_collisions(tmp_path):
+    """Verify xlsx sanitizes long node names and rejects collisions.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies xlsx sanitizes long node names and rejects collisions.
+    """
     module = _module()
     long_node = "Invalid/[Node] name with more than thirty-one characters"
     output = tmp_path / "safe.xlsx"
@@ -351,6 +763,16 @@ def test_xlsx_sanitizes_long_node_names_and_rejects_collisions(tmp_path):
 
 
 def test_parser_and_main_use_shared_cli_contract(tmp_path, monkeypatch, caplog):
+    """Verify parser and main use shared cli contract.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies parser and main use shared cli contract.
+    """
     module = _module()
     parser = module.build_argument_parser()
     args = parser.parse_args([
@@ -368,10 +790,25 @@ def test_parser_and_main_use_shared_cli_contract(tmp_path, monkeypatch, caplog):
     calls = []
 
     class FakeDirectory:
+        """Record Directory constructor options and raw representative-loader calls.
+        """
         def __init__(self, **kwargs):
+            """Intercept Directory construction without loading remote entities.
+
+            Args:
+                **kwargs: Directory constructor options observed by this CLI-routing double; no remote data is loaded.
+            """
             calls.append(("directory", kwargs))
 
         def loadNegotiatorRepresentatives(self, path):
+            """Record representative-XLSX loading on the Directory double.
+
+            Args:
+                path: Raw representative XLSX argument; this double performs no file I/O.
+
+            Returns:
+                None. Record representative-XLSX loading on the Directory double.
+            """
             calls.append(("load", path))
 
     monkeypatch.setattr(module, "build_report_model", lambda directory: _model(module, ("AT",)))
@@ -419,17 +856,50 @@ def test_parser_and_main_use_shared_cli_contract(tmp_path, monkeypatch, caplog):
 def test_main_selects_explicit_negotiator_xlsx_source(
     source_args, expected_call, monkeypatch
 ):
+    """Verify main selects explicit negotiator xlsx source.
+
+    Args:
+        source_args: Negotiator-source arguments supplied to the CLI invocation.
+        expected_call: Expected (loader kind, workbook path) entry in the Directory call log.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies main selects explicit negotiator xlsx source.
+    """
     module = _module()
     calls = []
 
     class FakeDirectory:
+        """Record which raw/orphan Negotiator loader is selected by the explicit CLI source option.
+        """
         def __init__(self, **kwargs):
+            """Intercept Directory construction without loading remote entities.
+
+            Args:
+                **kwargs: Directory constructor options observed by this CLI-routing double; no remote data is loaded.
+            """
             calls.append(("directory", kwargs))
 
         def loadNegotiatorRepresentatives(self, path):
+            """Record representative-XLSX loading on the Directory double.
+
+            Args:
+                path: Raw representative XLSX argument; this double performs no file I/O.
+
+            Returns:
+                None. Record representative-XLSX loading on the Directory double.
+            """
             calls.append(("representatives", path))
 
         def loadNegotiatorOrphansReport(self, path):
+            """Record orphan-report loading on the Directory double.
+
+            Args:
+                path: Orphan-export XLSX argument logged for source-routing assertions; not opened.
+
+            Returns:
+                None. Record orphan-report loading on the Directory double.
+            """
             calls.append(("orphans", path))
 
     monkeypatch.setattr(
@@ -453,6 +923,15 @@ def test_main_selects_explicit_negotiator_xlsx_source(
     ],
 )
 def test_main_requires_exactly_one_negotiator_source(source_args, capsys):
+    """Verify main requires exactly one negotiator source.
+
+    Args:
+        source_args: Negotiator-source arguments supplied to the CLI invocation.
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies main requires exactly one negotiator source.
+    """
     module = _module()
 
     with pytest.raises(SystemExit):
@@ -462,11 +941,26 @@ def test_main_requires_exactly_one_negotiator_source(source_args, capsys):
 
 
 def test_main_rejects_reserved_negotiator_api_before_directory_loading(capsys):
+    """Verify main rejects reserved negotiator api before directory loading.
+
+    Args:
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies main rejects reserved negotiator api before directory loading.
+    """
     module = _module()
     constructed = False
 
     class FakeDirectory:
+        """Record whether Directory construction occurred before rejecting unavailable API mode.
+        """
         def __init__(self, **kwargs):
+            """Intercept Directory construction without loading remote entities.
+
+            Args:
+                **kwargs: Directory constructor options observed by this CLI-routing double; no remote data is loaded.
+            """
             nonlocal constructed
             constructed = True
 
@@ -478,14 +972,37 @@ def test_main_rejects_reserved_negotiator_api_before_directory_loading(capsys):
 
 
 def test_main_does_not_publish_xlsx_after_loader_failure(tmp_path):
+    """Verify main does not publish xlsx after loader failure.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies main does not publish xlsx after loader failure.
+    """
     module = _module()
     output = tmp_path / "must-not-exist.xlsx"
 
     class FailingDirectory:
+        """Provide failing directory used to isolate the tested behavior.
+        """
         def __init__(self, **kwargs):
+            """Intercept Directory construction without loading remote entities.
+
+            Args:
+                **kwargs: Directory constructor options observed by this CLI-routing double; no remote data is loaded.
+            """
             pass
 
         def loadNegotiatorRepresentatives(self, path):
+            """Record representative-XLSX loading on the Directory double.
+
+            Args:
+                path: Raw representative XLSX argument; this double performs no file I/O.
+
+            Returns:
+                None. Record representative-XLSX loading on the Directory double.
+            """
             raise ValueError("Malformed Negotiator workbook")
 
     with pytest.raises(ValueError, match="Malformed Negotiator workbook"):

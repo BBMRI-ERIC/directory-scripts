@@ -4,7 +4,11 @@ from flourish_nn import COUNTRY_POINTS, FlourishPoint, assigned_country, build_p
 
 
 def test_ext_country_switches():
-    """EXT records require the requested inclusion switch and country scope."""
+    """EXT records require the requested inclusion switch and country scope.
+
+    Returns:
+        None. EXT records require the requested inclusion switch and country scope.
+    """
     assert assigned_country("EXT", "AT", include_ext=False, include_all_countries=False) is None
     assert assigned_country("EXT", "AT", include_ext=True, include_all_countries=False) == "AT"
     assert assigned_country("EXT", "US", include_ext=True, include_all_countries=False) is None
@@ -12,7 +16,11 @@ def test_ext_country_switches():
 
 
 def test_html_summary_and_points_columns():
-    """Flourish HTML begins with a break and the dataframe uses reference columns."""
+    """Flourish HTML begins with a break and the dataframe uses reference columns.
+
+    Returns:
+        None. Flourish HTML begins with a break and the dataframe uses reference columns.
+    """
     point = FlourishPoint("AT", frozenset({"bb1"}), frozenset({"c1", "c2"}), {"SAMPLE": 2})
     html = html_summary(point, "https://directory.bbmri-eric.eu")
     assert html.startswith("<br>")
@@ -25,14 +33,68 @@ def test_html_summary_and_points_columns():
 
 
 def test_build_points_aggregates_member_and_enabled_ext_records():
-    """Selected biobanks and collections are assigned by Node with EXT opt-in."""
+    """Selected biobanks and collections are assigned by Node with EXT opt-in.
+
+    Returns:
+        None. Selected biobanks and collections are assigned by Node with EXT opt-in.
+    """
     class DirectoryFixture:
-        def getBiobanks(self): return [{"id": "at"}, {"id": "ext"}]
-        def getCollections(self): return [{"id": "at-c"}, {"id": "ext-c"}]
-        def getBiobankNN(self, item): return {"at": "AT", "ext": "EXT"}[item]
-        def getBiobankCountry(self, item): return "AT"
-        def getCollectionNN(self, item): return "EXT" if item == "ext-c" else "AT"
-        def getCollectionCountry(self, item): return "AT"
+        """Provide directory fixture used to isolate the tested behavior.
+        """
+        def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
+            return [{"id": "at"}, {"id": "ext"}]
+        def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
+            return [{"id": "at-c"}, {"id": "ext-c"}]
+        def getBiobankNN(self, item):
+            """Return fixture national-node code for the requested biobank.
+
+            Args:
+                item: Biobank identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested biobank.
+            """
+            return {"at": "AT", "ext": "EXT"}[item]
+        def getBiobankCountry(self, item):
+            """Return fixture country code for the requested biobank.
+
+            Args:
+                item: Biobank identifier whose fixture country code this stub returns.
+
+            Returns:
+                The fixture country code for the requested biobank.
+            """
+            return "AT"
+        def getCollectionNN(self, item):
+            """Return fixture national-node code for the requested collection.
+
+            Args:
+                item: Collection identifier whose fixture national-node code this stub returns.
+
+            Returns:
+                The fixture national-node code for the requested collection.
+            """
+            return "EXT" if item == "ext-c" else "AT"
+        def getCollectionCountry(self, item):
+            """Return fixture country code for the requested collection.
+
+            Args:
+                item: Collection identifier whose fixture country code this stub returns.
+
+            Returns:
+                The fixture country code for the requested collection.
+            """
+            return "AT"
 
     points = build_points(DirectoryFixture(), include_ext=True, include_all_countries=False)
     assert len(points) == 1

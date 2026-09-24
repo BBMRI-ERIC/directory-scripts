@@ -1,3 +1,5 @@
+"""Test ai cache behavior."""
+
 import json
 import copy
 from pathlib import Path
@@ -7,22 +9,51 @@ from ai_cache import load_ai_findings_for_directory
 
 
 class DirectoryStub:
+    """Provide ERIC collections and a copied initial checksum baseline for AI cache tests.
+    """
     def __init__(self, collections, *, include_withdrawn=False, only_withdrawn=False):
+        """Copy collection inputs, record withdrawal scope, and start an empty checksum snapshot.
+
+        Args:
+            collections: Synthetic collection records from which AI-cache checksums are derived.
+            include_withdrawn: Whether withdrawn records are eligible for cache reuse.
+            only_withdrawn: Whether cache reuse is restricted to withdrawn records; also enables include_withdrawn.
+        """
         self._collections = list(collections)
         self.include_withdrawn_entities = include_withdrawn or only_withdrawn
         self.only_withdrawn_entities = only_withdrawn
         self._ai_checksum_snapshot = {}
 
     def getSchema(self):
+        """Return schema string selected for the fake Directory session.
+
+        Returns:
+            The schema string selected for the fake Directory session.
+        """
         return "ERIC"
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return list(self._collections)
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return []
 
     def prepare_ai_cache_checksum_state(self):
+        """Prepare a checksum fixture for AI-cache tests.
+
+        Returns:
+            None. Prepare a checksum fixture for AI-cache tests.
+        """
         if self._ai_checksum_snapshot:
             return
         self._ai_checksum_snapshot = {
@@ -33,12 +64,31 @@ class DirectoryStub:
         }
 
     def get_ai_checksum_entity(self, entity_type, entity_id):
+        """Return fixture checksum stored for the requested entity type and identifier.
+
+        Args:
+            entity_type: Entity-type namespace containing the requested fixture checksum.
+            entity_id: Identifier selecting one checksum from the entity-type fixture mapping.
+
+        Returns:
+            The fixture checksum stored for the requested entity type and identifier.
+        """
         if not self._ai_checksum_snapshot:
             self.prepare_ai_cache_checksum_state()
         return self._ai_checksum_snapshot.get(entity_type, {}).get(entity_id)
 
 
 def build_collection(collection_id, **overrides):
+    """Build the collection fixture.
+
+    Args:
+        collection_id: Identifier inserted into the synthetic collection record.
+        **overrides: Field overrides merged into the synthetic collection record.
+
+    Returns:
+        New active collection dictionary with empty text/ontology fields and unset
+        age bounds, then overrides applied; suitable for isolated checksum mutations.
+    """
     collection = {
         "id": collection_id,
         "name": "Collection",
@@ -55,18 +105,46 @@ def build_collection(collection_id, **overrides):
 
 
 def write_payload(root, payload):
+    """Write the payload fixture.
+
+    Args:
+        root: Temporary root directory that receives serialized fixture files.
+        payload: Serialized fixture payload written below the temporary cache root.
+
+    Returns:
+        None. Writes the payload fixture.
+    """
     schema_dir = root / "ERIC"
     schema_dir.mkdir(parents=True, exist_ok=True)
     (schema_dir / "study-text.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def write_named_payload(root, filename, payload):
+    """Write the named payload fixture.
+
+    Args:
+        root: Temporary root directory that receives serialized fixture files.
+        filename: JSON filename relative to the ERIC schema cache directory under root.
+        payload: Serialized fixture payload written under the requested fixture filename.
+
+    Returns:
+        None. Writes the named payload fixture.
+    """
     schema_dir = root / "ERIC"
     schema_dir.mkdir(parents=True, exist_ok=True)
     (schema_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_load_ai_findings_for_directory_filters_stale_entities(monkeypatch, tmp_path):
+    """Verify load ai findings for directory filters stale entities.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load ai findings for directory filters stale entities.
+    """
     original = build_collection("col1", description="Baseline follow-up visit", type=["SAMPLE"])
     changed = build_collection("col2", description="Original description", type=["SAMPLE"])
     fields = ["COLLECTION.name", "COLLECTION.description", "COLLECTION.type"]
@@ -137,6 +215,15 @@ def test_load_ai_findings_for_directory_filters_stale_entities(monkeypatch, tmp_
 
 
 def test_load_ai_findings_for_directory_reports_scope_mismatch(monkeypatch, tmp_path):
+    """Verify load ai findings for directory reports scope mismatch.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load ai findings for directory reports scope mismatch.
+    """
     collection = build_collection("col1")
     fields = ["COLLECTION.name", "COLLECTION.description", "COLLECTION.type"]
     payload = {
@@ -166,6 +253,15 @@ def test_load_ai_findings_for_directory_reports_scope_mismatch(monkeypatch, tmp_
 
 
 def test_load_ai_findings_for_directory_uses_pristine_checksum_snapshot(monkeypatch, tmp_path):
+    """Verify load ai findings for directory uses pristine checksum snapshot.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load ai findings for directory uses pristine checksum snapshot.
+    """
     collection = build_collection(
         "col1",
         description="Narrative access conditions",
@@ -214,6 +310,15 @@ def test_load_ai_findings_for_directory_uses_pristine_checksum_snapshot(monkeypa
 
 
 def test_load_ai_findings_for_directory_aggregates_multiple_payload_files(monkeypatch, tmp_path):
+    """Verify load ai findings for directory aggregates multiple payload files.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load ai findings for directory aggregates multiple payload files.
+    """
     collection_a = build_collection("colA", description="Access narrative")
     collection_b = build_collection("colB", description="Material narrative")
     fields = ["COLLECTION.name", "COLLECTION.description"]
@@ -295,6 +400,15 @@ def test_load_ai_findings_for_directory_aggregates_multiple_payload_files(monkey
 
 
 def test_load_ai_payloads_skips_invalid_payload_with_warning(monkeypatch, tmp_path):
+    """Verify load ai payloads skips invalid payload with warning.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load ai payloads skips invalid payload with warning.
+    """
     write_named_payload(
         tmp_path,
         "broken.json",
@@ -315,6 +429,15 @@ def test_load_ai_payloads_skips_invalid_payload_with_warning(monkeypatch, tmp_pa
 
 
 def test_load_ai_payloads_rejects_payload_missing_findings(monkeypatch, tmp_path):
+    """Verify load ai payloads rejects payload missing findings.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load ai payloads rejects payload missing findings.
+    """
     write_named_payload(
         tmp_path,
         "missing-findings.json",

@@ -1,7 +1,19 @@
+"""Test text consistency behavior."""
+
 from text_consistency import build_text_consistency_findings
 
 
 def build_collection(collection_id, **overrides):
+    """Build the collection fixture.
+
+    Args:
+        collection_id: Identifier inserted into the synthetic collection record.
+        **overrides: Field overrides merged into the synthetic collection record.
+
+    Returns:
+        New active collection dictionary with empty description and ontology lists,
+        unset age bounds, and overrides supplying the text/metadata contradiction.
+    """
     collection = {
         "id": collection_id,
         "name": "Collection",
@@ -18,10 +30,23 @@ def build_collection(collection_id, **overrides):
 
 
 def findings_by_id(collection):
+    """Index one collection's text-consistency findings by check identifier.
+
+    Args:
+        collection: Collection fixture whose findings are indexed by identifier.
+
+    Returns:
+        Check-ID-to-finding dictionary; if a check emits multiple findings, the last one wins.
+    """
     return {finding["check_id"]: finding for finding in build_text_consistency_findings(collection)}
 
 
 def test_age_range_skips_mixed_population_but_flags_pediatric_gap():
+    """Verify age range skips mixed population but flags pediatric gap.
+
+    Returns:
+        None. Verifies age range skips mixed population but flags pediatric gap.
+    """
     mixed = build_collection(
         "mixed",
         description="Samples from adult and pediatric patients.",
@@ -40,6 +65,11 @@ def test_age_range_skips_mixed_population_but_flags_pediatric_gap():
 
 
 def test_study_type_is_conservative_for_case_control_and_prospective():
+    """Verify study type is conservative for case control and prospective.
+
+    Returns:
+        None. Verifies study type is conservative for case control and prospective.
+    """
     follow_up = build_collection(
         "follow-up",
         description="Participants are seen for follow-up every year.",
@@ -64,6 +94,11 @@ def test_study_type_is_conservative_for_case_control_and_prospective():
 
 
 def test_ffpe_material_skips_slide_and_derived_mentions_but_keeps_blocks():
+    """Verify ffpe material skips slide and derived mentions but keeps blocks.
+
+    Returns:
+        None. Verifies ffpe material skips slide and derived mentions but keeps blocks.
+    """
     slides = build_collection(
         "slides",
         description="Whole slide images from H&E-stained FFPE tissue sections.",
@@ -88,6 +123,11 @@ def test_ffpe_material_skips_slide_and_derived_mentions_but_keeps_blocks():
 
 
 def test_ffpe_material_skips_negative_and_indirect_mentions():
+    """Verify ffpe material skips negative and indirect mentions.
+
+    Returns:
+        None. Verifies ffpe material skips negative and indirect mentions.
+    """
     indirect = build_collection(
         "indirect",
         description=(
@@ -107,6 +147,11 @@ def test_ffpe_material_skips_negative_and_indirect_mentions():
 
 
 def test_covid_diag_supports_long_covid_and_skips_context_only_cases():
+    """Verify covid diag supports long covid and skips context only cases.
+
+    Returns:
+        None. Verifies covid diag supports long covid and skips context only cases.
+    """
     long_covid = build_collection(
         "long-covid",
         description="A post-COVID and long COVID outpatient cohort.",

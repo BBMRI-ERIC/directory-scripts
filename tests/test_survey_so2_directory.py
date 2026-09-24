@@ -1,3 +1,5 @@
+"""Test survey so2 directory behavior."""
+
 from argparse import Namespace
 import ast
 from datetime import datetime
@@ -9,6 +11,14 @@ import pytest
 
 
 def write_descriptive_schema(tmp_path: Path) -> Path:
+    """Write the descriptive schema fixture.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to descriptive-schema.json describing the controlled Digital maturity question.
+    """
     payload = {
         "schema_version": "1",
         "input": {
@@ -40,7 +50,14 @@ def write_descriptive_schema(tmp_path: Path) -> Path:
 
 
 def write_descriptive_form_manifest(tmp_path: Path) -> Path:
-    """Write runtime JSON form metadata for the controlled question."""
+    """Write runtime JSON form metadata for the controlled question.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to descriptive-form.json containing the mandatory single-choice Digital maturity field.
+    """
     path = tmp_path / "descriptive-form.json"
     path.write_text(json.dumps({
         "schema_version": 1,
@@ -60,7 +77,14 @@ def write_descriptive_form_manifest(tmp_path: Path) -> Path:
 
 
 def write_empty_association_registry(tmp_path: Path) -> Path:
-    """Write a valid registry for tests that intentionally have no association panels."""
+    """Write a valid registry for tests that intentionally have no association panels.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to empty-association-registry.json, whose definitions list is intentionally empty.
+    """
     path = tmp_path / "empty-association-registry.json"
     path.write_text(json.dumps({"schema_version": "1", "definitions": []}), encoding="utf-8")
     return path
@@ -68,6 +92,14 @@ def write_empty_association_registry(tmp_path: Path) -> Path:
 
 
 def write_descriptive_workbook(tmp_path: Path) -> Path:
+    """Write the descriptive workbook fixture.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to descriptive.xlsx with one Czech institution answering High to Digital maturity.
+    """
     path = tmp_path / "descriptive.xlsx"
     workbook = __import__("openpyxl").Workbook()
     sheet = workbook.active
@@ -82,6 +114,15 @@ def write_descriptive_workbook(tmp_path: Path) -> Path:
 
 
 def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
+    """Verify describe has no directory dependency.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies describe has no directory dependency.
+    """
     module = load_module()
     monkeypatch.setattr(module, "Directory", lambda *args, **kwargs: pytest.fail("Directory must not be used"))
     output_json = tmp_path / "descriptive.json"
@@ -98,7 +139,15 @@ def test_describe_has_no_directory_dependency(tmp_path, monkeypatch):
 
 
 def test_describe_passes_association_heatmap_registry_provenance_and_excludes_exploratory_pairs(tmp_path, monkeypatch):
-    """Describe embeds only default registry definitions unless explicitly opted in."""
+    """Describe embeds only default registry definitions unless explicitly opted in.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Describe embeds only default registry definitions unless explicitly opted in.
+    """
     module = load_module()
     registry = tmp_path / "association-heatmaps.json"
     registry.write_text("{}", encoding="utf-8")
@@ -106,29 +155,74 @@ def test_describe_passes_association_heatmap_registry_provenance_and_excludes_ex
     captured = {}
 
     class DescriptiveStub:
+        """Capture registry provenance and default/exploratory pair selection without rendering a report.
+        """
         class InputError(Exception):
+            """Stand in for descriptive input-validation failures caught by the CLI.
+            """
             pass
 
         @staticmethod
         def load_descriptive_schema(_path):
+            """Load the descriptive schema fixture.
+
+            Args:
+                _path: Schema JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded descriptive schema used by the test.
+            """
             return {}
 
         @staticmethod
         def load_association_heatmap_registry(_path):
+            """Load the association heatmap registry fixture.
+
+            Args:
+                _path: Association-registry JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded association heatmap registry used by the test.
+            """
             return ()
 
         @staticmethod
         def load_form_manifest_structure(_path):
+            """Load the form manifest structure fixture.
+
+            Args:
+                _path: EUS form-manifest JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded form manifest structure used by the test.
+            """
             return {}
 
         @staticmethod
         def read_descriptive_workbook(_path, _schema):
+            """Return the controlled workbook response from the patched reader.
+
+            Args:
+                _path: Response XLSX filename ignored because the stub supplies in-memory rows.
+                _schema: Descriptive schema deliberately ignored by the patched helper.
+
+            Returns:
+                The parsed descriptive workbook fixture value.
+            """
             return Namespace(responses=__import__("pandas").DataFrame({
                 "Digital maturity": ["High"], "source_row": [5],
             }))
 
         @staticmethod
         def load_association_heatmap_registry(_path):
+            """Load the association heatmap registry fixture.
+
+            Args:
+                _path: Association-registry JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded association heatmap registry used by the test.
+            """
             return (
                 Namespace(mode="default"),
                 Namespace(mode="exploratory"),
@@ -136,14 +230,41 @@ def test_describe_passes_association_heatmap_registry_provenance_and_excludes_ex
 
         @staticmethod
         def validate_descriptive_schema(_schema, _headers):
+            """Validate the controlled schema through the patched validator.
+
+            Args:
+                _schema: Descriptive schema deliberately ignored by the patched helper.
+                _headers: Worksheet headers deliberately ignored by the patched helper.
+
+            Returns:
+                One question stub with ID digital_maturity for association-registry validation.
+            """
             return (Namespace(question_id="digital_maturity"),)
 
         @staticmethod
         def validate_association_definitions(definitions, _questions):
+            """Validate controlled association definitions through the patched validator.
+
+            Args:
+                definitions: Association definitions submitted to the validation bypass.
+                _questions: Question definitions deliberately ignored by the validation bypass.
+
+            Returns:
+                None. Validate controlled association definitions through the patched validator.
+            """
             captured["validated"] = definitions
 
         @staticmethod
         def build_descriptive_payload(*_args, **kwargs):
+            """Build the descriptive payload fixture.
+
+            Args:
+                *_args: Workbook/schema positional inputs ignored while capturing association options.
+                **kwargs: Association definitions, registry hash, and provenance options observed without computing statistics.
+
+            Returns:
+                The constructed descriptive payload fixture.
+            """
             captured.update(kwargs)
             return {"payload_type": "so2_descriptive_statistics"}
 
@@ -165,7 +286,14 @@ def test_describe_passes_association_heatmap_registry_provenance_and_excludes_ex
 
 
 def test_unknown_association_heatmap_registry_blocks_all_describe_publication(tmp_path):
-    """An unreadable registry fails before JSON, TeX, PDF, or chart publication."""
+    """An unreadable registry fails before JSON, TeX, PDF, or chart publication.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. An unreadable registry fails before JSON, TeX, PDF, or chart publication.
+    """
     module = load_module()
     output_json = tmp_path / "payload.json"
     output_tex = tmp_path / "report.tex"
@@ -190,7 +318,14 @@ def test_unknown_association_heatmap_registry_blocks_all_describe_publication(tm
 
 
 def test_describe_refuses_association_registry_as_output(tmp_path):
-    """The association registry is an input and must never be overwritten."""
+    """The association registry is an input and must never be overwritten.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. The association registry is an input and must never be overwritten.
+    """
     module = load_module()
     registry = write_empty_association_registry(tmp_path)
     args = module.build_cli().parse_args([
@@ -206,7 +341,14 @@ def test_describe_refuses_association_registry_as_output(tmp_path):
 
 
 def test_render_descriptive_cli_accepts_exploratory_association_opt_in(tmp_path):
-    """Rerendering can retain exploratory panels already present in a payload."""
+    """Rerendering can retain exploratory panels already present in a payload.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Rerendering can retain exploratory panels already present in a payload.
+    """
     module = load_module()
     args = module.build_cli().parse_args([
         "render-descriptive-report", "-i", str(tmp_path / "payload.json"),
@@ -218,36 +360,102 @@ def test_render_descriptive_cli_accepts_exploratory_association_opt_in(tmp_path)
 
 
 def test_default_registry_schema_mismatch_blocks_describe_publication(tmp_path, monkeypatch):
-    """A loaded default registry must not be silently discarded on schema mismatch."""
+    """A loaded default registry must not be silently discarded on schema mismatch.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A loaded default registry must not be silently discarded on schema mismatch.
+    """
     module = load_module()
     output_json = tmp_path / "payload.json"
 
     class DescriptiveStub:
+        """Inject an association-registry/schema mismatch before output publication.
+        """
         class InputError(Exception):
+            """Stand in for descriptive input-validation failures caught by the CLI.
+            """
             pass
 
         @staticmethod
         def load_descriptive_schema(_path):
+            """Load the descriptive schema fixture.
+
+            Args:
+                _path: Schema JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded descriptive schema used by the test.
+            """
             return {"output": {"source_row_column": "source_row"}}
 
         @staticmethod
         def load_form_manifest_structure(_path):
+            """Load the form manifest structure fixture.
+
+            Args:
+                _path: EUS form-manifest JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded form manifest structure used by the test.
+            """
             return {}
 
         @staticmethod
         def read_descriptive_workbook(_path, _schema):
+            """Return the controlled workbook response from the patched reader.
+
+            Args:
+                _path: Response XLSX filename ignored because the stub supplies in-memory rows.
+                _schema: Descriptive schema deliberately ignored by the patched helper.
+
+            Returns:
+                The parsed descriptive workbook fixture value.
+            """
             return Namespace(responses=__import__("pandas").DataFrame({"source_row": [5]}))
 
         @staticmethod
         def validate_descriptive_schema(_schema, _headers):
+            """Validate the controlled schema through the patched validator.
+
+            Args:
+                _schema: Descriptive schema deliberately ignored by the patched helper.
+                _headers: Worksheet headers deliberately ignored by the patched helper.
+
+            Returns:
+                One question stub with ID unrelated, intentionally incompatible with the registry.
+            """
             return (Namespace(question_id="unrelated"),)
 
         @staticmethod
         def validate_association_definitions(_definitions, _questions):
+            """Validate controlled association definitions through the patched validator.
+
+            Args:
+                _definitions: Association definitions deliberately ignored by the validation bypass.
+                _questions: Question definitions deliberately ignored by the validation bypass.
+
+            Returns:
+                None. Validate controlled association definitions through the patched validator.
+            """
             raise DescriptiveStub.InputError("schema mismatch")
 
         @staticmethod
         def build_descriptive_payload(_workbook, _schema, _form_structure, **_kwargs):
+            """Build the descriptive payload fixture.
+
+            Args:
+                _workbook: Workbook deliberately ignored by the patched payload builder.
+                _schema: Schema deliberately ignored by the patched payload builder.
+                _form_structure: Form structure deliberately ignored by the patched payload builder.
+                **_kwargs: Additional keyword arguments accepted to preserve the patched builder signature.
+
+            Returns:
+                The constructed descriptive payload fixture.
+            """
             return {"payload_type": "so2_descriptive_statistics"}
 
     monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
@@ -270,7 +478,11 @@ def test_default_registry_schema_mismatch_blocks_describe_publication(tmp_path, 
 
 
 def test_piechart_ratio_parser_accepts_positive_width_to_height_values():
-    """The CLI ratio accepts conventional, wide, and tall chart proportions."""
+    """The CLI ratio accepts conventional, wide, and tall chart proportions.
+
+    Returns:
+        None. The CLI ratio accepts conventional, wide, and tall chart proportions.
+    """
     module = load_module()
 
     assert module._parse_piechart_ratio("4:3") == pytest.approx(4 / 3)
@@ -283,7 +495,14 @@ def test_piechart_ratio_parser_accepts_positive_width_to_height_values():
 
 
 def test_describe_refuses_to_overwrite_existing_payload(tmp_path):
-    """The primary descriptive JSON is a new output, not an overwrite target."""
+    """The primary descriptive JSON is a new output, not an overwrite target.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. The primary descriptive JSON is a new output, not an overwrite target.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     output_json.write_text("keep me", encoding="utf-8")
@@ -301,7 +520,14 @@ def test_describe_refuses_to_overwrite_existing_payload(tmp_path):
 
 
 def test_describe_overwrite_replaces_existing_json(tmp_path):
-    """Explicit overwrite permits a deliberate descriptive JSON rerun."""
+    """Explicit overwrite permits a deliberate descriptive JSON rerun.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Explicit overwrite permits a deliberate descriptive JSON rerun.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     output_json.write_text("old payload", encoding="utf-8")
@@ -320,7 +546,15 @@ def test_describe_overwrite_replaces_existing_json(tmp_path):
 def test_describe_records_report_relative_chart_paths_before_writing_payload(
     tmp_path, monkeypatch,
 ):
-    """Chart filenames added by rendering are persisted in the JSON payload."""
+    """Chart filenames added by rendering are persisted in the JSON payload.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Chart filenames added by rendering are persisted in the JSON payload.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     output_tex = tmp_path / "publication" / "report.tex"
@@ -328,35 +562,101 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
     chart_dir = output_tex.parent / "charts"
 
     class DescriptiveStub:
+        """Capture chart-relative paths and renderer options while replacing TeX/PDF generation with sentinels.
+        """
         class InputError(Exception):
+            """Stand in for descriptive input-validation failures caught by the CLI.
+            """
             pass
 
         @staticmethod
         def load_descriptive_schema(_path):
+            """Load the descriptive schema fixture.
+
+            Args:
+                _path: Schema JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded descriptive schema used by the test.
+            """
             return {}
 
         @staticmethod
         def load_association_heatmap_registry(_path):
+            """Load the association heatmap registry fixture.
+
+            Args:
+                _path: Association-registry JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded association heatmap registry used by the test.
+            """
             return ()
 
         @staticmethod
         def load_form_manifest_structure(_path):
+            """Load the form manifest structure fixture.
+
+            Args:
+                _path: EUS form-manifest JSON filename ignored by the stub; no file is read.
+
+            Returns:
+                The loaded form manifest structure used by the test.
+            """
             return object()
 
         @staticmethod
         def read_descriptive_workbook(_path, _schema):
+            """Return the controlled workbook response from the patched reader.
+
+            Args:
+                _path: Response XLSX filename ignored because the stub supplies in-memory rows.
+                _schema: Descriptive schema deliberately ignored by the patched helper.
+
+            Returns:
+                The parsed descriptive workbook fixture value.
+            """
             return Namespace(responses=__import__("pandas").DataFrame({"source_row": [5]}))
 
         @staticmethod
         def validate_descriptive_schema(_schema, _headers):
+            """Validate the controlled schema through the patched validator.
+
+            Args:
+                _schema: Descriptive schema deliberately ignored by the patched helper.
+                _headers: Worksheet headers deliberately ignored by the patched helper.
+
+            Returns:
+                Empty tuple: this path tests chart publication rather than question validation.
+            """
             return ()
 
         @staticmethod
         def validate_association_definitions(definitions, _questions):
+            """Validate controlled association definitions through the patched validator.
+
+            Args:
+                definitions: Association definitions submitted to the validation bypass.
+                _questions: Question definitions deliberately ignored by the validation bypass.
+
+            Returns:
+                None. Validate controlled association definitions through the patched validator.
+            """
             assert definitions == ()
 
         @staticmethod
         def build_descriptive_payload(_workbook, _schema, _form_structure, **kwargs):
+            """Build the descriptive payload fixture.
+
+            Args:
+                _workbook: Workbook deliberately ignored by the patched payload builder.
+                _schema: Schema deliberately ignored by the patched payload builder.
+                _form_structure: Form structure deliberately ignored by the patched payload builder.
+                **kwargs: Association definitions, registry hash, and provenance options observed without computing statistics.
+
+            Returns:
+                The constructed descriptive payload fixture.
+            """
             assert kwargs["association_definitions"] == ()
             assert len(kwargs["association_registry_sha256"]) == 64
             return {
@@ -371,6 +671,20 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             include_parent_context=False, include_exploratory_association_heatmaps=False,
             max_piechart_ratio=4 / 3,
         ):
+            """Render controlled TeX through the patched report renderer.
+
+            Args:
+                payload: Descriptive payload forwarded to the patched TeX renderer.
+                chart_path: Chart output directory used to derive the report-relative q.pdf link.
+                report_path: Final TeX output filename anchoring relative chart paths; asserted against output_tex.
+                include_contribution_tables: Contribution-table toggle; asserted false for this CLI invocation.
+                include_parent_context: Free-text parent-answer toggle; asserted true for this CLI invocation.
+                include_exploratory_association_heatmaps: Exploratory-panel toggle; asserted false for this CLI invocation.
+                max_piechart_ratio: Piechart aspect-ratio limit forwarded to the patched TeX renderer.
+
+            Returns:
+                A sentinel object standing in for rendered TeX during CLI orchestration.
+            """
             assert include_contribution_tables is False
             assert include_parent_context is True
             assert include_exploratory_association_heatmaps is False
@@ -388,6 +702,19 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             _rendered, tex_path, _pdf_path, _chart_dir, overwrite=False,
             additional_text_outputs=None,
         ):
+            """Render controlled PDF output through the patched report renderer.
+
+            Args:
+                _rendered: Rendered TeX fixture deliberately ignored by the patched PDF renderer.
+                tex_path: Destination where the stub writes sentinel report text instead of compiling TeX.
+                _pdf_path: Requested PDF destination, ignored; this double creates no PDF.
+                _chart_dir: Chart-directory fixture deliberately ignored by the patched PDF renderer.
+                overwrite: Overwrite flag asserted when the patched PDF renderer is invoked.
+                additional_text_outputs: Additional staged text outputs passed through the patched PDF renderer.
+
+            Returns:
+                None. Render controlled PDF output through the patched report renderer.
+            """
             assert overwrite is False
             Path(tex_path).write_text("report", encoding="utf-8")
             for target, text in (additional_text_outputs or {}).items():
@@ -412,12 +739,30 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
 
 
 def test_describe_wraps_payload_write_failure_as_input_error(tmp_path, monkeypatch):
-    """Filesystem errors while writing the requested JSON are actionable."""
+    """Filesystem errors while writing the requested JSON are actionable.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Filesystem errors while writing the requested JSON are actionable.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     real_write_text = Path.write_text
 
     def fail_output(path, *args, **kwargs):
+        """Inject the fail output fixture.
+
+        Args:
+            path: Path.write_text receiver; writing output_json raises OSError, other paths use the real writer.
+            *args: Path.write_text content/options forwarded for non-rejected destinations.
+            **kwargs: Path.write_text keyword options forwarded unchanged for non-rejected destinations.
+
+        Returns:
+            The original text-write result when output-publication failure injection is inactive.
+        """
         if path == output_json:
             raise OSError("simulated JSON write failure")
         return real_write_text(path, *args, **kwargs)
@@ -436,7 +781,14 @@ def test_describe_wraps_payload_write_failure_as_input_error(tmp_path, monkeypat
 
 
 def test_render_descriptive_rejects_nonobject_json_root(tmp_path):
-    """A JSON array cannot escape as an incidental attribute error."""
+    """A JSON array cannot escape as an incidental attribute error.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. A JSON array cannot escape as an incidental attribute error.
+    """
     module = load_module()
     input_json = tmp_path / "payload.json"
     input_json.write_text("[]", encoding="utf-8")
@@ -452,6 +804,11 @@ def test_render_descriptive_rejects_nonobject_json_root(tmp_path):
 
 
 def test_every_top_level_survey_function_has_a_docstring():
+    """Verify every top level survey function has a docstring.
+
+    Returns:
+        None. Verifies every top level survey function has a docstring.
+    """
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
 
     undocumented = [
@@ -464,6 +821,14 @@ def test_every_top_level_survey_function_has_a_docstring():
 
 
 def test_describe_rejects_output_alias_to_source(tmp_path):
+    """Verify describe rejects output alias to source.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies describe rejects output alias to source.
+    """
     module = load_module()
     source = write_descriptive_workbook(tmp_path)
     args = module.build_cli().parse_args([
@@ -478,7 +843,14 @@ def test_describe_rejects_output_alias_to_source(tmp_path):
 
 
 def test_describe_rejects_implicit_tex_path_that_aliases_output_json(tmp_path):
-    """A derived TeX target must not replace the descriptive JSON payload."""
+    """A derived TeX target must not replace the descriptive JSON payload.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. A derived TeX target must not replace the descriptive JSON payload.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.tex"
     monkeypatch = pytest.MonkeyPatch()
@@ -505,6 +877,14 @@ def test_describe_rejects_implicit_tex_path_that_aliases_output_json(tmp_path):
 
 
 def test_render_descriptive_rejects_legacy_findings_json(tmp_path):
+    """Verify render descriptive rejects legacy findings json.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies render descriptive rejects legacy findings json.
+    """
     module = load_module()
     input_json = tmp_path / "findings.json"
     input_json.write_text(json.dumps({"summary": {}}), encoding="utf-8")
@@ -520,7 +900,14 @@ def test_render_descriptive_rejects_legacy_findings_json(tmp_path):
 
 
 def test_render_descriptive_rejects_non_object_json_as_input_error(tmp_path):
-    """A syntactically valid but malformed payload has a user-facing failure."""
+    """A syntactically valid but malformed payload has a user-facing failure.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. A syntactically valid but malformed payload has a user-facing failure.
+    """
     module = load_module()
     input_json = tmp_path / "payload.json"
     input_json.write_text("[]", encoding="utf-8")
@@ -536,7 +923,15 @@ def test_render_descriptive_rejects_non_object_json_as_input_error(tmp_path):
 
 
 def test_descriptive_commands_require_new_file_outputs(tmp_path, monkeypatch):
-    """Descriptive CLI commands do not silently replace prior report artifacts."""
+    """Descriptive CLI commands do not silently replace prior report artifacts.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Descriptive CLI commands do not silently replace prior report artifacts.
+    """
     module = load_module()
     source = write_descriptive_workbook(tmp_path)
     schema = write_descriptive_schema(tmp_path)
@@ -575,10 +970,27 @@ def test_descriptive_commands_require_new_file_outputs(tmp_path, monkeypatch):
 
 
 def test_write_json_translates_output_failure_to_input_error(tmp_path, monkeypatch):
-    """Filesystem write errors are reported through the CLI's user-facing error type."""
+    """Filesystem write errors are reported through the CLI's user-facing error type.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Filesystem write errors are reported through the CLI's user-facing error type.
+    """
     module = load_module()
 
     def fail_write(*_args, **_kwargs):
+        """Inject the fail write fixture.
+
+        Args:
+            *_args: Ignored writer/renderer positional inputs; this double always raises the injected failure.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            None. Inject the fail write fixture.
+        """
         raise OSError("simulated JSON write failure")
 
     monkeypatch.setattr(Path, "write_text", fail_write)
@@ -588,7 +1000,15 @@ def test_write_json_translates_output_failure_to_input_error(tmp_path, monkeypat
 
 
 def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
-    """A failed multi-output describe operation leaves no payload-only partial result."""
+    """A failed multi-output describe operation leaves no payload-only partial result.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A failed multi-output describe operation leaves no payload-only partial result.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     args = module.build_cli().parse_args([
@@ -601,6 +1021,15 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
     ])
 
     def fail_render(*_args, **_kwargs):
+        """Inject the fail render fixture.
+
+        Args:
+            *_args: Ignored writer/renderer positional inputs; this double always raises the injected failure.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            None. Inject the fail render fixture.
+        """
         raise module.InputError("simulated rendering failure")
 
     monkeypatch.setattr(module, "_render_descriptive_payload", fail_render)
@@ -612,7 +1041,15 @@ def test_describe_removes_new_json_if_rendering_fails(tmp_path, monkeypatch):
 
 
 def test_describe_delegates_payload_publication_to_the_render_transaction(tmp_path, monkeypatch):
-    """Rendered reports receive JSON as a transaction member rather than a later write."""
+    """Rendered reports receive JSON as a transaction member rather than a later write.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Rendered reports receive JSON as a transaction member rather than a later write.
+    """
     module = load_module()
     output_json = tmp_path / "descriptive.json"
     output_tex = tmp_path / "descriptive.tex"
@@ -626,6 +1063,17 @@ def test_describe_delegates_payload_publication_to_the_render_transaction(tmp_pa
     ])
 
     def fake_render(_payload, render_args, _input_paths, additional_json_output):
+        """Write a sentinel TeX artifact, then raise a publication InputError.
+
+        Args:
+            _payload: Ignored payload placeholder accepted to match the patched renderer signature.
+            render_args: Renderer arguments captured by the fake report renderer.
+            _input_paths: Ignored input-path placeholder accepted to match the patched renderer signature.
+            additional_json_output: Optional JSON target captured by the fake renderer.
+
+        Returns:
+            None. Always raises InputError after creating the TeX artifact.
+        """
         Path(render_args.output_tex).write_text("rendered", encoding="utf-8")
         assert additional_json_output == output_json
         raise module.InputError("simulated publication failure")
@@ -640,7 +1088,11 @@ def test_describe_delegates_payload_publication_to_the_render_transaction(tmp_pa
 
 
 def test_public_descriptive_cli_apis_document_contracts():
-    """Public descriptive orchestration APIs document inputs, results, and failures."""
+    """Public descriptive orchestration APIs document inputs, results, and failures.
+
+    Returns:
+        None. Public descriptive orchestration APIs document inputs, results, and failures.
+    """
     module = load_module()
 
     for function in (
@@ -655,6 +1107,11 @@ def test_public_descriptive_cli_apis_document_contracts():
 
 
 def test_current_commands_keep_existing_parser_contract():
+    """Verify current commands keep existing parser contract.
+
+    Returns:
+        None. Verifies current commands keep existing parser contract.
+    """
     parser = load_module().build_cli()
 
     assert parser.parse_args(["analyze", "-i", "survey.xlsx", "-o", "findings.json"]).command == "analyze"
@@ -665,6 +1122,11 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "survey-so2-directory.py"
 
 
 def load_module():
+    """Import the SO2 CLI without executing an analysis or rendering command.
+
+    Returns:
+        Newly executed survey-so2-directory.py module with patchable Directory and renderer dependencies.
+    """
     spec = spec_from_file_location("survey_so2_directory", MODULE_PATH)
     module = module_from_spec(spec)
     assert spec.loader is not None
@@ -673,6 +1135,14 @@ def load_module():
 
 
 def write_mapping(tmp_path: Path) -> Path:
+    """Write the mapping fixture.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to mapping.json with Whole Blood mapped to Directory WHOLE_BLOOD material.
+    """
     payload = {
         "survey": {
             "file": "survey.xlsx",
@@ -693,6 +1163,14 @@ def write_mapping(tmp_path: Path) -> Path:
 
 
 def write_objectives_mapping(tmp_path: Path) -> Path:
+    """Write the objectives mapping fixture.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to objectives-mapping.json linking sample, promotion, and pathology questions to SO2 objectives.
+    """
     payload = {
         "strategic_objectives": {
             "SO2.1": {"title": "Datafication at source", "description": "x"},
@@ -732,6 +1210,14 @@ def write_objectives_mapping(tmp_path: Path) -> Path:
 
 
 def write_survey(tmp_path: Path) -> Path:
+    """Write the survey fixture.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to survey.xlsx with one Directory-resolvable Czech response in the Content sheet at row 5.
+    """
     row = {
         "Name": "Test Person",
         "Role": "Manager",
@@ -753,6 +1239,16 @@ def write_survey(tmp_path: Path) -> Path:
 
 
 def write_survey_row(tmp_path: Path, updates: dict[str, object] | None = None, *, filename: str = "survey.xlsx") -> Path:
+    """Write the survey row fixture.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        updates: Cell updates applied to the generated survey-row fixture.
+        filename: Output XLSX filename relative to tmp_path, replaced if it already exists.
+
+    Returns:
+        Path to the saved Content-sheet XLSX after applying the requested answer-cell overrides.
+    """
     row = {
         "Name": "Test Person",
         "Role": "Manager",
@@ -787,7 +1283,15 @@ def write_survey_row(tmp_path: Path, updates: dict[str, object] | None = None, *
 
 
 class DirectoryStub:
+    """Expose a Czech biobank, one collection, and its contact for survey resolution and fix proposals.
+    """
     def __init__(self, *args, **kwargs):
+        """Populate the institution, collection, and contact records used by respondent-resolution assertions.
+
+        Args:
+            *args: Directory constructor positional arguments, forwarded by subclasses and ignored by the base stub.
+            **kwargs: Directory constructor options; only schema is used (default ERIC), and subclasses forward these unchanged.
+        """
         self.schema = kwargs.get("schema", "ERIC")
         self._biobank = {
             "id": "bbmri-eric:ID:CZ_demo",
@@ -816,27 +1320,76 @@ class DirectoryStub:
         }
 
     def getSchema(self):
+        """Return schema string selected for the fake Directory session.
+
+        Returns:
+            The schema string selected for the fake Directory session.
+        """
         return self.schema
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return [self._biobank]
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [self._collection]
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return self._biobank if biobank_id == self._biobank["id"] else None
 
     def getCollectionById(self, collection_id):
+        """Return synthetic collection record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            collection_id: Collection identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic collection record selected by the requested identifier, or `None` when absent.
+        """
         return self._collection if collection_id == self._collection["id"] else None
 
     def getContacts(self):
+        """Return synthetic contact records available to the code under test.
+
+        Returns:
+            The synthetic contact records available to the code under test.
+        """
         return [self._contact]
 
     def getNetworks(self):
+        """Return synthetic network records available to the code under test.
+
+        Returns:
+            The synthetic network records available to the code under test.
+        """
         return []
 
     def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
+        """Return fixture graph relating the requested biobank to its collections.
+
+        Args:
+            biobank_id: Biobank identifier used to obtain the fixture collection graph.
+
+        Returns:
+            The fixture graph relating the requested biobank to its collections.
+        """
         import networkx as nx
         graph = nx.DiGraph()
         graph.add_node(self._biobank["id"])
@@ -845,11 +1398,23 @@ class DirectoryStub:
         return graph
 
     def getContact(self, contact_id):
+        """Return synthetic contact record selected by the requested identifier.
+
+        Args:
+            contact_id: Contact identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The synthetic contact record selected by the requested identifier.
+        """
         return self._contact
 
 
 class SwissResolutionDirectoryStub:
+    """Distinguish Bern human/animal collections and Geneva university/hospital institutions.
+    """
     def __init__(self):
+        """Populate the institution, collection, and contact records used by respondent-resolution assertions.
+        """
         self._biobanks = [
             {"id": "bbmri-eric:ID:CH_UniversityOfBern", "name": "University of Bern", "country": "CH"},
             {"id": "bbmri-eric:ID:CH_Unige", "name": "Université de Genève", "country": "CH"},
@@ -895,15 +1460,38 @@ class SwissResolutionDirectoryStub:
         ]
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return list(self._biobanks)
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return list(self._collections)
 
     def getNetworks(self):
+        """Return synthetic network records available to the code under test.
+
+        Returns:
+            The synthetic network records available to the code under test.
+        """
         return []
 
     def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
+        """Return fixture graph relating the requested biobank to its collections.
+
+        Args:
+            biobank_id: Biobank identifier used to obtain the fixture collection graph.
+
+        Returns:
+            The fixture graph relating the requested biobank to its collections.
+        """
         import networkx as nx
 
         graph = nx.DiGraph()
@@ -916,6 +1504,15 @@ class SwissResolutionDirectoryStub:
 
 
 def test_survey_so2_analyze_generates_findings_and_proposed_updates(tmp_path, monkeypatch):
+    """Verify survey so2 analyze generates findings and proposed updates.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies survey so2 analyze generates findings and proposed updates.
+    """
     module = load_module()
     mapping_path = write_mapping(tmp_path)
     objectives_mapping_path = write_objectives_mapping(tmp_path)
@@ -960,6 +1557,15 @@ def test_survey_so2_analyze_generates_findings_and_proposed_updates(tmp_path, mo
 
 
 def test_survey_so2_analyze_radiology_presence_and_explicit_size_bucket(tmp_path, monkeypatch):
+    """Verify survey so2 analyze radiology presence and explicit size bucket.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies survey so2 analyze radiology presence and explicit size bucket.
+    """
     module = load_module()
     mapping_path = write_mapping(tmp_path)
     objectives_mapping_path = write_objectives_mapping(tmp_path)
@@ -974,7 +1580,15 @@ def test_survey_so2_analyze_radiology_presence_and_explicit_size_bucket(tmp_path
     output_json = tmp_path / "radiology-size-report.json"
 
     class DirectoryExplicitSizeStub(DirectoryStub):
+        """Set the Czech collection size to 1500 for explicit-count comparison.
+        """
         def __init__(self, *args, **kwargs):
+            """Populate the institution, collection, and contact records used by respondent-resolution assertions.
+
+            Args:
+                *args: Directory constructor positional arguments, forwarded by subclasses and ignored by the base stub.
+                **kwargs: Directory constructor options; only schema is used (default ERIC), and subclasses forward these unchanged.
+            """
             super().__init__(*args, **kwargs)
             self._collection["size"] = 1500
 
@@ -1013,6 +1627,15 @@ def test_survey_so2_analyze_radiology_presence_and_explicit_size_bucket(tmp_path
 
 
 def test_survey_so2_analyze_outputs_technology_upset_artifacts(tmp_path, monkeypatch):
+    """Verify survey so2 analyze outputs technology upset artifacts.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies survey so2 analyze outputs technology upset artifacts.
+    """
     module = load_module()
     mapping_path = write_mapping(tmp_path)
     objectives_mapping_path = write_objectives_mapping(tmp_path)
@@ -1097,6 +1720,15 @@ def test_survey_so2_analyze_outputs_technology_upset_artifacts(tmp_path, monkeyp
 
 
 def test_technology_genotyping_panels_is_split_from_other_positive_detail(tmp_path, monkeypatch):
+    """Verify technology genotyping panels is split from other positive detail.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies technology genotyping panels is split from other positive detail.
+    """
     module = load_module()
     mapping_path = write_mapping(tmp_path)
     objectives_mapping_path = write_objectives_mapping(tmp_path)
@@ -1146,6 +1778,15 @@ def test_technology_genotyping_panels_is_split_from_other_positive_detail(tmp_pa
 
 
 def test_technology_other_checkbox_requires_positive_detail(tmp_path, monkeypatch):
+    """Verify technology other checkbox requires positive detail.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies technology other checkbox requires positive detail.
+    """
     module = load_module()
     mapping_path = write_mapping(tmp_path)
     objectives_mapping_path = write_objectives_mapping(tmp_path)
@@ -1194,6 +1835,15 @@ def test_technology_other_checkbox_requires_positive_detail(tmp_path, monkeypatc
 
 
 def test_survey_so2_analyze_sample_size_uses_oom_fallback_as_manual_review(tmp_path, monkeypatch):
+    """Verify survey so2 analyze sample size uses oom fallback as manual review.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies survey so2 analyze sample size uses oom fallback as manual review.
+    """
     module = load_module()
     mapping_path = write_mapping(tmp_path)
     objectives_mapping_path = write_objectives_mapping(tmp_path)
@@ -1207,7 +1857,15 @@ def test_survey_so2_analyze_sample_size_uses_oom_fallback_as_manual_review(tmp_p
     output_json = tmp_path / "size-oom-report.json"
 
     class DirectoryOomSizeStub(DirectoryStub):
+        """Set the Czech collection sample order of magnitude to 3 for estimate comparison.
+        """
         def __init__(self, *args, **kwargs):
+            """Populate the institution, collection, and contact records used by respondent-resolution assertions.
+
+            Args:
+                *args: Directory constructor positional arguments, forwarded by subclasses and ignored by the base stub.
+                **kwargs: Directory constructor options; only schema is used (default ERIC), and subclasses forward these unchanged.
+            """
             super().__init__(*args, **kwargs)
             self._collection["order_of_magnitude"] = 3
 
@@ -1242,6 +1900,14 @@ def test_survey_so2_analyze_sample_size_uses_oom_fallback_as_manual_review(tmp_p
 
 
 def test_survey_so2_export_update_plan_keeps_biobank_and_collection_updates(tmp_path):
+    """Verify survey so2 export update plan keeps biobank and collection updates.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies survey so2 export update plan keeps biobank and collection updates.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1313,6 +1979,15 @@ def test_survey_so2_export_update_plan_keeps_biobank_and_collection_updates(tmp_
 
 
 def test_survey_so2_render_report_writes_tex_and_pdf(tmp_path, monkeypatch):
+    """Verify survey so2 render report writes tex and pdf.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies survey so2 render report writes tex and pdf.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1327,8 +2002,23 @@ def test_survey_so2_render_report_writes_tex_and_pdf(tmp_path, monkeypatch):
     monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/xelatex")
 
     def fake_run(cmd, cwd, check, stdout, stderr, text):
+        """Write report.pdf in the compilation directory and mimic empty process stdout.
+
+        Args:
+            cmd: Command vector captured by the patched subprocess runner.
+            cwd: Working directory captured by the fake subprocess call.
+            check: Subprocess check flag captured by the fake command runner.
+            stdout: Subprocess standard-output setting captured by the fake runner.
+            stderr: Subprocess standard-error setting captured by the fake runner.
+            text: Subprocess text-mode setting captured by the fake runner.
+
+        Returns:
+            The successful fake process result consumed by the external renderer wrapper.
+        """
         Path(cwd, "report.pdf").write_bytes(b"%PDF-1.4\\n")
         class Result:
+            """Mimic a completed TeX process with empty captured stdout.
+            """
             stdout = ""
         return Result()
 
@@ -1343,6 +2033,11 @@ def test_survey_so2_render_report_writes_tex_and_pdf(tmp_path, monkeypatch):
 
 
 def test_survey_so2_render_tex_escapes_special_characters():
+    """Verify survey so2 render tex escapes special characters.
+
+    Returns:
+        None. Verifies survey so2 render tex escapes special characters.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1382,6 +2077,11 @@ def test_survey_so2_render_tex_escapes_special_characters():
 
 
 def test_survey_so2_render_tex_includes_biobank_grouped_summary():
+    """Verify survey so2 render tex includes biobank grouped summary.
+
+    Returns:
+        None. Verifies survey so2 render tex includes biobank grouped summary.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1449,6 +2149,11 @@ def test_survey_so2_render_tex_includes_biobank_grouped_summary():
 
 
 def test_survey_so2_render_tex_includes_objective_summary():
+    """Verify survey so2 render tex includes objective summary.
+
+    Returns:
+        None. Verifies survey so2 render tex includes objective summary.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1491,6 +2196,11 @@ def test_survey_so2_render_tex_includes_objective_summary():
 
 
 def test_survey_so2_render_tex_keeps_empty_objectives_in_toc():
+    """Verify survey so2 render tex keeps empty objectives in toc.
+
+    Returns:
+        None. Verifies survey so2 render tex keeps empty objectives in toc.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1511,6 +2221,11 @@ def test_survey_so2_render_tex_keeps_empty_objectives_in_toc():
 
 
 def test_survey_so2_render_tex_uses_appendix_and_detailed_inconsistent_values():
+    """Verify survey so2 render tex uses appendix and detailed inconsistent values.
+
+    Returns:
+        None. Verifies survey so2 render tex uses appendix and detailed inconsistent values.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1586,6 +2301,11 @@ def test_survey_so2_render_tex_uses_appendix_and_detailed_inconsistent_values():
 
 
 def test_survey_so2_render_tex_breaks_entity_identifiers():
+    """Verify survey so2 render tex breaks entity identifiers.
+
+    Returns:
+        None. Verifies survey so2 render tex breaks entity identifiers.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1617,6 +2337,11 @@ def test_survey_so2_render_tex_breaks_entity_identifiers():
 
 
 def test_escape_latex_breakable_entity_hyphenates_camel_case_segments():
+    """Verify escape latex breakable entity hyphenates camel case segments.
+
+    Returns:
+        None. Verifies escape latex breakable entity hyphenates camel case segments.
+    """
     module = load_module()
 
     rendered = module.escape_latex_breakable_entity("bbmri-eric:ID:CH_FondazioneEpatocentroTicino")
@@ -1625,6 +2350,11 @@ def test_escape_latex_breakable_entity_hyphenates_camel_case_segments():
 
 
 def test_survey_so2_render_tex_uses_status_colors():
+    """Verify survey so2 render tex uses status colors.
+
+    Returns:
+        None. Verifies survey so2 render tex uses status colors.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1658,6 +2388,11 @@ def test_survey_so2_render_tex_uses_status_colors():
 
 
 def test_survey_so2_render_tex_includes_toc_and_clearpage_after_title():
+    """Verify survey so2 render tex includes toc and clearpage after title.
+
+    Returns:
+        None. Verifies survey so2 render tex includes toc and clearpage after title.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -1675,6 +2410,11 @@ def test_survey_so2_render_tex_includes_toc_and_clearpage_after_title():
 
 
 def test_resolve_row_normalizes_collection_scope_and_avoids_geneva_bern_mixup():
+    """Verify resolve row normalizes collection scope and avoids geneva bern mixup.
+
+    Returns:
+        None. Verifies resolve row normalizes collection scope and avoids geneva bern mixup.
+    """
     module = load_module()
     directory = SwissResolutionDirectoryStub()
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
@@ -1750,6 +2490,11 @@ def test_resolve_row_normalizes_collection_scope_and_avoids_geneva_bern_mixup():
 
 
 def test_normalize_biobank_id_accepts_bare_directory_id():
+    """Verify normalize biobank id accepts bare directory id.
+
+    Returns:
+        None. Verifies normalize biobank id accepts bare directory id.
+    """
     module = load_module()
 
     assert module.normalize_biobank_id("NL_AUMCBB") == "bbmri-eric:ID:NL_AUMCBB"
@@ -1757,6 +2502,11 @@ def test_normalize_biobank_id_accepts_bare_directory_id():
 
 
 def test_resolve_row_matches_bare_biobank_id_and_falls_back_from_invalid_explicit_id():
+    """Verify resolve row matches bare biobank id and falls back from invalid explicit id.
+
+    Returns:
+        None. Verifies resolve row matches bare biobank id and falls back from invalid explicit id.
+    """
     module = load_module()
     directory = DirectoryStub()
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
@@ -1820,6 +2570,11 @@ def test_resolve_row_matches_bare_biobank_id_and_falls_back_from_invalid_explici
 
 
 def test_alias_and_acronym_matching_supports_chuv_and_small_typos():
+    """Verify alias and acronym matching supports chuv and small typos.
+
+    Returns:
+        None. Verifies alias and acronym matching supports chuv and small typos.
+    """
     module = load_module()
 
     assert module.normalize_text(float("nan")) == ""
@@ -1849,13 +2604,30 @@ def test_alias_and_acronym_matching_supports_chuv_and_small_typos():
 
 
 def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
+    """Verify resolve row matches chuv alias even with invalid explicit biobank id.
+
+    Returns:
+        None. Verifies resolve row matches chuv alias even with invalid explicit biobank id.
+    """
     module = load_module()
 
     class ChuvDirectoryStub:
+        """Expose CHUV under its full French name for acronym/typo respondent matching.
+        """
         def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
             return "ERIC"
 
         def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:ID:CH_CHUV",
@@ -1865,6 +2637,11 @@ def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
             ]
 
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:ID:CH_CHUV:collection:demo",
@@ -1877,6 +2654,14 @@ def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
             ]
 
         def getGraphBiobankCollectionsFromBiobank(self, biobank_id):
+            """Return fixture graph relating the requested biobank to its collections.
+
+            Args:
+                biobank_id: Biobank identifier used to obtain the fixture collection graph.
+
+            Returns:
+                The fixture graph relating the requested biobank to its collections.
+            """
             import networkx as nx
 
             graph = nx.DiGraph()
@@ -1927,10 +2712,23 @@ def test_resolve_row_matches_chuv_alias_even_with_invalid_explicit_biobank_id():
 
 
 def test_resolve_row_uses_exact_contact_email_before_name_matching():
+    """Verify resolve row uses exact contact email before name matching.
+
+    Returns:
+        None. Verifies resolve row uses exact contact email before name matching.
+    """
     module = load_module()
 
     class ContactDirectoryStub(DirectoryStub):
+        """Change the official biobank name and owner email to isolate contact-based resolution.
+        """
         def __init__(self, *args, **kwargs):
+            """Populate the institution, collection, and contact records used by respondent-resolution assertions.
+
+            Args:
+                *args: Directory constructor positional arguments, forwarded by subclasses and ignored by the base stub.
+                **kwargs: Directory constructor options; only schema is used (default ERIC), and subclasses forward these unchanged.
+            """
             super().__init__(*args, **kwargs)
             self._biobank["name"] = "Different Official Name"
             self._contact["email"] = "owner@example.org"
@@ -1977,19 +2775,46 @@ def test_resolve_row_uses_exact_contact_email_before_name_matching():
 
 
 def test_resolve_row_marks_dangling_contact_biobank_references_for_manual_review():
+    """Verify resolve row marks dangling contact biobank references for manual review.
+
+    Returns:
+        None. Verifies resolve row marks dangling contact biobank references for manual review.
+    """
     module = load_module()
 
     class DanglingContactDirectoryStub:
+        """Expose a Spanish contact referencing a biobank absent from the loaded snapshot.
+        """
         def getSchema(self):
+            """Return schema string selected for the fake Directory session.
+
+            Returns:
+                The schema string selected for the fake Directory session.
+            """
             return "ERIC"
 
         def getBiobanks(self):
+            """Return synthetic biobank records available to the code under test.
+
+            Returns:
+                The synthetic biobank records available to the code under test.
+            """
             return []
 
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return []
 
         def getContacts(self):
+            """Return synthetic contact records available to the code under test.
+
+            Returns:
+                The synthetic contact records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:contactID:ES_demo",
@@ -1999,6 +2824,11 @@ def test_resolve_row_marks_dangling_contact_biobank_references_for_manual_review
             ]
 
         def getNetworks(self):
+            """Return synthetic network records available to the code under test.
+
+            Returns:
+                The synthetic network records available to the code under test.
+            """
             return []
 
     directory = DanglingContactDirectoryStub()
@@ -2038,6 +2868,11 @@ def test_resolve_row_marks_dangling_contact_biobank_references_for_manual_review
 
 
 def test_resolve_row_supports_explicit_network_id():
+    """Verify resolve row supports explicit network id.
+
+    Returns:
+        None. Verifies resolve row supports explicit network id.
+    """
     module = load_module()
     directory = DirectoryStub()
     biobank_index = {biobank["id"]: biobank for biobank in directory.getBiobanks()}
@@ -2081,6 +2916,11 @@ def test_resolve_row_supports_explicit_network_id():
 
 
 def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_breakable_emails():
+    """Verify survey so2 render tex adds directory fields missing country prefix and breakable emails.
+
+    Returns:
+        None. Verifies survey so2 render tex adds directory fields missing country prefix and breakable emails.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -2179,6 +3019,11 @@ def test_survey_so2_render_tex_adds_directory_fields_missing_country_prefix_and_
 
 
 def test_findings_by_status_orders_missing_in_directory_manual_review_and_missing_from_directory():
+    """Verify findings by status orders missing in directory manual review and missing from directory.
+
+    Returns:
+        None. Verifies findings by status orders missing in directory manual review and missing from directory.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -2242,6 +3087,11 @@ def test_findings_by_status_orders_missing_in_directory_manual_review_and_missin
 
 
 def test_findings_by_status_adds_intro_for_ambiguous_section():
+    """Verify findings by status adds intro for ambiguous section.
+
+    Returns:
+        None. Verifies findings by status adds intro for ambiguous section.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -2270,6 +3120,11 @@ def test_findings_by_status_adds_intro_for_ambiguous_section():
 
 
 def test_findings_by_status_keeps_stable_sections_when_one_status_has_no_findings():
+    """Verify findings by status keeps stable sections when one status has no findings.
+
+    Returns:
+        None. Verifies findings by status keeps stable sections when one status has no findings.
+    """
     module = load_module()
     report = {
         "report_metadata": {"generated_at": "2026-03-13T00:00:00+00:00"},
@@ -2317,6 +3172,11 @@ def test_findings_by_status_keeps_stable_sections_when_one_status_has_no_finding
 
 
 def test_summarize_collection_scope_uses_all_collections_and_all_except():
+    """Verify summarize collection scope uses all collections and all except.
+
+    Returns:
+        None. Verifies summarize collection scope uses all collections and all except.
+    """
     module = load_module()
 
     assert module.summarize_collection_scope(["c1", "c2"], ["c1", "c2"]) == "all collections"
@@ -2327,6 +3187,11 @@ def test_summarize_collection_scope_uses_all_collections_and_all_except():
 
 
 def test_survey_so2_render_tex_includes_so21_technology_matrix():
+    """Verify survey so2 render tex includes so21 technology matrix.
+
+    Returns:
+        None. Verifies survey so2 render tex includes so21 technology matrix.
+    """
     module = load_module()
     technology_rows = [
         {
@@ -2377,6 +3242,14 @@ def test_survey_so2_render_tex_includes_so21_technology_matrix():
 
 
 def test_technology_modalities_combine_question_sources_and_render_inconsistencies(tmp_path):
+    """Verify technology modalities combine question sources and render inconsistencies.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies technology modalities combine question sources and render inconsistencies.
+    """
     module = load_module()
     survey_row = __import__("pandas").Series(
         {
@@ -2432,6 +3305,14 @@ def test_technology_modalities_combine_question_sources_and_render_inconsistenci
     assert "Technology Source Inconsistencies" in tex
 
 def test_survey_so2_render_report_can_write_only_technology_upset_artifacts(tmp_path):
+    """Verify survey so2 render report can write only technology upset artifacts.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies survey so2 render report can write only technology upset artifacts.
+    """
     module = load_module()
     survey_row = __import__("pandas").Series(
         {

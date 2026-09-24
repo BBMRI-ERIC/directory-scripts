@@ -1,8 +1,17 @@
+"""Test access policies fix proposals behavior."""
+
 from checks.AccessPolicies import AccessPolicies, CHECK_DOCS
 
 
 class DirectoryStub:
+    """Expose a Czech DNA collection with academic-only collaboration and missing DUO metadata.
+    """
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return [
             {
                 "id": "bb1",
@@ -14,6 +23,11 @@ class DirectoryStub:
         ]
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [
             {
                 "id": "bbmri-eric:ID:CZ_demo:collection:col1",
@@ -28,9 +42,25 @@ class DirectoryStub:
         ]
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return "bb1"
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return {
             "id": "bb1",
             "withdrawn": False,
@@ -39,13 +69,34 @@ class DirectoryStub:
         }
 
     def getCollectionNN(self, collection_id):
+        """Return fixture national-node code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested collection.
+        """
         return "CZ"
 
     def getBiobankNN(self, biobank_id):
+        """Return fixture national-node code for the requested biobank.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested biobank.
+        """
         return "CZ"
 
 
 def test_access_policies_attach_duo_fix_proposals():
+    """Verify access policies attach duo fix proposals.
+
+    Returns:
+        None. Verifies access policies attach duo fix proposals.
+    """
     warnings = AccessPolicies().check(DirectoryStub(), args=None)
     warning_map = {warning.dataCheckID: warning for warning in warnings}
 
@@ -57,8 +108,20 @@ def test_access_policies_attach_duo_fix_proposals():
 
 
 def test_access_policies_treats_duo_underscore_and_colon_as_same_term():
+    """Verify access policies treats duo underscore and colon as same term.
+
+    Returns:
+        None. Verifies access policies treats duo underscore and colon as same term.
+    """
     class DirectoryUnderscoreStub(DirectoryStub):
+        """Expose an existing underscore-form DUO code to test canonical no-op detection.
+        """
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:ID:CZ_demo:collection:col1",
@@ -77,8 +140,20 @@ def test_access_policies_treats_duo_underscore_and_colon_as_same_term():
 
 
 def test_access_policies_skips_bio_duo_missing_for_nav_only_materials():
+    """Verify access policies skips bio duo missing for nav only materials.
+
+    Returns:
+        None. Verifies access policies skips bio duo missing for nav only materials.
+    """
     class DirectoryNavMaterialsStub(DirectoryStub):
+        """Expose NAV-only materials to test whether sample access can be inferred.
+        """
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:ID:CZ_demo:collection:col1",
@@ -96,8 +171,20 @@ def test_access_policies_skips_bio_duo_missing_for_nav_only_materials():
 
 
 def test_access_policies_use_generic_access_fields_only():
+    """Verify access policies use generic access fields only.
+
+    Returns:
+        None. Verifies access policies use generic access fields only.
+    """
     class DirectoryGenericAccessStub(DirectoryStub):
+        """Expose generic access prose without modality-specific access fields.
+        """
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:ID:CZ_demo:collection:col1",
@@ -116,8 +203,20 @@ def test_access_policies_use_generic_access_fields_only():
 
 
 def test_access_policies_raise_generic_access_missing_once():
+    """Verify access policies raise generic access missing once.
+
+    Returns:
+        None. Verifies access policies raise generic access missing once.
+    """
     class DirectoryMissingAccessStub(DirectoryStub):
+        """Expose sample, clinical, and imaging categories without access metadata.
+        """
         def getCollections(self):
+            """Return synthetic collection records available to the code under test.
+
+            Returns:
+                The synthetic collection records available to the code under test.
+            """
             return [
                 {
                     "id": "bbmri-eric:ID:CZ_demo:collection:col1",
@@ -137,12 +236,22 @@ def test_access_policies_raise_generic_access_missing_once():
 
 
 def test_access_policies_old_access_check_ids_do_not_return():
+    """Verify access policies old access check ids do not return.
+
+    Returns:
+        None. Verifies access policies old access check ids do not return.
+    """
     assert "AP:SampleAccess" not in CHECK_DOCS
     assert "AP:DataAccessMissing" not in CHECK_DOCS
     assert "AP:ImgAccess" not in CHECK_DOCS
 
 
 def test_access_policies_check_docs_do_not_reference_old_modality_access_fields():
+    """Verify access policies check docs do not reference old modality access fields.
+
+    Returns:
+        None. Verifies access policies check docs do not reference old modality access fields.
+    """
     deprecated_fields = {
         "sample_access_description",
         "sample_access_fee",

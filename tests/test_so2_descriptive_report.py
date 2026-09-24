@@ -50,7 +50,11 @@ HEADERS = [
 
 
 def minimal_schema():
-    """Return a complete schema for the controlled workbook fixture."""
+    """Return a complete schema for the controlled workbook fixture.
+
+    Returns:
+        The complete controlled schema consumed by descriptive-report tests.
+    """
     return {
         "schema_version": "1",
         "input": {
@@ -82,7 +86,16 @@ def minimal_schema():
 
 
 def write_descriptive_workbook(tmp_path, rows=(), mutator=None):
-    """Write a workbook matching the survey service envelope."""
+    """Write a workbook matching the survey service envelope.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        rows: Synthetic survey response rows written into the workbook fixture.
+        mutator: Callback that applies the targeted malformed-workbook mutation.
+
+    Returns:
+        Path to the saved descriptive.xlsx containing service rows, headers, and the supplied responses.
+    """
     workbook = openpyxl.Workbook()
     sheet = workbook.active
     sheet.title = "Survey responses"
@@ -103,7 +116,15 @@ def write_descriptive_workbook(tmp_path, rows=(), mutator=None):
 
 
 def descriptive_workbook(rows, source_rows=None):
-    """Build a validated in-memory survey workbook for payload behavior tests."""
+    """Build a validated in-memory survey workbook for payload behavior tests.
+
+    Args:
+        rows: Synthetic survey response rows written into the workbook fixture.
+        source_rows: Optional source-row numbers retained with synthetic workbook rows.
+
+    Returns:
+        The validated in-memory workbook used to build descriptive payloads.
+    """
     source_rows = source_rows or range(5, 5 + len(rows))
     return module.SurveyWorkbook(
         source_path="controlled.xlsx",
@@ -121,7 +142,14 @@ def descriptive_workbook(rows, source_rows=None):
 
 
 def descriptive_schema(question):
-    """Build the schema required for a controlled descriptive question."""
+    """Build the schema required for a controlled descriptive question.
+
+    Args:
+        question: Question definition used to construct the controlled schema.
+
+    Returns:
+        The controlled schema containing the supplied question.
+    """
     return {
         "schema_version": "1",
         "input": {"worksheet": "Survey responses", "alias": "SO2_2025", "header_row": 4},
@@ -155,7 +183,15 @@ def descriptive_schema(question):
 
 
 def payload_question(workbook, schema):
-    """Return the one question in a controlled descriptive payload."""
+    """Return the one question in a controlled descriptive payload.
+
+    Args:
+        workbook: Synthetic workbook used to construct the descriptive payload.
+        schema: Descriptive-report schema dictionary with question definitions and workbook-column mappings.
+
+    Returns:
+        The sole question extracted from the controlled payload.
+    """
     return next(
         item for item in module.build_descriptive_payload(workbook, schema)["questions"]
         if item["question_id"] == schema["questions"][-1]["question_id"]
@@ -163,7 +199,11 @@ def payload_question(workbook, schema):
 
 
 def test_so2_modules_document_each_parameter_and_return_value():
-    """SO2 helpers expose parameter and return semantics, including variadic inputs."""
+    """SO2 helpers expose parameter and return semantics, including variadic inputs.
+
+    Returns:
+        None. SO2 helpers expose parameter and return semantics, including variadic inputs.
+    """
     import ast
     import re
 
@@ -177,9 +217,9 @@ def test_so2_modules_document_each_parameter_and_return_value():
                 if argument.arg not in {"self", "cls"}
             ]
             if function.args.vararg is not None:
-                parameters.append("*" + function.args.vararg.arg)
+                parameters.append(function.args.vararg.arg)
             if function.args.kwarg is not None:
-                parameters.append("**" + function.args.kwarg.arg)
+                parameters.append(function.args.kwarg.arg)
             if parameters:
                 assert "Args:" in docstring, (source_path.name, function.name)
                 args_section = docstring.split("Args:", 1)[1].split("Returns:", 1)[0]
@@ -194,7 +234,11 @@ def test_so2_modules_document_each_parameter_and_return_value():
 
 
 def test_multi_choice_has_answered_selection_percentages_and_all_row_missing_percent():
-    """Selections use answered rows while Missing always uses every response row."""
+    """Selections use answered rows while Missing always uses every response row.
+
+    Returns:
+        None. Selections use answered rows while Missing always uses every response row.
+    """
     question = {
         "question_id": "systems",
         "column": "Systems",
@@ -220,7 +264,11 @@ def test_multi_choice_has_answered_selection_percentages_and_all_row_missing_per
 
 
 def test_literal_duplicate_contributions_are_preserved_and_marked():
-    """Repeated normalized respondents retain both literal source contributions."""
+    """Repeated normalized respondents retain both literal source contributions.
+
+    Returns:
+        None. Repeated normalized respondents retain both literal source contributions.
+    """
     question = {
         "question_id": "answer",
         "column": "Answer",
@@ -242,7 +290,11 @@ def test_literal_duplicate_contributions_are_preserved_and_marked():
 
 
 def test_free_text_preserves_missing_parent_and_parent_group():
-    """Narrative rows preserve literal text and normalized missing parent values."""
+    """Narrative rows preserve literal text and normalized missing parent values.
+
+    Returns:
+        None. Narrative rows preserve literal text and normalized missing parent values.
+    """
     question = {
         "question_id": "other_barrier",
         "column": "Other barrier",
@@ -272,7 +324,11 @@ def test_free_text_preserves_missing_parent_and_parent_group():
 
 
 def test_free_text_context_keeps_only_its_configured_parent_selection():
-    """A follow-up does not repeat unrelated multi-choice parent selections."""
+    """A follow-up does not repeat unrelated multi-choice parent selections.
+
+    Returns:
+        None. A follow-up does not repeat unrelated multi-choice parent selections.
+    """
     question = {
         "question_id": "standards_other",
         "column": "Standards",
@@ -312,7 +368,11 @@ def test_free_text_context_keeps_only_its_configured_parent_selection():
 
 
 def test_free_text_context_retains_unmatched_text_as_a_diagnostic():
-    """A child response is retained when its configured parent trigger is absent."""
+    """A child response is retained when its configured parent trigger is absent.
+
+    Returns:
+        None. A child response is retained when its configured parent trigger is absent.
+    """
     question = {
         "question_id": "other_system",
         "column": "Other system",
@@ -348,7 +408,11 @@ def test_free_text_context_retains_unmatched_text_as_a_diagnostic():
 
 
 def test_schema_rejects_unknown_free_text_parent_context_values():
-    """Context filters may reference only declared parent columns and values."""
+    """Context filters may reference only declared parent columns and values.
+
+    Returns:
+        None. Context filters may reference only declared parent columns and values.
+    """
     question = {
         "question_id": "other_system",
         "column": "Other system",
@@ -370,7 +434,11 @@ def test_schema_rejects_unknown_free_text_parent_context_values():
 
 
 def test_schema_rejects_empty_or_non_free_text_parent_context_filters():
-    """Semantic context filters are nonempty metadata exclusive to free-text follow-ups."""
+    """Semantic context filters are nonempty metadata exclusive to free-text follow-ups.
+
+    Returns:
+        None. Semantic context filters are nonempty metadata exclusive to free-text follow-ups.
+    """
     structured = {
         "question_id": "systems",
         "column": "Systems",
@@ -395,7 +463,11 @@ def test_schema_rejects_empty_or_non_free_text_parent_context_filters():
         )
 
 def test_blank_conditional_answer_stays_blank_when_applicability_is_unknown():
-    """A blank answer is not inferred as inapplicable without explicit routing metadata."""
+    """A blank answer is not inferred as inapplicable without explicit routing metadata.
+
+    Returns:
+        None. A blank answer is not inferred as inapplicable without explicit routing metadata.
+    """
     question = {
         "question_id": "conditional",
         "column": "Conditional",
@@ -414,7 +486,11 @@ def test_blank_conditional_answer_stays_blank_when_applicability_is_unknown():
 
 
 def test_multi_choice_preserves_unexpected_literals_and_sorts_all_contributions():
-    """Multi-select evidence remains literal, deduplicated, diagnosed, and ordered."""
+    """Multi-select evidence remains literal, deduplicated, diagnosed, and ordered.
+
+    Returns:
+        None. Multi-select evidence remains literal, deduplicated, diagnosed, and ordered.
+    """
     question = {
         "question_id": "systems",
         "column": "Systems",
@@ -458,7 +534,11 @@ def test_multi_choice_preserves_unexpected_literals_and_sorts_all_contributions(
 
 
 def test_declared_applicability_separates_skips_unanswered_and_out_of_route_answers():
-    """Declared routing exposes row states without discarding any submitted answer."""
+    """Declared routing exposes row states without discarding any submitted answer.
+
+    Returns:
+        None. Declared routing exposes row states without discarding any submitted answer.
+    """
     question = {
         "question_id": "conditional",
         "column": "Conditional",
@@ -497,7 +577,11 @@ def test_declared_applicability_separates_skips_unanswered_and_out_of_route_answ
 
 
 def test_blank_declared_applicability_value_is_unknown_not_inapplicable():
-    """Blank routing metadata is reported as unknown rather than a structural skip."""
+    """Blank routing metadata is reported as unknown rather than a structural skip.
+
+    Returns:
+        None. Blank routing metadata is reported as unknown rather than a structural skip.
+    """
     question = {
         "question_id": "conditional",
         "column": "Conditional",
@@ -527,7 +611,11 @@ def test_blank_declared_applicability_value_is_unknown_not_inapplicable():
 
 
 def test_applicability_matches_a_selection_inside_multi_choice_parent():
-    """A routing value may be one selection in a delimiter-separated parent answer."""
+    """A routing value may be one selection in a delimiter-separated parent answer.
+
+    Returns:
+        None. A routing value may be one selection in a delimiter-separated parent answer.
+    """
     question = {
         "question_id": "q_020_exchange",
         "column": "Exchange",
@@ -559,7 +647,11 @@ def test_applicability_matches_a_selection_inside_multi_choice_parent():
 
 
 def test_schema_rejects_invalid_applicability_references_and_values():
-    """Routing rules must reference declared questions and canonical parent values."""
+    """Routing rules must reference declared questions and canonical parent values.
+
+    Returns:
+        None. Routing rules must reference declared questions and canonical parent values.
+    """
     question = {
         "question_id": "conditional",
         "column": "Conditional",
@@ -584,7 +676,11 @@ def test_schema_rejects_invalid_applicability_references_and_values():
 
 
 def test_multi_choice_exclusive_category_combination_is_diagnosed():
-    """Mutually exclusive selections remain counted and are traceable as contradictions."""
+    """Mutually exclusive selections remain counted and are traceable as contradictions.
+
+    Returns:
+        None. Mutually exclusive selections remain counted and are traceable as contradictions.
+    """
     question = {
         "question_id": "q_020_exchange",
         "column": "Exchange",
@@ -615,7 +711,11 @@ def test_multi_choice_exclusive_category_combination_is_diagnosed():
 
 
 def test_schema_rejects_invalid_exclusive_categories():
-    """Only multi-choice questions may declare canonical mutually exclusive values."""
+    """Only multi-choice questions may declare canonical mutually exclusive values.
+
+    Returns:
+        None. Only multi-choice questions may declare canonical mutually exclusive values.
+    """
     question = {
         "question_id": "q_020_exchange",
         "column": "Exchange",
@@ -634,7 +734,11 @@ def test_schema_rejects_invalid_exclusive_categories():
 
 
 def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies():
-    """Payload provenance and narrative diagnostics make later rendering self-contained."""
+    """Payload provenance and narrative diagnostics make later rendering self-contained.
+
+    Returns:
+        None. Payload provenance and narrative diagnostics make later rendering self-contained.
+    """
     question = {
         "question_id": "other_barrier",
         "column": "Other barrier",
@@ -682,7 +786,11 @@ def test_payload_records_schema_provenance_and_free_text_parent_inconsistencies(
 
 
 def test_free_text_parent_diagnostics_parse_multi_choice_parent_answers():
-    """A declared multi-choice parent accepts its delimiter-separated selections."""
+    """A declared multi-choice parent accepts its delimiter-separated selections.
+
+    Returns:
+        None. A declared multi-choice parent accepts its delimiter-separated selections.
+    """
     question = {
         "question_id": "other_system",
         "column": "Other system",
@@ -712,32 +820,74 @@ def test_free_text_parent_diagnostics_parse_multi_choice_parent_answers():
 
 
 def wrong_alias_row(sheet):
-    """Break the row-1 alias envelope field."""
+    """Break the row-1 alias envelope field.
+
+    Args:
+        sheet: OpenPyXL worksheet mutated to simulate the service-envelope defect.
+
+    Returns:
+        None. Break the row-1 alias envelope field.
+    """
     sheet.cell(1, 1, "Wrong label")
 
 
 def missing_export_date(sheet):
-    """Break the row-2 export-date envelope field."""
+    """Break the row-2 export-date envelope field.
+
+    Args:
+        sheet: OpenPyXL worksheet mutated to simulate the service-envelope defect.
+
+    Returns:
+        None. Break the row-2 export-date envelope field.
+    """
     sheet.cell(2, 2).value = None
 
 
 def invalid_export_date(sheet):
-    """Break the datetime row-2 export-date envelope field."""
+    """Break the datetime row-2 export-date envelope field.
+
+    Args:
+        sheet: OpenPyXL worksheet mutated to simulate the service-envelope defect.
+
+    Returns:
+        None. Break the datetime row-2 export-date envelope field.
+    """
     sheet.cell(2, 2, "not-a-date")
 
 
 def nonblank_separator(sheet):
-    """Break the required blank separator row."""
+    """Break the required blank separator row.
+
+    Args:
+        sheet: OpenPyXL worksheet mutated to simulate the service-envelope defect.
+
+    Returns:
+        None. Break the required blank separator row.
+    """
     sheet.cell(3, 1, "not blank")
 
 
 def wrong_header(sheet):
-    """Break the first cell of the row-4 header row."""
+    """Break the first cell of the row-4 header row.
+
+    Args:
+        sheet: OpenPyXL worksheet mutated to simulate the service-envelope defect.
+
+    Returns:
+        None. Break the first cell of the row-4 header row.
+    """
     sheet.cell(4, 1, "Institution")
 
 
 def test_reader_preserves_service_metadata_and_only_response_rows(tmp_path):
-    """Reader preserves service provenance and excludes blank data records."""
+    """Reader preserves service provenance and excludes blank data records.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Reader preserves service provenance and excludes blank data records.
+    """
     workbook = write_descriptive_workbook(
         tmp_path,
         rows=[
@@ -766,7 +916,11 @@ def test_reader_preserves_service_metadata_and_only_response_rows(tmp_path):
     reason=f"Production SO2 workbook is unavailable at {PRODUCTION_WORKBOOK}",
 )
 def test_reader_reads_actual_production_workbook_envelope():
-    """Reader accepts the service's labeled production envelope without Directory access."""
+    """Reader accepts the service's labeled production envelope without Directory access.
+
+    Returns:
+        None. Reader accepts the service's labeled production envelope without Directory access.
+    """
     result = module.read_descriptive_workbook(
         PRODUCTION_WORKBOOK, module.load_descriptive_schema(PRODUCTION_SCHEMA)
     )
@@ -786,7 +940,16 @@ def test_reader_reads_actual_production_workbook_envelope():
     ],
 )
 def test_reader_rejects_invalid_service_envelope(tmp_path, mutator, message):
-    """Reader rejects each service-envelope row when it is malformed."""
+    """Reader rejects each service-envelope row when it is malformed.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        mutator: Callback that applies the targeted malformed-workbook mutation.
+        message: Expected diagnostic substring asserted for the invalid input.
+
+    Returns:
+        None. Reader rejects each service-envelope row when it is malformed.
+    """
     with pytest.raises(module.InputError, match=message):
         module.read_descriptive_workbook(
             write_descriptive_workbook(tmp_path, mutator=mutator), minimal_schema()
@@ -794,7 +957,14 @@ def test_reader_rejects_invalid_service_envelope(tmp_path, mutator, message):
 
 
 def test_reader_converts_corrupt_xlsx_to_input_error(tmp_path):
-    """Reader reports a non-ZIP XLSX file as a user-facing input error."""
+    """Reader reports a non-ZIP XLSX file as a user-facing input error.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Reader reports a non-ZIP XLSX file as a user-facing input error.
+    """
     workbook = tmp_path / "corrupt.xlsx"
     workbook.write_bytes(b"not a ZIP workbook")
 
@@ -803,7 +973,14 @@ def test_reader_converts_corrupt_xlsx_to_input_error(tmp_path):
 
 
 def test_reader_rejects_missing_schema_fields(tmp_path):
-    """Reader reports incomplete schemas as actionable input errors."""
+    """Reader reports incomplete schemas as actionable input errors.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Reader reports incomplete schemas as actionable input errors.
+    """
     schema = minimal_schema()
     del schema["input"]
 
@@ -812,7 +989,11 @@ def test_reader_rejects_missing_schema_fields(tmp_path):
 
 
 def test_schema_rejects_missing_or_unclassified_columns():
-    """Schema cannot omit a source column or declare one that is absent."""
+    """Schema cannot omit a source column or declare one that is absent.
+
+    Returns:
+        None. Schema cannot omit a source column or declare one that is absent.
+    """
     with pytest.raises(module.InputError, match="unclassified source column"):
         module.validate_descriptive_schema(
             minimal_schema(), HEADERS + ["Extra"]
@@ -824,7 +1005,11 @@ def test_schema_rejects_missing_or_unclassified_columns():
 
 
 def test_schema_rejects_duplicate_classification_and_invalid_question_values():
-    """Schema requires one classification per column and valid question fields."""
+    """Schema requires one classification per column and valid question fields.
+
+    Returns:
+        None. Schema requires one classification per column and valid question fields.
+    """
     schema = minimal_schema()
     schema["columns"]["respondent_context"].append("Digital maturity")
     with pytest.raises(module.InputError, match="classified more than once"):
@@ -842,7 +1027,14 @@ def test_schema_rejects_duplicate_classification_and_invalid_question_values():
     ["institution_column", "country_column", "administrative_exclusion_reasons"],
 )
 def test_schema_requires_shared_context_and_named_administrative_reasons(field):
-    """Schema names report-wide context columns and every administrative exclusion reason."""
+    """Schema names report-wide context columns and every administrative exclusion reason.
+
+    Args:
+        field: Schema field selected for the parameterized validation case.
+
+    Returns:
+        None. Schema names report-wide context columns and every administrative exclusion reason.
+    """
     schema = minimal_schema()
     del schema["columns"][field]
 
@@ -856,7 +1048,11 @@ def test_schema_requires_shared_context_and_named_administrative_reasons(field):
 
 
 def test_schema_rejects_free_text_parent_that_is_not_a_question_column():
-    """Free-text parents must resolve to declared question columns."""
+    """Free-text parents must resolve to declared question columns.
+
+    Returns:
+        None. Free-text parents must resolve to declared question columns.
+    """
     schema = minimal_schema()
     schema["questions"][0].update({
         "question_type": "free_text",
@@ -868,7 +1064,11 @@ def test_schema_rejects_free_text_parent_that_is_not_a_question_column():
         module.validate_descriptive_schema(schema, HEADERS)
 
 def test_schema_rejects_absent_parent_column():
-    """Question parent references must name an existing source column."""
+    """Question parent references must name an existing source column.
+
+    Returns:
+        None. Question parent references must name an existing source column.
+    """
     schema = minimal_schema()
     schema["questions"][0]["parent_columns"] = ["Missing parent"]
 
@@ -877,7 +1077,14 @@ def test_schema_rejects_absent_parent_column():
 
 
 def test_load_schema_rejects_duplicate_json_keys_and_invalid_output(tmp_path):
-    """Schema loading rejects ambiguous JSON and unusable output provenance."""
+    """Schema loading rejects ambiguous JSON and unusable output provenance.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Schema loading rejects ambiguous JSON and unusable output provenance.
+    """
     duplicate_keys = tmp_path / "duplicate-keys.json"
     duplicate_keys.write_text('{"schema_version": "1", "schema_version": "1"}')
     with pytest.raises(module.InputError, match="duplicate JSON key"):
@@ -890,7 +1097,11 @@ def test_load_schema_rejects_duplicate_json_keys_and_invalid_output(tmp_path):
 
 
 def test_schema_returns_frozen_question_definitions():
-    """Validated questions expose the stable immutable public data class."""
+    """Validated questions expose the stable immutable public data class.
+
+    Returns:
+        None. Validated questions expose the stable immutable public data class.
+    """
     questions = module.validate_descriptive_schema(minimal_schema(), HEADERS)
 
     assert questions[0] == module.QuestionDefinition(
@@ -908,7 +1119,11 @@ def test_schema_returns_frozen_question_definitions():
 
 
 def test_nonblank_response_row_ignores_administrative_values():
-    """Creation and update timestamps alone never create a response record."""
+    """Creation and update timestamps alone never create a response record.
+
+    Returns:
+        None. Creation and update timestamps alone never create a response record.
+    """
     pandas = pytest.importorskip("pandas")
     row = pandas.Series(
         {
@@ -926,7 +1141,14 @@ def test_nonblank_response_row_ignores_administrative_values():
 
 
 def read_row_four_headers(workbook_path):
-    """Return the exact production workbook row-4 headers."""
+    """Return the exact production workbook row-4 headers.
+
+    Args:
+        workbook_path: Existing XLSX opened read-only; the active sheet's fourth row supplies the headers.
+
+    Returns:
+        Cell values in worksheet column order, including blank header cells.
+    """
     workbook = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
     try:
         return [cell.value for cell in workbook.active[4]]
@@ -935,19 +1157,41 @@ def read_row_four_headers(workbook_path):
 
 
 def questions_by_column(schema):
-    """Index raw schema questions by their explicit source header."""
+    """Index raw schema questions by their explicit source header.
+
+    Args:
+        schema: Descriptive-report schema dictionary with question definitions and workbook-column mappings.
+
+    Returns:
+        Worksheet-column-label-to-question-definition dictionary from schema["questions"].
+    """
     return {question["column"]: question for question in schema["questions"]}
 
 
 def write_association_registry(tmp_path, definitions):
-    """Write one controlled association registry for loader validation tests."""
+    """Write one controlled association registry for loader validation tests.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        definitions: Association definitions supplied to the registry validation case.
+
+    Returns:
+        Path to association-registry.json with schema version 1 and the supplied definitions.
+    """
     path = tmp_path / "association-registry.json"
     path.write_text(json.dumps({"schema_version": "1", "definitions": definitions}), encoding="utf-8")
     return path
 
 
 def association_definition(**overrides):
-    """Return a syntactically valid association definition fixture."""
+    """Return a syntactically valid association definition fixture.
+
+    Args:
+        **overrides: Field overrides merged into the synthetic descriptive-report fixture.
+
+    Returns:
+        The controlled association definition fixture used by association-rendering tests.
+    """
     definition = {
         "definition_id": "returned_data_policy",
         "row_question_id": "q_094",
@@ -966,7 +1210,11 @@ def association_definition(**overrides):
 
 
 def production_questions_by_id():
-    """Return validated production questions indexed by their stable schema identifiers."""
+    """Return validated production questions indexed by their stable schema identifiers.
+
+    Returns:
+        Question-ID-to-definition dictionary from the committed production descriptive schema.
+    """
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
     headers = [
         *schema["columns"]["respondent_context"],
@@ -978,7 +1226,11 @@ def production_questions_by_id():
 
 
 def test_production_association_registry_has_exact_default_and_exploratory_pairs():
-    """The checked-in registry contains only the approved association pairs."""
+    """The checked-in registry contains only the approved association pairs.
+
+    Returns:
+        None. The checked-in registry contains only the approved association pairs.
+    """
     definitions = module.load_association_heatmap_registry(ASSOCIATION_REGISTRY)
     module.validate_association_definitions(definitions, production_questions_by_id())
 
@@ -1023,7 +1275,16 @@ def test_production_association_registry_has_exact_default_and_exploratory_pairs
 def test_association_registry_loader_rejects_invalid_syntactic_definitions(
     tmp_path, definitions, message
 ):
-    """Registry loading validates only the JSON contract available without a schema."""
+    """Registry loading validates only the JSON contract available without a schema.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        definitions: Association definitions supplied to the registry validation case.
+        message: Expected diagnostic substring asserted for the invalid input.
+
+    Returns:
+        None. Registry loading validates only the JSON contract available without a schema.
+    """
     registry = write_association_registry(tmp_path, definitions)
 
     with pytest.raises(module.InputError, match=message):
@@ -1031,7 +1292,14 @@ def test_association_registry_loader_rejects_invalid_syntactic_definitions(
 
 
 def test_association_registry_validation_rejects_contact_question_uid_and_category_drift(tmp_path):
-    """Schema-aware validation rejects semantically unsafe or stale pair definitions."""
+    """Schema-aware validation rejects semantically unsafe or stale pair definitions.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Schema-aware validation rejects semantically unsafe or stale pair definitions.
+    """
     questions = production_questions_by_id()
     registry = write_association_registry(
         tmp_path,
@@ -1084,7 +1352,18 @@ def test_association_registry_validation_rejects_contact_question_uid_and_catego
 
 
 def association_question(question_id, column, categories, applicability=None, form_uid=""):
-    """Return one controlled structured question for association-pair tests."""
+    """Return one controlled structured question for association-pair tests.
+
+    Args:
+        question_id: Question identifier assigned to the synthetic association question.
+        column: Workbook column associated with the controlled survey question.
+        categories: Allowed response categories assigned to the controlled question.
+        applicability: Applicability rule assigned to the controlled question.
+        form_uid: Stable form identifier assigned to the controlled survey question.
+
+    Returns:
+        The controlled association question fixture used by association-rendering tests.
+    """
     return module.QuestionDefinition(
         question_id=question_id,
         column=column,
@@ -1099,7 +1378,12 @@ def association_question(question_id, column, categories, applicability=None, fo
 
 
 def controlled_association_definitions():
-    """Return approved controlled pairs with stable category order."""
+    """Return approved controlled pairs with stable category order.
+
+    Returns:
+        Tuple of returned-data/policy and routed-row/column heatmap definitions,
+        both ordered No then Yes; only the first enables a conditional summary.
+    """
     return (
         module.AssociationHeatmapDefinition(
             definition_id="returned_data_policy",
@@ -1131,7 +1415,11 @@ def controlled_association_definitions():
 
 
 def controlled_association_questions():
-    """Return controlled pair questions including one independently routed axis."""
+    """Return controlled pair questions including one independently routed axis.
+
+    Returns:
+        Question-ID-to-QuestionSpec lookup for the synthetic association test fields.
+    """
     return {
         "returned_data": association_question("returned_data", "Returned data", ["No", "Yes"], form_uid="returned-data-uid"),
         "policy": association_question("policy", "Policy", ["No", "Yes"], form_uid="policy-uid"),
@@ -1145,7 +1433,14 @@ def controlled_association_questions():
 
 
 def canonical_association_definitions_sha256(definitions):
-    """Return the canonical association-definition digest expected by the renderer."""
+    """Return the canonical association-definition digest expected by the renderer.
+
+    Args:
+        definitions: Association definitions supplied to the registry validation case.
+
+    Returns:
+        The SHA-256 digest of the canonical serialized association definitions.
+    """
     serialized = [module._association_definition_payload(definition) for definition in definitions]
     return sha256(
         json.dumps(serialized, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -1153,7 +1448,11 @@ def canonical_association_definitions_sha256(definitions):
 
 
 def test_pairing_uses_original_source_row_and_preserves_missing_states():
-    """Association vectors retain only source rows and do not pair by respondent context."""
+    """Association vectors retain only source rows and do not pair by respondent context.
+
+    Returns:
+        None. Association vectors retain only source rows and do not pair by respondent context.
+    """
     responses = pd.DataFrame([
         {"source_row": 8, "Returned data": "Yes", "Policy": "Yes", "Country": "Austria", "Institution": "Alpha", "Free text": "private"},
         {"source_row": 5, "Returned data": "No", "Policy": "Yes", "Country": "Belgium", "Institution": "Beta", "Free text": "private"},
@@ -1175,7 +1474,11 @@ def test_pairing_uses_original_source_row_and_preserves_missing_states():
 
 
 def test_inapplicable_and_out_of_route_answers_are_not_complete_case_observations():
-    """A routed blank and routed answer remain distinct and are excluded from cells."""
+    """A routed blank and routed answer remain distinct and are excluded from cells.
+
+    Returns:
+        None. A routed blank and routed answer remain distinct and are excluded from cells.
+    """
     responses = pd.DataFrame([
         {"source_row": 2, "Routing": "Yes", "Routed row": "Yes", "Routed column": "No"},
         {"source_row": 3, "Routing": "No", "Routed row": "", "Routed column": "Yes"},
@@ -1194,7 +1497,11 @@ def test_inapplicable_and_out_of_route_answers_are_not_complete_case_observation
 
 
 def test_renderer_rejects_unknown_association_category_and_mismatched_cell_total():
-    """Serialized association data cannot drift from declared categories or vectors."""
+    """Serialized association data cannot drift from declared categories or vectors.
+
+    Returns:
+        None. Serialized association data cannot drift from declared categories or vectors.
+    """
     definitions = controlled_association_definitions()[:1]
     definitions_sha256 = canonical_association_definitions_sha256(definitions)
     payload = report_payload()
@@ -1223,7 +1530,11 @@ def test_renderer_rejects_unknown_association_category_and_mismatched_cell_total
 
 
 def test_renderer_rejects_forged_association_definitions_with_stale_registry_digest():
-    """Internally consistent forged association data cannot replace recorded provenance."""
+    """Internally consistent forged association data cannot replace recorded provenance.
+
+    Returns:
+        None. Internally consistent forged association data cannot replace recorded provenance.
+    """
     definitions = controlled_association_definitions()[:1]
     definitions_sha256 = canonical_association_definitions_sha256(definitions)
     payload = report_payload()
@@ -1255,7 +1566,11 @@ def test_renderer_rejects_forged_association_definitions_with_stale_registry_dig
 
 
 def test_renderer_rejects_mismatched_association_definition_digest():
-    """Canonical definition provenance must bind exactly to embedded definitions."""
+    """Canonical definition provenance must bind exactly to embedded definitions.
+
+    Returns:
+        None. Canonical definition provenance must bind exactly to embedded definitions.
+    """
     definitions = controlled_association_definitions()[:1]
     payload = report_payload()
     payload["association_heatmap_definitions"] = {
@@ -1275,7 +1590,11 @@ def test_renderer_rejects_mismatched_association_definition_digest():
 
 
 def test_renderer_rejects_contact_definition_and_pair_identifying_fields():
-    """Rerendered association payloads cannot introduce contact axes or extra data."""
+    """Rerendered association payloads cannot introduce contact axes or extra data.
+
+    Returns:
+        None. Rerendered association payloads cannot introduce contact axes or extra data.
+    """
     definitions = controlled_association_definitions()[:1]
     payload = report_payload()
     payload["association_heatmap_definitions"] = {
@@ -1314,7 +1633,11 @@ def test_renderer_rejects_contact_definition_and_pair_identifying_fields():
 
 
 def test_descriptive_payload_carries_validated_association_registry_provenance():
-    """The renderer receives exact registry metadata with no responder context."""
+    """The renderer receives exact registry metadata with no responder context.
+
+    Returns:
+        None. The renderer receives exact registry metadata with no responder context.
+    """
     schema = descriptive_schema({
         "question_id": "returned_data",
         "column": "Returned data",
@@ -1356,7 +1679,11 @@ def test_descriptive_payload_carries_validated_association_registry_provenance()
 
 
 def returned_data_definition():
-    """Return the approved returned-data panel definition for renderer tests."""
+    """Return the approved returned-data panel definition for renderer tests.
+
+    Returns:
+        The controlled returned data definition fixture used by association-rendering tests.
+    """
     return replace(
         controlled_association_definitions()[0],
         title="Returned-data experience versus policy/workflow",
@@ -1365,7 +1692,11 @@ def returned_data_definition():
 
 
 def returned_data_pair():
-    """Return a complete 2x2 pair with fixed zero-inclusive cell order."""
+    """Return a complete 2x2 pair with fixed zero-inclusive cell order.
+
+    Returns:
+        The controlled returned data pair fixture used by association-rendering tests.
+    """
     return {
         "row_categories": ["No", "Yes"],
         "column_categories": ["No", "Yes"],
@@ -1381,7 +1712,11 @@ def returned_data_pair():
 
 
 def association_render_payload():
-    """Return a renderer-valid payload containing only the safe pair vector fields."""
+    """Return a renderer-valid payload containing only the safe pair vector fields.
+
+    Returns:
+        The controlled association render payload fixture used by association-rendering tests.
+    """
     definition = replace(
         returned_data_definition(),
         definition_id="returned_data_policy",
@@ -1424,7 +1759,11 @@ def association_render_payload():
 
 
 def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
-    """Heatmaps retain every declared category cell and their exact denominator."""
+    """Heatmaps retain every declared category cell and their exact denominator.
+
+    Returns:
+        None. Heatmaps retain every declared category cell and their exact denominator.
+    """
     pair = returned_data_pair()
     pair["cells"]["No|No"] = 0
     tex = module._association_heatmap_fragment(returned_data_definition(), pair)
@@ -1442,7 +1781,11 @@ def test_heatmap_has_fixed_axes_zero_cells_counts_and_paired_denominator():
 
 
 def test_binary_heatmap_uses_answer_ticks_and_wrapped_question_axis_titles():
-    """Yes/no panels show their answers directly and name both questions on the axes."""
+    """Yes/no panels show their answers directly and name both questions on the axes.
+
+    Returns:
+        None. Yes/no panels show their answers directly and name both questions on the axes.
+    """
     tex = module._association_heatmap_fragment(
         returned_data_definition(),
         returned_data_pair(),
@@ -1461,7 +1804,11 @@ def test_binary_heatmap_uses_answer_ticks_and_wrapped_question_axis_titles():
 
 
 def test_returned_data_pair_adds_conditional_percentages_with_group_sizes():
-    """Returned-data conditional rows use their displayed row denominators."""
+    """Returned-data conditional rows use their displayed row denominators.
+
+    Returns:
+        None. Returned-data conditional rows use their displayed row denominators.
+    """
     tex = module._association_conditional_summary_fragment(
         returned_data_definition(), returned_data_pair()
     )
@@ -1471,7 +1818,11 @@ def test_returned_data_pair_adds_conditional_percentages_with_group_sizes():
 
 
 def test_heatmap_axis_captions_follow_each_definition_not_returned_data_wording():
-    """Generic panels must not inherit the returned-data pair's semantic axis labels."""
+    """Generic panels must not inherit the returned-data pair's semantic axis labels.
+
+    Returns:
+        None. Generic panels must not inherit the returned-data pair's semantic axis labels.
+    """
     tex = module._association_heatmap_fragment(
         controlled_association_definitions()[1], returned_data_pair()
     )
@@ -1482,7 +1833,11 @@ def test_heatmap_axis_captions_follow_each_definition_not_returned_data_wording(
 
 
 def test_contact_field_cannot_appear_in_association_tex_or_chart_paths():
-    """Association rendering exposes no contact-field identifier or content."""
+    """Association rendering exposes no contact-field identifier or content.
+
+    Returns:
+        None. Association rendering exposes no contact-field identifier or content.
+    """
     rendered = module.render_descriptive_tex(association_render_payload(), chart_dir="charts")
 
     assert "q_111" not in rendered.tex
@@ -1500,7 +1855,11 @@ def test_contact_field_cannot_appear_in_association_tex_or_chart_paths():
 
 
 def test_renderer_includes_exploratory_association_heatmaps_only_when_requested():
-    """Exploratory association panels require the explicit renderer opt-in."""
+    """Exploratory association panels require the explicit renderer opt-in.
+
+    Returns:
+        None. Exploratory association panels require the explicit renderer opt-in.
+    """
     payload = association_render_payload()
     definition = replace(
         module._association_definition_from_payload(
@@ -1527,7 +1886,14 @@ def test_renderer_includes_exploratory_association_heatmaps_only_when_requested(
 
 @pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
 def test_real_xelatex_renders_minimal_association_chart_document(tmp_path):
-    """The registered association chart source is a self-contained XeLaTeX document."""
+    """The registered association chart source is a self-contained XeLaTeX document.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. The registered association chart source is a self-contained XeLaTeX document.
+    """
     rendered = module.render_descriptive_tex(association_render_payload(), chart_dir="charts")
 
     module.render_descriptive_pdf(rendered, tmp_path / "report.tex", None, tmp_path / "charts")
@@ -1536,7 +1902,11 @@ def test_real_xelatex_renders_minimal_association_chart_document(tmp_path):
 
 
 def test_production_schema_accounts_for_every_header():
-    """The production registry classifies each current source header exactly once."""
+    """The production registry classifies each current source header exactly once.
+
+    Returns:
+        None. The production registry classifies each current source header exactly once.
+    """
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
     headers = read_row_four_headers(PRODUCTION_WORKBOOK)
     module.validate_descriptive_schema(schema, headers)
@@ -1549,7 +1919,11 @@ def test_production_schema_accounts_for_every_header():
 
 
 def test_production_schema_declares_verified_routing_and_exclusive_answers():
-    """Production diagnostics are driven by explicit survey semantics."""
+    """Production diagnostics are driven by explicit survey semantics.
+
+    Returns:
+        None. Production diagnostics are driven by explicit survey semantics.
+    """
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
     questions = {question["question_id"]: question for question in schema["questions"]}
 
@@ -1572,7 +1946,11 @@ def test_production_schema_declares_verified_routing_and_exclusive_answers():
 
 
 def test_production_schema_narrative_barrier_columns_are_free_text_with_parents():
-    """Other-barrier narrative answers remain text while retaining their matrix context."""
+    """Other-barrier narrative answers remain text while retaining their matrix context.
+
+    Returns:
+        None. Other-barrier narrative answers remain text while retaining their matrix context.
+    """
     questions = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))
 
     assert questions[LEGAL_GDPR]["question_type"] == "single_choice"
@@ -1599,7 +1977,11 @@ def test_production_schema_narrative_barrier_columns_are_free_text_with_parents(
 
 
 def test_production_schema_preserves_declared_zero_count_ordinal_category_order():
-    """Declared ordinal storage bands remain ordered even when no response selects some bands."""
+    """Declared ordinal storage bands remain ordered even when no response selects some bands.
+
+    Returns:
+        None. Declared ordinal storage bands remain ordered even when no response selects some bands.
+    """
     question = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))[RETURNED_DATA_STORAGE]
 
     assert question["question_type"] == "single_choice"
@@ -1614,7 +1996,11 @@ def test_production_schema_preserves_declared_zero_count_ordinal_category_order(
 
 
 def test_production_schema_semicolon_inside_declared_ordinal_is_not_split():
-    """An ordinal label containing semicolons is not treated as a multi-choice answer."""
+    """An ordinal label containing semicolons is not treated as a multi-choice answer.
+
+    Returns:
+        None. An ordinal label containing semicolons is not treated as a multi-choice answer.
+    """
     question = questions_by_column(module.load_descriptive_schema(PRODUCTION_SCHEMA))[TRACEABILITY_READINESS]
 
     assert question["question_type"] == "single_choice"
@@ -1622,7 +2008,11 @@ def test_production_schema_semicolon_inside_declared_ordinal_is_not_split():
 
 
 def test_production_schema_declares_every_observed_non_other_structured_value():
-    """Ordinary structured responses have an explicit declared category."""
+    """Ordinary structured responses have an explicit declared category.
+
+    Returns:
+        None. Ordinary structured responses have an explicit declared category.
+    """
     schema = module.load_descriptive_schema(PRODUCTION_SCHEMA)
     questions = questions_by_column(schema)
     workbook = openpyxl.load_workbook(PRODUCTION_WORKBOOK, read_only=True, data_only=True)
@@ -1647,7 +2037,14 @@ def test_production_schema_declares_every_observed_non_other_structured_value():
 
 
 def report_payload(*questions):
-    """Return a minimal accepted payload for renderer contract tests."""
+    """Return a minimal accepted payload for renderer contract tests.
+
+    Args:
+        *questions: Question payload dictionaries placed in the report's questions list in argument order.
+
+    Returns:
+        The controlled report payload used by the renderer test.
+    """
     return {
         "payload_type": "so2_descriptive_statistics",
         "payload_version": "1",
@@ -1669,7 +2066,15 @@ def report_payload(*questions):
 
 
 def structured_report_question(**overrides):
-    """Return a small structured question with intentionally different denominators."""
+    """Return a small structured question with intentionally different denominators.
+
+    Args:
+        **overrides: Field overrides merged into the synthetic descriptive-report fixture.
+
+    Returns:
+        New multi-choice question dictionary with three responses, two answered,
+        LIMS/PACS counts 1/2, and one Missing; overrides replace top-level fields.
+    """
     question = {
         "question_id": "q_009_institution_type",
         "column": "Institution type",
@@ -1699,12 +2104,20 @@ def structured_report_question(**overrides):
 
 
 def multi_choice_payload():
-    """Return the count-bar payload used by renderer tests."""
+    """Return the count-bar payload used by renderer tests.
+
+    Returns:
+        The controlled multi choice payload used by the renderer test.
+    """
     return report_payload(structured_report_question())
 
 
 def single_choice_payload_with_missing():
-    """Return a single-choice payload that has missing rows."""
+    """Return a single-choice payload that has missing rows.
+
+    Returns:
+        The single-choice payload containing the controlled missing-answer distribution.
+    """
     return report_payload(structured_report_question(
         question_id="q_011_hosting_organisation",
         column="Hosting organisation",
@@ -1714,7 +2127,11 @@ def single_choice_payload_with_missing():
 
 
 def test_single_choice_questions_render_two_denominator_aware_pies_without_metadata():
-    """Single-choice charts are pies even though payloads carry no chart hint."""
+    """Single-choice charts are pies even though payloads carry no chart hint.
+
+    Returns:
+        None. Single-choice charts are pies even though payloads carry no chart hint.
+    """
     rendered = module.render_descriptive_tex(single_choice_payload_with_missing(), chart_dir=None)
 
     assert "including Missing" in rendered.tex
@@ -1723,7 +2140,11 @@ def test_single_choice_questions_render_two_denominator_aware_pies_without_metad
 
 
 def test_pie_uses_distinct_nonmissing_colours_before_any_palette_wraparound():
-    """Six observed answer categories do not reuse a colour before Missing red."""
+    """Six observed answer categories do not reuse a colour before Missing red.
+
+    Returns:
+        None. Six observed answer categories do not reuse a colour before Missing red.
+    """
     question = structured_report_question(
         question_type="single_choice",
         population={"N": 7, "A": 6, "M": 1, "blank_rows": 1},
@@ -1743,7 +2164,11 @@ def test_pie_uses_distinct_nonmissing_colours_before_any_palette_wraparound():
 
 
 def test_fully_answered_single_choice_pie_omits_the_zero_missing_slice():
-    """A complete single-choice response set does not receive a misleading Missing pie."""
+    """A complete single-choice response set does not receive a misleading Missing pie.
+
+    Returns:
+        None. A complete single-choice response set does not receive a misleading Missing pie.
+    """
     question = structured_report_question(
         question_type="single_choice",
         population={"N": 3, "A": 3, "M": 0, "blank_rows": 0},
@@ -1766,7 +2191,11 @@ def test_fully_answered_single_choice_pie_omits_the_zero_missing_slice():
 
 
 def test_bar_charts_keep_category_labels_and_skip_empty_ordinal_exceptions():
-    """Horizontal bars retain labels and do not emit a degenerate zero-only panel."""
+    """Horizontal bars retain labels and do not emit a degenerate zero-only panel.
+
+    Returns:
+        None. Horizontal bars retain labels and do not emit a degenerate zero-only panel.
+    """
     question = structured_report_question(
         question_type="ordinal",
         categories=[
@@ -1783,7 +2212,11 @@ def test_bar_charts_keep_category_labels_and_skip_empty_ordinal_exceptions():
 
 
 def payload_with_repeated_and_free_text():
-    """Return literal contribution and narrative rows for table rendering."""
+    """Return literal contribution and narrative rows for table rendering.
+
+    Returns:
+        The controlled payload with repeated and free text used by the renderer test.
+    """
     structured = structured_report_question(contributions=[{
         "value": "PACS", "country": "Austria", "institution": "Alpha",
         "source_row": 5, "repeated_response": True,
@@ -1811,12 +2244,20 @@ def payload_with_repeated_and_free_text():
 
 
 def rendered_payload():
-    """Render one bar chart for filesystem publication tests."""
+    """Render one bar chart for filesystem publication tests.
+
+    Returns:
+        The controlled rendered payload used by the renderer test.
+    """
     return module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts")
 
 
 def test_upsets_are_placed_with_single_questions_and_shared_figures_are_referenced():
-    """Single figures are local while combined figures remain in one shared section."""
+    """Single figures are local while combined figures remain in one shared section.
+
+    Returns:
+        None. Single figures are local while combined figures remain in one shared section.
+    """
     q009 = structured_report_question()
     q042 = structured_report_question(question_id="q_042_national", label="National contribution")
     q044 = structured_report_question(question_id="q_044_international", label="International contribution")
@@ -1841,7 +2282,11 @@ def test_upsets_are_placed_with_single_questions_and_shared_figures_are_referenc
 
 
 def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
-    """Multi-choice charts retain selection counts and separate missing-row bases."""
+    """Multi-choice charts retain selection counts and separate missing-row bases.
+
+    Returns:
+        None. Multi-choice charts retain selection counts and separate missing-row bases.
+    """
     tex = module.render_descriptive_tex(multi_choice_payload(), chart_dir="charts").tex
 
     assert r"\begin{axis}[xbar" in tex
@@ -1852,7 +2297,11 @@ def test_multi_choice_tex_is_count_bars_with_missing_and_percentage_labels():
 
 
 def test_bar_label_width_uses_document_text_width_not_nested_axis_linewidth():
-    """Long labels retain their intended physical width inside the PGFPlots axis."""
+    """Long labels retain their intended physical width inside the PGFPlots axis.
+
+    Returns:
+        None. Long labels retain their intended physical width inside the PGFPlots axis.
+    """
     question = structured_report_question(categories=[
         {
             "value": "Electronic – standalone biobank system (BIMS or LIMS) managed by the biobank",
@@ -1875,7 +2324,11 @@ def test_bar_label_width_uses_document_text_width_not_nested_axis_linewidth():
     assert r"\linewidth" not in fragment
 
 def test_bar_tex_locks_every_bar_to_its_category_row_and_reserves_label_space():
-    """Separate colour plots must not be shifted away from their y-axis labels."""
+    """Separate colour plots must not be shifted away from their y-axis labels.
+
+    Returns:
+        None. Separate colour plots must not be shifted away from their y-axis labels.
+    """
     fragment = module.render_descriptive_tex(multi_choice_payload(), chart_dir=None).chart_fragments[
         "09-institution-type"
     ]
@@ -1889,7 +2342,11 @@ def test_bar_tex_locks_every_bar_to_its_category_row_and_reserves_label_space():
 
 
 def test_report_tex_is_self_contained_and_displays_required_semantics():
-    """Published TeX embeds charts and exposes provenance and question denominators."""
+    """Published TeX embeds charts and exposes provenance and question denominators.
+
+    Returns:
+        None. Published TeX embeds charts and exposes provenance and question denominators.
+    """
     payload = multi_choice_payload()
 
     tex = module.render_descriptive_tex(payload, chart_dir=None).tex
@@ -1918,7 +2375,14 @@ def test_report_tex_is_self_contained_and_displays_required_semantics():
 
 
 def test_form_structure_uses_xml_question_types_matrix_rows_and_dependencies(tmp_path):
-    """XML form metadata preserves types, matrix headers, and answer routing links."""
+    """XML form metadata preserves types, matrix headers, and answer routing links.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. XML form metadata preserves types, matrix headers, and answer routing links.
+    """
     form_path = tmp_path / "form.xml"
     form_path.write_text(
         '<Results><Survey><Elements>'
@@ -1944,7 +2408,14 @@ def test_form_structure_uses_xml_question_types_matrix_rows_and_dependencies(tmp
 
 
 def test_payload_carries_authoritative_xml_response_metadata(tmp_path):
-    """Payload questions retain the form-derived type and non-inferred requiredness."""
+    """Payload questions retain the form-derived type and non-inferred requiredness.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Payload questions retain the form-derived type and non-inferred requiredness.
+    """
     schema = descriptive_schema({
         "question_id": "digital_maturity",
         "column": "Digital maturity",
@@ -1971,7 +2442,11 @@ def test_payload_carries_authoritative_xml_response_metadata(tmp_path):
 
 
 def test_free_text_urls_render_as_short_hyperlinks_and_placeholders_are_suppressed():
-    """Narrative tables retain usable links while omitting semantically empty responses."""
+    """Narrative tables retain usable links while omitting semantically empty responses.
+
+    Returns:
+        None. Narrative tables retain usable links while omitting semantically empty responses.
+    """
     narrative = payload_with_repeated_and_free_text()["questions"][1]
     narrative["free_text_rows"][0]["text"] = "See https://example.org/a/very/long/path?query=1"
 
@@ -1984,7 +2459,11 @@ def test_free_text_urls_render_as_short_hyperlinks_and_placeholders_are_suppress
 
 
 def test_empty_free_text_question_is_explicitly_reported():
-    """An unanswered narrative question is not rendered as an unexplained empty table."""
+    """An unanswered narrative question is not rendered as an unexplained empty table.
+
+    Returns:
+        None. An unanswered narrative question is not rendered as an unexplained empty table.
+    """
     narrative = payload_with_repeated_and_free_text()["questions"][1]
     narrative["population"] = {"N": 3, "A": 0, "M": 3, "blank_rows": 3}
     narrative["free_text_rows"] = []
@@ -1995,7 +2474,11 @@ def test_empty_free_text_question_is_explicitly_reported():
 
 
 def test_pie_legends_have_coloured_connectors_for_each_slice():
-    """Pie labels are explicitly connected to their corresponding coloured segment."""
+    """Pie labels are explicitly connected to their corresponding coloured segment.
+
+    Returns:
+        None. Pie labels are explicitly connected to their corresponding coloured segment.
+    """
     fragment = module.render_descriptive_tex(single_choice_payload_with_missing(), None).chart_fragments[
         "11-hosting-organisation"
     ]
@@ -2006,7 +2489,11 @@ def test_pie_legends_have_coloured_connectors_for_each_slice():
 
 
 def test_pie_eligible_single_choice_with_missing_has_two_variants():
-    """A schema-designated pie exposes both missing-inclusive and answered-only views."""
+    """A schema-designated pie exposes both missing-inclusive and answered-only views.
+
+    Returns:
+        None. A schema-designated pie exposes both missing-inclusive and answered-only views.
+    """
     rendered = module.render_descriptive_tex(single_choice_payload_with_missing(), chart_dir=None)
 
     assert "including Missing" in rendered.tex
@@ -2017,7 +2504,14 @@ def test_pie_eligible_single_choice_with_missing_has_two_variants():
 
 
 def test_standalone_chart_has_context_and_report_relative_payload_path(tmp_path):
-    """Standalone charts retain interpretation context and payload paths are portable."""
+    """Standalone charts retain interpretation context and payload paths are portable.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Standalone charts retain interpretation context and payload paths are portable.
+    """
     payload = multi_choice_payload()
     report_path = tmp_path / "publication" / "report.tex"
     chart_dir = tmp_path / "publication" / "charts"
@@ -2042,7 +2536,11 @@ def test_standalone_chart_has_context_and_report_relative_payload_path(tmp_path)
 
 
 def test_missing_bar_is_distinct_and_ordinal_exceptions_are_separated():
-    """Missing and ordinal exceptions cannot visually masquerade as scale levels."""
+    """Missing and ordinal exceptions cannot visually masquerade as scale levels.
+
+    Returns:
+        None. Missing and ordinal exceptions cannot visually masquerade as scale levels.
+    """
     ordinal = structured_report_question(
         question_id="q_012_frequency",
         label="Frequency",
@@ -2068,7 +2566,11 @@ def test_missing_bar_is_distinct_and_ordinal_exceptions_are_separated():
 
 
 def test_chart_key_bounds_long_sanitized_question_labels():
-    """Staged TeX fragment filenames remain below filesystem component limits."""
+    """Staged TeX fragment filenames remain below filesystem component limits.
+
+    Returns:
+        None. Staged TeX fragment filenames remain below filesystem component limits.
+    """
     question = {
         "question_id": "q_018_long_question",
         "label": "One " + ("very long descriptive question label " * 20),
@@ -2081,7 +2583,11 @@ def test_chart_key_bounds_long_sanitized_question_labels():
 
 
 def test_parent_context_is_opt_in_and_uses_raw_parent_answers():
-    """Narrative tables omit context by default and show unfiltered evidence on request."""
+    """Narrative tables omit context by default and show unfiltered evidence on request.
+
+    Returns:
+        None. Narrative tables omit context by default and show unfiltered evidence on request.
+    """
     narrative = payload_with_repeated_and_free_text()["questions"][1]
     narrative["free_text_rows"][0]["parent_answers"] = [
         {"column": "Terminologies", "value": "Other standards (please specify):"},
@@ -2104,7 +2610,11 @@ def test_parent_context_is_opt_in_and_uses_raw_parent_answers():
 
 
 def test_contribution_table_prints_literal_repeated_rows_when_requested():
-    """Structured evidence tables retain repeat warnings and omit source-row provenance."""
+    """Structured evidence tables retain repeat warnings and omit source-row provenance.
+
+    Returns:
+        None. Structured evidence tables retain repeat warnings and omit source-row provenance.
+    """
     tex = module.render_descriptive_tex(
         payload_with_repeated_and_free_text(), chart_dir=None, include_contribution_tables=True,
     ).tex
@@ -2115,9 +2625,17 @@ def test_contribution_table_prints_literal_repeated_rows_when_requested():
 
 
 def test_structured_evidence_table_groups_institutions_and_uses_compact_type():
-    """Structured evidence has one row per value/country with literal institution entries."""
+    """Structured evidence has one row per value/country with literal institution entries.
+
+    Returns:
+        None. Structured evidence has one row per value/country with literal institution entries.
+    """
 def test_short_report_omits_structured_contribution_tables():
-    """Short reports retain charts while omitting verbose structured evidence."""
+    """Short reports retain charts while omitting verbose structured evidence.
+
+    Returns:
+        None. Short reports retain charts while omitting verbose structured evidence.
+    """
     tex = module.render_descriptive_tex(multi_choice_payload(), chart_dir=None).tex
 
     assert "Value & Country & Institutions" not in tex
@@ -2138,7 +2656,11 @@ def test_short_report_omits_structured_contribution_tables():
 
 
 def test_free_text_parent_header_lists_fixed_parent_questions_once():
-    """Fixed parent columns appear in the header while cells contain values only."""
+    """Fixed parent columns appear in the header while cells contain values only.
+
+    Returns:
+        None. Fixed parent columns appear in the header while cells contain values only.
+    """
     narrative = payload_with_repeated_and_free_text()["questions"][1]
     narrative["free_text_rows"][0]["parent_answers"].append(
         {"column": "Barrier B", "value": "Missing"}
@@ -2158,7 +2680,11 @@ def test_free_text_parent_header_lists_fixed_parent_questions_once():
 
 
 def test_free_text_table_uses_country_codes_and_omits_uniform_empty_parent_context():
-    """Narrative tables reserve their width for institutions and responses, not empty metadata."""
+    """Narrative tables reserve their width for institutions and responses, not empty metadata.
+
+    Returns:
+        None. Narrative tables reserve their width for institutions and responses, not empty metadata.
+    """
     narrative = payload_with_repeated_and_free_text()["questions"][1]
     narrative["free_text_rows"][0]["country"] = "Czech Republic"
     narrative["free_text_rows"][0]["parent_answers"] = []
@@ -2173,7 +2699,11 @@ def test_free_text_table_uses_country_codes_and_omits_uniform_empty_parent_conte
 
 
 def test_pie_labels_are_distributed_on_both_sides_of_the_chart():
-    """Bilateral leader labels keep individual pie connectors short."""
+    """Bilateral leader labels keep individual pie connectors short.
+
+    Returns:
+        None. Bilateral leader labels keep individual pie connectors short.
+    """
     fragment = module.render_descriptive_tex(single_choice_payload_with_missing(), None).chart_fragments[
         "11-hosting-organisation"
     ]
@@ -2184,21 +2714,33 @@ def test_pie_labels_are_distributed_on_both_sides_of_the_chart():
 
 
 def test_question_identifier_line_uses_compact_type_throughout():
-    """The Question identifier label and identifier share the same compact style."""
+    """The Question identifier label and identifier share the same compact style.
+
+    Returns:
+        None. The Question identifier label and identifier share the same compact style.
+    """
     tex = module.render_descriptive_tex(single_choice_payload_with_missing(), None).tex
 
     assert r"\noindent\smaller[3] Question identifier: \texttt{" in tex
 
 
 def test_question_identifier_has_a_small_following_paragraph_gap():
-    """Question metadata is visibly separated from denominator metadata."""
+    """Question metadata is visibly separated from denominator metadata.
+
+    Returns:
+        None. Question metadata is visibly separated from denominator metadata.
+    """
     tex = module.render_descriptive_tex(single_choice_payload_with_missing(), None).tex
 
     assert r"\normalsize\par\vspace{0.35\baselineskip}" in tex
 
 
 def test_long_bar_charts_fill_printable_page_capacity_before_splitting():
-    """Continuation charts use the printable page height, not an arbitrary half page."""
+    """Continuation charts use the printable page height, not an arbitrary half page.
+
+    Returns:
+        None. Continuation charts use the printable page height, not an arbitrary half page.
+    """
     categories = [
         {"value": f"Category {index}", "count": index, "percent_base": 60, "percent": index / 60 * 100}
         for index in range(1, 61)
@@ -2218,7 +2760,11 @@ def test_long_bar_charts_fill_printable_page_capacity_before_splitting():
 
 
 def test_production_free_text_followups_have_validated_parent_contexts():
-    """Configured SO2 follow-ups retain their immediately preceding structured context."""
+    """Configured SO2 follow-ups retain their immediately preceding structured context.
+
+    Returns:
+        None. Configured SO2 follow-ups retain their immediately preceding structured context.
+    """
     schema = json.loads(
         (Path(__file__).parents[1] / "survey-mappings" / "so2_2025_descriptive_report.json").read_text()
     )
@@ -2255,7 +2801,11 @@ def test_production_free_text_followups_have_validated_parent_contexts():
     }
 
 def test_free_text_evidence_table_uses_less_aggressive_compact_type():
-    """Narrative evidence remains row-level but has a readable compact table size."""
+    """Narrative evidence remains row-level but has a readable compact table size.
+
+    Returns:
+        None. Narrative evidence remains row-level but has a readable compact table size.
+    """
     narrative = payload_with_repeated_and_free_text()["questions"][1]
 
     tex = module.render_descriptive_tex(report_payload(narrative), chart_dir=None).tex
@@ -2265,7 +2815,14 @@ def test_free_text_evidence_table_uses_less_aggressive_compact_type():
 
 
 def test_chart_dir_must_be_new_or_empty(tmp_path):
-    """Renderer refuses to mix generated chart PDFs with pre-existing files."""
+    """Renderer refuses to mix generated chart PDFs with pre-existing files.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Renderer refuses to mix generated chart PDFs with pre-existing files.
+    """
     target = tmp_path / "charts"
     target.mkdir()
     (target / "old.pdf").write_bytes(b"old")
@@ -2275,8 +2832,25 @@ def test_chart_dir_must_be_new_or_empty(tmp_path):
 
 
 def test_pdf_render_overwrite_replaces_a_nonempty_chart_directory(tmp_path, monkeypatch):
-    """Explicit overwrite replaces chart artifacts rather than mixing generations."""
+    """Explicit overwrite replaces chart artifacts rather than mixing generations.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Explicit overwrite replaces chart artifacts rather than mixing generations.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2296,7 +2870,15 @@ def test_pdf_render_overwrite_replaces_a_nonempty_chart_directory(tmp_path, monk
 
 
 def test_tex_only_render_does_not_require_a_compiler_or_render_chart_pdfs(tmp_path, monkeypatch):
-    """Publishing TeX alone leaves PDF and standalone-chart compilation to explicit requests."""
+    """Publishing TeX alone leaves PDF and standalone-chart compilation to explicit requests.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Publishing TeX alone leaves PDF and standalone-chart compilation to explicit requests.
+    """
     monkeypatch.setattr(
         module,
         "_run_xelatex",
@@ -2311,8 +2893,25 @@ def test_tex_only_render_does_not_require_a_compiler_or_render_chart_pdfs(tmp_pa
 
 
 def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkeypatch):
-    """Successful staged compiler outputs are atomically published to requested targets."""
+    """Successful staged compiler outputs are atomically published to requested targets.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Successful staged compiler outputs are atomically published to requested targets.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2332,10 +2931,27 @@ def test_pdf_render_stages_and_publishes_only_completed_outputs(tmp_path, monkey
 
 
 def test_report_pdf_runs_xelatex_twice_to_resolve_the_table_of_contents(tmp_path, monkeypatch):
-    """The report receives two passes while standalone chart files receive one."""
+    """The report receives two passes while standalone chart files receive one.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. The report receives two passes while standalone chart files receive one.
+    """
     calls = []
 
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         calls.append(Path(command[-1]).name)
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
@@ -2349,8 +2965,25 @@ def test_report_pdf_runs_xelatex_twice_to_resolve_the_table_of_contents(tmp_path
 
 
 def test_pdf_publication_never_replaces_across_filesystems(tmp_path, monkeypatch):
-    """Every promoted artifact is first staged beside its destination."""
+    """Every promoted artifact is first staged beside its destination.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Every promoted artifact is first staged beside its destination.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2359,6 +2992,15 @@ def test_pdf_publication_never_replaces_across_filesystems(tmp_path, monkeypatch
     real_replace = module.os.replace
 
     def reject_cross_device_replace(source, destination):
+        """Raise a cross-device error for atomic-publication tests.
+
+        Args:
+            source: Source file or directory passed to the real filesystem operation unless failure is injected.
+            destination: Publication target passed to the injected filesystem failure.
+
+        Returns:
+            The original path-replacement result when publication failure injection is inactive.
+        """
         source_path = Path(source)
         destination_path = Path(destination)
         if source_path.parent.resolve() != destination_path.parent.resolve():
@@ -2378,8 +3020,25 @@ def test_pdf_publication_never_replaces_across_filesystems(tmp_path, monkeypatch
 
 
 def test_chart_staging_failure_removes_target_filesystem_stages(tmp_path, monkeypatch):
-    """A chart-copy failure removes every hidden target-side staging artifact."""
+    """A chart-copy failure removes every hidden target-side staging artifact.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A chart-copy failure removes every hidden target-side staging artifact.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\\nmock")
@@ -2388,6 +3047,15 @@ def test_chart_staging_failure_removes_target_filesystem_stages(tmp_path, monkey
     real_copy2 = module.shutil.copy2
 
     def fail_chart_stage_copy(source, destination):
+        """Inject the fail chart stage copy fixture.
+
+        Args:
+            source: Source file or directory passed to the real filesystem operation unless failure is injected.
+            destination: Publication target passed to the injected filesystem failure.
+
+        Returns:
+            The original file-copy result when chart-staging failure injection is inactive.
+        """
         if Path(destination).parent.name.startswith(".so2-charts-"):
             raise OSError("simulated chart staging failure")
         return real_copy2(source, destination)
@@ -2408,10 +3076,27 @@ def test_chart_staging_failure_removes_target_filesystem_stages(tmp_path, monkey
 def test_pdf_render_keeps_final_outputs_absent_when_report_compilation_fails(
     tmp_path, monkeypatch,
 ):
-    """A report compiler failure leaves no report or chart publication behind."""
+    """A report compiler failure leaves no report or chart publication behind.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A report compiler failure leaves no report or chart publication behind.
+    """
     compilation_dirs = []
 
     def fake_xelatex(command, **_kwargs):
+        """Fail report compilation but write sentinel PDFs for individual charts.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            CompletedProcess with exit status 1 for report.tex and 0 for chart sources.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         compilation_dirs.append(output_dir)
@@ -2435,8 +3120,25 @@ def test_pdf_render_keeps_final_outputs_absent_when_report_compilation_fails(
 
 
 def test_pdf_render_rolls_back_all_outputs_when_publication_fails(tmp_path, monkeypatch):
-    """A publication error removes every final artifact already promoted."""
+    """A publication error removes every final artifact already promoted.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A publication error removes every final artifact already promoted.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2447,6 +3149,15 @@ def test_pdf_render_rolls_back_all_outputs_when_publication_fails(tmp_path, monk
     fail_once = True
 
     def fail_report_pdf_publication(source, destination):
+        """Inject the fail report pdf publication fixture.
+
+        Args:
+            source: Source file or directory passed to the real filesystem operation unless failure is injected.
+            destination: Publication target passed to the injected filesystem failure.
+
+        Returns:
+            The original path-replacement result when publication failure injection is inactive.
+        """
         nonlocal fail_once
         if Path(destination).name == "report.pdf" and fail_once:
             fail_once = False
@@ -2470,8 +3181,25 @@ def test_pdf_render_rolls_back_all_outputs_when_publication_fails(tmp_path, monk
 def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
     tmp_path, monkeypatch,
 ):
-    """Rollback preserves report files that existed before publication began."""
+    """Rollback preserves report files that existed before publication began.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Rollback preserves report files that existed before publication began.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2482,6 +3210,15 @@ def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
     fail_once = True
 
     def fail_report_pdf_publication(source, destination):
+        """Inject the fail report pdf publication fixture.
+
+        Args:
+            source: Source file or directory passed to the real filesystem operation unless failure is injected.
+            destination: Publication target passed to the injected filesystem failure.
+
+        Returns:
+            The original path-replacement result when publication failure injection is inactive.
+        """
         nonlocal fail_once
         if Path(destination).name == "report.pdf" and fail_once:
             fail_once = False
@@ -2505,11 +3242,28 @@ def test_pdf_render_restores_existing_report_outputs_when_publication_fails(
 def test_pdf_render_restores_existing_additional_text_output_when_publication_fails(
     tmp_path, monkeypatch,
 ):
-    """One transaction restores a prior payload when its final promotion fails."""
+    """One transaction restores a prior payload when its final promotion fails.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. One transaction restores a prior payload when its final promotion fails.
+    """
     real_replace = module.os.replace
     fail_once = True
 
     def fail_payload_publication(source, destination):
+        """Inject the fail payload publication fixture.
+
+        Args:
+            source: Source file or directory passed to the real filesystem operation unless failure is injected.
+            destination: Publication target passed to the injected filesystem failure.
+
+        Returns:
+            The original path-replacement result when publication failure injection is inactive.
+        """
         nonlocal fail_once
         if Path(destination).name == "descriptive.json" and fail_once:
             fail_once = False
@@ -2539,8 +3293,25 @@ def test_pdf_render_restores_existing_additional_text_output_when_publication_fa
 def test_pdf_render_reports_chart_publication_and_restoration_failures(
     tmp_path, monkeypatch,
 ):
-    """A failed chart rollback keeps the publication failure visible and actionable."""
+    """A failed chart rollback keeps the publication failure visible and actionable.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A failed chart rollback keeps the publication failure visible and actionable.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2550,11 +3321,30 @@ def test_pdf_render_reports_chart_publication_and_restoration_failures(
     real_mkdir = Path.mkdir
 
     def fail_chart_publication(source, destination):
+        """Inject the fail chart publication fixture.
+
+        Args:
+            source: Source file or directory passed to the real filesystem operation unless failure is injected.
+            destination: Publication target passed to the injected filesystem failure.
+
+        Returns:
+            The original path-replacement result when publication failure injection is inactive.
+        """
         if Path(destination).name == "charts" and Path(source).name.startswith(".so2-charts-"):
             raise OSError("simulated chart publication failure")
         return real_replace(source, destination)
 
     def fail_chart_directory_restoration(path, *args, **kwargs):
+        """Inject the fail chart directory restoration fixture.
+
+        Args:
+            path: Directory to create; creating the final chart_dir is made to fail during rollback.
+            *args: Path.mkdir positional mode/options forwarded unless rollback failure is injected.
+            **kwargs: Path.mkdir keyword options, such as parents/exist_ok, forwarded unchanged.
+
+        Returns:
+            The original directory-creation result when restoration failure injection is inactive.
+        """
         if path == chart_dir:
             raise OSError("simulated chart restoration failure")
         return real_mkdir(path, *args, **kwargs)
@@ -2574,8 +3364,25 @@ def test_pdf_render_reports_chart_publication_and_restoration_failures(
 
 
 def test_pdf_render_rejects_empty_symlink_chart_output_directory(tmp_path, monkeypatch):
-    """An empty symlink must not redirect chart publication outside the requested path."""
+    """An empty symlink must not redirect chart publication outside the requested path.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. An empty symlink must not redirect chart publication outside the requested path.
+    """
     def fake_xelatex(command, **_kwargs):
+        """Write a sentinel PDF instead of invoking XeLaTeX.
+
+        Args:
+            command: Command vector captured by the fake XeLaTeX invocation.
+            **_kwargs: Additional keyword arguments accepted to preserve the patched helper signature.
+
+        Returns:
+            A successful completed-process result that simulates a XeLaTeX invocation.
+        """
         output_dir = Path(command[command.index("-output-directory") + 1])
         source = Path(command[-1])
         (output_dir / f"{source.stem}.pdf").write_bytes(b"%PDF-1.4\nmock")
@@ -2593,7 +3400,14 @@ def test_pdf_render_rejects_empty_symlink_chart_output_directory(tmp_path, monke
 
 @pytest.mark.skipif(shutil.which("xelatex") is None, reason="XeLaTeX is not installed")
 def test_real_xelatex_renders_minimal_descriptive_report(tmp_path):
-    """A minimal real report compiles to a vector PDF when XeLaTeX is available."""
+    """A minimal real report compiles to a vector PDF when XeLaTeX is available.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. A minimal real report compiles to a vector PDF when XeLaTeX is available.
+    """
     rendered = module.render_descriptive_tex(multi_choice_payload(), chart_dir=None)
 
     module.render_descriptive_pdf(rendered, tmp_path / "report.tex", tmp_path / "report.pdf", None)
@@ -2636,7 +3450,15 @@ def test_real_xelatex_renders_minimal_descriptive_report(tmp_path):
     ],
 )
 def test_renderer_rejects_malformed_nested_payload_as_input_error(mutate, message):
-    """Malformed external payloads never escape as incidental Python exceptions."""
+    """Malformed external payloads never escape as incidental Python exceptions.
+
+    Args:
+        mutate: Payload mutation applied before renderer input validation.
+        message: Expected diagnostic substring asserted for the invalid input.
+
+    Returns:
+        None. Malformed external payloads never escape as incidental Python exceptions.
+    """
     payload = deepcopy(multi_choice_payload())
     mutate(payload)
 
@@ -2645,7 +3467,11 @@ def test_renderer_rejects_malformed_nested_payload_as_input_error(mutate, messag
 
 
 def test_public_descriptive_apis_document_contracts():
-    """Public APIs state their inputs, results, and user-facing failure modes."""
+    """Public APIs state their inputs, results, and user-facing failure modes.
+
+    Returns:
+        None. Public APIs state their inputs, results, and user-facing failure modes.
+    """
     public_functions = [
         module.load_descriptive_schema,
         module.is_nonblank_response_row,
@@ -2667,12 +3493,30 @@ def test_public_descriptive_apis_document_contracts():
 def test_target_filesystem_staging_write_failure_is_input_error_without_output(
     tmp_path, monkeypatch,
 ):
-    """A target-side write error is actionable and leaves no published file."""
+    """A target-side write error is actionable and leaves no published file.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. A target-side write error is actionable and leaves no published file.
+    """
     rendered = rendered_payload()
     report_tex = tmp_path / "report.tex"
     real_write_text = Path.write_text
 
     def fail_publication_stage(path, *args, **kwargs):
+        """Inject the fail publication stage fixture.
+
+        Args:
+            path: Text-write destination; sibling .so2-stage- files trigger the injected OSError.
+            *args: Path.write_text content/options forwarded when this destination is not rejected.
+            **kwargs: Path.write_text keyword options, including encoding, forwarded unchanged.
+
+        Returns:
+            The original text-write result when output-publication failure injection is inactive.
+        """
         if path.parent == tmp_path and ".so2-stage-" in path.name:
             raise OSError("simulated target write failure")
         return real_write_text(path, *args, **kwargs)
@@ -2687,13 +3531,31 @@ def test_target_filesystem_staging_write_failure_is_input_error_without_output(
 
 
 def test_chart_source_write_failure_is_input_error_without_output(tmp_path, monkeypatch):
-    """Temporary chart-source write failures use the public error boundary."""
+    """Temporary chart-source write failures use the public error boundary.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Temporary chart-source write failures use the public error boundary.
+    """
     rendered = rendered_payload()
     report_tex = tmp_path / "report.tex"
     chart_dir = tmp_path / "charts"
     real_write_text = Path.write_text
 
     def fail_chart_source(path, *args, **kwargs):
+        """Inject the fail chart source fixture.
+
+        Args:
+            path: Text-write destination; the standalone chart TeX source triggers the injected OSError.
+            *args: Path.write_text content/options forwarded when this destination is not rejected.
+            **kwargs: Path.write_text keyword options, including encoding, forwarded unchanged.
+
+        Returns:
+            The original text-write result when output-publication failure injection is inactive.
+        """
         if path.parent.name.startswith("so2-charts-"):
             raise OSError("simulated chart source write failure")
         return real_write_text(path, *args, **kwargs)
@@ -2708,7 +3570,11 @@ def test_chart_source_write_failure_is_input_error_without_output(tmp_path, monk
 
 
 def test_form_manifest_structure_exposes_matrix_rows_and_requiredness():
-    """Runtime form metadata is derived from JSON rather than XML serialization."""
+    """Runtime form metadata is derived from JSON rather than XML serialization.
+
+    Returns:
+        None. Runtime form metadata is derived from JSON rather than XML serialization.
+    """
     manifest = Path(__file__).parents[1] / "survey-mappings" / "so2_2025_form.json"
 
     structure = module.load_form_manifest_structure(manifest)
@@ -2720,7 +3586,11 @@ def test_form_manifest_structure_exposes_matrix_rows_and_requiredness():
 
 
 def test_pie_leader_lines_use_radial_pie_arc_intersections():
-    """Pie leaders start at the arc point nearest the positioned swatch."""
+    """Pie leaders start at the arc point nearest the positioned swatch.
+
+    Returns:
+        None. Pie leaders start at the arc point nearest the positioned swatch.
+    """
     fragment = module._pie_fragment({
         "pie_categories": [
             {"value": "Alpha", "count": 3, "percent": 75, "excluded_from_chart": False},
@@ -2735,7 +3605,11 @@ def test_pie_leader_lines_use_radial_pie_arc_intersections():
 
 
 def test_report_preamble_uses_libertine_typeface():
-    """Reports select Libertine consistently for XeLaTeX rendering."""
+    """Reports select Libertine consistently for XeLaTeX rendering.
+
+    Returns:
+        None. Reports select Libertine consistently for XeLaTeX rendering.
+    """
     preamble = module._preamble()
     assert r"\usepackage{libertine}" in preamble
     assert r"\tikzset{every picture/.append style={font=\sffamily}}" in preamble
@@ -2743,7 +3617,11 @@ def test_report_preamble_uses_libertine_typeface():
 
 
 def test_tikz_annotations_keep_sans_serif_when_using_small_fonts():
-    """Explicit TikZ font-size styles must not discard the chart sans-serif family."""
+    """Explicit TikZ font-size styles must not discard the chart sans-serif family.
+
+    Returns:
+        None. Explicit TikZ font-size styles must not discard the chart sans-serif family.
+    """
     pie = module._pie_fragment({"pie_categories": [{"value": "Yes", "count": 1, "percent": 100, "excluded_from_chart": False}]}, False, 4 / 3)
     bar = module._bar_fragment(structured_report_question())
     heatmap = module._association_heatmap_fragment(returned_data_definition(), returned_data_pair())
@@ -2754,7 +3632,11 @@ def test_tikz_annotations_keep_sans_serif_when_using_small_fonts():
 
 
 def test_response_structure_prints_concise_status_and_dependencies():
-    """Report metadata shows a plain status plus readable routing evidence."""
+    """Report metadata shows a plain status plus readable routing evidence.
+
+    Returns:
+        None. Report metadata shows a plain status plus readable routing evidence.
+    """
     text = module._response_structure_text({"form": {
         "response_type": "Free Text", "requiredness": "optional",
         "dependencies": [{"parent_question": "Institution type", "answer": "Other"}],
@@ -2766,7 +3648,11 @@ def test_response_structure_prints_concise_status_and_dependencies():
 
 
 def test_manifest_structure_resolves_dependency_to_human_labels():
-    """Manifest routing is readable in the descriptive report metadata."""
+    """Manifest routing is readable in the descriptive report metadata.
+
+    Returns:
+        None. Manifest routing is readable in the descriptive report metadata.
+    """
     manifest = Path(__file__).parents[1] / "survey-mappings" / "so2_2025_form.json"
     structure = module.load_form_manifest_structure(manifest)
     form = structure["questions"][module._form_label("Type of Institution")]
@@ -2778,13 +3664,21 @@ def test_manifest_structure_resolves_dependency_to_human_labels():
 
 
 def test_render_rejects_non_positive_piechart_ratio():
-    """The renderer rejects invalid direct API ratios before layout arithmetic."""
+    """The renderer rejects invalid direct API ratios before layout arithmetic.
+
+    Returns:
+        None. The renderer rejects invalid direct API ratios before layout arithmetic.
+    """
     with pytest.raises(module.InputError, match="max_piechart_ratio must be positive"):
         module.render_descriptive_tex(single_choice_payload_with_missing(), None, max_piechart_ratio=0)
 
 
 def test_matrix_rows_render_as_subsections_under_one_parent_section():
-    """Single-choice matrix rows share their manifest parent section."""
+    """Single-choice matrix rows share their manifest parent section.
+
+    Returns:
+        None. Single-choice matrix rows share their manifest parent section.
+    """
     payload = single_choice_payload_with_missing()
     row = payload["questions"][0]
     row["form"] = {"response_type": "Single Choice Matrix Question", "requiredness": "mandatory", "dependencies": [], "matrix_parent": "Barrier matrix", "matrix_row": "GDPR"}
@@ -2794,7 +3688,11 @@ def test_matrix_rows_render_as_subsections_under_one_parent_section():
 
 
 def test_matrix_rows_repeat_parent_metadata_only_once():
-    """Matrix parent metadata is printed once before its child pie sections."""
+    """Matrix parent metadata is printed once before its child pie sections.
+
+    Returns:
+        None. Matrix parent metadata is printed once before its child pie sections.
+    """
     payload = single_choice_payload_with_missing()
     first = payload["questions"][0]
     first["form"] = {"response_type": "Single Choice Matrix Question", "requiredness": "mandatory", "dependencies": [], "matrix_parent": "Barrier matrix", "matrix_row": "GDPR"}
@@ -2813,7 +3711,11 @@ def test_matrix_rows_repeat_parent_metadata_only_once():
 
 
 def test_pie_overflow_uses_keyed_labels_and_full_legend():
-    """Unfit full pie labels fall back to escaped keys with complete evidence."""
+    """Unfit full pie labels fall back to escaped keys with complete evidence.
+
+    Returns:
+        None. Unfit full pie labels fall back to escaped keys with complete evidence.
+    """
     q={"pie_categories":[{"value":"A very long category label "*8+str(i),"count":1,"excluded_from_chart":False} for i in range(8)]}
     tex=module._pie_fragment(q,False)
     assert r"\#1" in tex

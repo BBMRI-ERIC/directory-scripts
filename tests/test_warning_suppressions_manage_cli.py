@@ -1,3 +1,5 @@
+"""Test warning suppressions manage cli behavior."""
+
 import json
 import subprocess
 import sys
@@ -9,6 +11,14 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "warning-suppressions-manage
 
 
 def run_cli(*args):
+    """Run the cli fixture command.
+
+    Args:
+        *args: Command-line tokens appended after the Python script path, preserving order.
+
+    Returns:
+        The completed process object captured from the invoked command-line tool.
+    """
     return subprocess.run(
         [sys.executable, str(SCRIPT_PATH), *args],
         text=True,
@@ -18,6 +28,14 @@ def run_cli(*args):
 
 
 def test_warning_suppressions_manage_add_and_list(tmp_path):
+    """Verify warning suppressions manage add and list.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions manage add and list.
+    """
     path = tmp_path / "warning-suppressions.json"
     path.write_text("{}", encoding="utf-8")
 
@@ -46,6 +64,14 @@ def test_warning_suppressions_manage_add_and_list(tmp_path):
 
 
 def test_warning_suppressions_manage_prune_stale_dry_run(tmp_path):
+    """Verify warning suppressions manage prune stale dry run.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions manage prune stale dry run.
+    """
     path = tmp_path / "warning-suppressions.json"
     path.write_text(
         json.dumps(
@@ -69,6 +95,14 @@ def test_warning_suppressions_manage_prune_stale_dry_run(tmp_path):
 
 
 def test_warning_suppressions_manage_add_defaults_added_on_to_today(tmp_path):
+    """Verify warning suppressions manage add defaults added on to today.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions manage add defaults added on to today.
+    """
     path = tmp_path / "warning-suppressions.json"
     path.write_text("{}", encoding="utf-8")
 
@@ -88,6 +122,14 @@ def test_warning_suppressions_manage_add_defaults_added_on_to_today(tmp_path):
 
 
 def test_warning_suppressions_manage_add_fix_only_records_target_flags(tmp_path):
+    """Verify warning suppressions manage add fix only records target flags.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions manage add fix only records target flags.
+    """
     path = tmp_path / "warning-suppressions.json"
     path.write_text("{}", encoding="utf-8")
 

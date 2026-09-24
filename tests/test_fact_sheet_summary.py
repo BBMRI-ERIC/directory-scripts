@@ -1,3 +1,5 @@
+"""Test fact sheet summary behavior."""
+
 from fact_sheet_summary import (
     build_fact_sheet_summary,
     build_fact_sheet_xlsx_tables,
@@ -6,14 +8,34 @@ from fact_sheet_summary import (
 
 
 class FactDirectoryStub:
+    """Look up caller-provided fact rows by collection ID, returning an empty list for unknown IDs.
+    """
     def __init__(self, facts_by_collection):
+        """Retain the caller's collection-to-fact-row lookup without copying it.
+
+        Args:
+            facts_by_collection: Fixture fact rows keyed by collection identifier.
+        """
         self.facts_by_collection = facts_by_collection
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.facts_by_collection.get(collection_id, [])
 
 
 def test_fact_sheet_summary_keeps_fact_values_as_observations():
+    """Verify fact sheet summary keeps fact values as observations.
+
+    Returns:
+        None. Verifies fact sheet summary keeps fact values as observations.
+    """
     collections = [
         {"id": "col1", "name": "Collection 1"},
         {"id": "col2", "name": "Collection 2"},
@@ -138,6 +160,14 @@ def test_fact_sheet_summary_keeps_fact_values_as_observations():
 
 
 def test_fact_sheet_summary_prints_all_star_totals_and_value_distributions(capsys):
+    """Verify fact sheet summary prints all star totals and value distributions.
+
+    Args:
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies fact sheet summary prints all star totals and value distributions.
+    """
     collections = [{"id": "col1", "name": "Collection 1"}]
     directory = FactDirectoryStub(
         {
@@ -192,6 +222,14 @@ def test_fact_sheet_summary_prints_all_star_totals_and_value_distributions(capsy
 
 
 def test_no_star_fallback_is_opt_in_per_missing_value_and_preserves_provenance(capsys):
+    """Verify no star fallback is opt in per missing value and preserves provenance.
+
+    Args:
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies no star fallback is opt in per missing value and preserves provenance.
+    """
     collections = [
         {"id": "fallback", "name": "Fallback collection"},
         {"id": "authoritative", "name": "Authoritative collection"},
@@ -345,6 +383,11 @@ def test_no_star_fallback_is_opt_in_per_missing_value_and_preserves_provenance(c
 
 
 def test_duplicate_all_but_one_rows_block_fallback_only_for_that_value():
+    """Verify duplicate all but one rows block fallback only for that value.
+
+    Returns:
+        None. Verifies duplicate all but one rows block fallback only for that value.
+    """
     collections = [{"id": "duplicate", "name": "Duplicate"}]
     directory = FactDirectoryStub({"duplicate": [
         {"id": "m1", "sex": "FEMALE", "age_range": "*", "sample_type": "*", "disease": "*", "number_of_samples": 10, "number_of_donors": 5},
@@ -367,6 +410,11 @@ def test_duplicate_all_but_one_rows_block_fallback_only_for_that_value():
 
 
 def test_empty_duplicate_all_but_one_row_blocks_authoritative_total():
+    """Verify empty duplicate all but one row blocks authoritative total.
+
+    Returns:
+        None. Verifies empty duplicate all but one row blocks authoritative total.
+    """
     collections = [{"id": "duplicate", "name": "Duplicate"}]
     directory = FactDirectoryStub({"duplicate": [
         {"id": "m1", "sex": "FEMALE", "age_range": "*", "sample_type": "*", "disease": "*", "number_of_samples": 10, "number_of_donors": 5},
@@ -389,6 +437,14 @@ def test_empty_duplicate_all_but_one_row_blocks_authoritative_total():
 
 
 def test_no_star_fallback_provenance_prints_zero_use_counts(capsys):
+    """Verify no star fallback provenance prints zero use counts.
+
+    Args:
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies no star fallback provenance prints zero use counts.
+    """
     print_fact_sheet_summary(
         [{"id": "empty", "name": "Empty"}],
         FactDirectoryStub({"empty": []}),

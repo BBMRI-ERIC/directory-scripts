@@ -16,6 +16,16 @@ BIOBANK_ID = "bbmri-eric:ID:AT_MUG"
 
 
 def _collection(collection_id, name, **values):
+    """Build a collection record for fact-sheet emulation tests.
+
+    Args:
+        collection_id: Identifier inserted into the synthetic collection fixture.
+        name: Human-readable collection name used as text evidence for partition discovery.
+        **values: Field values merged into the synthetic collection fixture.
+
+    Returns:
+        New Austrian FFPE collection dictionary with shared contact/storage metadata and requested field overrides.
+    """
     collection = {
         "id": collection_id,
         "name": name,
@@ -33,6 +43,11 @@ def _collection(collection_id, name, **values):
 
 
 def _at_anatomy_records():
+    """Build Austrian anatomy-partition collection records.
+
+    Returns:
+        List ordered as FFPE parent then Breast, Lymphatic system, and Bones children, with sizes 100/40/35/25.
+    """
     parent = _collection(
         PARENT_ID,
         "FFPE Blocks Collection",
@@ -68,6 +83,11 @@ def _at_anatomy_records():
 
 
 def test_sibling_anatomy_family_is_high_confidence_but_not_currently_representable():
+    """Verify sibling anatomy family is high confidence but not currently representable.
+
+    Returns:
+        None. Verifies sibling anatomy family is high confidence but not currently representable.
+    """
     analysis = analyze_collection_records(_at_anatomy_records())
 
     assert len(analysis["candidate_families"]) == 1
@@ -107,6 +127,11 @@ def test_sibling_anatomy_family_is_high_confidence_but_not_currently_representab
 
 
 def test_at_mug_regression_shape_keeps_71_anatomy_members_and_31_structured_values():
+    """Verify at mug regression shape keeps 71 anatomy members and 31 structured values.
+
+    Returns:
+        None. Verifies at mug regression shape keeps 71 anatomy members and 31 structured values.
+    """
     parent = _collection(
         PARENT_ID,
         "FFPE Blocks Collection",
@@ -156,6 +181,11 @@ def test_at_mug_regression_shape_keeps_71_anatomy_members_and_31_structured_valu
 
 
 def test_image_type_added_with_body_part_is_not_an_operational_conflict():
+    """Verify image type added with body part is not an operational conflict.
+
+    Returns:
+        None. Verifies image type added with body part is not an operational conflict.
+    """
     analysis = analyze_collection_records(_at_anatomy_records())
 
     type_comparison = next(
@@ -168,6 +198,11 @@ def test_image_type_added_with_body_part_is_not_an_operational_conflict():
 
 
 def test_supported_material_partition_previews_all_but_one_star_rows_without_summing():
+    """Verify supported material partition previews all but one star rows without summing.
+
+    Returns:
+        None. Verifies supported material partition previews all but one star rows without summing.
+    """
     parent_id = "bbmri-eric:ID:CZ_BB1:collection:parent"
     parent = _collection(parent_id, "Material collection", country="CZ", size=999)
     children = [
@@ -207,6 +242,11 @@ def test_supported_material_partition_previews_all_but_one_star_rows_without_sum
 
 
 def test_multiple_supported_dimensions_produce_independent_all_but_one_star_previews():
+    """Verify multiple supported dimensions produce independent all but one star previews.
+
+    Returns:
+        None. Verifies multiple supported dimensions produce independent all but one star previews.
+    """
     parent_id = "bbmri-eric:ID:CZ_BB1:collection:two-dimensions"
     parent = _collection(parent_id, "Partition", country="CZ", size=30)
     children = [
@@ -257,6 +297,11 @@ def test_multiple_supported_dimensions_produce_independent_all_but_one_star_prev
 
 
 def test_repeated_top_level_name_can_be_high_confidence_but_oom_blocks_migration():
+    """Verify repeated top level name can be high confidence but oom blocks migration.
+
+    Returns:
+        None. Verifies repeated top level name can be high confidence but oom blocks migration.
+    """
     records = [
         _collection(
             "bbmri-eric:ID:UK_BB1:collection:1",
@@ -288,6 +333,11 @@ def test_repeated_top_level_name_can_be_high_confidence_but_oom_blocks_migration
 
 
 def test_top_level_structured_dimension_suffixes_form_one_conservative_family():
+    """Verify top level structured dimension suffixes form one conservative family.
+
+    Returns:
+        None. Verifies top level structured dimension suffixes form one conservative family.
+    """
     records = [
         _collection(
             "serum",
@@ -324,6 +374,11 @@ def test_top_level_structured_dimension_suffixes_form_one_conservative_family():
 
 
 def test_top_level_dimension_suffix_family_reuses_unique_umbrella_target():
+    """Verify top level dimension suffix family reuses unique umbrella target.
+
+    Returns:
+        None. Verifies top level dimension suffix family reuses unique umbrella target.
+    """
     records = [
         _collection("umbrella", "Legacy samples", size=30),
         _collection(
@@ -353,6 +408,11 @@ def test_top_level_dimension_suffix_family_reuses_unique_umbrella_target():
 
 
 def test_different_top_level_names_are_not_grouped_only_by_biobank():
+    """Verify different top level names are not grouped only by biobank.
+
+    Returns:
+        None. Verifies different top level names are not grouped only by biobank.
+    """
     records = [
         _collection("one", "Blood collection"),
         _collection("two", "Tumour collection"),
@@ -362,6 +422,11 @@ def test_different_top_level_names_are_not_grouped_only_by_biobank():
 
 
 def test_operational_conflict_is_reported_and_blocks_migration():
+    """Verify operational conflict is reported and blocks migration.
+
+    Returns:
+        None. Verifies operational conflict is reported and blocks migration.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20)
     first = _collection(
@@ -388,6 +453,11 @@ def test_operational_conflict_is_reported_and_blocks_migration():
 
 
 def test_missing_operational_value_is_unknown_not_a_conflict():
+    """Verify missing operational value is unknown not a conflict.
+
+    Returns:
+        None. Verifies missing operational value is unknown not a conflict.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20)
     first = _collection(
@@ -416,6 +486,11 @@ def test_missing_operational_value_is_unknown_not_a_conflict():
 
 
 def test_missing_critical_operational_metadata_blocks_migration_previews():
+    """Verify missing critical operational metadata blocks migration previews.
+
+    Returns:
+        None. Verifies missing critical operational metadata blocks migration previews.
+    """
     parent_id = "parent"
     records = [
         {"id": parent_id, "name": "Parent", "biobank": {"id": BIOBANK_ID}, "size": 20},
@@ -446,6 +521,11 @@ def test_missing_critical_operational_metadata_blocks_migration_previews():
 
 
 def test_network_and_networks_aliases_are_compared_as_operational_membership():
+    """Verify network and networks aliases are compared as operational membership.
+
+    Returns:
+        None. Verifies network and networks aliases are compared as operational membership.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20)
     first = _collection(
@@ -472,6 +552,11 @@ def test_network_and_networks_aliases_are_compared_as_operational_membership():
 
 
 def test_parent_operational_conflict_blocks_reuse_as_migration_target():
+    """Verify parent operational conflict blocks reuse as migration target.
+
+    Returns:
+        None. Verifies parent operational conflict blocks reuse as migration target.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20, license="parent-license")
     children = [
@@ -499,6 +584,11 @@ def test_parent_operational_conflict_blocks_reuse_as_migration_target():
 
 
 def test_unrelated_sibling_names_without_structured_variation_get_no_migration_advice():
+    """Verify unrelated sibling names without structured variation get no migration advice.
+
+    Returns:
+        None. Verifies unrelated sibling names without structured variation get no migration advice.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Administrative parent", size=20)
     children = [
@@ -516,6 +606,11 @@ def test_unrelated_sibling_names_without_structured_variation_get_no_migration_a
 
 
 def test_structured_variation_alone_does_not_make_unrelated_siblings_one_collection():
+    """Verify structured variation alone does not make unrelated siblings one collection.
+
+    Returns:
+        None. Verifies structured variation alone does not make unrelated siblings one collection.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Administrative parent", size=20)
     children = [
@@ -545,6 +640,11 @@ def test_structured_variation_alone_does_not_make_unrelated_siblings_one_collect
 
 
 def test_conflicting_structured_purpose_is_an_operational_blocker():
+    """Verify conflicting structured purpose is an operational blocker.
+
+    Returns:
+        None. Verifies conflicting structured purpose is an operational blocker.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20, purpose="research")
     children = [
@@ -574,6 +674,11 @@ def test_conflicting_structured_purpose_is_an_operational_blocker():
 
 
 def test_conflicting_descriptions_require_review_and_block_source_fact_previews():
+    """Verify conflicting descriptions require review and block source fact previews.
+
+    Returns:
+        None. Verifies conflicting descriptions require review and block source fact previews.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20)
     children = [
@@ -606,6 +711,11 @@ def test_conflicting_descriptions_require_review_and_block_source_fact_previews(
 
 
 def test_multivalued_supported_dimension_blocks_fact_preview():
+    """Verify multivalued supported dimension blocks fact preview.
+
+    Returns:
+        None. Verifies multivalued supported dimension blocks fact preview.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20)
     first = _collection(
@@ -630,6 +740,11 @@ def test_multivalued_supported_dimension_blocks_fact_preview():
 
 
 def test_identical_multivalued_characterization_is_not_a_dimension():
+    """Verify identical multivalued characterization is not a dimension.
+
+    Returns:
+        None. Verifies identical multivalued characterization is not a dimension.
+    """
     parent_id = "parent"
     parent = _collection(parent_id, "Parent", size=20)
     children = [
@@ -658,6 +773,11 @@ def test_identical_multivalued_characterization_is_not_a_dimension():
 
 
 def test_existing_target_all_star_is_retained_as_evidence_not_proposed():
+    """Verify existing target all star is retained as evidence not proposed.
+
+    Returns:
+        None. Verifies existing target all star is retained as evidence not proposed.
+    """
     records = _at_anatomy_records()
     facts = {
         PARENT_ID: [
@@ -683,6 +803,11 @@ def test_existing_target_all_star_is_retained_as_evidence_not_proposed():
 
 
 def test_multiple_target_all_star_rows_block_migration():
+    """Verify multiple target all star rows block migration.
+
+    Returns:
+        None. Verifies multiple target all star rows block migration.
+    """
     records = _at_anatomy_records()
     all_star = {
         "sex": "*",
@@ -706,6 +831,11 @@ def test_multiple_target_all_star_rows_block_migration():
 
 
 def test_sibling_family_cannot_hide_cross_country_operational_conflict():
+    """Verify sibling family cannot hide cross country operational conflict.
+
+    Returns:
+        None. Verifies sibling family cannot hide cross country operational conflict.
+    """
     parent_id = "parent"
     records = [
         _collection(parent_id, "Parent", size=20),
@@ -726,6 +856,11 @@ def test_sibling_family_cannot_hide_cross_country_operational_conflict():
 
 
 def test_ai_review_packet_is_self_contained_and_json_serializable():
+    """Verify ai review packet is self contained and json serializable.
+
+    Returns:
+        None. Verifies ai review packet is self contained and json serializable.
+    """
     analysis = analyze_collection_records(_at_anatomy_records())
 
     packet = build_ai_review_packet(analysis)
@@ -749,6 +884,11 @@ def test_ai_review_packet_is_self_contained_and_json_serializable():
 
 
 def test_ai_review_packet_uses_strict_json_null_for_nan_counts():
+    """Verify ai review packet uses strict json null for nan counts.
+
+    Returns:
+        None. Verifies ai review packet uses strict json null for nan counts.
+    """
     records = _at_anatomy_records()
     records[1]["size"] = float("nan")
     analysis = analyze_collection_records(records)
@@ -761,10 +901,28 @@ def test_ai_review_packet_uses_strict_json_null_for_nan_counts():
 
 
 def _diagnosis(code):
+    """Build a diagnosis value for a collection fixture.
+
+    Args:
+        code: Diagnosis or ontology code placed into the generated fixture.
+
+    Returns:
+        Single-element diagnosis_available list containing a name-keyed urn:miriam:icd identifier.
+    """
     return [{"name": f"urn:miriam:icd:{code}"}]
 
 
 def _family_for_collection_ids(analysis, collection_ids):
+    """Select the analysed family covering the supplied collection identifiers.
+
+    Args:
+        analysis: Fact-sheet emulation analysis whose result is inspected.
+        collection_ids: Collection identifiers whose generated family is selected.
+
+    Returns:
+        The sole candidate-family dictionary containing all requested collection IDs;
+        absence or multiple matches fails an assertion.
+    """
     expected = set(collection_ids)
     matches = [
         family
@@ -776,6 +934,16 @@ def _family_for_collection_ids(analysis, collection_ids):
 
 
 def _description_evidence(analysis, family):
+    """Select description-comparison evidence for one analysed family.
+
+    Args:
+        analysis: Fact-sheet emulation analysis whose result is inspected.
+        family: Candidate collection family selected from the analysis result.
+
+    Returns:
+        Description-evidence dictionary from the first description field-comparison
+        row matching family_id; missing evidence raises StopIteration.
+    """
     comparison = next(
         row
         for row in analysis["field_comparisons"]
@@ -798,6 +966,23 @@ def _diagnosis_pair(
     second_description="DNA samples from a shared cohort.",
     country="ES",
 ):
+    """Build sibling collections that differ only by diagnosis.
+
+    Args:
+        biobank_id: Biobank identifier assigned to both synthetic diagnosis collections.
+        first_id: Identifier assigned to the first synthetic diagnosis collection.
+        second_id: Identifier assigned to the second synthetic diagnosis collection.
+        first_name: Name assigned to the first generated collection.
+        second_name: Name assigned to the second generated collection.
+        first_diagnosis: Diagnosis assigned to the first generated collection.
+        second_diagnosis: Diagnosis assigned to the second generated collection.
+        first_description: Description assigned to the first generated collection.
+        second_description: Description assigned to the second generated collection.
+        country: Country value varied by the parametrized identity case.
+
+    Returns:
+        Two top-level collection dictionaries in first/second order, each with 10 samples and 8 donors.
+    """
     common = {
         "biobank_id": biobank_id,
         "country": country,
@@ -830,6 +1015,20 @@ def _sibling_pair(
     first_values=None,
     second_values=None,
 ):
+    """Build a pair of sibling collection fixtures.
+
+    Args:
+        label: Readable label assigned to the generated collection family.
+        first_description: Description assigned to the first generated collection.
+        second_description: Description assigned to the second generated collection.
+        first_diagnosis: Diagnosis assigned to the first generated collection.
+        second_diagnosis: Diagnosis assigned to the second generated collection.
+        first_values: Fact values assigned to the first generated collection.
+        second_values: Fact values assigned to the second generated collection.
+
+    Returns:
+        Three dictionaries ordered as umbrella parent, first child, and second child; both children point to that parent.
+    """
     biobank_id = f"bbmri-eric:ID:SYN_{label.upper()}"
     parent_id = f"{biobank_id}:collection:umbrella"
     parent = _collection(
@@ -868,6 +1067,11 @@ def _sibling_pair(
 
 
 def test_exact_non_dimension_equality_discovers_diagnosis_partition():
+    """Verify exact non dimension equality discovers diagnosis partition.
+
+    Returns:
+        None. Verifies exact non dimension equality discovers diagnosis partition.
+    """
     records = _diagnosis_pair(
         "bbmri-eric:ID:SYN_EXACT",
         "bbmri-eric:ID:SYN_EXACT:collection:alpha",
@@ -889,6 +1093,11 @@ def test_exact_non_dimension_equality_discovers_diagnosis_partition():
 
 
 def test_differently_named_diagnosis_families_use_three_conceptual_anchors():
+    """Verify differently named diagnosis families use three conceptual anchors.
+
+    Returns:
+        None. Verifies differently named diagnosis families use three conceptual anchors.
+    """
     cases = [
         (
             _diagnosis_pair(
@@ -995,6 +1204,18 @@ def test_description_boundary_markers_prevent_emulation(
     boundary_category,
     token,
 ):
+    """Verify description boundary markers prevent emulation.
+
+    Args:
+        label: Readable label assigned to the generated collection family.
+        first_description: Description assigned to the first generated collection.
+        second_description: Description assigned to the second generated collection.
+        boundary_category: Boundary category that makes the sibling descriptions distinct.
+        token: Boundary marker inserted into the sibling descriptions.
+
+    Returns:
+        None. Verifies description boundary markers prevent emulation.
+    """
     records = _sibling_pair(
         label,
         first_description=first_description,
@@ -1015,6 +1236,11 @@ def test_description_boundary_markers_prevent_emulation(
 
 
 def test_placeholder_description_is_not_a_conceptual_family_anchor():
+    """Verify placeholder description is not a conceptual family anchor.
+
+    Returns:
+        None. Verifies placeholder description is not a conceptual family anchor.
+    """
     records = _sibling_pair(
         "placeholder",
         first_description="To be provided",
@@ -1033,6 +1259,11 @@ def test_placeholder_description_is_not_a_conceptual_family_anchor():
 
 
 def test_scientific_question_catalogue_is_not_fact_sheet_emulation():
+    """Verify scientific question catalogue is not fact sheet emulation.
+
+    Returns:
+        None. Verifies scientific question catalogue is not fact sheet emulation.
+    """
     records = _sibling_pair(
         "scientific_questions",
         first_description="Structured clinical variable catalogue.",
@@ -1054,6 +1285,11 @@ def test_scientific_question_catalogue_is_not_fact_sheet_emulation():
 
 
 def test_imaging_body_region_family_is_review_only_without_operational_proof():
+    """Verify imaging body region family is review only without operational proof.
+
+    Returns:
+        None. Verifies imaging body region family is review only without operational proof.
+    """
     biobank_id = "bbmri-eric:ID:SYN_BCU"
     records = [
         _collection(
@@ -1094,6 +1330,11 @@ def test_imaging_body_region_family_is_review_only_without_operational_proof():
 
 
 def test_multivalued_diagnosis_blocks_fact_preview():
+    """Verify multivalued diagnosis blocks fact preview.
+
+    Returns:
+        None. Verifies multivalued diagnosis blocks fact preview.
+    """
     records = _sibling_pair(
         "multivalued_diagnosis",
         first_description="Samples from a shared cohort.",
@@ -1119,6 +1360,11 @@ def test_multivalued_diagnosis_blocks_fact_preview():
 
 
 def test_coarse_diagnosis_mapping_blocks_fact_preview():
+    """Verify coarse diagnosis mapping blocks fact preview.
+
+    Returns:
+        None. Verifies coarse diagnosis mapping blocks fact preview.
+    """
     records = _sibling_pair(
         "coarse_diagnosis",
         first_description="Samples from a shared cohort.",
@@ -1145,6 +1391,11 @@ def test_coarse_diagnosis_mapping_blocks_fact_preview():
 
 
 def test_negated_or_control_diagnosis_blocks_fact_preview():
+    """Verify negated or control diagnosis blocks fact preview.
+
+    Returns:
+        None. Verifies negated or control diagnosis blocks fact preview.
+    """
     records = _sibling_pair(
         "negated_control_diagnosis",
         first_description="Participants diagnosed with breast cancer.",
@@ -1172,6 +1423,11 @@ def test_negated_or_control_diagnosis_blocks_fact_preview():
 
 
 def test_exact_equivalence_also_discovers_material_partition():
+    """Verify exact equivalence also discovers material partition.
+
+    Returns:
+        None. Verifies exact equivalence also discovers material partition.
+    """
     biobank_id = "bbmri-eric:ID:SYN_MATERIAL_EQUIVALENCE"
     records = [
         _collection(
@@ -1206,6 +1462,11 @@ def test_exact_equivalence_also_discovers_material_partition():
 
 
 def test_copied_description_with_only_age_difference_is_not_enough_to_group_projects():
+    """Verify copied description with only age difference is not enough to group projects.
+
+    Returns:
+        None. Verifies copied description with only age difference is not enough to group projects.
+    """
     biobank_id = "bbmri-eric:ID:SYN_PROJECTS"
     records = [
         _collection(
@@ -1228,6 +1489,11 @@ def test_copied_description_with_only_age_difference_is_not_enough_to_group_proj
 
 
 def test_placeholder_description_does_not_anchor_top_level_diagnosis_records():
+    """Verify placeholder description does not anchor top level diagnosis records.
+
+    Returns:
+        None. Verifies placeholder description does not anchor top level diagnosis records.
+    """
     records = _diagnosis_pair(
         "bbmri-eric:ID:SYN_PLACEHOLDER_TOP",
         "bbmri-eric:ID:SYN_PLACEHOLDER_TOP:collection:alpha",
@@ -1242,6 +1508,11 @@ def test_placeholder_description_does_not_anchor_top_level_diagnosis_records():
 
 
 def test_autopsy_and_living_covid_records_are_operationally_distinct():
+    """Verify autopsy and living covid records are operationally distinct.
+
+    Returns:
+        None. Verifies autopsy and living covid records are operationally distinct.
+    """
     records = _diagnosis_pair(
         "bbmri-eric:ID:SYN_COVID",
         "bbmri-eric:ID:SYN_COVID:collection:autopsy",
@@ -1260,6 +1531,11 @@ def test_autopsy_and_living_covid_records_are_operationally_distinct():
 
 
 def test_shared_phase_background_is_neutral_boundary_evidence():
+    """Verify shared phase background is neutral boundary evidence.
+
+    Returns:
+        None. Verifies shared phase background is neutral boundary evidence.
+    """
     records = _sibling_pair(
         "shared_background",
         first_description="Samples support a shared phase III trial background.",
@@ -1276,6 +1552,11 @@ def test_shared_phase_background_is_neutral_boundary_evidence():
 
 
 def test_laboratory_phase_language_abstains_instead_of_becoming_a_boundary():
+    """Verify laboratory phase language abstains instead of becoming a boundary.
+
+    Returns:
+        None. Verifies laboratory phase language abstains instead of becoming a boundary.
+    """
     records = _sibling_pair(
         "laboratory_phase",
         first_description="The assay was evaluated in laboratory phase 1.",
@@ -1293,6 +1574,11 @@ def test_laboratory_phase_language_abstains_instead_of_becoming_a_boundary():
 
 
 def test_duplicate_diagnosis_mapping_blocks_fact_preview():
+    """Verify duplicate diagnosis mapping blocks fact preview.
+
+    Returns:
+        None. Verifies duplicate diagnosis mapping blocks fact preview.
+    """
     records = _sibling_pair(
         "duplicate_diagnosis",
         first_description="Samples from one diagnosis inventory.",
@@ -1332,6 +1618,11 @@ def test_duplicate_diagnosis_mapping_blocks_fact_preview():
 
 
 def test_variable_catalogue_without_fact_dimension_variation_is_not_discovered():
+    """Verify variable catalogue without fact dimension variation is not discovered.
+
+    Returns:
+        None. Verifies variable catalogue without fact dimension variation is not discovered.
+    """
     biobank_id = "bbmri-eric:ID:SYN_CONCRETE"
     records = [
         _collection(
@@ -1350,6 +1641,11 @@ def test_variable_catalogue_without_fact_dimension_variation_is_not_discovered()
 
 
 def test_specific_id_series_accepts_meaningful_alphabetic_suffixes():
+    """Verify specific id series accepts meaningful alphabetic suffixes.
+
+    Returns:
+        None. Verifies specific id series accepts meaningful alphabetic suffixes.
+    """
     biobank_id = "bbmri-eric:ID:SYN_ID_ALPHA"
     records = [
         _collection(
@@ -1375,6 +1671,11 @@ def test_specific_id_series_accepts_meaningful_alphabetic_suffixes():
 
 
 def test_diagnosis_frame_keeps_with_and_without_control_in_one_family():
+    """Verify diagnosis frame keeps with and without control in one family.
+
+    Returns:
+        None. Verifies diagnosis frame keeps with and without control in one family.
+    """
     biobank_id = "bbmri-eric:ID:SYN_ARTHRITIS"
     records = []
     for local_id, name, description, diagnoses in (
@@ -1432,6 +1733,11 @@ def test_diagnosis_frame_keeps_with_and_without_control_in_one_family():
 
 
 def test_id_series_does_not_override_different_eligibility_criteria():
+    """Verify id series does not override different eligibility criteria.
+
+    Returns:
+        None. Verifies id series does not override different eligibility criteria.
+    """
     biobank_id = "bbmri-eric:ID:SYN_BIOHELD"
     records = [
         _collection(
@@ -1461,6 +1767,11 @@ def test_id_series_does_not_override_different_eligibility_criteria():
 
 
 def _material_partition_with_shared_diagnosis():
+    """Build a material partition that shares one diagnosis.
+
+    Returns:
+        Tuple of (parent ID, parent-plus-children list); SERUM and PLASMA children share ICD C50 and each have 10 samples.
+    """
     parent_id = "bbmri-eric:ID:AT_TEST:collection:shared"
     parent = _collection(
         parent_id,
@@ -1483,6 +1794,11 @@ def _material_partition_with_shared_diagnosis():
 
 
 def test_shared_diagnosis_does_not_block_material_fact_preview():
+    """Verify shared diagnosis does not block material fact preview.
+
+    Returns:
+        None. Verifies shared diagnosis does not block material fact preview.
+    """
     _, records = _material_partition_with_shared_diagnosis()
 
     analysis = analyze_collection_records(records)
@@ -1499,6 +1815,11 @@ def test_shared_diagnosis_does_not_block_material_fact_preview():
 
 
 def test_target_total_mismatch_blocks_source_fact_previews():
+    """Verify target total mismatch blocks source fact previews.
+
+    Returns:
+        None. Verifies target total mismatch blocks source fact previews.
+    """
     parent_id, records = _material_partition_with_shared_diagnosis()
     facts = {
         parent_id: [
@@ -1522,6 +1843,11 @@ def test_target_total_mismatch_blocks_source_fact_previews():
 
 
 def test_ai_review_packet_bounds_large_source_evidence():
+    """Verify ai review packet bounds large source evidence.
+
+    Returns:
+        None. Verifies ai review packet bounds large source evidence.
+    """
     records = _at_anatomy_records()
     records[1]["keywords"] = "x" * 5000
 

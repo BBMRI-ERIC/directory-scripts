@@ -1,8 +1,15 @@
+"""Test fact descriptor sync behavior."""
+
 from fact_descriptor_sync import build_collection_descriptor_proposal
 from check_fix_helpers import build_fact_alignment_fix_proposals
 
 
 def test_descriptor_proposal_preserves_broader_icd_codes_and_replaces_totals():
+    """Verify descriptor proposal preserves broader icd codes and replaces totals.
+
+    Returns:
+        None. Verifies descriptor proposal preserves broader icd codes and replaces totals.
+    """
     collection = {
         "id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
         "diagnosis_available": "urn:miriam:icd:C18,urn:miriam:icd:C19",
@@ -51,6 +58,11 @@ def test_descriptor_proposal_preserves_broader_icd_codes_and_replaces_totals():
 
 
 def test_descriptor_proposal_can_replace_existing_multi_value_fields():
+    """Verify descriptor proposal can replace existing multi value fields.
+
+    Returns:
+        None. Verifies descriptor proposal can replace existing multi value fields.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col1",
         "diagnosis_available": "urn:miriam:icd:C18,urn:miriam:icd:C50",
@@ -87,6 +99,11 @@ def test_descriptor_proposal_can_replace_existing_multi_value_fields():
 
 
 def test_descriptor_proposal_treats_nan_target_cells_as_missing_values():
+    """Verify descriptor proposal treats nan target cells as missing values.
+
+    Returns:
+        None. Verifies descriptor proposal treats nan target cells as missing values.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col1",
         "diagnosis_available": float("nan"),
@@ -122,6 +139,11 @@ def test_descriptor_proposal_treats_nan_target_cells_as_missing_values():
 
 
 def test_descriptor_proposal_replace_existing_can_clear_materials_and_sex():
+    """Verify descriptor proposal replace existing can clear materials and sex.
+
+    Returns:
+        None. Verifies descriptor proposal replace existing can clear materials and sex.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col2",
         "diagnosis_available": "urn:miriam:icd:C18",
@@ -158,6 +180,11 @@ def test_descriptor_proposal_replace_existing_can_clear_materials_and_sex():
 
 
 def test_descriptor_proposal_preserves_month_age_unit_from_fact_ranges():
+    """Verify descriptor proposal preserves month age unit from fact ranges.
+
+    Returns:
+        None. Verifies descriptor proposal preserves month age unit from fact ranges.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col3",
         "age_low": "",
@@ -194,6 +221,11 @@ def test_descriptor_proposal_preserves_month_age_unit_from_fact_ranges():
 
 
 def test_descriptor_proposal_skips_age_update_for_mixed_fact_units():
+    """Verify descriptor proposal skips age update for mixed fact units.
+
+    Returns:
+        None. Verifies descriptor proposal skips age update for mixed fact units.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col4",
         "age_low": "",
@@ -231,6 +263,11 @@ def test_descriptor_proposal_skips_age_update_for_mixed_fact_units():
 
 
 def test_descriptor_proposal_ignores_zero_support_age_label_outliers_when_high_support_rows_exist():
+    """Verify descriptor proposal ignores zero support age label outliers when high support rows exist.
+
+    Returns:
+        None. Verifies descriptor proposal ignores zero support age label outliers when high support rows exist.
+    """
     collection = {
         "id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
         "age_low": "18",
@@ -286,6 +323,11 @@ def test_descriptor_proposal_ignores_zero_support_age_label_outliers_when_high_s
 
 
 def test_descriptor_proposal_widens_existing_age_range_to_cover_fact_span():
+    """Verify descriptor proposal widens existing age range to cover fact span.
+
+    Returns:
+        None. Verifies descriptor proposal widens existing age range to cover fact span.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col5",
         "age_low": "20",
@@ -322,6 +364,11 @@ def test_descriptor_proposal_widens_existing_age_range_to_cover_fact_span():
 
 
 def test_fact_alignment_fix_proposals_keep_age_notes_on_age_only():
+    """Verify fact alignment fix proposals keep age notes on age only.
+
+    Returns:
+        None. Verifies fact alignment fix proposals keep age notes on age only.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col6",
         "diagnosis_available": "urn:miriam:icd:C18.0",
@@ -352,6 +399,11 @@ def test_fact_alignment_fix_proposals_keep_age_notes_on_age_only():
 
 
 def test_fact_alignment_count_fix_rationale_mentions_all_star_requirement():
+    """Verify fact alignment count fix rationale mentions all star requirement.
+
+    Returns:
+        None. Verifies fact alignment count fix rationale mentions all star requirement.
+    """
     collection = {
         "id": "bbmri-eric:ID:CZ_demo:collection:col7",
         "size": "10",

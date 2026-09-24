@@ -50,7 +50,7 @@ class ValidatedUpSetAssets:
     """Validated optional asset state passed to the TeX renderer.
 
     Attributes:
-        state: ``empty`` or ``complete``.
+        state: Asset availability: ``empty`` when omitted, ``complete`` after bundle validation.
         figures: Figure pairs keyed by definition ID.
     """
 

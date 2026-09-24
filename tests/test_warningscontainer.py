@@ -1,3 +1,5 @@
+"""Test warningscontainer behavior."""
+
 from openpyxl import load_workbook
 
 from customwarnings import (
@@ -9,6 +11,14 @@ from warningscontainer import WarningsContainer
 
 
 def test_dump_warnings_xlsx_uses_expected_column_widths_and_node_tabs(tmp_path):
+    """Verify dump warnings xlsx uses expected column widths and node tabs.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies dump warnings xlsx uses expected column widths and node tabs.
+    """
     output_file = tmp_path / "warnings.xlsx"
     container = WarningsContainer()
     container.newWarning(
@@ -57,6 +67,14 @@ def test_dump_warnings_xlsx_uses_expected_column_widths_and_node_tabs(tmp_path):
 
 
 def test_dump_warnings_xlsx_writes_boolean_withdrawn_flags(tmp_path):
+    """Verify dump warnings xlsx writes boolean withdrawn flags.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies dump warnings xlsx writes boolean withdrawn flags.
+    """
     output_file = tmp_path / "warnings-bool.xlsx"
     container = WarningsContainer()
     container.newWarning(
@@ -87,6 +105,14 @@ def test_dump_warnings_xlsx_writes_boolean_withdrawn_flags(tmp_path):
 
 
 def test_dump_suppressed_warnings_debug_logs_suppressed_entries(caplog):
+    """Verify dump suppressed warnings debug logs suppressed entries.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies dump suppressed warnings debug logs suppressed entries.
+    """
     container = WarningsContainer(
         {
             "FT:KAnonViolation": {

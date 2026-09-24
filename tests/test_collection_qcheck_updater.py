@@ -1,3 +1,5 @@
+"""Test collection qcheck updater behavior."""
+
 from argparse import Namespace
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -14,6 +16,11 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "qcheck-updater.py"
 
 
 def load_module():
+    """Import qcheck-updater without parsing arguments or applying updates.
+
+    Returns:
+        Newly executed qcheck-updater.py module with patchable review and session helpers.
+    """
     spec = spec_from_file_location("collection_qcheck_updater", MODULE_PATH)
     module = module_from_spec(spec)
     assert spec.loader is not None
@@ -22,6 +29,14 @@ def load_module():
 
 
 def build_plan(tmp_path: Path) -> Path:
+    """Write a checksummed plan appending collaboration-required DUO metadata.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        Path to updates.json containing one certain AP:JointDuo collection append proposal.
+    """
     update = {
         "update_id": "access.duo.collaboration_required",
         "module": "AP",
@@ -68,6 +83,15 @@ def build_plan(tmp_path: Path) -> Path:
 
 
 def test_collection_qcheck_updater_list_mode_outputs_human_readable_plan(tmp_path, capsys):
+    """Verify collection qcheck updater list mode outputs human readable plan.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies collection qcheck updater list mode outputs human readable plan.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     args = Namespace(
@@ -102,10 +126,26 @@ def test_collection_qcheck_updater_list_mode_outputs_human_readable_plan(tmp_pat
 
 
 def test_collection_qcheck_updater_main_handles_ctrl_c(monkeypatch, caplog):
+    """Verify collection qcheck updater main handles ctrl c.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies collection qcheck updater main handles ctrl c.
+    """
     module = load_module()
 
     class ParserStub:
+        """Return quiet/debug/verbose defaults without parsing the test runner arguments.
+        """
         def parse_args(self):
+            """Return preconfigured command-line arguments from the parser double.
+
+            Returns:
+                The fixed argparse namespace representing the command-line options for this invocation.
+            """
             return Namespace(verbose=False, debug=False, quiet=False)
 
     monkeypatch.setattr(module, "build_parser", lambda: ParserStub())
@@ -121,6 +161,15 @@ def test_collection_qcheck_updater_main_handles_ctrl_c(monkeypatch, caplog):
 
 
 def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_save(tmp_path, monkeypatch):
+    """Verify collection qcheck updater dry run checks live mismatch and does not save.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies collection qcheck updater dry run checks live mismatch and does not save.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
@@ -128,20 +177,61 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
     confirm_prompts = []
 
     class SessionStub:
+        """Expose a conflicting live DUO value and record saves so dry-run writes can be detected.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert table == "Collections"
             assert schema == "BBMRI-CZ"
             assert as_df is True
@@ -153,6 +243,14 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
             ])
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
@@ -190,6 +288,14 @@ def test_collection_qcheck_updater_dry_run_checks_live_mismatch_and_does_not_sav
 
 
 def test_collection_qcheck_updater_module_filter_accepts_check_prefix(tmp_path):
+    """Verify collection qcheck updater module filter accepts check prefix.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies collection qcheck updater module filter accepts check prefix.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     payload = module.load_fix_plan(path).payload
@@ -213,6 +319,16 @@ def test_collection_qcheck_updater_module_filter_accepts_check_prefix(tmp_path):
 
 
 def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp_path, monkeypatch, caplog):
+    """Verify collection qcheck updater ignores multi value order only mismatches.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies collection qcheck updater ignores multi value order only mismatches.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
@@ -231,20 +347,61 @@ def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose reversed FEMALE/MALE ordering and record any attempted metadata write.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert table == "Collections"
             assert schema == "BBMRI-CZ"
             assert as_df is True
@@ -256,6 +413,14 @@ def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp
             ])
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
@@ -293,6 +458,16 @@ def test_collection_qcheck_updater_ignores_multi_value_order_only_mismatches(tmp
 
 
 def test_collection_qcheck_updater_review_display_normalizes_multi_value_order(tmp_path, monkeypatch, capsys):
+    """Verify collection qcheck updater review display normalizes multi value order.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies collection qcheck updater review display normalizes multi value order.
+    """
     module = load_module()
     path = build_plan(tmp_path)
 
@@ -310,20 +485,61 @@ def test_collection_qcheck_updater_review_display_normalizes_multi_value_order(t
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose three underscore-form DUO values and reject writes during review-only execution.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert table == "Collections"
             assert schema == "BBMRI-CZ"
             assert as_df is True
@@ -335,6 +551,14 @@ def test_collection_qcheck_updater_review_display_normalizes_multi_value_order(t
             ])
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             raise AssertionError("dry-run must not save")
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
@@ -373,6 +597,15 @@ def test_collection_qcheck_updater_review_display_normalizes_multi_value_order(t
 
 
 def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_separator(tmp_path, monkeypatch):
+    """Verify collection qcheck updater does not append duplicate duo with different separator.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies collection qcheck updater does not append duplicate duo with different separator.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
@@ -390,20 +623,61 @@ def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose DUO_0000020 and record saves to detect duplicate canonical-equivalent appends.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert table == "Collections"
             assert schema == "BBMRI-CZ"
             assert as_df is True
@@ -415,6 +689,14 @@ def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_
             ])
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
@@ -450,6 +732,15 @@ def test_collection_qcheck_updater_does_not_append_duplicate_duo_with_different_
 
 
 def test_collection_qcheck_updater_saves_changed_rows_without_dtype_assignment_futurewarnings(tmp_path, monkeypatch):
+    """Verify collection qcheck updater saves changed rows without dtype assignment futurewarnings.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies collection qcheck updater saves changed rows without dtype assignment futurewarnings.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
@@ -467,20 +758,61 @@ def test_collection_qcheck_updater_saves_changed_rows_without_dtype_assignment_f
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose mixed bool/int/string cells and record saved DataFrames for dtype preservation checks.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert table == "Collections"
             assert schema == "BBMRI-CZ"
             assert as_df is True
@@ -496,6 +828,14 @@ def test_collection_qcheck_updater_saves_changed_rows_without_dtype_assignment_f
             )
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
@@ -537,6 +877,16 @@ def test_collection_qcheck_updater_saves_changed_rows_without_dtype_assignment_f
 
 
 def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interactive_mode(tmp_path, monkeypatch, caplog):
+    """Verify collection qcheck updater handles live mismatch per update in interactive mode.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies collection qcheck updater handles live mismatch per update in interactive mode.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
@@ -560,20 +910,61 @@ def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interacti
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose two live collections with different mismatch states and record accepted saves.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert table == "Collections"
             assert schema == "BBMRI-CZ"
             assert as_df is True
@@ -591,6 +982,14 @@ def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interacti
             )
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             saved.append(kwargs)
 
     prompt_answers = iter([False, True])
@@ -640,6 +1039,16 @@ def test_collection_qcheck_updater_handles_live_mismatch_per_update_in_interacti
 
 
 def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, monkeypatch, caplog):
+    """Verify collection qcheck updater applies fact row delete updates.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies collection qcheck updater applies fact row delete updates.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     deleted = []
@@ -665,20 +1074,61 @@ def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, mon
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose three fact rows, record their deletion, and reject accidental collection metadata writes.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert schema == "BBMRI-CZ"
             assert as_df is True
             if table == "Collections":
@@ -696,9 +1146,27 @@ def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, mon
             raise AssertionError(f"unexpected table {table}")
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             raise AssertionError("Fact-row delete update should not write Collections.")
 
         def delete_records(self, *, table, schema, data):
+            """Record deleted fact-record identifiers on the session double.
+
+            Args:
+                table: Directory table passed to the fake row-deletion operation.
+                schema: Schema passed to the fake row-deletion operation.
+                data: Row payload captured by the fake row-deletion operation.
+
+            Returns:
+                None. Record deleted fact-record identifiers on the session double.
+            """
             assert table == "CollectionFacts"
             assert schema == "BBMRI-CZ"
             deleted.append(data.copy())
@@ -708,26 +1176,76 @@ def test_collection_qcheck_updater_applies_fact_row_delete_updates(tmp_path, mon
 
 
 def test_collection_qcheck_updater_can_ignore_and_record_false_positive(tmp_path, monkeypatch):
+    """Verify collection qcheck updater can ignore and record false positive.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies collection qcheck updater can ignore and record false positive.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     suppressions_path = tmp_path / "warning-suppressions.json"
     confirm_prompts = []
 
     class SessionStub:
+        """Expose one collection and no facts, rejecting saves when its update is ignored.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             if table == "Collections":
                 return pd.DataFrame(
                     [{"id": "bbmri-eric:ID:CZ_demo:collection:col1", "data_use": ""}]
@@ -737,6 +1255,14 @@ def test_collection_qcheck_updater_can_ignore_and_record_false_positive(tmp_path
             raise AssertionError(f"unexpected table {table}")
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             raise AssertionError("Ignored updates must not write Collections.")
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)
@@ -785,6 +1311,15 @@ def test_collection_qcheck_updater_can_ignore_and_record_false_positive(tmp_path
 
 
 def test_collection_qcheck_updater_applies_biobank_updates(tmp_path, monkeypatch):
+    """Verify collection qcheck updater applies biobank updates.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies collection qcheck updater applies biobank updates.
+    """
     module = load_module()
     path = build_plan(tmp_path)
     saved = []
@@ -814,20 +1349,61 @@ def test_collection_qcheck_updater_applies_biobank_updates(tmp_path, monkeypatch
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     class SessionStub:
+        """Expose one biobank with collaboration disabled and record its accepted metadata update.
+        """
         def __init__(self, url):
+            """Retain the endpoint URL without opening a remote connection.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             assert username == "user"
             assert password == "secret"
 
         def get(self, *, table, schema, as_df):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                schema: Schema argument accepted by the fake session without changing its fixture rows.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             assert schema == "BBMRI-CZ"
             assert as_df is True
             if table == "Biobanks":
@@ -841,6 +1417,14 @@ def test_collection_qcheck_updater_applies_biobank_updates(tmp_path, monkeypatch
             raise AssertionError(f"unexpected table {table}")
 
         def save_table(self, **kwargs):
+            """Record the table-save call on the Directory-session double.
+
+            Args:
+                **kwargs: Proposed table write options (including data and target schema/table); recorded or rejected without remote I/O.
+
+            Returns:
+                None. Record the table-save call on the Directory-session double.
+            """
             saved.append(kwargs)
 
     monkeypatch.setattr(module, "DirectorySession", SessionStub)

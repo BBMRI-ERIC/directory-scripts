@@ -426,7 +426,7 @@ def load_mapping(path: str | Path) -> dict[str, Any]:
     """Load the editable survey-to-Directory mapping configuration.
 
     Args:
-        path: Input filesystem path.
+        path: UTF-8 survey-to-Directory JSON file requiring entity_resolution and field_mappings keys.
 
     Returns:
         Parsed mapping object used to classify and compare survey fields."""
@@ -443,7 +443,7 @@ def load_objectives_mapping(path: str | Path) -> dict[str, Any]:
     """Load survey-question strategic-objective metadata.
 
     Args:
-        path: Input filesystem path.
+        path: UTF-8 JSON file linking survey questions to strategic objectives.
 
     Returns:
         Parsed objective mapping used to annotate findings."""
@@ -603,7 +603,7 @@ def get_row_value(row: pd.Series, *column_names: str) -> Any:
 
     Args:
         row: One submitted survey response row.
-        *column_names: Alternative survey column names checked in declared order.
+        column_names: Variadic alternative survey column names checked in declared order.
 
     Returns:
         Matched row value or an empty value when no candidate column is present."""

@@ -1,3 +1,5 @@
+"""Test exporter consistency behavior."""
+
 import copy
 import io
 import json
@@ -12,7 +14,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class SharedDirectoryStub:
-    """Directory stub shared across exporter consistency tests."""
+    """Directory stub shared across exporter consistency tests.
+    """
 
     BASE_BIOBANKS = [
         {
@@ -215,6 +218,12 @@ class SharedDirectoryStub:
     ]
 
     def __init__(self, *args, **kwargs):
+        """Deep-copy entity fixtures and configure schema, target, and withdrawal scope.
+
+        Args:
+            *args: Unused positional Directory constructor arguments, accepted for CLI compatibility.
+            **kwargs: Directory options: schema, directory_url, and include/only_withdrawn_entities; remaining keys are ignored.
+        """
         self.include_withdrawn_entities = kwargs.get("include_withdrawn_entities", False) or kwargs.get("only_withdrawn_entities", False)
         self.only_withdrawn_entities = kwargs.get("only_withdrawn_entities", False)
         self._schema = kwargs.get("schema", "ERIC")
@@ -229,6 +238,14 @@ class SharedDirectoryStub:
         self.contactHashmap = {contact["id"]: contact for contact in self.contacts}
 
     def _matches_withdrawn_scope(self, is_withdrawn):
+        """Return whether the configured withdrawal state is in scope.
+
+        Args:
+            is_withdrawn: Fixture withdrawal flag evaluated against the requested scope.
+
+        Returns:
+            True when the flag satisfies only/include-withdrawn settings; only-withdrawn takes precedence.
+        """
         if self.only_withdrawn_entities:
             return is_withdrawn
         if self.include_withdrawn_entities:
@@ -236,18 +253,44 @@ class SharedDirectoryStub:
         return not is_withdrawn
 
     def getSchema(self):
+        """Return schema string selected for the fake Directory session.
+
+        Returns:
+            The schema string selected for the fake Directory session.
+        """
         return self._schema
 
     def getDirectoryUrl(self):
+        """Return endpoint string assigned to the fake Directory session.
+
+        Returns:
+            Fixed synthetic endpoint URL; no connection is opened.
+        """
         return self._directory_url
 
     def isBiobankWithdrawn(self, biobank_id):
+        """Report the fixture marks the requested biobank as withdrawn.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture withdrawal status this stub reports.
+
+        Returns:
+            Whether the fixture marks the requested biobank as withdrawn.
+        """
         biobank = next(
             biobank for biobank in self.biobanks if biobank["id"] == biobank_id
         )
         return bool(biobank.get("withdrawn"))
 
     def isCollectionWithdrawn(self, collection_id):
+        """Report the fixture marks the requested collection as withdrawn.
+
+        Args:
+            collection_id: Collection identifier whose fixture withdrawal status this stub reports.
+
+        Returns:
+            Whether the fixture marks the requested collection as withdrawn.
+        """
         collection = next(
             collection for collection in self.collections if collection["id"] == collection_id
         )
@@ -261,6 +304,11 @@ class SharedDirectoryStub:
         return False
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return [
             biobank
             for biobank in self.biobanks
@@ -268,9 +316,23 @@ class SharedDirectoryStub:
         ]
 
     def getBiobanksCount(self):
+        """Return number of synthetic biobank records visible in the selected scope.
+
+        Returns:
+            Number of biobank records exposed by this stub.
+        """
         return len(self.getBiobanks())
 
     def getBiobankById(self, biobank_id, raise_on_missing=False):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+            raise_on_missing: Whether the fixture lookup should raise instead of returning a missing record.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         for biobank in self.biobanks:
             if biobank["id"] == biobank_id:
                 if not self._matches_withdrawn_scope(self.isBiobankWithdrawn(biobank_id)):
@@ -281,6 +343,15 @@ class SharedDirectoryStub:
         return None
 
     def getLoadedBiobankById(self, biobank_id, raise_on_missing=False):
+        """Return synthetic loaded biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose loaded fixture record this stub returns or omits.
+            raise_on_missing: Whether the fixture lookup should raise instead of returning a missing record.
+
+        Returns:
+            The synthetic loaded biobank record selected by the requested identifier, or `None` when absent.
+        """
         for biobank in self.biobanks:
             if biobank["id"] == biobank_id:
                 return biobank
@@ -289,9 +360,22 @@ class SharedDirectoryStub:
         return None
 
     def getBiobankCountry(self, biobank_id):
+        """Return fixture country code for the requested biobank.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture country code this stub returns.
+
+        Returns:
+            The fixture country code for the requested biobank.
+        """
         return self.getBiobankById(biobank_id)["country"]
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [
             collection
             for collection in self.collections
@@ -299,12 +383,34 @@ class SharedDirectoryStub:
         ]
 
     def getCollectionsCount(self):
+        """Return number of synthetic collection records visible in the selected scope.
+
+        Returns:
+            Number of collection records exposed by this stub.
+        """
         return len(self.getCollections())
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return self.getCollectionById(collection_id)["biobank"]["id"]
 
     def getCollectionById(self, collection_id, raise_on_missing=False):
+        """Return synthetic collection record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            collection_id: Collection identifier whose fixture record this stub returns or omits.
+            raise_on_missing: Whether the fixture lookup should raise instead of returning a missing record.
+
+        Returns:
+            The synthetic collection record selected by the requested identifier, or `None` when absent.
+        """
         for collection in self.collections:
             if collection["id"] == collection_id:
                 if not self._matches_withdrawn_scope(
@@ -317,6 +423,15 @@ class SharedDirectoryStub:
         return None
 
     def getLoadedCollectionById(self, collection_id, raise_on_missing=False):
+        """Return synthetic loaded collection record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            collection_id: Collection identifier whose loaded fixture record this stub returns or omits.
+            raise_on_missing: Whether the fixture lookup should raise instead of returning a missing record.
+
+        Returns:
+            The synthetic loaded collection record selected by the requested identifier, or `None` when absent.
+        """
         for collection in self.collections:
             if collection["id"] == collection_id:
                 return collection
@@ -325,16 +440,45 @@ class SharedDirectoryStub:
         return None
 
     def getLoadedCollections(self):
+        """Return synthetic unfiltered collection records retained by the Directory fixture.
+
+        Returns:
+            The synthetic unfiltered collection records retained by the Directory fixture.
+        """
         return list(self.collections)
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.collectionFactMap.get(collection_id, [])
 
     def getCollectionCountry(self, collection_id):
+        """Return fixture country code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture country code this stub returns.
+
+        Returns:
+            The fixture country code for the requested collection.
+        """
         collection = self.getCollectionById(collection_id)
         return collection["country"]
 
     def getCollectionStudies(self, collection_id):
+        """Return fixture studies linked to the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture linked studies this stub returns.
+
+        Returns:
+            The fixture studies linked to the requested collection.
+        """
         collection = self.getCollectionById(collection_id)
         if collection is None:
             return []
@@ -350,18 +494,49 @@ class SharedDirectoryStub:
         ]
 
     def getCollectionStudyIds(self, collection_id):
+        """Return fixture study identifiers linked to the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture linked study identifiers this stub returns.
+
+        Returns:
+            The fixture study identifiers linked to the requested collection.
+        """
         return [study["id"] for study in self.getCollectionStudies(collection_id)]
 
     def getContact(self, contact_id):
+        """Return synthetic contact record selected by the requested identifier.
+
+        Args:
+            contact_id: Contact identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The synthetic contact record selected by the requested identifier.
+        """
         return self.contactHashmap[contact_id]
 
     def getContacts(self):
+        """Return synthetic contact records available to the code under test.
+
+        Returns:
+            The synthetic contact records available to the code under test.
+        """
         return self.contacts
 
     def getNetworks(self):
+        """Return synthetic network records available to the code under test.
+
+        Returns:
+            The synthetic network records available to the code under test.
+        """
         return self.networks
 
     def getServices(self):
+        """Return synthetic service records available to the code under test.
+
+        Returns:
+            The synthetic service records available to the code under test.
+        """
         return [
             service
             for service in self.services
@@ -371,6 +546,14 @@ class SharedDirectoryStub:
         ]
 
     def getServiceBiobankId(self, service_id):
+        """Return fixture parent-biobank identifier for the requested service.
+
+        Args:
+            service_id: Service identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested service.
+        """
         return next(
             service["biobank"]["id"]
             for service in self.services
@@ -378,6 +561,11 @@ class SharedDirectoryStub:
         )
 
     def getStudies(self):
+        """Return synthetic study records available to the code under test.
+
+        Returns:
+            The synthetic study records available to the code under test.
+        """
         visible_study_ids = []
         for collection in self.getCollections():
             for study_ref in collection.get("studies", []):
@@ -393,6 +581,15 @@ class SharedDirectoryStub:
         ]
 
     def getStudyById(self, study_id, raise_on_missing=False):
+        """Return fixture study record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            study_id: Study identifier whose fixture record this stub returns or omits.
+            raise_on_missing: Whether the fixture lookup should raise instead of returning a missing record.
+
+        Returns:
+            The fixture study record selected by the requested identifier, or `None` when absent.
+        """
         for study in self.getStudies():
             if study["id"] == study_id:
                 return study
@@ -401,6 +598,14 @@ class SharedDirectoryStub:
         return None
 
     def getStudyCollectionIds(self, study_id):
+        """Return fixture collection identifiers linked to the requested study.
+
+        Args:
+            study_id: Study identifier whose fixture collection identifiers this stub returns.
+
+        Returns:
+            The fixture collection identifiers linked to the requested study.
+        """
         collection_ids = []
         for collection in self.getCollections():
             study_ids = {
@@ -413,6 +618,14 @@ class SharedDirectoryStub:
         return collection_ids
 
     def getStudyBiobankIds(self, study_id):
+        """Return fixture biobank identifiers linked to the requested study.
+
+        Args:
+            study_id: Study identifier whose fixture biobank identifiers this stub returns.
+
+        Returns:
+            The fixture biobank identifiers linked to the requested study.
+        """
         biobank_ids = []
         for collection_id in self.getStudyCollectionIds(study_id):
             biobank_id = self.getCollectionBiobankId(collection_id)
@@ -421,6 +634,14 @@ class SharedDirectoryStub:
         return biobank_ids
 
     def getBiobankStudies(self, biobank_id):
+        """Return fixture studies linked to the requested biobank.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture linked studies this stub returns.
+
+        Returns:
+            The fixture studies linked to the requested biobank.
+        """
         return [
             study
             for study in self.getStudies()
@@ -428,6 +649,14 @@ class SharedDirectoryStub:
         ]
 
     def getStudyCountries(self, study_id):
+        """Return sorted fixture country codes represented by the requested study.
+
+        Args:
+            study_id: Study identifier whose fixture country codes this stub returns.
+
+        Returns:
+            The sorted fixture country codes represented by the requested study.
+        """
         return sorted(
             {
                 self.getCollectionCountry(collection_id)
@@ -436,9 +665,26 @@ class SharedDirectoryStub:
         )
 
     def isTopLevelCollection(self, collection_id):
+        """Report the fixture collection has no parent collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture hierarchy position this stub evaluates.
+
+        Returns:
+            Whether the fixture collection has no parent collection.
+        """
         return "parent_collection" not in self.getCollectionById(collection_id)
 
     def isCountableCollection(self, collection_id, metric):
+        """Report the fixture collection is countable for the requested metric.
+
+        Args:
+            collection_id: Collection identifier whose fixture counting eligibility this stub evaluates.
+            metric: Fact-sheet metric whose countability is evaluated by the fixture.
+
+        Returns:
+            Whether the fixture collection is countable for the requested metric.
+        """
         collection = self.getCollectionById(collection_id)
         if metric not in collection or not isinstance(collection[metric], int):
             return False
@@ -452,6 +698,17 @@ class SharedDirectoryStub:
 
 
 def _run_script(monkeypatch, script_name, argv, directory_class=SharedDirectoryStub):
+    """Execute an exporter in-process with a fake Directory and captured output streams.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        script_name: Repository-relative Python CLI filename run as __main__.
+        argv: Command-line vector supplied to the isolated script invocation.
+        directory_class: Directory double injected into the exporter entry point.
+
+    Returns:
+        Tuple of (script globals dictionary, captured stdout text, captured stderr text).
+    """
     fake_directory_module = types.ModuleType("directory")
     fake_directory_module.Directory = directory_class
     monkeypatch.setitem(sys.modules, "directory", fake_directory_module)
@@ -468,14 +725,16 @@ def _run_script(monkeypatch, script_name, argv, directory_class=SharedDirectoryS
 
 
 class WithdrawnCohortUnderActiveBiobankDirectoryStub(SharedDirectoryStub):
-    """Directory stub with a withdrawn cohort collection under an active biobank."""
+    """Directory stub with a withdrawn cohort collection under an active biobank.
+    """
 
     BASE_COLLECTIONS = copy.deepcopy(SharedDirectoryStub.BASE_COLLECTIONS)
     BASE_COLLECTIONS[3]["type"] = ["COHORT"]
 
 
 class CohortTotalsDirectoryStub(SharedDirectoryStub):
-    """Directory stub with cohort collections covering explicit and OoM totals."""
+    """Directory stub with cohort collections covering explicit and OoM totals.
+    """
 
     BASE_COLLECTIONS = copy.deepcopy(SharedDirectoryStub.BASE_COLLECTIONS)
     BASE_COLLECTIONS[0]["type"] = ["COHORT"]
@@ -484,7 +743,8 @@ class CohortTotalsDirectoryStub(SharedDirectoryStub):
 
 
 class CohortNoStarFallbackDirectoryStub(CohortTotalsDirectoryStub):
-    """Cohort fixture with one fully concrete fact row and no margins."""
+    """Cohort fixture with one fully concrete fact row and no margins.
+    """
 
     BASE_FACTS = copy.deepcopy(CohortTotalsDirectoryStub.BASE_FACTS)
     BASE_FACTS["col1"].append(
@@ -501,7 +761,8 @@ class CohortNoStarFallbackDirectoryStub(CohortTotalsDirectoryStub):
 
 
 class FactSheetEmulationDirectoryStub(SharedDirectoryStub):
-    """Directory fixture with one material-partitioned sibling family."""
+    """Directory fixture with one material-partitioned sibling family.
+    """
 
     PARENT_ID = "bbmri-eric:ID:CZ_BB1:collection:legacy"
     BASE_COLLECTIONS = [
@@ -557,7 +818,8 @@ class FactSheetEmulationDirectoryStub(SharedDirectoryStub):
 
 
 class FactSheetEmulationReviewDirectoryStub(FactSheetEmulationDirectoryStub):
-    """Emulation fixture with anatomy evidence needing external review."""
+    """Emulation fixture with anatomy evidence needing external review.
+    """
 
     BASE_COLLECTIONS = copy.deepcopy(FactSheetEmulationDirectoryStub.BASE_COLLECTIONS)
     BASE_COLLECTIONS[1]["body_part_examined"] = ["T-28000"]
@@ -567,6 +829,14 @@ class FactSheetEmulationReviewDirectoryStub(FactSheetEmulationDirectoryStub):
 
 
 def test_directory_stats_matches_exporter_all_active_totals(monkeypatch):
+    """Verify directory stats matches exporter all active totals.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory stats matches exporter all active totals.
+    """
     stats_globals, _, _ = _run_script(
         monkeypatch,
         "directory-stats.py",
@@ -589,6 +859,14 @@ def test_directory_stats_matches_exporter_all_active_totals(monkeypatch):
 
 
 def test_exporter_all_collects_services_and_studies_in_active_scope(monkeypatch):
+    """Verify exporter all collects services and studies in active scope.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies exporter all collects services and studies in active scope.
+    """
     exporter_globals, _, _ = _run_script(
         monkeypatch,
         "exporter-all.py",
@@ -602,6 +880,15 @@ def test_exporter_all_collects_services_and_studies_in_active_scope(monkeypatch)
 
 
 def test_exporter_all_can_append_withdrawn_sheets_to_main_workbook(monkeypatch, tmp_path):
+    """Verify exporter all can append withdrawn sheets to main workbook.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter all can append withdrawn sheets to main workbook.
+    """
     workbook = tmp_path / "all.xlsx"
     _run_script(
         monkeypatch,
@@ -639,6 +926,15 @@ def test_exporter_all_can_append_withdrawn_sheets_to_main_workbook(monkeypatch, 
 
 
 def test_exporter_all_writes_clickable_id_hyperlinks(monkeypatch, tmp_path):
+    """Verify exporter all writes clickable id hyperlinks.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter all writes clickable id hyperlinks.
+    """
     workbook = tmp_path / "links.xlsx"
     _run_script(
         monkeypatch,
@@ -672,6 +968,15 @@ def test_exporter_cohorts_only_withdrawn_handles_active_parent_biobank(
     monkeypatch,
     tmp_path,
 ):
+    """Verify exporter cohorts only withdrawn handles active parent biobank.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter cohorts only withdrawn handles active parent biobank.
+    """
     workbook = tmp_path / "cohorts.xlsx"
 
     exporter_globals, _, _ = _run_script(
@@ -689,6 +994,14 @@ def test_exporter_cohorts_only_withdrawn_handles_active_parent_biobank(
 
 
 def test_exporter_cohorts_reports_explicit_and_oom_totals(monkeypatch):
+    """Verify exporter cohorts reports explicit and oom totals.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies exporter cohorts reports explicit and oom totals.
+    """
     exporter_globals, stdout, _ = _run_script(
         monkeypatch,
         "exporter-cohorts.py",
@@ -723,6 +1036,15 @@ def test_exporter_cohorts_reports_explicit_and_oom_totals(monkeypatch):
 
 
 def test_exporter_cohorts_writes_fact_sheet_summary_sheets(monkeypatch, tmp_path):
+    """Verify exporter cohorts writes fact sheet summary sheets.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter cohorts writes fact sheet summary sheets.
+    """
     workbook = tmp_path / "cohorts.xlsx"
 
     _run_script(
@@ -748,6 +1070,15 @@ def test_exporter_cohorts_no_star_fallback_is_warned_and_separate(
     monkeypatch,
     tmp_path,
 ):
+    """Verify exporter cohorts no star fallback is warned and separate.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter cohorts no star fallback is warned and separate.
+    """
     workbook = tmp_path / "cohorts-fallback.xlsx"
 
     _, stdout, _ = _run_script(
@@ -776,6 +1107,14 @@ def test_exporter_cohorts_no_star_fallback_is_warned_and_separate(
 
 
 def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):
+    """Verify exporter cmdr lists biobanks collections and studies.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies exporter cmdr lists biobanks collections and studies.
+    """
     exporter_globals, stdout, _ = _run_script(
         monkeypatch,
         "exporter-cMDR.py",
@@ -807,6 +1146,15 @@ def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):
 
 
 def test_exporter_cmdr_writes_sorted_hyperlinked_workbook(monkeypatch, tmp_path):
+    """Verify exporter cmdr writes sorted hyperlinked workbook.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter cmdr writes sorted hyperlinked workbook.
+    """
     workbook = tmp_path / "cmdr.xlsx"
     _run_script(
         monkeypatch,
@@ -847,6 +1195,15 @@ def test_exporter_cmdr_writes_sorted_hyperlinked_workbook(monkeypatch, tmp_path)
 
 
 def test_exporter_cmdr_writes_geojson_with_entity_and_biobank_fallback(monkeypatch, tmp_path):
+    """Verify exporter cmdr writes geojson with entity and biobank fallback.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies exporter cmdr writes geojson with entity and biobank fallback.
+    """
     output_file = tmp_path / "cmdr.geojson"
     _run_script(
         monkeypatch,
@@ -884,6 +1241,14 @@ def test_exporter_cmdr_writes_geojson_with_entity_and_biobank_fallback(monkeypat
 
 
 def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):
+    """Verify directory stats can include withdrawn biobanks.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory stats can include withdrawn biobanks.
+    """
     default_globals, _, _ = _run_script(
         monkeypatch,
         "directory-stats.py",
@@ -909,6 +1274,14 @@ def test_directory_stats_can_include_withdrawn_biobanks(monkeypatch):
 
 
 def test_directory_stats_can_select_only_withdrawn_biobanks(monkeypatch):
+    """Verify directory stats can select only withdrawn biobanks.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory stats can select only withdrawn biobanks.
+    """
     only_globals, _, _ = _run_script(
         monkeypatch,
         "directory-stats.py",
@@ -925,6 +1298,14 @@ def test_directory_stats_can_select_only_withdrawn_biobanks(monkeypatch):
 def test_directory_stats_matches_exporter_all_when_oom_policy_changes(
     monkeypatch,
 ):
+    """Verify directory stats matches exporter all when oom policy changes.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory stats matches exporter all when oom policy changes.
+    """
     monkeypatch.setenv("DIRECTORY_OOM_UPPER_BOUND_COEFFICIENT", "0.3")
 
     stats_globals, _, _ = _run_script(
@@ -945,6 +1326,14 @@ def test_directory_stats_matches_exporter_all_when_oom_policy_changes(
 
 
 def test_directory_stats_script_applies_country_and_staging_area_filters(monkeypatch):
+    """Verify directory stats script applies country and staging area filters.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory stats script applies country and staging area filters.
+    """
     globals_dict, _, _ = _run_script(
         monkeypatch,
         "directory-stats.py",
@@ -963,6 +1352,14 @@ def test_directory_stats_script_applies_country_and_staging_area_filters(monkeyp
 def test_directory_stats_script_supports_comma_delimited_filters_and_collection_types(
     monkeypatch,
 ):
+    """Verify directory stats script supports comma delimited filters and collection types.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory stats script supports comma delimited filters and collection types.
+    """
     globals_dict, _, _ = _run_script(
         monkeypatch,
         "directory-stats.py",
@@ -985,6 +1382,15 @@ def test_fact_sheet_emulation_exporter_writes_complete_hyperlinked_workbook(
     monkeypatch,
     tmp_path,
 ):
+    """Verify fact sheet emulation exporter writes complete hyperlinked workbook.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies fact sheet emulation exporter writes complete hyperlinked workbook.
+    """
     workbook = tmp_path / "emulation.xlsx"
 
     _, stdout, _ = _run_script(
@@ -1050,6 +1456,15 @@ def test_fact_sheet_emulation_exporter_adds_diagnostics_only_to_advanced_workboo
     monkeypatch,
     tmp_path,
 ):
+    """Verify fact sheet emulation exporter adds diagnostics only to advanced workbook.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies fact sheet emulation exporter adds diagnostics only to advanced workbook.
+    """
     workbook = tmp_path / "emulation-advanced.xlsx"
 
     _run_script(
@@ -1096,6 +1511,15 @@ def test_fact_sheet_emulation_exporter_writes_matching_external_review_packets(
     monkeypatch,
     tmp_path,
 ):
+    """Verify fact sheet emulation exporter writes matching external review packets.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies fact sheet emulation exporter writes matching external review packets.
+    """
     prefix = tmp_path / "emulation"
 
     _run_script(

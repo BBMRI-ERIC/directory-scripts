@@ -60,7 +60,8 @@ class NegotiatorCoverage:
             considered for coverage.
         represented_collection_count: Visible collections with direct registrations.
         unrepresented_collection_count: Visible collections without direct registrations.
-        status: ``fully``, ``partially``, ``missing``, or ``no_collections``.
+        status: Direct-registration coverage classification: ``fully``,
+            ``partially``, ``missing``, or ``no_collections``.
     """
 
     biobank_id: str
@@ -2411,7 +2412,7 @@ class Directory:
         """Return study ids associated with a collection id.
 
         Args:
-            collectionID: Collection identifier passed to ``getCollectionStudies``.
+            collectionID: Collection whose visible study memberships are queried.
 
         Returns:
             New list of visible study IDs in the corresponding study order.

@@ -1,3 +1,5 @@
+"""Test directory behavior."""
+
 import networkx as nx
 import pandas as pd
 import pytest
@@ -7,6 +9,12 @@ from directory import Directory, get_directory_ontology_table
 
 
 def _make_directory_stub():
+    """Build an in-memory Directory with linked entities without fetching remote data.
+
+    Returns:
+        Directory instance constructed via __new__ with ERIC identity, populated
+        entity graphs and lookups, and active plus withdrawn visibility enabled.
+    """
     directory = Directory.__new__(Directory)
     directory.include_withdrawn_entities = True
     directory.only_withdrawn_entities = False
@@ -300,6 +308,14 @@ def _make_directory_stub():
 
 
 def test_get_biobank_by_id_returns_none_and_logs_warning(caplog):
+    """Verify get biobank by id returns none and logs warning.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies get biobank by id returns none and logs warning.
+    """
     directory = _make_directory_stub()
     with caplog.at_level("WARNING"):
         assert directory.getBiobankById("missing-id") is None
@@ -307,12 +323,25 @@ def test_get_biobank_by_id_returns_none_and_logs_warning(caplog):
 
 
 def test_get_biobank_by_id_raise_on_missing():
+    """Verify get biobank by id raise on missing.
+
+    Returns:
+        None. Verifies get biobank by id raise on missing.
+    """
     directory = _make_directory_stub()
     with pytest.raises(KeyError):
         directory.getBiobankById("missing-id", raise_on_missing=True)
 
 
 def test_get_collection_by_id_returns_none_and_logs_warning(caplog):
+    """Verify get collection by id returns none and logs warning.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies get collection by id returns none and logs warning.
+    """
     directory = _make_directory_stub()
     with caplog.at_level("WARNING"):
         assert directory.getCollectionById("missing-id") is None
@@ -320,6 +349,11 @@ def test_get_collection_by_id_returns_none_and_logs_warning(caplog):
 
 
 def test_get_collection_by_id_raise_on_missing():
+    """Verify get collection by id raise on missing.
+
+    Returns:
+        None. Verifies get collection by id raise on missing.
+    """
     directory = _make_directory_stub()
     with pytest.raises(KeyError):
         directory.getCollectionById("missing-id", raise_on_missing=True)
@@ -328,6 +362,14 @@ def test_get_collection_by_id_raise_on_missing():
 def test_bidirectional_graph_validation_reports_and_repairs_missing_reverse_edges(
     caplog,
 ):
+    """Verify bidirectional graph validation reports and repairs missing reverse edges.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies bidirectional graph validation reports and repairs missing reverse edges.
+    """
     graph = nx.DiGraph()
     graph.add_node("source", data={"id": "source"})
     graph.add_node("target", data={"id": "target"})
@@ -345,6 +387,14 @@ def test_bidirectional_graph_validation_reports_and_repairs_missing_reverse_edge
 
 
 def test_dag_validation_reports_offending_graph_cycle_and_debug_node_data(caplog):
+    """Verify dag validation reports offending graph cycle and debug node data.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies dag validation reports offending graph cycle and debug node data.
+    """
     graph = nx.DiGraph()
     graph.add_node("biobank1", data={"id": "biobank1", "name": "Biobank"})
     graph.add_node("collection1", data={"id": "collection1", "name": "Collection"})
@@ -372,6 +422,14 @@ def test_dag_validation_reports_offending_graph_cycle_and_debug_node_data(caplog
 
 
 def test_directory_dag_validation_emergency_skip_allows_cyclic_graph(caplog):
+    """Verify directory dag validation emergency skip allows cyclic graph.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies directory dag validation emergency skip allows cyclic graph.
+    """
     cyclic_collections = nx.DiGraph()
     cyclic_collections.add_edge("collection1", "collection2")
     cyclic_collections.add_edge("collection2", "collection1")
@@ -391,6 +449,11 @@ def test_directory_dag_validation_emergency_skip_allows_cyclic_graph(caplog):
 
 
 def test_directory_dag_validation_rejects_cyclic_graph_without_emergency_skip():
+    """Verify directory dag validation rejects cyclic graph without emergency skip.
+
+    Returns:
+        None. Verifies directory dag validation rejects cyclic graph without emergency skip.
+    """
     cyclic_collections = nx.DiGraph()
     cyclic_collections.add_edge("collection1", "collection2")
     cyclic_collections.add_edge("collection2", "collection1")
@@ -405,6 +468,14 @@ def test_directory_dag_validation_rejects_cyclic_graph_without_emergency_skip():
 
 
 def test_collection_withdrawn_inheritance_handles_parent_cycle(caplog):
+    """Verify collection withdrawn inheritance handles parent cycle.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies collection withdrawn inheritance handles parent cycle.
+    """
     directory = Directory.__new__(Directory)
     directory._collection_withdrawn_cache = {}
     directory.directoryGraph = nx.DiGraph()
@@ -439,32 +510,65 @@ def test_collection_withdrawn_inheritance_handles_parent_cycle(caplog):
 
 
 def test_is_countable_collection_rejects_unsupported_metric():
+    """Verify is countable collection rejects unsupported metric.
+
+    Returns:
+        None. Verifies is countable collection rejects unsupported metric.
+    """
     directory = _make_directory_stub()
     with pytest.raises(ValueError):
         directory.isCountableCollection("col1", "unsupported")
 
 
 def test_is_countable_collection_for_top_level_metric():
+    """Verify is countable collection for top level metric.
+
+    Returns:
+        None. Verifies is countable collection for top level metric.
+    """
     directory = _make_directory_stub()
     assert directory.isCountableCollection("col1", "size") is True
 
 
 def test_is_countable_collection_for_child_with_countable_parent():
+    """Verify is countable collection for child with countable parent.
+
+    Returns:
+        None. Verifies is countable collection for child with countable parent.
+    """
     directory = _make_directory_stub()
     assert directory.isCountableCollection("col2", "size") is False
 
 
 def test_is_countable_collection_returns_false_for_missing_metric():
+    """Verify is countable collection returns false for missing metric.
+
+    Returns:
+        None. Verifies is countable collection returns false for missing metric.
+    """
     directory = _make_directory_stub()
     assert directory.isCountableCollection("col1", "number_of_donors") is False
 
 
 def test_get_collection_facts_returns_empty_list_for_missing_collection():
+    """Verify get collection facts returns empty list for missing collection.
+
+    Returns:
+        None. Verifies get collection facts returns empty list for missing collection.
+    """
     directory = _make_directory_stub()
     assert directory.getCollectionFacts("missing-id") == []
 
 
 def test_get_service_by_id_returns_none_and_logs_warning(caplog):
+    """Verify get service by id returns none and logs warning.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies get service by id returns none and logs warning.
+    """
     directory = _make_directory_stub()
     with caplog.at_level("WARNING"):
         assert directory.getServiceById("missing-id") is None
@@ -472,17 +576,32 @@ def test_get_service_by_id_returns_none_and_logs_warning(caplog):
 
 
 def test_get_service_by_id_raise_on_missing():
+    """Verify get service by id raise on missing.
+
+    Returns:
+        None. Verifies get service by id raise on missing.
+    """
     directory = _make_directory_stub()
     with pytest.raises(KeyError):
         directory.getServiceById("missing-id", raise_on_missing=True)
 
 
 def test_get_biobank_services_returns_services_for_biobank():
+    """Verify get biobank services returns services for biobank.
+
+    Returns:
+        None. Verifies get biobank services returns services for biobank.
+    """
     directory = _make_directory_stub()
     assert directory.getBiobankServices("bb1") == [{"id": "svc1", "biobank": {"id": "bb1"}}]
 
 
 def test_service_helpers_resolve_parent_biobank_contact_and_scope():
+    """Verify service helpers resolve parent biobank contact and scope.
+
+    Returns:
+        None. Verifies service helpers resolve parent biobank contact and scope.
+    """
     directory = _make_directory_stub()
     assert directory.getServiceBiobankId("svc1") == "bb1"
     assert directory.getServiceContact("svc1") == {"id": "ct1", "country": "CZ"}
@@ -491,6 +610,11 @@ def test_service_helpers_resolve_parent_biobank_contact_and_scope():
 
 
 def test_study_helpers_resolve_collections_biobanks_and_contacts():
+    """Verify study helpers resolve collections biobanks and contacts.
+
+    Returns:
+        None. Verifies study helpers resolve collections biobanks and contacts.
+    """
     directory = _make_directory_stub()
 
     assert [study["id"] for study in directory.getStudies()] == ["study1", "study2", "study3", "study4"]
@@ -511,6 +635,11 @@ def test_study_helpers_resolve_collections_biobanks_and_contacts():
 
 
 def test_service_and_study_graph_helpers_return_expected_subgraphs():
+    """Verify service and study graph helpers return expected subgraphs.
+
+    Returns:
+        None. Verifies service and study graph helpers return expected subgraphs.
+    """
     directory = _make_directory_stub()
 
     assert set(directory.getGraphBiobankServicesFromBiobank("bb1").nodes()) == {"bb1", "svc1"}
@@ -532,6 +661,11 @@ def test_service_and_study_graph_helpers_return_expected_subgraphs():
 
 
 def test_get_entity_attribute_id_normalizes_dict_name_and_scalar_values():
+    """Verify get entity attribute id normalizes dict name and scalar values.
+
+    Returns:
+        None. Verifies get entity attribute id normalizes dict name and scalar values.
+    """
     assert Directory.getEntityAttributeId({"id": "X1", "name": "Name"}) == "X1"
     assert Directory.getEntityAttributeId({"name": "Only Name"}) == "Only Name"
     assert Directory.getEntityAttributeId("PLASMA") == "PLASMA"
@@ -540,6 +674,11 @@ def test_get_entity_attribute_id_normalizes_dict_name_and_scalar_values():
 
 
 def test_get_list_of_entity_attribute_ids_accepts_mixed_emx2_shapes():
+    """Verify get list of entity attribute ids accepts mixed emx2 shapes.
+
+    Returns:
+        None. Verifies get list of entity attribute ids accepts mixed emx2 shapes.
+    """
     entity = {
         "materials": ["DNA", {"id": "RNA"}, {"name": "SERUM"}, None, ""],
         "diagnosis_available": [{"name": "E11"}, {"id": "ORPHA:123"}],
@@ -553,12 +692,22 @@ def test_get_list_of_entity_attribute_ids_accepts_mixed_emx2_shapes():
 
 
 def test_get_parent_biobank_returns_visible_owner():
+    """Verify get parent biobank returns visible owner.
+
+    Returns:
+        None. Verifies get parent biobank returns visible owner.
+    """
     directory = _make_directory_stub()
 
     assert directory.getParentBiobank("col1") == directory.biobanks[0]
 
 
 def test_get_parent_biobank_handles_missing_collection():
+    """Verify get parent biobank handles missing collection.
+
+    Returns:
+        None. Verifies get parent biobank handles missing collection.
+    """
     directory = _make_directory_stub()
 
     assert directory.getParentBiobank("absent") is None
@@ -568,6 +717,14 @@ def test_get_parent_biobank_handles_missing_collection():
 
 @pytest.mark.parametrize("bad_owner", [None, "bb1", {}, {"id": ""}, {"id": "  "}])
 def test_get_parent_biobank_rejects_malformed_ownership(bad_owner):
+    """Verify get parent biobank rejects malformed ownership.
+
+    Args:
+        bad_owner: Malformed ownership value used to verify parent validation.
+
+    Returns:
+        None. Verifies get parent biobank rejects malformed ownership.
+    """
     directory = _make_directory_stub()
     directory.collections[0]["biobank"] = bad_owner
 
@@ -576,6 +733,11 @@ def test_get_parent_biobank_rejects_malformed_ownership(bad_owner):
 
 
 def test_get_parent_biobank_rejects_missing_ownership_field():
+    """Verify get parent biobank rejects missing ownership field.
+
+    Returns:
+        None. Verifies get parent biobank rejects missing ownership field.
+    """
     directory = _make_directory_stub()
     directory.collections[0].pop("biobank")
 
@@ -584,6 +746,11 @@ def test_get_parent_biobank_rejects_missing_ownership_field():
 
 
 def test_get_parent_biobank_handles_missing_parent():
+    """Verify get parent biobank handles missing parent.
+
+    Returns:
+        None. Verifies get parent biobank handles missing parent.
+    """
     directory = _make_directory_stub()
     directory.biobanks = directory.biobanks[1:]
 
@@ -593,6 +760,11 @@ def test_get_parent_biobank_handles_missing_parent():
 
 
 def test_get_parent_biobank_handles_parent_missing_from_graph():
+    """Verify get parent biobank handles parent missing from graph.
+
+    Returns:
+        None. Verifies get parent biobank handles parent missing from graph.
+    """
     directory = _make_directory_stub()
     directory.biobanks = directory.biobanks[1:]
     directory.directoryGraph.remove_node("bb1")
@@ -603,6 +775,11 @@ def test_get_parent_biobank_handles_parent_missing_from_graph():
 
 
 def test_get_parent_biobank_handles_placeholder_parent():
+    """Verify get parent biobank handles placeholder parent.
+
+    Returns:
+        None. Verifies get parent biobank handles placeholder parent.
+    """
     directory = _make_directory_stub()
     directory.directoryGraph.nodes["bb1"].clear()
 
@@ -612,12 +789,22 @@ def test_get_parent_biobank_handles_placeholder_parent():
 
 
 def test_get_parent_biobank_does_not_treat_biobank_as_collection():
+    """Verify get parent biobank does not treat biobank as collection.
+
+    Returns:
+        None. Verifies get parent biobank does not treat biobank as collection.
+    """
     directory = _make_directory_stub()
 
     assert directory.getParentBiobank("bb1") is None
 
 
 def test_get_parent_biobank_excludes_withdrawn_collection_in_active_scope():
+    """Verify get parent biobank excludes withdrawn collection in active scope.
+
+    Returns:
+        None. Verifies get parent biobank excludes withdrawn collection in active scope.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -628,6 +815,11 @@ def test_get_parent_biobank_excludes_withdrawn_collection_in_active_scope():
 
 
 def test_negotiator_queries_require_loaded_state():
+    """Verify negotiator queries require loaded state.
+
+    Returns:
+        None. Verifies negotiator queries require loaded state.
+    """
     directory = _make_directory_stub()
 
     assert directory.hasNegotiatorData() is False
@@ -636,6 +828,11 @@ def test_negotiator_queries_require_loaded_state():
 
 
 def test_set_negotiator_representatives_normalizes_immutable_sets():
+    """Verify set negotiator representatives normalizes immutable sets.
+
+    Returns:
+        None. Verifies set negotiator representatives normalizes immutable sets.
+    """
     directory = _make_directory_stub()
 
     directory.setNegotiatorRepresentatives({
@@ -653,6 +850,15 @@ def test_set_negotiator_representatives_normalizes_immutable_sets():
 
 @pytest.mark.parametrize("source", ["injection", "xlsx"])
 def test_negotiator_query_respects_visibility_and_injection_tracks_unmatched(source, tmp_path):
+    """Verify negotiator query respects visibility and injection tracks unmatched.
+
+    Args:
+        source: Registration route: injection for in-memory records, otherwise the representative XLSX loader.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies negotiator query respects visibility and injection tracks unmatched.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -681,6 +887,11 @@ def test_negotiator_query_respects_visibility_and_injection_tracks_unmatched(sou
 
 
 def test_negotiator_replacement_is_atomic_on_invalid_ownership():
+    """Verify negotiator replacement is atomic on invalid ownership.
+
+    Returns:
+        None. Verifies negotiator replacement is atomic on invalid ownership.
+    """
     directory = _make_directory_stub()
     directory.setNegotiatorRepresentatives({"col1": {"representatives": {"old@example.org"}}})
     previous = directory.getNegotiatorResources()
@@ -694,6 +905,11 @@ def test_negotiator_replacement_is_atomic_on_invalid_ownership():
 
 
 def test_negotiator_coverage_uses_direct_representatives_only():
+    """Verify negotiator coverage uses direct representatives only.
+
+    Returns:
+        None. Verifies negotiator coverage uses direct representatives only.
+    """
     directory = _make_directory_stub()
     directory.setNegotiatorRepresentatives({"col1": {"representatives": {"a@example.org"}}})
 
@@ -706,6 +922,15 @@ def test_negotiator_coverage_uses_direct_representatives_only():
 
 
 def test_load_negotiator_representatives_merges_duplicate_rows(tmp_path, caplog):
+    """Verify load negotiator representatives merges duplicate rows.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies load negotiator representatives merges duplicate rows.
+    """
     workbook = tmp_path / "representatives.xlsx"
     pd.DataFrame([
         {"network_name": "N", "biobank_name": "B", "resource_name": "C", "resource_source_id": "col1", "representatives_emails": "A@example.org; b@example.org"},
@@ -720,6 +945,14 @@ def test_load_negotiator_representatives_merges_duplicate_rows(tmp_path, caplog)
 
 
 def test_load_negotiator_orphans_report_uses_collection_stats_sheet(tmp_path):
+    """Verify load negotiator orphans report uses collection stats sheet.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load negotiator orphans report uses collection stats sheet.
+    """
     workbook = tmp_path / "orphans.xlsx"
     with pd.ExcelWriter(workbook) as writer:
         pd.DataFrame([{"summary_only": 1}]).to_excel(
@@ -758,6 +991,14 @@ def test_load_negotiator_orphans_report_uses_collection_stats_sheet(tmp_path):
 
 
 def test_load_negotiator_orphans_report_requires_collection_stats_sheet(tmp_path):
+    """Verify load negotiator orphans report requires collection stats sheet.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load negotiator orphans report requires collection stats sheet.
+    """
     workbook = tmp_path / "orphans.xlsx"
     pd.DataFrame([{"summary_only": 1}]).to_excel(
         workbook, sheet_name="nn_summary", index=False
@@ -769,6 +1010,14 @@ def test_load_negotiator_orphans_report_requires_collection_stats_sheet(tmp_path
 
 
 def test_load_negotiator_orphans_report_validates_collection_stats_columns(tmp_path):
+    """Verify load negotiator orphans report validates collection stats columns.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load negotiator orphans report validates collection stats columns.
+    """
     workbook = tmp_path / "orphans.xlsx"
     pd.DataFrame([{"resource_source_id": "col1"}]).to_excel(
         workbook, sheet_name="negotiator_collection_stats", index=False
@@ -780,6 +1029,11 @@ def test_load_negotiator_orphans_report_validates_collection_stats_columns(tmp_p
 
 
 def test_directory_filters_withdrawn_entities_when_requested():
+    """Verify directory filters withdrawn entities when requested.
+
+    Returns:
+        None. Verifies directory filters withdrawn entities when requested.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -802,6 +1056,11 @@ def test_directory_filters_withdrawn_entities_when_requested():
 
 
 def test_get_loaded_biobank_by_id_ignores_withdrawn_scope():
+    """Verify get loaded biobank by id ignores withdrawn scope.
+
+    Returns:
+        None. Verifies get loaded biobank by id ignores withdrawn scope.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -811,6 +1070,11 @@ def test_get_loaded_biobank_by_id_ignores_withdrawn_scope():
 
 
 def test_get_loaded_collections_ignores_withdrawn_scope():
+    """Verify get loaded collections ignores withdrawn scope.
+
+    Returns:
+        None. Verifies get loaded collections ignores withdrawn scope.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -825,6 +1089,11 @@ def test_get_loaded_collections_ignores_withdrawn_scope():
 
 
 def test_is_countable_collection_checks_ancestors_outside_withdrawn_scope():
+    """Verify is countable collection checks ancestors outside withdrawn scope.
+
+    Returns:
+        None. Verifies is countable collection checks ancestors outside withdrawn scope.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -834,6 +1103,11 @@ def test_is_countable_collection_checks_ancestors_outside_withdrawn_scope():
 
 
 def test_is_collection_withdrawn_inherits_from_parent_biobank_and_collection():
+    """Verify is collection withdrawn inherits from parent biobank and collection.
+
+    Returns:
+        None. Verifies is collection withdrawn inherits from parent biobank and collection.
+    """
     directory = _make_directory_stub()
 
     assert directory.isCollectionWithdrawn("col1") is False
@@ -842,6 +1116,11 @@ def test_is_collection_withdrawn_inherits_from_parent_biobank_and_collection():
 
 
 def test_get_direct_subcollections_respects_withdrawn_filter():
+    """Verify get direct subcollections respects withdrawn filter.
+
+    Returns:
+        None. Verifies get direct subcollections respects withdrawn filter.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -851,6 +1130,11 @@ def test_get_direct_subcollections_respects_withdrawn_filter():
 
 
 def test_quality_info_api_respects_scope_and_returns_copies():
+    """Verify quality info api respects scope and returns copies.
+
+    Returns:
+        None. Verifies quality info api respects scope and returns copies.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = False
     directory.only_withdrawn_entities = False
@@ -868,6 +1152,14 @@ def test_quality_info_api_respects_scope_and_returns_copies():
 
 
 def test_quality_info_wide_api_uses_instance_bound_ontology_labels(monkeypatch):
+    """Verify quality info wide api uses instance bound ontology labels.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies quality info wide api uses instance bound ontology labels.
+    """
     directory = _make_directory_stub()
     calls = []
     ontology_df = pd.DataFrame(
@@ -878,6 +1170,16 @@ def test_quality_info_wide_api_uses_instance_bound_ontology_labels(monkeypatch):
     )
 
     def fake_get_directory_ontology_table(table_name, *, directory_url=None, purge_cache=False):
+        """Record the ontology request and return the shared QualityStandards DataFrame.
+
+        Args:
+            table_name: Ontology table name requested from the patched loader.
+            directory_url: Directory URL observed by the patched ontology loader.
+            purge_cache: Cache-purge flag observed by the fake ontology-table loader.
+
+        Returns:
+            The shared QualityStandards DataFrame after recording table, target URL, and purge flag.
+        """
         calls.append((table_name, directory_url, purge_cache))
         return ontology_df
 
@@ -890,6 +1192,11 @@ def test_quality_info_wide_api_uses_instance_bound_ontology_labels(monkeypatch):
 
 
 def test_quality_info_api_rejects_invalid_scope():
+    """Verify quality info api rejects invalid scope.
+
+    Returns:
+        None. Verifies quality info api rejects invalid scope.
+    """
     directory = _make_directory_stub()
 
     with pytest.raises(ValueError, match="Unsupported quality scope"):
@@ -898,32 +1205,99 @@ def test_quality_info_api_rejects_invalid_scope():
 
 @pytest.mark.parametrize("skip_dag", [False, True])
 def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_path, skip_dag):
+    """Verify directory authenticates before setting private schema.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        skip_dag: DAG-validation flag passed to the Directory constructor.
+
+    Returns:
+        None. Verifies directory authenticates before setting private schema.
+    """
     calls = []
 
     class ClientStub:
+        """Record client entry, authentication, schema selection, and empty table reads in order.
+        """
         def __init__(self, url, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             calls.append(("init", url, kwargs))
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             calls.append(("enter",))
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             calls.append(("exit",))
             return False
 
         def signin(self, username, password):
+            """Record the sign-in call on the Directory-session double.
+
+            Args:
+                username: Credential value recorded by the fake sign-in call.
+                password: Credential value recorded by the fake sign-in call.
+
+            Returns:
+                None. Record the sign-in call on the Directory-session double.
+            """
             calls.append(("signin", username, password))
 
         def set_schema(self, schema):
+            """Record the configured schema on this test double.
+
+            Args:
+                schema: Directory schema value retained by the session fixture.
+
+            Returns:
+                The same schema-name argument after recording the schema-selection call.
+            """
             calls.append(("set_schema", schema))
             return schema
 
         def get_graphql(self, table=None):
+            """Return fixture GraphQL result returned for the requested Directory table.
+
+            Args:
+                table: Directory table name recorded by the GraphQL session fixture.
+
+            Returns:
+                The fixture GraphQL result returned for the requested Directory table.
+            """
             calls.append(("get_graphql", table))
             return []
 
         def get(self, table=None, as_df=False):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             calls.append(("get", table, as_df))
             return pd.DataFrame()
 
@@ -941,29 +1315,86 @@ def test_directory_authenticates_before_setting_private_schema(monkeypatch, tmp_
 
 
 def test_directory_uses_schema_specific_cache_and_skips_missing_quality_tables(monkeypatch, tmp_path):
+    """Verify directory uses schema specific cache and skips missing quality tables.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies directory uses schema specific cache and skips missing quality tables.
+    """
     calls = []
 
     class ClientStub:
+        """Raise NoSuchTableException for optional quality tables while returning empty core tables.
+        """
         def __init__(self, url, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             self.url = url
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             return False
 
         def set_schema(self, schema):
+            """Record the configured schema on this test double.
+
+            Args:
+                schema: Directory schema value retained by the session fixture.
+
+            Returns:
+                The same schema-name argument after recording the schema-selection call.
+            """
             calls.append(("set_schema", schema))
             return schema
 
         def get(self, table=None, as_df=False):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             calls.append(("get", table, as_df))
             if table in {"QualityInfoBiobanks", "QualityInfoCollections"}:
                 raise directory_module.NoSuchTableException(f"{table} missing")
             return pd.DataFrame()
 
         def get_graphql(self, table=None):
+            """Return fixture GraphQL result returned for the requested Directory table.
+
+            Args:
+                table: Directory table name recorded by the GraphQL session fixture.
+
+            Returns:
+                The fixture GraphQL result returned for the requested Directory table.
+            """
             calls.append(("get_graphql", table))
             return []
 
@@ -980,6 +1411,15 @@ def test_directory_uses_schema_specific_cache_and_skips_missing_quality_tables(m
 
 
 def test_directory_uses_complete_cache_without_live_client(monkeypatch, tmp_path):
+    """Verify directory uses complete cache without live client.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies directory uses complete cache without live client.
+    """
     cache_dir = tmp_path / "data-check-cache" / "directory-ERIC"
     cache_dir.mkdir(parents=True)
     from diskcache import Cache
@@ -996,7 +1436,15 @@ def test_directory_uses_complete_cache_without_live_client(monkeypatch, tmp_path
         cache["quality_info_collections"] = pd.DataFrame()
 
     class ClientStub:
+        """Reject live client creation when a complete Directory snapshot is cached.
+        """
         def __init__(self, *args, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                *args: Client-constructor positional arguments accepted solely to reject live access in this scenario.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             raise AssertionError("Live client should not be constructed when the cache is complete.")
 
     monkeypatch.setattr(directory_module, "Client", ClientStub)
@@ -1014,6 +1462,15 @@ def test_directory_uses_complete_cache_without_live_client(monkeypatch, tmp_path
 
 
 def test_directory_backfills_missing_quality_tables_for_complete_cache(monkeypatch, tmp_path):
+    """Verify directory backfills missing quality tables for complete cache.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies directory backfills missing quality tables for complete cache.
+    """
     cache_dir = tmp_path / "data-check-cache" / "directory-ERIC"
     cache_dir.mkdir(parents=True)
     from diskcache import Cache
@@ -1036,22 +1493,62 @@ def test_directory_backfills_missing_quality_tables_for_complete_cache(monkeypat
     )
 
     class ClientStub:
+        """Record cache-backfill API calls and provide the requested fixture tables.
+        """
         def __init__(self, url, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             calls.append(("init", url, kwargs))
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             calls.append(("enter",))
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             calls.append(("exit",))
             return False
 
         def set_schema(self, schema):
+            """Record the configured schema on this test double.
+
+            Args:
+                schema: Directory schema value retained by the session fixture.
+
+            Returns:
+                The same schema-name argument after recording the schema-selection call.
+            """
             calls.append(("set_schema", schema))
             return schema
 
         def get(self, table=None, as_df=False):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             calls.append(("get", table, as_df))
             if table == "QualityInfoBiobanks":
                 return quality_biobanks
@@ -1078,6 +1575,15 @@ def test_directory_backfills_missing_quality_tables_for_complete_cache(monkeypat
 
 
 def test_get_directory_ontology_table_uses_cached_copy_without_live_client(monkeypatch, tmp_path):
+    """Verify get directory ontology table uses cached copy without live client.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies get directory ontology table uses cached copy without live client.
+    """
     cache_dir = tmp_path / "data-check-cache" / "directory-DirectoryOntologies"
     cache_dir.mkdir(parents=True)
     ontology_df = pd.DataFrame([{"name": "iso-1", "label": "ISO 1"}])
@@ -1089,7 +1595,15 @@ def test_get_directory_ontology_table_uses_cached_copy_without_live_client(monke
         cache[cache_key] = ontology_df
 
     class ClientStub:
+        """Reject live client creation when the quality ontology is cached.
+        """
         def __init__(self, *args, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                *args: Client-constructor positional arguments accepted solely to reject live access in this scenario.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             raise AssertionError("Live client should not be constructed when ontology cache exists.")
 
     monkeypatch.setattr(directory_module, "Client", ClientStub)
@@ -1101,23 +1615,64 @@ def test_get_directory_ontology_table_uses_cached_copy_without_live_client(monke
 
 
 def test_get_directory_ontology_table_fetches_and_caches_live_copy(monkeypatch, tmp_path):
+    """Verify get directory ontology table fetches and caches live copy.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies get directory ontology table fetches and caches live copy.
+    """
     calls = []
     ontology_df = pd.DataFrame([{"name": "iso-1", "label": "ISO 1"}])
     cache_key = "table:https://directory.bbmri-eric.eu:QualityStandards"
 
     class ClientStub:
+        """Serve the QualityStandards DataFrame and record context-manager and table-read calls.
+        """
         def __init__(self, url, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                url: Directory endpoint retained by the session test double.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             calls.append(("init", url, kwargs))
 
         def __enter__(self):
+            """Enter the context-manager test double.
+
+            Returns:
+                The context-manager test double entered by the with statement.
+            """
             calls.append(("enter",))
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            """Exit the context-manager test double.
+
+            Args:
+                exc_type: Exception class accepted by the context-manager exit hook and deliberately not suppressed.
+                exc: Exception instance accepted by the context-manager exit hook and deliberately not suppressed.
+                tb: Traceback accepted by the context-manager exit hook and deliberately not suppressed.
+
+            Returns:
+                False, so exceptions raised inside the with block propagate to the caller.
+            """
             calls.append(("exit",))
             return False
 
         def get(self, table=None, as_df=False):
+            """Return DataFrame fixture returned for the requested Directory table.
+
+            Args:
+                table: Directory table whose fixture rows the fake session returns.
+                as_df: Flag selecting the DataFrame-shaped fixture result expected by the caller.
+
+            Returns:
+                The DataFrame fixture returned for the requested Directory table.
+            """
             calls.append(("get", table, as_df))
             assert table == "QualityStandards"
             assert as_df is True
@@ -1138,8 +1693,25 @@ def test_get_directory_ontology_table_fetches_and_caches_live_copy(monkeypatch, 
 
 
 def test_directory_raises_clear_error_when_offline_without_complete_cache(monkeypatch, tmp_path):
+    """Verify directory raises clear error when offline without complete cache.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies directory raises clear error when offline without complete cache.
+    """
     class ClientStub:
+        """Simulate unavailable networking by raising RuntimeError during client construction.
+        """
         def __init__(self, *args, **kwargs):
+            """Intercept client construction for the enclosing cache/authentication scenario.
+
+            Args:
+                *args: Client-constructor positional arguments accepted solely to reject live access in this scenario.
+                **kwargs: Client-constructor options accepted for API compatibility; no network session is opened.
+            """
             raise RuntimeError("offline")
 
     monkeypatch.setattr(directory_module, "Client", ClientStub)
@@ -1150,6 +1722,11 @@ def test_directory_raises_clear_error_when_offline_without_complete_cache(monkey
 
 
 def test_directory_can_return_only_withdrawn_entities():
+    """Verify directory can return only withdrawn entities.
+
+    Returns:
+        None. Verifies directory can return only withdrawn entities.
+    """
     directory = _make_directory_stub()
     directory.include_withdrawn_entities = True
     directory.only_withdrawn_entities = True
@@ -1161,6 +1738,11 @@ def test_directory_can_return_only_withdrawn_entities():
 
 
 def test_directory_nn_methods_prefer_staging_area_over_country():
+    """Verify directory nn methods prefer staging area over country.
+
+    Returns:
+        None. Verifies directory nn methods prefer staging area over country.
+    """
     directory = _make_directory_stub()
 
     assert directory.getBiobankNN("bbmri-eric:ID:EXT_demo") == "EXT"

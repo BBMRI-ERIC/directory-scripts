@@ -1,3 +1,5 @@
+"""Test xlsxutils behavior."""
+
 import logging
 
 from openpyxl import load_workbook
@@ -12,6 +14,14 @@ from xlsxutils import (
 
 
 def test_write_xlsx_tables_supports_multiple_sheets(tmp_path):
+    """Verify write xlsx tables supports multiple sheets.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies write xlsx tables supports multiple sheets.
+    """
     output_file = tmp_path / "export.xlsx"
 
     write_xlsx_tables(
@@ -29,6 +39,14 @@ def test_write_xlsx_tables_supports_multiple_sheets(tmp_path):
 
 
 def test_write_xlsx_tables_rejects_invalid_sheet_specs(tmp_path):
+    """Verify write xlsx tables rejects invalid sheet specs.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies write xlsx tables rejects invalid sheet specs.
+    """
     output_file = tmp_path / "broken.xlsx"
 
     with pytest.raises(ValueError):
@@ -38,6 +56,15 @@ def test_write_xlsx_tables_rejects_invalid_sheet_specs(tmp_path):
 def test_write_xlsx_tables_truncates_long_text_without_mutating_input(
     tmp_path, caplog
 ):
+    """Verify write xlsx tables truncates long text without mutating input.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies write xlsx tables truncates long text without mutating input.
+    """
     output_file = tmp_path / "long.xlsx"
     long_text = "x" * (EXCEL_MAX_CELL_CHARS + 100)
     dataframe = pd.DataFrame([{"id": "row1", "description": long_text}])
@@ -64,6 +91,15 @@ def test_write_xlsx_tables_truncates_long_text_without_mutating_input(
 
 
 def test_write_xlsx_tables_truncates_long_object_values(tmp_path, caplog):
+    """Verify write xlsx tables truncates long object values.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies write xlsx tables truncates long object values.
+    """
     output_file = tmp_path / "long-object.xlsx"
     long_values = ["x" * 1000] * 40
     dataframe = pd.DataFrame([{"id": "row1", "collections": long_values}])
@@ -85,6 +121,16 @@ def test_write_xlsx_tables_caps_hyperlinks_with_plain_text_fallback(
     tmp_path,
     caplog,
 ):
+    """Verify write xlsx tables caps hyperlinks with plain text fallback.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies write xlsx tables caps hyperlinks with plain text fallback.
+    """
     monkeypatch.setattr("xlsxutils.EXCEL_MAX_HYPERLINKS_PER_SHEET", 2)
     dataframe = pd.DataFrame(
         {

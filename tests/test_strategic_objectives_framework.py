@@ -1,3 +1,5 @@
+"""Test strategic objectives framework behavior."""
+
 import shutil
 import subprocess
 from pathlib import Path
@@ -6,6 +8,11 @@ import pytest
 
 
 def test_strategic_objectives_common_and_renderer_parse():
+    """Verify strategic objectives common and renderer parse.
+
+    Returns:
+        None. Verifies strategic objectives common and renderer parse.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -18,6 +25,11 @@ def test_strategic_objectives_common_and_renderer_parse():
 
 
 def test_strategic_objectives_family_renders_outputs():
+    """Verify strategic objectives family renders outputs.
+
+    Returns:
+        None. Verifies strategic objectives family renders outputs.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -53,6 +65,11 @@ if (requireNamespace("svglite", quietly = TRUE)) {
 
 
 def test_strategic_objectives_short_names_support_format_and_size_filters():
+    """Verify strategic objectives short names support format and size filters.
+
+    Returns:
+        None. Verifies strategic objectives short names support format and size filters.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -94,6 +111,11 @@ if (requireNamespace("svglite", quietly = TRUE)) {
 
 
 def test_strategic_objectives_subset_helper_keeps_so2_only():
+    """Verify strategic objectives subset helper keeps so2 only.
+
+    Returns:
+        None. Verifies strategic objectives subset helper keeps so2 only.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -111,6 +133,11 @@ stopifnot(
 
 
 def test_global_bars_keep_all_so_labels_when_order_is_supplied():
+    """Verify global bars keep all so labels when order is supplied.
+
+    Returns:
+        None. Verifies global bars keep all so labels when order is supplied.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -136,6 +163,11 @@ stopifnot(any(trimws(all_labels) == "SO:"), all(as.character(1:8) %in% all_label
 
 
 def test_global_bars_are_compact_and_use_so_prefix_labels():
+    """Verify global bars are compact and use so prefix labels.
+
+    Returns:
+        None. Verifies global bars are compact and use so prefix labels.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -178,6 +210,11 @@ stopifnot(any(trimws(global_text) == "SO:"), all(as.character(1:8) %in% global_t
 
 
 def test_global_bars_fallback_to_visible_label_anchor_for_norway():
+    """Verify global bars fallback to visible label anchor for norway.
+
+    Returns:
+        None. Verifies global bars fallback to visible label anchor for norway.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -204,6 +241,11 @@ stopifnot(
 
 
 def test_global_bar_frames_do_not_overlap_or_touch_after_resolution():
+    """Verify global bar frames do not overlap or touch after resolution.
+
+    Returns:
+        None. Verifies global bar frames do not overlap or touch after resolution.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -249,6 +291,11 @@ if (nrow(frames) > 1) {
 
 
 def test_global_bar_positions_are_named_by_size():
+    """Verify global bar positions are named by size.
+
+    Returns:
+        None. Verifies global bar positions are named by size.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -265,6 +312,11 @@ stopifnot(
 
 
 def test_global_bar_position_seed_contains_country_centers():
+    """Verify global bar position seed contains country centers.
+
+    Returns:
+        None. Verifies global bar position seed contains country centers.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -284,6 +336,11 @@ stopifnot(
 
 
 def test_global_bar_country_labels_follow_resolved_anchor_positions():
+    """Verify global bar country labels follow resolved anchor positions.
+
+    Returns:
+        None. Verifies global bar country labels follow resolved anchor positions.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -316,6 +373,11 @@ stopifnot(
 
 
 def test_global_bars_do_not_duplicate_labels_for_bar_countries():
+    """Verify global bars do not duplicate labels for bar countries.
+
+    Returns:
+        None. Verifies global bars do not duplicate labels for bar countries.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -344,6 +406,11 @@ stopifnot(length(intersect(bar_labels, other_labels)) == 0L)
 
 
 def test_recolor_legend_includes_member_and_observer_without_so_involvement():
+    """Verify recolor legend includes member and observer without so involvement.
+
+    Returns:
+        None. Verifies recolor legend includes member and observer without so involvement.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")

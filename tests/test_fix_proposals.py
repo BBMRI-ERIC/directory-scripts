@@ -1,3 +1,5 @@
+"""Test fix proposals behavior."""
+
 from pathlib import Path
 
 from customwarnings import DataCheckEntityType, DataCheckWarning, DataCheckWarningLevel
@@ -10,6 +12,14 @@ from fix_proposals import (
 
 
 def test_fix_plan_payload_merges_duplicate_fix_proposals(tmp_path: Path):
+    """Verify fix plan payload merges duplicate fix proposals.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies fix plan payload merges duplicate fix proposals.
+    """
     fix = make_fix_proposal(
         update_id="access.duo.collaboration_required",
         module="AP",
@@ -59,6 +69,14 @@ def test_fix_plan_payload_merges_duplicate_fix_proposals(tmp_path: Path):
 
 
 def test_load_fix_plan_reports_checksum_mismatch(tmp_path: Path):
+    """Verify load fix plan reports checksum mismatch.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies load fix plan reports checksum mismatch.
+    """
     path = tmp_path / "updates.json"
     path.write_text(
         '{"format_version":1,"generated_at":"2026-03-04T00:00:00+00:00","generated_by":{"tool":"data-check.py","schema":"ERIC","withdrawn_scope":"active-only"},"updates":[{"update_id":"u1","module":"AP","entity_type":"COLLECTION","entity_id":"col1","field":"data_use","mode":"append","confidence":"certain","current_value_at_export":[],"expected_current_value":[],"proposed_value":["DUO:0000020"],"human_explanation":"x","rationale":"","term_explanations":[],"source_check_ids":["AP:JointDuo"],"source_warning_messages":[],"source_warning_actions":[],"replace_required":false,"blocking_reason":"","exclusive_group":"","staging_area":"CZ","update_checksum":"broken"}],"file_checksum":"broken"}',
@@ -70,6 +88,11 @@ def test_load_fix_plan_reports_checksum_mismatch(tmp_path: Path):
 
 
 def test_fix_plan_payload_skips_suppressed_update_ids():
+    """Verify fix plan payload skips suppressed update ids.
+
+    Returns:
+        None. Verifies fix plan payload skips suppressed update ids.
+    """
     fix = make_fix_proposal(
         update_id="FT/facts.k_anonymity.drop_rows_k10",
         module="FT",
@@ -108,6 +131,11 @@ def test_fix_plan_payload_skips_suppressed_update_ids():
 
 
 def test_fix_plan_payload_skips_suppressed_module_prefixed_update_id():
+    """Verify fix plan payload skips suppressed module prefixed update id.
+
+    Returns:
+        None. Verifies fix plan payload skips suppressed module prefixed update id.
+    """
     fix = make_fix_proposal(
         update_id="facts.k_anonymity.drop_rows_k10",
         module="FT",
@@ -146,6 +174,11 @@ def test_fix_plan_payload_skips_suppressed_module_prefixed_update_id():
 
 
 def test_fix_plan_payload_skips_fixes_when_source_warning_id_is_suppressed():
+    """Verify fix plan payload skips fixes when source warning id is suppressed.
+
+    Returns:
+        None. Verifies fix plan payload skips fixes when source warning id is suppressed.
+    """
     fix = make_fix_proposal(
         update_id="facts.k_anonymity.drop_rows_k10",
         module="FT",

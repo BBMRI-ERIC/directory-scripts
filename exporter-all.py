@@ -333,7 +333,7 @@ def _collect_scope_contact_ids(biobank_ids, collections, networks):
 
     Args:
         biobank_ids: Biobank identifiers resolved through the global Directory.
-        collections: Selected collection mappings.
+        collections: Export-scope collection records whose contact/contacts references are inspected.
         networks: Selected network mappings.
 
     Returns:
@@ -360,7 +360,7 @@ def _collect_scope_network_ids(biobank_ids, collections):
 
     Args:
         biobank_ids: Biobank identifiers resolved through the global Directory.
-        collections: Selected collection mappings.
+        collections: Export-scope collection records whose network/networks references are inspected.
 
     Returns:
         Newly allocated set of referenced network IDs.

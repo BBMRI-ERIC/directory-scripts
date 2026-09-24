@@ -1,3 +1,5 @@
+"""Test directory stats utils behavior."""
+
 from directory_stats_utils import (
     build_biobank_stats,
     build_directory_stats,
@@ -7,12 +9,20 @@ from directory_stats_utils import (
 
 
 class DirectoryStatsStub:
+    """Supply active/withdrawn and EXT entities with sample totals for scoped statistics tests.
+    """
     def __init__(
         self,
         *,
         include_withdrawn_entities=False,
         only_withdrawn_entities=False,
     ):
+        """Populate statistics records and configure the active/withdrawn view.
+
+        Args:
+            include_withdrawn_entities: Whether active and withdrawn records are visible.
+            only_withdrawn_entities: Whether only withdrawn records are visible; takes precedence over include_withdrawn_entities.
+        """
         self.include_withdrawn_entities = include_withdrawn_entities or only_withdrawn_entities
         self.only_withdrawn_entities = only_withdrawn_entities
         self.biobanks = [
@@ -169,6 +179,14 @@ class DirectoryStatsStub:
         }
 
     def _matches_withdrawn_scope(self, is_withdrawn):
+        """Return whether the configured withdrawal state is in scope.
+
+        Args:
+            is_withdrawn: Fixture withdrawal flag evaluated against the requested scope.
+
+        Returns:
+            True when the flag satisfies only/include-withdrawn settings; only-withdrawn takes precedence.
+        """
         if self.only_withdrawn_entities:
             return is_withdrawn
         if self.include_withdrawn_entities:
@@ -176,12 +194,28 @@ class DirectoryStatsStub:
         return not is_withdrawn
 
     def isBiobankWithdrawn(self, biobank_id):
+        """Report the fixture marks the requested biobank as withdrawn.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture withdrawal status this stub reports.
+
+        Returns:
+            Whether the fixture marks the requested biobank as withdrawn.
+        """
         biobank = next(
             biobank for biobank in self.biobanks if biobank["id"] == biobank_id
         )
         return bool(biobank.get("withdrawn"))
 
     def isCollectionWithdrawn(self, collection_id):
+        """Report the fixture marks the requested collection as withdrawn.
+
+        Args:
+            collection_id: Collection identifier whose fixture withdrawal status this stub reports.
+
+        Returns:
+            Whether the fixture marks the requested collection as withdrawn.
+        """
         collection = next(
             collection for collection in self.collections if collection["id"] == collection_id
         )
@@ -195,6 +229,11 @@ class DirectoryStatsStub:
         return False
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return [
             biobank
             for biobank in self.biobanks
@@ -202,6 +241,15 @@ class DirectoryStatsStub:
         ]
 
     def getBiobankById(self, biobank_id, raise_on_missing=False):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+            raise_on_missing: Whether the fixture lookup should raise instead of returning a missing record.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         for biobank in self.biobanks:
             if biobank["id"] == biobank_id:
                 return biobank
@@ -210,6 +258,11 @@ class DirectoryStatsStub:
         return None
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [
             collection
             for collection in self.collections
@@ -217,6 +270,11 @@ class DirectoryStatsStub:
         ]
 
     def getServices(self):
+        """Return synthetic service records available to the code under test.
+
+        Returns:
+            The synthetic service records available to the code under test.
+        """
         return [
             service
             for service in self.services
@@ -224,6 +282,14 @@ class DirectoryStatsStub:
         ]
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return next(
             collection["biobank"]["id"]
             for collection in self.collections
@@ -231,12 +297,29 @@ class DirectoryStatsStub:
         )
 
     def isTopLevelCollection(self, collection_id):
+        """Report the fixture collection has no parent collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture hierarchy position this stub evaluates.
+
+        Returns:
+            Whether the fixture collection has no parent collection.
+        """
         collection = next(
             collection for collection in self.collections if collection["id"] == collection_id
         )
         return "parent_collection" not in collection
 
     def isCountableCollection(self, collection_id, metric):
+        """Report the fixture collection is countable for the requested metric.
+
+        Args:
+            collection_id: Collection identifier whose fixture counting eligibility this stub evaluates.
+            metric: Fact-sheet metric whose countability is evaluated by the fixture.
+
+        Returns:
+            Whether the fixture collection is countable for the requested metric.
+        """
         collection = next(
             collection for collection in self.collections if collection["id"] == collection_id
         )
@@ -253,10 +336,23 @@ class DirectoryStatsStub:
         return True
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.facts_by_collection.get(collection_id, [])
 
 
 def test_build_biobank_stats_include_services_facts_and_subcollection_counts():
+    """Verify build biobank stats include services facts and subcollection counts.
+
+    Returns:
+        None. Verifies build biobank stats include services facts and subcollection counts.
+    """
     rows = build_biobank_stats(DirectoryStatsStub())
 
     bb1 = next(row for row in rows if row["id"] == "bb1")
@@ -287,6 +383,11 @@ def test_build_biobank_stats_include_services_facts_and_subcollection_counts():
 
 
 def test_build_biobank_stats_supports_oom_fallback_services_and_missing_all_star():
+    """Verify build biobank stats supports oom fallback services and missing all star.
+
+    Returns:
+        None. Verifies build biobank stats supports oom fallback services and missing all star.
+    """
     rows = build_biobank_stats(DirectoryStatsStub())
 
     bb2 = next(row for row in rows if row["id"] == "bbmri-eric:ID:EXT_BB2")
@@ -306,6 +407,11 @@ def test_build_biobank_stats_supports_oom_fallback_services_and_missing_all_star
 
 
 def test_build_directory_stats_emits_breakdown_and_warning_rows():
+    """Verify build directory stats emits breakdown and warning rows.
+
+    Returns:
+        None. Verifies build directory stats emits breakdown and warning rows.
+    """
     stats = build_directory_stats(DirectoryStatsStub())
 
     assert stats["collection_type_summary_rows"] == [
@@ -341,6 +447,11 @@ def test_build_directory_stats_emits_breakdown_and_warning_rows():
 
 
 def test_build_stats_summary_aggregates_all_metrics():
+    """Verify build stats summary aggregates all metrics.
+
+    Returns:
+        None. Verifies build stats summary aggregates all metrics.
+    """
     rows = build_biobank_stats(DirectoryStatsStub())
     summary = build_stats_summary(rows)
 
@@ -376,6 +487,11 @@ def test_build_stats_summary_aggregates_all_metrics():
 
 
 def test_build_biobank_stats_excludes_withdrawn_biobanks_by_default():
+    """Verify build biobank stats excludes withdrawn biobanks by default.
+
+    Returns:
+        None. Verifies build biobank stats excludes withdrawn biobanks by default.
+    """
     rows = build_biobank_stats(DirectoryStatsStub())
 
     assert [row["id"] for row in rows] == [
@@ -387,6 +503,11 @@ def test_build_biobank_stats_excludes_withdrawn_biobanks_by_default():
 
 
 def test_build_biobank_stats_can_include_withdrawn_biobanks():
+    """Verify build biobank stats can include withdrawn biobanks.
+
+    Returns:
+        None. Verifies build biobank stats can include withdrawn biobanks.
+    """
     rows = build_biobank_stats(DirectoryStatsStub(include_withdrawn_entities=True))
 
     bb3 = next(row for row in rows if row["id"] == "bbmri-eric:ID:NL_BB3")
@@ -394,17 +515,32 @@ def test_build_biobank_stats_can_include_withdrawn_biobanks():
 
 
 def test_build_biobank_stats_can_select_only_withdrawn_biobanks():
+    """Verify build biobank stats can select only withdrawn biobanks.
+
+    Returns:
+        None. Verifies build biobank stats can select only withdrawn biobanks.
+    """
     rows = build_biobank_stats(DirectoryStatsStub(only_withdrawn_entities=True))
 
     assert [row["id"] for row in rows] == ["bbmri-eric:ID:NL_BB3"]
 
 
 def test_extract_staging_area_from_id_supports_directory_ids():
+    """Verify extract staging area from id supports directory ids.
+
+    Returns:
+        None. Verifies extract staging area from id supports directory ids.
+    """
     assert extract_staging_area_from_id("bbmri-eric:ID:EXT_POB") == "EXT"
     assert extract_staging_area_from_id("bbmri-eric:ID:CZ_REVMA") == "CZ"
 
 
 def test_build_directory_stats_supports_country_and_staging_area_filters():
+    """Verify build directory stats supports country and staging area filters.
+
+    Returns:
+        None. Verifies build directory stats supports country and staging area filters.
+    """
     stats = build_directory_stats(
         DirectoryStatsStub(),
         country_filters=["DE"],
@@ -419,6 +555,11 @@ def test_build_directory_stats_supports_country_and_staging_area_filters():
 
 
 def test_build_directory_stats_supports_comma_delimited_or_filters_and_collection_type():
+    """Verify build directory stats supports comma delimited or filters and collection type.
+
+    Returns:
+        None. Verifies build directory stats supports comma delimited or filters and collection type.
+    """
     stats = build_directory_stats(
         DirectoryStatsStub(),
         country_filters=["CZ,DE"],
@@ -443,6 +584,11 @@ def test_build_directory_stats_supports_comma_delimited_or_filters_and_collectio
 
 
 def test_build_directory_stats_sorts_ext_rows_by_country_then_id():
+    """Verify build directory stats sorts ext rows by country then id.
+
+    Returns:
+        None. Verifies build directory stats sorts ext rows by country then id.
+    """
     stats = build_directory_stats(
         DirectoryStatsStub(),
         staging_area_filters=["EXT"],

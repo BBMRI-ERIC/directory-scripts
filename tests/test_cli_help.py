@@ -1,3 +1,5 @@
+"""Test cli help behavior."""
+
 import ast
 from pathlib import Path
 import subprocess
@@ -60,6 +62,14 @@ FACT_SHEET_EXPORTERS = [
 
 @pytest.mark.parametrize("script_name", CLI_SCRIPTS)
 def test_cli_help_runs(script_name):
+    """Verify cli help runs.
+
+    Args:
+        script_name: Standalone script invoked by the command-line help test.
+
+    Returns:
+        None. Verifies cli help runs.
+    """
     result = subprocess.run(
         [sys.executable, str(REPO_ROOT / script_name), "-h"],
         cwd=REPO_ROOT,
@@ -77,6 +87,14 @@ def test_cli_help_runs(script_name):
     ids=lambda path: str(path.relative_to(REPO_ROOT)),
 )
 def test_production_python_file_has_module_purpose_docstring(module_path):
+    """Verify production python file has module purpose docstring.
+
+    Args:
+        module_path: Production Python file parsed without import to check its module-purpose docstring.
+
+    Returns:
+        None. Verifies production python file has module purpose docstring.
+    """
     source = module_path.read_text(encoding="utf-8")
 
     assert ast.get_docstring(ast.parse(source)), (
@@ -86,6 +104,11 @@ def test_production_python_file_has_module_purpose_docstring(module_path):
 
 
 def test_each_exporter_has_a_documentation_section():
+    """Verify each exporter has a documentation section.
+
+    Returns:
+        None. Verifies each exporter has a documentation section.
+    """
     documentation = (REPO_ROOT / "docs" / "exporters.md").read_text(encoding="utf-8")
 
     for script_name in EXPORTER_SCRIPTS:
@@ -95,6 +118,14 @@ def test_each_exporter_has_a_documentation_section():
 
 @pytest.mark.parametrize("script_name", FACT_SHEET_EXPORTERS)
 def test_fact_sheet_exporter_help_exposes_no_star_fallback(script_name):
+    """Verify fact sheet exporter help exposes no star fallback.
+
+    Args:
+        script_name: Standalone script invoked by the command-line help test.
+
+    Returns:
+        None. Verifies fact sheet exporter help exposes no star fallback.
+    """
     source = (REPO_ROOT / script_name).read_text(encoding="utf-8")
 
     assert "add_fact_sheet_summary_arguments(parser)" in source
@@ -103,6 +134,11 @@ def test_fact_sheet_exporter_help_exposes_no_star_fallback(script_name):
 
 
 def test_data_check_non_eric_schema_requires_auth():
+    """Verify data check non eric schema requires auth.
+
+    Returns:
+        None. Verifies data check non eric schema requires auth.
+    """
     env = dict(**__import__("os").environ)
     env["DIRECTORYUSERNAME"] = ""
     env["DIRECTORYPASSWORD"] = ""

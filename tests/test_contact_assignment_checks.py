@@ -1,3 +1,5 @@
+"""Test contact assignment checks behavior."""
+
 from types import SimpleNamespace
 
 from checks.ContactAssignments import ContactAssignments
@@ -5,7 +7,11 @@ from checks.ContactReuse import ContactReuse
 
 
 class ContactAssignmentDirectoryStub:
+    """Model foreign-institution contacts, shared-study contacts, and legitimate multi-owner reuse.
+    """
     def __init__(self):
+        """Populate institutional contacts and cross-owner graph relationships.
+        """
         self.contacts = [
             {
                 "id": "ct_at_mug_main",
@@ -182,34 +188,94 @@ class ContactAssignmentDirectoryStub:
         ]
 
     def getContacts(self):
+        """Return synthetic contact records available to the code under test.
+
+        Returns:
+            The synthetic contact records available to the code under test.
+        """
         return self.contacts
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return self.collections
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return list(self.biobanks.values())
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return self.biobanks[biobank_id]
 
     def getContact(self, contact_id):
+        """Return synthetic contact record selected by the requested identifier.
+
+        Args:
+            contact_id: Contact identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The synthetic contact record selected by the requested identifier.
+        """
         for contact in self.contacts:
             if contact["id"] == contact_id:
                 return contact
         raise KeyError(contact_id)
 
     def getContactNN(self, contact_id):
+        """Return fixture national-node code for the requested contact.
+
+        Args:
+            contact_id: Contact identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested contact.
+        """
         return "AT" if "at_" in contact_id else "DE"
 
     def getCollectionNN(self, collection_id):
+        """Return fixture national-node code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested collection.
+        """
         return collection_id.split(":ID:", 1)[1][:2]
 
     def isCollectionWithdrawn(self, collection_id):
+        """Report the fixture marks the requested collection as withdrawn.
+
+        Args:
+            collection_id: Collection identifier whose fixture withdrawal status this stub reports.
+
+        Returns:
+            Whether the fixture marks the requested collection as withdrawn.
+        """
         return False
 
 
 def test_contact_reuse_reports_cross_biobank_info_only():
+    """Verify contact reuse reports cross biobank info only.
+
+    Returns:
+        None. Verifies contact reuse reports cross biobank info only.
+    """
     warnings = ContactReuse().check(ContactAssignmentDirectoryStub(), SimpleNamespace())
     warning_ids = {warning.dataCheckID for warning in warnings}
     assert "CTR:CrossBiobankReuse" in warning_ids
@@ -225,6 +291,11 @@ def test_contact_reuse_reports_cross_biobank_info_only():
 
 
 def test_contact_assignments_warn_for_unique_foreign_institution_contact_usage():
+    """Verify contact assignments warn for unique foreign institution contact usage.
+
+    Returns:
+        None. Verifies contact assignments warn for unique foreign institution contact usage.
+    """
     warnings = ContactAssignments().check(ContactAssignmentDirectoryStub(), SimpleNamespace())
     warnings_by_id = {}
     for warning in warnings:
@@ -250,6 +321,11 @@ def test_contact_assignments_warn_for_unique_foreign_institution_contact_usage()
 
 
 def test_contact_assignments_do_not_warn_for_generic_cross_biobank_shared_contact():
+    """Verify contact assignments do not warn for generic cross biobank shared contact.
+
+    Returns:
+        None. Verifies contact assignments do not warn for generic cross biobank shared contact.
+    """
     warnings = ContactAssignments().check(ContactAssignmentDirectoryStub(), SimpleNamespace())
     warned_entities = {warning.directoryEntityID for warning in warnings}
     assert "ct_shared_study" not in warned_entities

@@ -1,3 +1,5 @@
+"""Test warning suppressions behavior."""
+
 import json
 import os
 from pathlib import Path
@@ -18,6 +20,15 @@ from warningscontainer import WarningsContainer
 
 
 def test_warning_suppressions_loads_entity_mapping_and_suppresses_output(tmp_path, capsys):
+    """Verify warning suppressions loads entity mapping and suppresses output.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        capsys: Pytest capture fixture used to inspect process output.
+
+    Returns:
+        None. Verifies warning suppressions loads entity mapping and suppresses output.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(
@@ -67,6 +78,14 @@ def test_warning_suppressions_loads_entity_mapping_and_suppresses_output(tmp_pat
 
 
 def test_warning_suppressions_skips_invalid_entries_with_warning(tmp_path):
+    """Verify warning suppressions skips invalid entries with warning.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions skips invalid entries with warning.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(
@@ -95,6 +114,14 @@ def test_warning_suppressions_skips_invalid_entries_with_warning(tmp_path):
 
 
 def test_warning_suppressions_keeps_valid_entries_when_one_top_level_entry_is_invalid(tmp_path):
+    """Verify warning suppressions keeps valid entries when one top level entry is invalid.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions keeps valid entries when one top level entry is invalid.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(
@@ -123,6 +150,15 @@ def test_warning_suppressions_keeps_valid_entries_when_one_top_level_entry_is_in
 
 
 def test_warning_suppressions_default_path_is_repo_relative(tmp_path, monkeypatch):
+    """Verify warning suppressions default path is repo relative.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies warning suppressions default path is repo relative.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(
@@ -161,6 +197,14 @@ def test_warning_suppressions_default_path_is_repo_relative(tmp_path, monkeypatc
 
 
 def test_warning_suppressions_detailed_loader_parses_metadata_fields(tmp_path):
+    """Verify warning suppressions detailed loader parses metadata fields.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions detailed loader parses metadata fields.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(
@@ -204,6 +248,11 @@ def test_warning_suppressions_detailed_loader_parses_metadata_fields(tmp_path):
 
 
 def test_warning_suppression_diagnostics_report_unknown_expired_and_stale():
+    """Verify warning suppression diagnostics report unknown expired and stale.
+
+    Returns:
+        None. Verifies warning suppression diagnostics report unknown expired and stale.
+    """
     entry_result = load_warning_suppressions_detailed(
         path=None
     )
@@ -229,6 +278,11 @@ def test_warning_suppression_diagnostics_report_unknown_expired_and_stale():
 
 
 def test_serialize_suppression_entries_emits_v2_payload():
+    """Verify serialize suppression entries emits v2 payload.
+
+    Returns:
+        None. Verifies serialize suppression entries emits v2 payload.
+    """
     entry = warning_suppressions.WarningSuppressionEntryModel.parse_obj(
         {
             "check_id": "AP:BioDuoMissing",
@@ -245,6 +299,11 @@ def test_serialize_suppression_entries_emits_v2_payload():
 
 
 def test_warning_suppression_diagnostics_accept_module_prefixed_update_ids():
+    """Verify warning suppression diagnostics accept module prefixed update ids.
+
+    Returns:
+        None. Verifies warning suppression diagnostics accept module prefixed update ids.
+    """
     diagnostics = summarize_suppression_diagnostics(
         [
             warning_suppressions.WarningSuppressionEntryModel.parse_obj(
@@ -263,6 +322,14 @@ def test_warning_suppression_diagnostics_accept_module_prefixed_update_ids():
 
 
 def test_warning_suppressions_entry_can_target_warning_only(tmp_path):
+    """Verify warning suppressions entry can target warning only.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions entry can target warning only.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(
@@ -293,6 +360,14 @@ def test_warning_suppressions_entry_can_target_warning_only(tmp_path):
 
 
 def test_warning_suppressions_entry_can_target_fix_only(tmp_path):
+    """Verify warning suppressions entry can target fix only.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies warning suppressions entry can target fix only.
+    """
     config_path = tmp_path / "warning-suppressions.json"
     config_path.write_text(
         json.dumps(

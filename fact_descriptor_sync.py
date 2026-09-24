@@ -548,7 +548,8 @@ def _is_missing_value(value: Any) -> bool:
     """Return whether a scalar should be treated as an unset descriptor value.
 
     Args:
-        value: Value passed to ``pandas.isna``.
+        value: Candidate descriptor cell checked for pandas-style missingness,
+            including None and NaN.
 
     Returns:
         Boolean scalar missingness result, or ``False`` when pandas returns a

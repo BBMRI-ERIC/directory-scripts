@@ -1,3 +1,5 @@
+"""Test contactfields check behavior."""
+
 from types import SimpleNamespace
 
 import __main__
@@ -7,7 +9,11 @@ from checks.ContactFields import ContactFields
 
 
 class ContactFieldsDirectoryStub:
+    """Expose contact emails and owners covering placeholder domains and country mismatches.
+    """
     def __init__(self):
+        """Populate malformed-contact and owner-country lookup cases.
+        """
         self.contacts = [
             {
                 "id": "ct_placeholder",
@@ -77,22 +83,56 @@ class ContactFieldsDirectoryStub:
         }
 
     def getContacts(self):
+        """Return synthetic contact records available to the code under test.
+
+        Returns:
+            The synthetic contact records available to the code under test.
+        """
         return self.contacts
 
     def getContactNN(self, contact_id):
+        """Return fixture national-node code for the requested contact.
+
+        Args:
+            contact_id: Contact identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested contact.
+        """
         for contact in self.contacts:
             if contact["id"] == contact_id:
                 return contact["country"]
         raise KeyError(contact_id)
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return self.collection_biobank_map[collection_id]
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return self.biobanks.get(biobank_id)
 
 
 def test_contactfields_reports_placeholder_and_country_suffix_email_warnings():
+    """Verify contactfields reports placeholder and country suffix email warnings.
+
+    Returns:
+        None. Verifies contactfields reports placeholder and country suffix email warnings.
+    """
     __main__.remoteCheckList = ["emails"]
     args = SimpleNamespace(disableChecksRemote=["emails"], purgeCaches=[])
 
@@ -145,6 +185,14 @@ def test_contactfields_reports_placeholder_and_country_suffix_email_warnings():
 
 
 def test_contactfields_skips_remote_email_checks_when_validate_email_package_is_missing(caplog):
+    """Verify contactfields skips remote email checks when validate email package is missing.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies contactfields skips remote email checks when validate email package is missing.
+    """
     __main__.remoteCheckList = ["emails"]
     args = SimpleNamespace(disableChecksRemote=[], purgeCaches=[])
 

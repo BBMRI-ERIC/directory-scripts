@@ -14,6 +14,14 @@ SCRIPT_PATH = REPO_ROOT / "directory-tables-modifier.py"
 
 
 def _run_modifier(*args: str) -> subprocess.CompletedProcess[str]:
+    """Run the modifier fixture command.
+
+    Args:
+        *args: Command-line tokens appended after the Python script path, preserving order.
+
+    Returns:
+        The completed process object captured from the invoked command-line tool.
+    """
     cmd = [sys.executable, str(SCRIPT_PATH), *args]
     return subprocess.run(
         cmd,
@@ -25,6 +33,11 @@ def _run_modifier(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _base_auth_args() -> list[str]:
+    """Build standard authentication arguments for the CLI test.
+
+    Returns:
+        CLI tokens selecting example.org and dummy test-user/test-password credentials; no live secrets.
+    """
     return [
         "--directory-target",
         "https://example.org",
@@ -36,6 +49,11 @@ def _base_auth_args() -> list[str]:
 
 
 def test_k_anonymity_rejected_for_non_collectionfacts_table() -> None:
+    """Verify k anonymity rejected for non collectionfacts table.
+
+    Returns:
+        None. Verifies k anonymity rejected for non collectionfacts table.
+    """
     result = _run_modifier(
         *_base_auth_args(),
         "-s",
@@ -52,6 +70,11 @@ def test_k_anonymity_rejected_for_non_collectionfacts_table() -> None:
 
 
 def test_k_anonymity_rejected_for_delete_action() -> None:
+    """Verify k anonymity rejected for delete action.
+
+    Returns:
+        None. Verifies k anonymity rejected for delete action.
+    """
     result = _run_modifier(
         *_base_auth_args(),
         "-s",
@@ -70,6 +93,11 @@ def test_k_anonymity_rejected_for_delete_action() -> None:
 
 
 def test_k_anonymity_requires_positive_threshold() -> None:
+    """Verify k anonymity requires positive threshold.
+
+    Returns:
+        None. Verifies k anonymity requires positive threshold.
+    """
     result = _run_modifier(
         *_base_auth_args(),
         "-s",
@@ -86,6 +114,11 @@ def test_k_anonymity_requires_positive_threshold() -> None:
 
 
 def test_k_anonymity_help_documents_positive_range_only() -> None:
+    """Verify k anonymity help documents positive range only.
+
+    Returns:
+        None. Verifies k anonymity help documents positive range only.
+    """
     result = _run_modifier("-h")
     assert result.returncode == 0
     assert "number_of_donors is >0 and <k" in result.stdout

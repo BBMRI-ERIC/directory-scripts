@@ -1,8 +1,14 @@
+"""Test facttables check behavior."""
+
 from checks.FactTables import FactTables
 
 
 class FactTablesDirectoryStub:
+    """Supply duplicate marginals and inconsistent fact/collection totals for QC warning tests.
+    """
     def __init__(self):
+        """Populate fact rows, collection aggregates, and parent/contact context for fact-table checks.
+        """
         self.collections = [
             {
                 "id": "col1",
@@ -114,28 +120,76 @@ class FactTablesDirectoryStub:
         }
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return self.collections
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.facts_by_collection.get(collection_id, [])
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return "bb1"
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return self.biobank
 
     def getCollectionNN(self, collection_id):
+        """Return fixture national-node code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested collection.
+        """
         return "CZ"
 
     def getCollectionContact(self, collection_id):
+        """Return fixture contact record associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The fixture contact record associated with the requested collection.
+        """
         return self.contact
 
 
 class FactTablesZeroOnlyDirectoryStub(FactTablesDirectoryStub):
-    """Fact sheet with no positive counts still requiring structural QC."""
+    """Fact sheet with no positive counts still requiring structural QC.
+    """
 
     def __init__(self):
+        """Populate fact rows, collection aggregates, and parent/contact context for fact-table checks.
+        """
         super().__init__()
         self.collections = [self.collections[1]]
         self.facts_by_collection = {
@@ -154,7 +208,11 @@ class FactTablesZeroOnlyDirectoryStub(FactTablesDirectoryStub):
 
 
 class FactTablesAgeRangeBroadStub:
+    """Expose a 0..99-year collection with a narrower 2..80-year fact and valid parent contacts.
+    """
     def __init__(self):
+        """Populate fact rows, collection aggregates, and parent/contact context for fact-table checks.
+        """
         self.collection = {
             "id": "col-age",
             "name": "Collection with broad age range",
@@ -195,26 +253,75 @@ class FactTablesAgeRangeBroadStub:
         ]
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [self.collection]
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.facts
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return "bb1"
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return self.biobank
 
     def getCollectionNN(self, collection_id):
+        """Return fixture national-node code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested collection.
+        """
         return "EU"
 
     def getCollectionContact(self, collection_id):
+        """Return fixture contact record associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The fixture contact record associated with the requested collection.
+        """
         return self.contact
 
 
 class FactTablesCrcLikeAgeRangeStub:
+    """Expose CRC-like child/adult/elderly fact buckets to test metadata age-range coverage.
+    """
     def __init__(self):
+        """Populate fact rows, collection aggregates, and parent/contact context for fact-table checks.
+        """
         self.collection = {
             "id": "bbmri-eric:ID:EU_BBMRI-ERIC:collection:CRC-Cohort",
             "name": "CRC-Cohort",
@@ -282,25 +389,75 @@ class FactTablesCrcLikeAgeRangeStub:
         ]
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [self.collection]
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.facts
 
     def getCollectionBiobankId(self, collection_id):
+        """Return fixture parent-biobank identifier for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture parent-biobank ID this stub returns.
+
+        Returns:
+            The fixture parent-biobank identifier for the requested collection.
+        """
         return "bb1"
 
     def getBiobankById(self, biobank_id):
+        """Return synthetic biobank record selected by the requested identifier, or `None` when absent.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture record this stub returns or omits.
+
+        Returns:
+            The synthetic biobank record selected by the requested identifier, or `None` when absent.
+        """
         return self.biobank
 
     def getCollectionNN(self, collection_id):
+        """Return fixture national-node code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested collection.
+        """
         return "EU"
 
     def getCollectionContact(self, collection_id):
+        """Return fixture contact record associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The fixture contact record associated with the requested collection.
+        """
         return self.contact
 
 
 def test_facttables_check_reports_all_star_consistency_warnings():
+    """Verify facttables check reports all star consistency warnings.
+
+    Returns:
+        None. Verifies facttables check reports all star consistency warnings.
+    """
     plugin = FactTables()
     warnings = plugin.check(FactTablesDirectoryStub(), args=None)
     warning_ids = {warning.dataCheckID for warning in warnings}
@@ -316,6 +473,11 @@ def test_facttables_check_reports_all_star_consistency_warnings():
 
 
 def test_facttables_check_runs_structure_checks_without_positive_counts():
+    """Verify facttables check runs structure checks without positive counts.
+
+    Returns:
+        None. Verifies facttables check runs structure checks without positive counts.
+    """
     warnings = FactTables().check(FactTablesZeroOnlyDirectoryStub(), args=None)
     warning_ids = {warning.dataCheckID for warning in warnings}
 
@@ -324,6 +486,11 @@ def test_facttables_check_runs_structure_checks_without_positive_counts():
 
 
 def test_facttables_check_ignores_star_rows_and_non_authoritative_nav_material():
+    """Verify facttables check ignores star rows and non authoritative nav material.
+
+    Returns:
+        None. Verifies facttables check ignores star rows and non authoritative nav material.
+    """
     plugin = FactTables()
     warnings = plugin.check(FactTablesDirectoryStub(), args=None)
     warning_keys = {(warning.directoryEntityID, warning.message) for warning in warnings}
@@ -335,6 +502,11 @@ def test_facttables_check_ignores_star_rows_and_non_authoritative_nav_material()
 
 
 def test_facttables_check_attaches_fact_alignment_fix_proposals():
+    """Verify facttables check attaches fact alignment fix proposals.
+
+    Returns:
+        None. Verifies facttables check attaches fact alignment fix proposals.
+    """
     plugin = FactTables()
     warnings = plugin.check(FactTablesDirectoryStub(), args=None)
 
@@ -349,6 +521,11 @@ def test_facttables_check_attaches_fact_alignment_fix_proposals():
 
 
 def test_facttables_check_attaches_k_anonymity_drop_rows_fix_proposal():
+    """Verify facttables check attaches k anonymity drop rows fix proposal.
+
+    Returns:
+        None. Verifies facttables check attaches k anonymity drop rows fix proposal.
+    """
     plugin = FactTables()
     warnings = plugin.check(FactTablesDirectoryStub(), args=None)
 
@@ -370,6 +547,11 @@ def test_facttables_check_attaches_k_anonymity_drop_rows_fix_proposal():
 
 
 def test_facttables_age_range_broad_warning_includes_current_and_fact_ranges():
+    """Verify facttables age range broad warning includes current and fact ranges.
+
+    Returns:
+        None. Verifies facttables age range broad warning includes current and fact ranges.
+    """
     plugin = FactTables()
     warnings = plugin.check(FactTablesAgeRangeBroadStub(), args=None)
 
@@ -382,6 +564,11 @@ def test_facttables_age_range_broad_warning_includes_current_and_fact_ranges():
 
 
 def test_facttables_age_range_uses_label_based_rows_for_crc_like_cohort():
+    """Verify facttables age range uses label based rows for crc like cohort.
+
+    Returns:
+        None. Verifies facttables age range uses label based rows for crc like cohort.
+    """
     plugin = FactTables()
     warnings = plugin.check(FactTablesCrcLikeAgeRangeStub(), args=None)
 

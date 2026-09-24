@@ -1,3 +1,5 @@
+"""Test rmaps new maps behavior."""
+
 import json
 import shutil
 import subprocess
@@ -24,6 +26,14 @@ R_SCRIPTS = [
 
 @pytest.mark.parametrize("script_path", R_SCRIPTS)
 def test_new_rmaps_scripts_parse(script_path):
+    """Verify new rmaps scripts parse.
+
+    Args:
+        script_path: R map-renderer source passed to Rscript parse(), without rendering or fetching data.
+
+    Returns:
+        None. Verifies new rmaps scripts parse.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -32,6 +42,11 @@ def test_new_rmaps_scripts_parse(script_path):
 
 
 def test_rare_disease_prep_script_compiles():
+    """Verify rare disease prep script compiles.
+
+    Returns:
+        None. Verifies rare disease prep script compiles.
+    """
     py = shutil.which("python3")
     if py is None:
         pytest.skip("python3 not available")
@@ -47,6 +62,11 @@ def test_rare_disease_prep_script_compiles():
 
 
 def test_label_layer_order_and_rare_disease_fixed_sizes():
+    """Verify label layer order and rare disease fixed sizes.
+
+    Returns:
+        None. Verifies label layer order and rare disease fixed sizes.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -81,6 +101,11 @@ stopifnot(length(unique(round(rd_sizes, 6))) == 1)
 
 
 def test_strategic_objectives_template_is_valid_toml_and_normalizes():
+    """Verify strategic objectives template is valid toml and normalizes.
+
+    Returns:
+        None. Verifies strategic objectives template is valid toml and normalizes.
+    """
     py = shutil.which("python3")
     if py is None:
         pytest.skip("python3 not available")

@@ -1,3 +1,5 @@
+"""Test check docs metadata behavior."""
+
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -15,6 +17,11 @@ CHECKS_DIR = Path(__file__).resolve().parents[1] / "checks"
 
 @pytest.mark.skipif(not GENERATOR_PATH.exists(), reason="manual generator not available")
 def test_check_docs_metadata_matches_all_plugins():
+    """Verify check docs metadata matches all plugins.
+
+    Returns:
+        None. Verifies check docs metadata matches all plugins.
+    """
     spec = spec_from_file_location("generate_checks_docs", GENERATOR_PATH)
     module = module_from_spec(spec)
     assert spec.loader is not None

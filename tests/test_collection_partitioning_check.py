@@ -1,8 +1,14 @@
+"""Test collection partitioning check behavior."""
+
 from checks.CollectionPartitioning import CollectionPartitioning
 
 
 class CollectionPartitioningDirectoryStub:
+    """Supply parent/child totals and facts covering valid, overcounted, and missing partitions.
+    """
     def __init__(self):
+        """Populate collection, child, and fact lookups for partition-total comparisons.
+        """
         self.collections = {
             "parent_ok": {
                 "id": "parent_ok",
@@ -175,6 +181,11 @@ class CollectionPartitioningDirectoryStub:
         }
 
     def getCollections(self):
+        """Return synthetic collection records available to the code under test.
+
+        Returns:
+            The synthetic collection records available to the code under test.
+        """
         return [
             self.collections["parent_ok"],
             self.collections["parent_over"],
@@ -182,22 +193,67 @@ class CollectionPartitioningDirectoryStub:
         ]
 
     def getDirectSubcollections(self, collection_id):
+        """Return fixture direct-child collections for the requested parent.
+
+        Args:
+            collection_id: Parent collection identifier whose fixture children this stub returns.
+
+        Returns:
+            The fixture direct-child collections for the requested parent.
+        """
         return self.child_map.get(collection_id, [])
 
     def getCollectionFacts(self, collection_id):
+        """Return synthetic fact rows associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture fact rows this stub returns.
+
+        Returns:
+            The synthetic fact rows associated with the requested collection.
+        """
         return self.fact_map.get(collection_id, [])
 
     def getCollectionNN(self, collection_id):
+        """Return fixture national-node code for the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture national-node code this stub returns.
+
+        Returns:
+            The fixture national-node code for the requested collection.
+        """
         return "CZ"
 
     def getCollectionContact(self, collection_id):
+        """Return fixture contact record associated with the requested collection.
+
+        Args:
+            collection_id: Collection identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The fixture contact record associated with the requested collection.
+        """
         return {"email": "collection@example.org"}
 
     def isCollectionWithdrawn(self, collection_id):
+        """Report the fixture marks the requested collection as withdrawn.
+
+        Args:
+            collection_id: Collection identifier whose fixture withdrawal status this stub reports.
+
+        Returns:
+            Whether the fixture marks the requested collection as withdrawn.
+        """
         return False
 
 
 def test_collection_partitioning_reports_exceeding_and_unverifiable_children():
+    """Verify collection partitioning reports exceeding and unverifiable children.
+
+    Returns:
+        None. Verifies collection partitioning reports exceeding and unverifiable children.
+    """
     warnings = CollectionPartitioning().check(
         CollectionPartitioningDirectoryStub(),
         args=None,

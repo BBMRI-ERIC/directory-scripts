@@ -1,3 +1,5 @@
+"""Test cli common behavior."""
+
 import importlib
 import logging
 
@@ -24,6 +26,11 @@ from cli_common import (
 
 
 def test_standard_exporter_arguments_support_normalized_and_legacy_aliases():
+    """Verify standard exporter arguments support normalized and legacy aliases.
+
+    Returns:
+        None. Verifies standard exporter arguments support normalized and legacy aliases.
+    """
     parser = build_parser()
     add_logging_arguments(parser)
     add_xlsx_output_argument(parser)
@@ -48,6 +55,14 @@ def test_standard_exporter_arguments_support_normalized_and_legacy_aliases():
 
 
 def test_fact_sheet_summary_argument_is_explicit_opt_in(caplog):
+    """Verify fact sheet summary argument is explicit opt in.
+
+    Args:
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies fact sheet summary argument is explicit opt in.
+    """
     parser = build_parser()
     add_fact_sheet_summary_arguments(parser)
 
@@ -62,6 +77,11 @@ def test_fact_sheet_summary_argument_is_explicit_opt_in(caplog):
 
 
 def test_schema_argument_accepts_schema_and_legacy_package_names():
+    """Verify schema argument accepts schema and legacy package names.
+
+    Returns:
+        None. Verifies schema argument accepts schema and legacy package names.
+    """
     parser = build_parser()
     add_directory_schema_argument(parser, default="ERIC")
 
@@ -72,6 +92,11 @@ def test_schema_argument_accepts_schema_and_legacy_package_names():
 
 
 def test_qc_arguments_can_be_enabled_selectively():
+    """Verify qc arguments can be enabled selectively.
+
+    Returns:
+        None. Verifies qc arguments can be enabled selectively.
+    """
     parser = build_parser()
     add_remote_check_disable_arguments(parser, ["emails", "geocoding"])
     add_plugin_disable_argument(parser, ["PluginA", "PluginB"])
@@ -108,6 +133,14 @@ def test_qc_arguments_can_be_enabled_selectively():
 
 
 def test_directory_auth_arguments_default_from_environment(monkeypatch):
+    """Verify directory auth arguments default from environment.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory auth arguments default from environment.
+    """
     monkeypatch.setenv("DIRECTORYUSERNAME", "env-user")
     monkeypatch.setenv("DIRECTORYPASSWORD", "env-secret")
     reloaded = importlib.reload(cli_common)
@@ -121,6 +154,11 @@ def test_directory_auth_arguments_default_from_environment(monkeypatch):
 
 
 def test_directory_auth_arguments_include_token():
+    """Verify directory auth arguments include token.
+
+    Returns:
+        None. Verifies directory auth arguments include token.
+    """
     parser = build_parser()
     add_directory_auth_arguments(parser)
 
@@ -130,6 +168,14 @@ def test_directory_auth_arguments_include_token():
 
 
 def test_directory_auth_token_default_from_environment(monkeypatch):
+    """Verify directory auth token default from environment.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies directory auth token default from environment.
+    """
     monkeypatch.setenv("DIRECTORYTOKEN", "env-token")
     reloaded = importlib.reload(cli_common)
     parser = reloaded.build_parser()
@@ -141,6 +187,11 @@ def test_directory_auth_token_default_from_environment(monkeypatch):
 
 
 def test_build_directory_kwargs_passes_token():
+    """Verify build directory kwargs passes token.
+
+    Returns:
+        None. Verifies build directory kwargs passes token.
+    """
     parser = build_parser()
     add_directory_auth_arguments(parser)
     add_directory_schema_argument(parser, default="ERIC")
@@ -155,6 +206,11 @@ def test_build_directory_kwargs_passes_token():
 
 
 def test_qc_arguments_support_short_option_for_disabling_all_remote_checks():
+    """Verify qc arguments support short option for disabling all remote checks.
+
+    Returns:
+        None. Verifies qc arguments support short option for disabling all remote checks.
+    """
     parser = build_parser()
     add_remote_check_disable_arguments(parser, ["emails", "geocoding"])
 
@@ -164,6 +220,11 @@ def test_qc_arguments_support_short_option_for_disabling_all_remote_checks():
 
 
 def test_include_withdrawn_argument_supports_short_and_long_forms():
+    """Verify include withdrawn argument supports short and long forms.
+
+    Returns:
+        None. Verifies include withdrawn argument supports short and long forms.
+    """
     parser = build_parser()
     add_include_withdrawn_argument(parser)
 
@@ -173,6 +234,11 @@ def test_include_withdrawn_argument_supports_short_and_long_forms():
 
 
 def test_withdrawn_scope_arguments_support_include_and_only():
+    """Verify withdrawn scope arguments support include and only.
+
+    Returns:
+        None. Verifies withdrawn scope arguments support include and only.
+    """
     parser = build_parser()
     add_withdrawn_scope_arguments(parser)
 
@@ -183,6 +249,11 @@ def test_withdrawn_scope_arguments_support_include_and_only():
 
 
 def test_build_directory_kwargs_uses_schema_and_withdrawn_scope():
+    """Verify build directory kwargs uses schema and withdrawn scope.
+
+    Returns:
+        None. Verifies build directory kwargs uses schema and withdrawn scope.
+    """
     parser = build_parser()
     add_logging_arguments(parser)
     add_directory_schema_argument(parser, default="ERIC")
@@ -203,6 +274,11 @@ def test_build_directory_kwargs_uses_schema_and_withdrawn_scope():
 
 
 def test_build_directory_kwargs_passes_emergency_dag_skip_flag():
+    """Verify build directory kwargs passes emergency dag skip flag.
+
+    Returns:
+        None. Verifies build directory kwargs passes emergency dag skip flag.
+    """
     parser = build_parser()
     add_directory_schema_argument(parser, default="ERIC")
 
@@ -214,6 +290,11 @@ def test_build_directory_kwargs_passes_emergency_dag_skip_flag():
 
 
 def test_configure_logging_sets_debug_level():
+    """Verify configure logging sets debug level.
+
+    Returns:
+        None. Verifies configure logging sets debug level.
+    """
     parser = build_parser()
     add_logging_arguments(parser)
     args = parser.parse_args(["--debug"])

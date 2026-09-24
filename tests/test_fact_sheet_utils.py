@@ -1,3 +1,5 @@
+"""Test fact sheet utils behavior."""
+
 from fact_sheet_utils import (
     analyze_collection_fact_sheet,
     count_star_dimensions,
@@ -9,12 +11,22 @@ from fact_sheet_utils import (
 
 
 def test_normalize_fact_dimension_value_supports_dict_and_scalar_values():
+    """Verify normalize fact dimension value supports dict and scalar values.
+
+    Returns:
+        None. Verifies normalize fact dimension value supports dict and scalar values.
+    """
     assert normalize_fact_dimension_value({"name": "ORPHA:1"}) == "ORPHA:1"
     assert normalize_fact_dimension_value({"id": "CZ"}) == "CZ"
     assert normalize_fact_dimension_value("*") == "*"
 
 
 def test_get_all_star_rows_and_star_count_handle_disease_dicts():
+    """Verify get all star rows and star count handle disease dicts.
+
+    Returns:
+        None. Verifies get all star rows and star count handle disease dicts.
+    """
     facts = [
         {
             "id": "f1",
@@ -41,6 +53,11 @@ def test_get_all_star_rows_and_star_count_handle_disease_dicts():
 
 
 def test_get_matching_one_star_rows_matches_normalized_values():
+    """Verify get matching one star rows matches normalized values.
+
+    Returns:
+        None. Verifies get matching one star rows matches normalized values.
+    """
     facts = [
         {
             "id": "f1",
@@ -63,6 +80,11 @@ def test_get_matching_one_star_rows_matches_normalized_values():
 
 
 def test_get_no_star_rows_requires_every_dimension_to_be_concrete():
+    """Verify get no star rows requires every dimension to be concrete.
+
+    Returns:
+        None. Verifies get no star rows requires every dimension to be concrete.
+    """
     facts = [
         {
             "id": "complete",
@@ -91,6 +113,11 @@ def test_get_no_star_rows_requires_every_dimension_to_be_concrete():
 
 
 def test_blank_dimension_values_are_not_treated_as_concrete():
+    """Verify blank dimension values are not treated as concrete.
+
+    Returns:
+        None. Verifies blank dimension values are not treated as concrete.
+    """
     facts = [
         {
             "id": "blank",
@@ -110,6 +137,11 @@ def test_blank_dimension_values_are_not_treated_as_concrete():
 
 
 def test_analyze_collection_fact_sheet_reports_missing_and_mismatched_all_star():
+    """Verify analyze collection fact sheet reports missing and mismatched all star.
+
+    Returns:
+        None. Verifies analyze collection fact sheet reports missing and mismatched all star.
+    """
     collection = {
         "id": "col1",
         "size": 10,
@@ -139,6 +171,11 @@ def test_analyze_collection_fact_sheet_reports_missing_and_mismatched_all_star()
 
 
 def test_analyze_collection_fact_sheet_reports_margin_coverage_duplicates_and_bounds():
+    """Verify analyze collection fact sheet reports margin coverage duplicates and bounds.
+
+    Returns:
+        None. Verifies analyze collection fact sheet reports margin coverage duplicates and bounds.
+    """
     collection = {
         "id": "col1",
         "size": 100,
@@ -204,6 +241,11 @@ def test_analyze_collection_fact_sheet_reports_margin_coverage_duplicates_and_bo
 
 
 def test_analyze_collection_fact_sheet_checks_all_star_against_oom_intervals():
+    """Verify analyze collection fact sheet checks all star against oom intervals.
+
+    Returns:
+        None. Verifies analyze collection fact sheet checks all star against oom intervals.
+    """
     collection = {
         "id": "col1",
         "order_of_magnitude": 3,
@@ -229,6 +271,11 @@ def test_analyze_collection_fact_sheet_checks_all_star_against_oom_intervals():
 
 
 def test_boolean_counts_are_not_compared_as_numeric_totals():
+    """Verify boolean counts are not compared as numeric totals.
+
+    Returns:
+        None. Verifies boolean counts are not compared as numeric totals.
+    """
     collection = {
         "id": "col1",
         "size": True,

@@ -1,3 +1,5 @@
+"""Test rmaps examples behavior."""
+
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,6 +20,14 @@ EXAMPLE_SCRIPTS = [
 
 @pytest.mark.parametrize("script_path", EXAMPLE_SCRIPTS)
 def test_rmaps_example_scripts_parse(script_path):
+    """Verify rmaps example scripts parse.
+
+    Args:
+        script_path: R example source passed to Rscript parse(), without executing the example.
+
+    Returns:
+        None. Verifies rmaps example scripts parse.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")

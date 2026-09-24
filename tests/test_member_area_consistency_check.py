@@ -1,8 +1,14 @@
+"""Test member area consistency check behavior."""
+
 from checks.MemberAreaConsistency import MemberAreaConsistency
 
 
 class MemberAreaDirectoryStub:
+    """Model institutions occurring in EXT and member staging areas with contact context.
+    """
     def __init__(self):
+        """Populate EXT/member-area biobanks and their contact lookup.
+        """
         self.biobanks = [
             {
                 "id": "bbmri-eric:ID:EXT_DE_NONMEMBER_ONLY",
@@ -65,15 +71,33 @@ class MemberAreaDirectoryStub:
         }
 
     def getBiobanks(self):
+        """Return synthetic biobank records available to the code under test.
+
+        Returns:
+            The synthetic biobank records available to the code under test.
+        """
         return self.biobanks
 
     def getBiobankContact(self, biobank_id):
+        """Return fixture contact record associated with the requested biobank.
+
+        Args:
+            biobank_id: Biobank identifier whose fixture contact record this stub returns.
+
+        Returns:
+            The fixture contact record associated with the requested biobank.
+        """
         biobank = next(item for item in self.biobanks if item["id"] == biobank_id)
         return self.contacts[biobank["contact"]["id"]]
 
 
 
 def test_member_area_consistency_check_distinguishes_warning_and_error_cases():
+    """Verify member area consistency check distinguishes warning and error cases.
+
+    Returns:
+        None. Verifies member area consistency check distinguishes warning and error cases.
+    """
     plugin = MemberAreaConsistency()
     warnings = plugin.check(MemberAreaDirectoryStub(), args=None)
     warnings_by_id = {warning.directoryEntityID: warning for warning in warnings}

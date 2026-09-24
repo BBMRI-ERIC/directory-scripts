@@ -19,6 +19,15 @@ write_matches_xlsx = xlsx_adapter.write_matches_xlsx
 
 
 def _make_source(path: Path, *, source_name: str = "Membership") -> Path:
+    """Write a membership workbook with a preamble, two institutions, and an unrelated sheet.
+
+    Args:
+        path: Destination XLSX filename, overwritten if present; its parent must exist.
+        source_name: Displayed membership-source name written into the workbook fixture.
+
+    Returns:
+        The destination Path after saving the workbook, for passing to read_membership.
+    """
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = source_name
@@ -43,7 +52,15 @@ def _make_source(path: Path, *, source_name: str = "Membership") -> Path:
 
 
 def _set_formula_caches(path: Path, values: dict[str, tuple[str, str]]) -> None:
-    """Inject cached formula values into a synthetic XLSX fixture."""
+    """Inject cached formula values into a synthetic XLSX fixture.
+
+    Args:
+        path: Existing XLSX archive replaced in place after patching sheet1.xml cache values.
+        values: Cell-coordinate-to-(cached text, XLSX type code) mapping; only existing cells are patched.
+
+    Returns:
+        None. Inject cached formula values into a synthetic XLSX fixture.
+    """
     worksheet_path = "xl/worksheets/sheet1.xml"
     namespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     ET.register_namespace("", namespace)
@@ -71,6 +88,14 @@ def _set_formula_caches(path: Path, values: dict[str, tuple[str, str]]) -> None:
 
 
 def test_read_membership_preserves_text_ids_and_selects_sheet(tmp_path):
+    """Verify read membership preserves text ids and selects sheet.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies read membership preserves text ids and selects sheet.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
 
     result = read_membership(source, sheet_index=1)
@@ -105,6 +130,14 @@ def test_read_membership_preserves_text_ids_and_selects_sheet(tmp_path):
 
 
 def test_sheet_selection_is_mutually_exclusive_and_one_based(tmp_path):
+    """Verify sheet selection is mutually exclusive and one based.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies sheet selection is mutually exclusive and one based.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
 
     with pytest.raises(ValueError, match="mutually exclusive"):
@@ -118,6 +151,14 @@ def test_sheet_selection_is_mutually_exclusive_and_one_based(tmp_path):
 
 
 def test_read_membership_skips_external_and_blank_ids_but_keeps_rows(tmp_path):
+    """Verify read membership skips external and blank ids but keeps rows.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies read membership skips external and blank ids but keeps rows.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     workbook = load_workbook(source)
     sheet = workbook["Membership"]
@@ -133,6 +174,14 @@ def test_read_membership_skips_external_and_blank_ids_but_keeps_rows(tmp_path):
 
 
 def test_read_membership_rejects_missing_required_values_and_duplicate_ids(tmp_path):
+    """Verify read membership rejects missing required values and duplicate ids.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies read membership rejects missing required values and duplicate ids.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     workbook = load_workbook(source)
     sheet = workbook["Membership"]
@@ -150,6 +199,15 @@ def test_read_membership_rejects_missing_required_values_and_duplicate_ids(tmp_p
 
 
 def test_blank_country_is_unknown_and_missing_record_fields_still_fail(tmp_path, caplog):
+    """Verify blank country is unknown and missing record fields still fail.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies blank country is unknown and missing record fields still fail.
+    """
     source = _make_source(tmp_path / "missing-country.xlsx")
     workbook = load_workbook(source)
     workbook["Membership"]["D3"] = "  "
@@ -180,6 +238,15 @@ def test_blank_country_is_unknown_and_missing_record_fields_still_fail(tmp_path,
 
 
 def test_formula_identity_fails_and_formula_contributor_warns(tmp_path, caplog):
+    """Verify formula identity fails and formula contributor warns.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies formula identity fails and formula contributor warns.
+    """
     source = _make_source(tmp_path / "formula.xlsx")
     workbook = load_workbook(source)
     sheet = workbook["Membership"]
@@ -203,6 +270,15 @@ def test_formula_identity_fails_and_formula_contributor_warns(tmp_path, caplog):
 def test_cached_formula_identity_values_are_read_and_formula_slots_remain_occupied(
     tmp_path, caplog
 ):
+    """Verify cached formula identity values are read and formula slots remain occupied.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies cached formula identity values are read and formula slots remain occupied.
+    """
     source = _make_source(tmp_path / "cached-formula.xlsx")
     workbook = load_workbook(source)
     sheet = workbook["Membership"]
@@ -257,6 +333,14 @@ def test_cached_formula_identity_values_are_read_and_formula_slots_remain_occupi
 
 
 def test_cached_excel_error_identity_does_not_enter_matchable_data(tmp_path):
+    """Verify cached excel error identity does not enter matchable data.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies cached excel error identity does not enter matchable data.
+    """
     source = _make_source(tmp_path / "cached-error.xlsx")
     workbook = load_workbook(source)
     workbook["Membership"]["A3"] = "=1+11"
@@ -268,6 +352,14 @@ def test_cached_excel_error_identity_does_not_enter_matchable_data(tmp_path):
 
 
 def test_writer_appends_one_shared_contributor_column_and_preserves_source(tmp_path):
+    """Verify writer appends one shared contributor column and preserves source.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer appends one shared contributor column and preserves source.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     before = hashlib.sha256(source.read_bytes()).hexdigest()
     parsed = read_membership(source)
@@ -310,6 +402,14 @@ def test_writer_appends_one_shared_contributor_column_and_preserves_source(tmp_p
 
 
 def test_writer_reuses_exact_tag_and_appends_after_notes_without_overwriting(tmp_path):
+    """Verify writer reuses exact tag and appends after notes without overwriting.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer reuses exact tag and appends after notes without overwriting.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     workbook = load_workbook(source)
     sheet = workbook["Membership"]
@@ -351,6 +451,15 @@ def test_writer_reuses_exact_tag_and_appends_after_notes_without_overwriting(tmp
 
 
 def test_writer_treats_formula_slots_as_occupied_and_warns(tmp_path, caplog):
+    """Verify writer treats formula slots as occupied and warns.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        caplog: Pytest log-capture fixture used to inspect emitted log records.
+
+    Returns:
+        None. Verifies writer treats formula slots as occupied and warns.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     workbook = load_workbook(source)
     workbook["Membership"]["H3"] = "=1+1"
@@ -380,6 +489,14 @@ def test_writer_treats_formula_slots_as_occupied_and_warns(tmp_path, caplog):
 
 
 def test_writer_rejects_existing_or_source_alias_and_empty_matches_are_valid(tmp_path):
+    """Verify writer rejects existing or source alias and empty matches are valid.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer rejects existing or source alias and empty matches are valid.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     parsed = read_membership(source)
     with pytest.raises(ValueError, match="alias"):
@@ -405,6 +522,14 @@ def test_writer_rejects_existing_or_source_alias_and_empty_matches_are_valid(tmp
 
 
 def test_writer_renames_conflicting_source_sheet_and_rejects_missing_match_keys(tmp_path):
+    """Verify writer renames conflicting source sheet and rejects missing match keys.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer renames conflicting source sheet and rejects missing match keys.
+    """
     source = _make_source(tmp_path / "membership.xlsx", source_name="Matched institutions")
     parsed = read_membership(source)
     with pytest.raises(ValueError, match="missing required key"):
@@ -416,6 +541,14 @@ def test_writer_renames_conflicting_source_sheet_and_rejects_missing_match_keys(
 
 
 def test_writer_keeps_literal_equals_strings_and_reopens_atomically(tmp_path):
+    """Verify writer keeps literal equals strings and reopens atomically.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer keeps literal equals strings and reopens atomically.
+    """
     source = _make_source(tmp_path / "membership.xlsx")
     parsed = read_membership(source)
     output = tmp_path / "output.xlsx"
@@ -439,6 +572,14 @@ def test_writer_keeps_literal_equals_strings_and_reopens_atomically(tmp_path):
 
 
 def test_writer_validates_semantically_blank_country_roundtrip(tmp_path):
+    """Verify writer validates semantically blank country roundtrip.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer validates semantically blank country roundtrip.
+    """
     source = _make_source(tmp_path / "blank-country.xlsx")
     workbook = load_workbook(source)
     workbook["Membership"]["D3"] = ""
@@ -451,12 +592,23 @@ def test_writer_validates_semantically_blank_country_roundtrip(tmp_path):
 
 
 def test_publication_fails_without_atomic_no_overwrite_primitive(tmp_path, monkeypatch):
+    """Verify publication fails without atomic no overwrite primitive.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+        monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+
+    Returns:
+        None. Verifies publication fails without atomic no overwrite primitive.
+    """
     temporary = tmp_path / "temporary.xlsx"
     destination = tmp_path / "destination.xlsx"
     temporary.write_bytes(b"validated")
     monkeypatch.delattr(xlsx_adapter.os, "link", raising=False)
 
     class NoRenameAt2:
+        """Provide no rename at2 used to isolate the tested behavior.
+        """
         pass
 
     monkeypatch.setattr(
@@ -469,11 +621,27 @@ def test_publication_fails_without_atomic_no_overwrite_primitive(tmp_path, monke
 
 
 def test_read_membership_property_for_text_ids_if_hypothesis_is_available(tmp_path):
+    """Verify read membership property for text ids if hypothesis is available.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies read membership property for text ids if hypothesis is available.
+    """
     hypothesis = pytest.importorskip("hypothesis")
     from hypothesis import given, strategies as st
 
     @given(st.from_regex(r"[0-9]{1,8}", fullmatch=True))
     def check(identifier):
+        """Record the identifier inspected by the formula-cache helper.
+
+        Args:
+            identifier: Membership identifier checked by the formula-cache helper.
+
+        Returns:
+            None. Record the identifier inspected by the formula-cache helper.
+        """
         source = tmp_path / f"{identifier}.xlsx"
         workbook = Workbook()
         sheet = workbook.active
@@ -489,6 +657,14 @@ def test_read_membership_property_for_text_ids_if_hypothesis_is_available(tmp_pa
 
 
 def test_writer_reuses_equivalent_contributor_spelling(tmp_path):
+    """Verify writer reuses equivalent contributor spelling.
+
+    Args:
+        tmp_path: Pytest-managed temporary filesystem directory for this test case.
+
+    Returns:
+        None. Verifies writer reuses equivalent contributor spelling.
+    """
     source = _make_source(tmp_path / "equivalent.xlsx")
     book = load_workbook(source)
     book["Membership"]["H3"] = " eosc   node bbmri-eric "

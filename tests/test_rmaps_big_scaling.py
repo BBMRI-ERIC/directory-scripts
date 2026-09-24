@@ -1,3 +1,5 @@
+"""Test rmaps big scaling behavior."""
+
 import shutil
 import subprocess
 
@@ -5,6 +7,11 @@ import pytest
 
 
 def test_rmaps_big_output_scales_are_explicitly_larger():
+    """Verify rmaps big output scales are explicitly larger.
+
+    Returns:
+        None. Verifies rmaps big output scales are explicitly larger.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -28,6 +35,11 @@ stopifnot(
 
 
 def test_rmaps_save_formats_emit_size_specific_svgs():
+    """Verify rmaps save formats emit size specific svgs.
+
+    Returns:
+        None. Verifies rmaps save formats emit size specific svgs.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
@@ -57,6 +69,11 @@ stopifnot(
 
 
 def test_rmaps_save_formats_can_filter_output_formats_and_sizes():
+    """Verify rmaps save formats can filter output formats and sizes.
+
+    Returns:
+        None. Verifies rmaps save formats can filter output formats and sizes.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")
