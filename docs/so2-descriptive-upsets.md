@@ -30,7 +30,8 @@ so values from different questions cannot collide.
 2. Run `export-descriptive-upset-r -i PAYLOAD --output-dir DIR`. It writes
    canonical respondent vectors, per-definition CSV files, an input manifest,
    and `render-descriptive-upsets.R`.
-3. Run that R script in a capable environment, such as the Debian proot.
+3. Run that R script in an R environment with `ComplexUpset`, `ggplot2`, and
+   `jsonlite` installed. Native R and Debian-proot examples are below.
 4. Re-run the normal `describe` command with `--upset-assets-dir DIR` and its
    requested TeX/PDF/chart outputs. It validates and embeds the figures.
 
@@ -83,9 +84,47 @@ python3 survey-so2-directory.py export-descriptive-upset-r \
   -i so2-2025-20260916-descriptive.json \
   --output-dir so2-2025-20260916-upsets
 
-proot-distro login debian -- \
-  Rscript /storage/emulated/0/BBMRI-ERIC/directory-scripts/so2-2025-20260916-upsets/render-descriptive-upsets.R
+# Native R, on a workstation or server with R installed.
+Rscript -e 'install.packages(c("ComplexUpset", "ggplot2", "jsonlite"), repos="https://cloud.r-project.org")'
+Rscript so2-2025-20260916-upsets/render-descriptive-upsets.R
+```
 
+### R in Termux Debian proot
+
+R does not need to be installed in Termux itself. Install the Debian proot
+once, then install R and the renderer dependencies inside that proot:
+
+```sh
+pkg install proot-distro
+proot-distro install debian
+
+proot-distro login debian \
+  --bind /storage/emulated/0:/storage/emulated/0 \
+  -- /bin/bash
+
+# Run these commands inside the Debian shell.
+apt update
+apt install -y r-base r-cran-ggplot2 r-cran-jsonlite
+Rscript -e 'install.packages("ComplexUpset", repos="https://cloud.r-project.org")'
+exit
+```
+
+The `/storage/emulated/0` bind is required: it makes the generated bundle and
+its input CSV files visible to R at the same path as Termux. Run the renderer
+through that bound path whenever figures must be regenerated:
+
+```sh
+proot-distro login debian \
+  --bind /storage/emulated/0:/storage/emulated/0 \
+  -- /bin/bash
+
+Rscript /storage/emulated/0/BBMRI-ERIC/directory-scripts/so2-2025-20260916-upsets/render-descriptive-upsets.R
+exit
+```
+
+Continue in Termux with the normal `describe` command:
+
+```sh
 python3 survey-so2-directory.py describe \
   -i Content_Export_SO2_2025_20260916.xlsx \
   --descriptive-schema survey-mappings/so2_2025_descriptive_report.json \

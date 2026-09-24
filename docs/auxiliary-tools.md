@@ -150,9 +150,11 @@ python3 survey-so2-directory.py export-descriptive-upset-r \
 ```
 
 Run `so2-upsets/render-descriptive-upsets.R` in an R environment containing
-`ComplexUpset`, `ggplot2`, and `jsonlite`, for example through Debian proot.
-Finally rerun the normal `describe` command with
-`--upset-assets-dir so2-upsets`. An explicitly empty existing assets directory
+`ComplexUpset`, `ggplot2`, and `jsonlite`. See
+[SO2 Descriptive UpSet Assets](so2-descriptive-upsets.md) for native-R and
+Termux Debian-proot installation and execution commands. Finally rerun the
+normal `describe` command with `--upset-assets-dir so2-upsets`. An explicitly
+empty existing assets directory
 adds omission notes; a nonempty directory must contain a current completed
 bundle whose canonical hash matches the newly generated payload. The final PDF
 embeds the figures, while TeX references the sidecar PDFs and therefore needs
