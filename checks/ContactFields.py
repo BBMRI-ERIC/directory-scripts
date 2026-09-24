@@ -125,14 +125,28 @@ CHECK_DOCS = {'CTF:EmailMissing': {'entity': 'CONTACT',
 
 
 def get_email_domain(email: str) -> str:
-    """Return normalized domain part of an email address or empty string."""
+    """Extract and normalize the domain from a syntactically split email address.
+
+    Args:
+        email: Candidate email string; non-strings and values without ``@`` are rejected.
+
+    Returns:
+        The stripped lowercase domain, or an empty string for unsupported input.
+    """
     if not isinstance(email, str) or "@" not in email:
         return ""
     return email.rsplit("@", 1)[1].strip().lower()
 
 
 def is_placeholder_email_domain(domain: str) -> bool:
-    """Return whether the email domain is a known placeholder domain."""
+    """Return whether an email domain is reserved, illustrative, or obviously fake.
+
+    Args:
+        domain: Normalized domain to compare with known placeholder domains and suffixes.
+
+    Returns:
+        ``True`` for configured placeholder domains or suffixes; otherwise ``False``.
+    """
     if not domain:
         return False
     if domain in PLACEHOLDER_EMAIL_DOMAINS:
@@ -141,7 +155,14 @@ def is_placeholder_email_domain(domain: str) -> bool:
 
 
 def is_email_syntax_valid(email: str) -> bool:
-    """Return a conservative local syntax check for email addresses."""
+    """Apply the plugin's conservative local syntax rules to one email address.
+
+    Args:
+        email: Candidate email value checked without DNS or network access.
+
+    Returns:
+        ``True`` when the value has one usable local part and a plausible domain; otherwise ``False``.
+    """
     if not isinstance(email, str):
         return False
     normalized = email.strip()
@@ -163,7 +184,14 @@ def is_email_syntax_valid(email: str) -> bool:
 
 
 def get_email_country_suffix(email: str) -> str:
-    """Return normalized country-code-like email suffix or empty string."""
+    """Extract a plausible two-letter country suffix from an email domain.
+
+    Args:
+        email: Candidate email string from which the final domain label is inspected.
+
+    Returns:
+        The uppercase two-letter suffix, or an empty string when none is inferable.
+    """
     domain = get_email_domain(email)
     if not domain or "." not in domain:
         return ""
@@ -176,7 +204,15 @@ def get_email_country_suffix(email: str) -> str:
 
 
 def get_contact_biobank_contexts(dir, contact: dict) -> list[tuple[str, str]]:
-    """Return linked country-based biobank contexts as (biobank_id, country)."""
+    """Resolve unique country-bearing biobank contexts linked to a contact.
+
+    Args:
+        dir: Loaded Directory view used for direct and collection-mediated biobank relationships.
+        contact: Contact record whose owner and usage relationships are traversed.
+
+    Returns:
+        Sorted unique ``(biobank_id, country_code)`` pairs; unresolved relationships are omitted.
+    """
     contexts: list[tuple[str, str]] = []
     seen_biobanks = set()
 
@@ -215,7 +251,15 @@ def get_contact_biobank_contexts(dir, contact: dict) -> list[tuple[str, str]]:
 
 
 def build_country_suffix_warning(contact: dict, contexts: list[tuple[str, str]]) -> str:
-    """Return mismatch warning text for an email country suffix."""
+    """Describe a mismatch between a contact email suffix and linked biobank countries.
+
+    Args:
+        contact: Contact record supplying identifier and email evidence.
+        contexts: Resolved ``(biobank_id, country_code)`` contexts that disagree with the suffix.
+
+    Returns:
+        A deterministic reviewer-facing mismatch message naming the suffix and affected biobanks.
+    """
     suffix = get_email_country_suffix(contact["email"])
     countries = sorted({country for _, country in contexts})
     biobank_ids = sorted({biobank_id for biobank_id, _ in contexts})
@@ -228,8 +272,21 @@ def build_country_suffix_warning(contact: dict, contexts: list[tuple[str, str]])
     )
 
 class ContactFields(IPlugin):
+	"""Validate contact names, email syntax, domains, and country consistency.
+
+	The plugin performs local checks and optional cached DNS lookups. It reports contact metadata problems without modifying Directory records.
+	"""
 	CHECK_ID_PREFIX = "CTF"
 	def check(self, dir, args):
+		"""Inspect visible contacts and return field, syntax, domain, and country-suffix warnings.
+
+		Args:
+		    dir: Loaded Directory view providing contacts, linked biobanks, countries, and National Node identifiers.
+		    args: Runner options listing disabled remote checks and caches to purge; the emails entries control DNS validation and its disk cache.
+
+		Returns:
+		    CTF warnings for missing, placeholder, malformed, unresolved, or country-inconsistent contact fields.
+		"""
 		warnings = []
 		log.info("Running contact fields checks (ContactFields)")
 		ValidateEmails = True

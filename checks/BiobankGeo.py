@@ -111,9 +111,22 @@ CHECK_DOCS = {'BG:BBLatInvalid': {'entity': 'BIOBANK',
                                                       'collection  location failed ()'}}
 
 class BiobankGeo(IPlugin):
+	"""Validate biobank and collection coordinates locally and by reverse geocoding.
+
+	The plugin reports malformed or missing coordinates and optional country mismatches. It uses a disk cache and may normalize comma decimal separators in loaded record mappings, but it does not write those changes to the Directory.
+	"""
 	CHECK_ID_PREFIX = "BG"
 
 	def check(self, dir, args):
+		"""Inspect coordinates and return syntax, presence, and optional reverse-geocoding warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible biobanks, collections, countries, contacts, and node identifiers.
+		    args: Runner options listing disabled remote checks and caches to purge; the geocoding entries control Nominatim use and its disk cache.
+
+		Returns:
+		    BG warnings for invalid, absent, unresolvable, or country-inconsistent coordinates.
+		"""
 		warnings = []
 		log.info("Running geographical location checks (BiobankGeo)")
 		# This is to be enabled for real runs.

@@ -33,8 +33,21 @@ CHECK_DOCS = {'BBF:JuridicalMissing': {'entity': 'BIOBANK',
                                                   'biobank'}}
 
 class BiobankFields(IPlugin):
+	"""Validate required juridical-person and contact fields on biobanks.
+
+	The plugin reports missing or placeholder juridical persons and invalid biobank contact references without modifying source records.
+	"""
 	CHECK_ID_PREFIX = "BBF"
 	def check(self, dir, args):
+		"""Inspect visible biobanks and return required-field warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible biobanks and their National Node identifiers.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    BBF warnings for missing or invalid juridical-person and contact metadata.
+		"""
 		warnings = []
 		log.info("Running biobank fields checks (BiobankFields)")
 		for biobank in dir.getBiobanks():

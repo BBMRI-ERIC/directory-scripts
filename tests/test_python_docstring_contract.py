@@ -43,6 +43,11 @@ WRITE_TOOL_PATHS = (
     "sync_directory_with_fdp.py",
     "eosc-organisation-matcher.py",
 )
+QC_HELPER_PATHS = (
+    "check_fix_helpers.py",
+    "contact_assignment_utils.py",
+    "text_consistency.py",
+)
 SECTION_PATTERN = re.compile(
     r"^(Args|Returns|Yields|Attributes|Raises):\s*$", re.MULTILINE
 )
@@ -725,6 +730,22 @@ def test_write_capable_tools_have_no_contract_violations() -> None:
     paths = [REPO_ROOT / name for name in WRITE_TOOL_PATHS]
     assert {path.name: violations_for_path(path) for path in paths} == {
         path.name: [] for path in paths
+    }
+
+
+def test_qc_plugins_and_check_helpers_have_no_contract_violations() -> None:
+    """Verify Task 4 quality-check code has complete explicit contracts.
+
+    Returns:
+        None. The test fails with per-file diagnostics when a plugin class,
+        check entry point, or supporting finding/fix helper lacks complete
+        implementation-derived documentation.
+    """
+    paths = sorted((REPO_ROOT / "checks").glob("*.py"))
+    paths.extend(REPO_ROOT / name for name in QC_HELPER_PATHS)
+    assert {path.relative_to(REPO_ROOT).as_posix(): violations_for_path(path)
+            for path in paths} == {
+        path.relative_to(REPO_ROOT).as_posix(): [] for path in paths
     }
 
 

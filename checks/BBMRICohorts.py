@@ -15,13 +15,43 @@ CHECK_ID_PREFIX = "BCO"
 
 def checkCollabBB(self, dir, collection : dict, biobank : dict, warningsList):
 
+	"""Append a collaboration warning when cohort collection and biobank flags both prohibit commercial use.
+
+	Args:
+	    dir: Loaded Directory view used for Node and collection-contact lookup.
+	    collection: Cohort collection whose ``commercial_use`` flag is evaluated.
+	    biobank: Owning biobank whose ``collaboration_commercial`` flag is evaluated.
+	    warningsList: Mutable result list receiving at most one BCO:AccessConflict warning.
+
+	Returns:
+	    None. The supplied warning list is mutated only for a conflicting commercial-collaboration state.
+	"""
 	def checkAttribute (feature : str, entity : dict, state : bool):
+		"""Compare one entity field with an expected boolean state.
+
+		Args:
+		    feature: Field name to inspect.
+		    entity: Biobank or collection record containing the candidate field.
+		    state: Boolean value that must match exactly.
+
+		Returns:
+		    ``True`` only when the field exists and equals the expected state.
+		"""
 		if feature in entity:
 			if entity[feature] == state:
 				return True
 		return False
 
 	def formatAttribute (feature : str, entity : dict):
+		"""Format an entity field for a cohort warning message.
+
+		Args:
+		    feature: Field name whose current value is displayed.
+		    entity: Biobank or collection record containing the field.
+
+		Returns:
+		    The string form of the field value, or ``not set`` when absent.
+		"""
 		if feature in entity:
 			return f'{entity[feature]}'
 		return f'not set'
@@ -88,9 +118,22 @@ CHECK_DOCS = {'BCO:AccessConflict': {'entity': 'COLLECTION',
                                                             'collection level.'}}
 
 class BBMRICohorts(IPlugin):
+	"""Validate BBMRI Cohorts network metadata and collaboration eligibility.
+
+	The plugin checks cohort-network collections against commercial-use, access, longitudinal, sample, and donor metadata. Findings are returned as warnings and never applied directly.
+	"""
 	CHECK_ID_PREFIX = "BCO"
 
 	def check(self, dir, args):
+		"""Inspect BBMRI Cohorts network members and return cohort-specific consistency warnings.
+
+		Args:
+		    dir: Loaded Directory view providing network membership, parent biobanks, facts, and contacts.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    Warnings for collections whose cohort metadata or collaboration flags conflict with network requirements.
+		"""
 		warnings = []
 		log.info("Running content checks on BBMRI Cohorts (BBMRICohorts)")
 

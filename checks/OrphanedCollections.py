@@ -15,8 +15,21 @@ CHECK_DOCS = {'OC:Orphan': {'entity': 'COLLECTION',
                                             'summary': 'Orphaned collection'}}
 
 class OrphanedCollections(IPlugin):
+	"""Report collections whose referenced parent biobank is not loaded.
+
+	The plugin checks collection ownership relationships in the active snapshot and returns warnings without repairing references.
+	"""
 	CHECK_ID_PREFIX = "OC"
 	def check(self, dir, args):
+		"""Inspect visible collections and return orphaned-parent warnings.
+
+		Args:
+		    dir: Loaded Directory view providing collections, loaded biobank lookups, contacts, and node identifiers.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    OC warnings for collections that reference an absent biobank.
+		"""
 		warnings = []
 		log.info("Running orphaned collection checks (OrphanedCollections)")
 		for collection in dir.getCollections():

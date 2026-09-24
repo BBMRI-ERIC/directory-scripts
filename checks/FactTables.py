@@ -28,11 +28,35 @@ CHECK_ID_PREFIX = "FT"
 
 
 def compareFactsColl(self, dir, factsList, collList, collection, errorDescription, actionDescription, warningsList): # TO improve
+	"""Append a collection-versus-fact mismatch warning when two value multisets differ.
+
+	Args:
+	    dir: Loaded Directory view used for Node, contact, and source fact lookup.
+	    factsList: Values derived from fact rows; an empty list suppresses the comparison.
+	    collList: Structured collection values compared as a multiset with fact values.
+	    collection: Collection record targeted by the warning and any alignment proposals.
+	    errorDescription: Human-readable prefix explaining the mismatched fields.
+	    actionDescription: Curator action recorded on the warning.
+	    warningsList: Mutable warning list receiving the FT:CollFactsMismatch result.
+
+	Returns:
+	    None. A warning with conservative fact-alignment proposals is appended only for a non-empty unequal fact multiset.
+	"""
 	if factsList and py_collections.Counter(factsList) != py_collections.Counter(collList):
 		warningsList.append(DataCheckWarning(make_check_id(self, "CollFactsMismatch"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), errorDescription + f" - collection information: {sorted(collList)} - fact information: {sorted(factsList)}", actionDescription, dir.getCollectionContact(collection['id'])['email'], fix_proposals=build_fact_alignment_fix_proposals(collection, dir.getCollectionFacts(collection['id']))))
 
 
 def _format_age_range(low, high, unit):
+	"""Format possibly open age bounds for fact-sheet diagnostics.
+
+	Args:
+	    low: Optional inclusive lower age bound.
+	    high: Optional inclusive upper age bound.
+	    unit: Age unit label; missing units are displayed as UNKNOWN.
+
+	Returns:
+	    A compact unknown, upper-bounded, lower-bounded, or closed range string.
+	"""
 	if not unit:
 		unit = "UNKNOWN"
 	if low is None and high is None:
@@ -45,12 +69,31 @@ def _format_age_range(low, high, unit):
 
 
 def _format_age_notes(notes):
+	"""Format derivation notes as an optional sentence suffix.
+
+	Args:
+	    notes: Ordered age-derivation notes returned by the shared fact helper.
+
+	Returns:
+	    An empty string for no notes, otherwise one leading space followed by joined notes.
+	"""
 	if not notes:
 		return ""
 	return " " + " ".join(notes)
 
 
 def compareAge(self, dir, collectionFacts, collection, warningsList):
+	"""Compare fact-derived age coverage with structured collection age metadata.
+
+	Args:
+	    dir: Loaded Directory view used for warning context and source fact retrieval.
+	    collectionFacts: Fact rows from which one conservative age range is derived.
+	    collection: Collection record supplying structured age bounds and unit.
+	    warningsList: Mutable list receiving age-unit, out-of-range, or over-broad warnings.
+
+	Returns:
+	    None. Applicable warnings include conservative fact-alignment proposals; incomplete or non-informative age data is skipped.
+	"""
 	age_update = derive_age_range_update(collectionFacts)
 	derived_low = age_update["age_low"]
 	derived_high = age_update["age_high"]
@@ -282,7 +325,17 @@ CHECK_DOCS = {'FT:SizeMissing': {'entity': 'COLLECTION',
 
 
 def _append_fact_sheet_analysis_warnings(self, dir, collection, fact_sheet, warnings):
-	"""Translate shared fact-sheet analysis warnings into QC warnings."""
+	"""Translate shared fact-sheet analysis diagnostics into FT warnings.
+
+	Args:
+	    dir: Loaded Directory view used for Node, withdrawal, and contact metadata.
+	    collection: Collection record owning the analyzed fact sheet.
+	    fact_sheet: Shared analysis result containing duplicate, missing, and inconsistency diagnostics.
+	    warnings: Mutable warning list receiving translated FT findings and supported fix proposals.
+
+	Returns:
+	    None. Recognized analysis diagnostics are appended as warnings; the fact sheet and collection remain unchanged.
+	"""
 	contact = dir.getCollectionContact(collection['id'])
 	contact_email = '' if contact is None else contact.get('email', '')
 	for fact_warning in fact_sheet['warnings']:
@@ -325,7 +378,15 @@ def _append_fact_sheet_analysis_warnings(self, dir, collection, fact_sheet, warn
 
 
 def _has_positive_fact_count(facts, field):
-	"""Return whether any fact row has a positive integer count in a field."""
+	"""Return whether any fact row has a strictly positive integer count.
+
+	Args:
+	    facts: Fact rows whose requested count field is inspected.
+	    field: Count field name, normally samples or donors.
+
+	Returns:
+	    ``True`` when at least one row contains an integer greater than zero; otherwise ``False``.
+	"""
 	return any(
 		isinstance(fact.get(field), int)
 		and not isinstance(fact.get(field), bool)
@@ -334,9 +395,22 @@ def _has_positive_fact_count(facts, field):
 	)
 
 class FactTables(IPlugin):
+	"""Validate collection fact sheets and their alignment with collection metadata.
+
+	The plugin checks required counts, all-star aggregates, all-but-one-star marginals, k-anonymity, age coverage, and descriptor consistency. It returns warnings with conservative fix proposals and never writes fact rows or collection fields.
+	"""
 	CHECK_ID_PREFIX = "FT"
 
 	def check(self, dir, args):
+		"""Inspect collection fact sheets and return completeness, privacy, and alignment warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible collections, fact rows, contacts, networks, and node identifiers.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    FT warnings and reviewable descriptor or row-deletion fix proposals derived from fact-sheet evidence.
+		"""
 		warnings = []
 		log.info("Running content checks on facts tables")
 

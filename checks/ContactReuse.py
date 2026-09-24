@@ -29,9 +29,22 @@ CHECK_DOCS = {
 
 
 class ContactReuse(IPlugin):
+	"""Report informational cross-biobank reuse of collection contacts.
+
+	The plugin emits the weaker reuse signal only when the stronger foreign-institution assignment check does not apply. It reads contact relationships and returns warnings without modifying them.
+	"""
 	CHECK_ID_PREFIX = "CTR"
 
 	def check(self, dir, args):
+		"""Inspect collection-contact reuse and return non-duplicative informational findings.
+
+		Args:
+		    dir: Loaded Directory view providing contact usage, biobank ownership, contacts, and institution signatures.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    CTR informational warnings for contacts reused across distinct biobanks after stronger CTA cases are excluded.
+		"""
 		warnings = []
 		log.info("Running cross-biobank contact reuse info checks (ContactReuse)")
 

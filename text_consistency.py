@@ -170,7 +170,14 @@ COVID_LONG_DIAGNOSIS = re.compile(r"\bU09(?:\.9)?\b", re.IGNORECASE)
 
 
 def build_text_consistency_findings(collection: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return deterministic narrative-vs-structure findings for one collection."""
+    """Run every deterministic narrative-versus-structure rule for one collection.
+
+    Args:
+        collection: Collection record whose name, description, and structured metadata are inspected without mutation.
+
+    Returns:
+        Findings from the age, study-design, FFPE, and COVID rules in stable rule order.
+    """
     findings = []
     for builder in (
         _build_age_finding,
@@ -185,6 +192,14 @@ def build_text_consistency_findings(collection: dict[str, Any]) -> list[dict[str
 
 
 def _build_age_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Detect a pediatric or adult narrative that conflicts with structured age bounds.
+
+    Args:
+        collection: Collection record supplying narrative and age_low, age_high, and age_unit metadata.
+
+    Returns:
+        A TXT:AgeRange finding with suggested structured age values, or ``None`` when evidence is absent, mixed, suppressed, or consistent.
+    """
     text = _collection_text(collection)
     if any(pattern.search(text) for pattern in AGE_SUPPRESSION_PATTERNS):
         return None
@@ -228,6 +243,14 @@ def _build_age_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
 
 
 def _build_study_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Detect missing longitudinal, prospective, or case-control collection types from narrative evidence.
+
+    Args:
+        collection: Collection record supplying narrative and current structured type values.
+
+    Returns:
+        A TXT:StudyType finding containing only absent suggested types, or ``None`` when no addition is indicated.
+    """
     text = _collection_text(collection)
     current_types = set(_as_sorted_strings(collection.get("type")))
     suggestions: list[str] = []
@@ -271,6 +294,14 @@ def _build_study_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]
 
 
 def _build_ffpe_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Detect likely FFPE tissue omitted from structured material metadata.
+
+    Args:
+        collection: Collection record supplying narrative and current material values.
+
+    Returns:
+        A TXT:FFPEMaterial finding after sentence-level false-positive filtering, or ``None`` when metadata is sufficient or evidence is unsafe.
+    """
     materials = set(_as_sorted_strings(collection.get("materials")))
     if "TISSUE_PARAFFIN_EMBEDDED" in materials:
         return None
@@ -304,6 +335,15 @@ def _build_ffpe_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
 
 
 def _ffpe_sentence_requires_material(sentence: str, materials: set[str]) -> bool:
+    """Decide whether one FFPE sentence implies stored paraffin-embedded tissue.
+
+    Args:
+        sentence: Narrative sentence containing a candidate FFPE expression.
+        materials: Current normalized material identifiers used to suppress slide-only or derived-material cases.
+
+    Returns:
+        ``True`` only when negative, indirect, slide-only, and derived-only evidence does not explain the wording.
+    """
     if any(pattern.search(sentence) for pattern in FFPE_NEGATIVE_PATTERNS):
         return False
 
@@ -321,6 +361,14 @@ def _ffpe_sentence_requires_material(sentence: str, materials: set[str]) -> bool
 
 
 def _build_covid_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Detect COVID or post-COVID narrative unsupported by structured diagnoses.
+
+    Args:
+        collection: Collection record supplying narrative and diagnosis references.
+
+    Returns:
+        A direct post-COVID or reviewer-choice acute-COVID finding, or ``None`` for negative, vaccination-only, contextual, or already-coded cases.
+    """
     text = _collection_text(collection)
     general_match = _first_match(COVID_GENERAL_PATTERNS, text)
     long_match = _first_match(COVID_LONG_PATTERNS, text)
@@ -380,12 +428,29 @@ def _build_covid_finding(collection: dict[str, Any]) -> Optional[dict[str, Any]]
 
 
 def _collection_text(collection: dict[str, Any]) -> str:
+    """Combine collection name and description for deterministic narrative matching.
+
+    Args:
+        collection: Collection record containing optional name and description values.
+
+    Returns:
+        Name and description joined by one space with embedded newlines replaced by spaces.
+    """
     name = collection.get("name") or ""
     description = collection.get("description") or ""
     return f"{name} {description}".replace("\n", " ")
 
 
 def _first_match(patterns: Iterable[tuple[re.Pattern[str], str]], text: str) -> Optional[str]:
+    """Return the label of the first matching compiled narrative pattern.
+
+    Args:
+        patterns: Ordered ``(compiled_pattern, label)`` pairs whose priority is significant.
+        text: Narrative text searched by each pattern.
+
+    Returns:
+        The first associated label, or ``None`` when no pattern matches.
+    """
     for pattern, label in patterns:
         if pattern.search(text):
             return label
@@ -393,10 +458,26 @@ def _first_match(patterns: Iterable[tuple[re.Pattern[str], str]], text: str) -> 
 
 
 def _split_sentences(text: str) -> list[str]:
+    """Split narrative text at punctuation followed by whitespace.
+
+    Args:
+        text: Narrative text to partition for sentence-local FFPE filtering.
+
+    Returns:
+        Non-empty stripped sentence fragments in source order.
+    """
     return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", text) if sentence.strip()]
 
 
 def _as_sorted_strings(values: Any) -> list[str]:
+    """Normalize scalar, mapping, or list values to deterministic display strings.
+
+    Args:
+        values: Optional scalar or list whose mappings prefer name, then ID, then full representation.
+
+    Returns:
+        A lexicographically sorted list for list input, a one-item list for a scalar, or an empty list for falsey input.
+    """
     if not values:
         return []
     if isinstance(values, list):
@@ -411,6 +492,14 @@ def _as_sorted_strings(values: Any) -> list[str]:
 
 
 def _diagnosis_names(collection: dict[str, Any]) -> list[str]:
+    """Extract deterministic diagnosis labels from a collection.
+
+    Args:
+        collection: Collection record containing optional diagnosis reference mappings or strings.
+
+    Returns:
+        Sorted diagnosis names or IDs, preferring mapping names before identifiers.
+    """
     diagnoses = collection.get("diagnosis_available")
     if not diagnoses:
         return []

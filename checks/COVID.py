@@ -168,8 +168,21 @@ CHECK_DOCS = {'C19:BBNetMissing': {'entity': 'BIOBANK',
                                                        'THROAT_SWAB'}}
 
 class COVID(IPlugin):
+	"""Validate COVID-19 collection metadata, network membership, and fact coverage.
+
+	The plugin compares structured diagnoses, materials, counts, collection types, and COVID network membership. It returns findings only and does not alter Directory records.
+	"""
 	CHECK_ID_PREFIX = "C19"
 	def check(self, dir, args):
+		"""Inspect visible collections and return COVID-specific consistency warnings.
+
+		Args:
+		    dir: Loaded Directory view providing collections, parent biobanks, network membership, facts, and contacts.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    C19 warnings describing inconsistent or incomplete COVID collection metadata.
+		"""
 		warnings = []
 		log.info("Running COVID content checks (COVID)")
 		biobankHasCovidCollection = {}

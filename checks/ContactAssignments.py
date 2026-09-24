@@ -40,6 +40,15 @@ CHECK_DOCS = {
 
 
 def _biobank_label(dir, biobank_id: str) -> str:
+	"""Format a biobank identifier with its loaded display name when available.
+
+	Args:
+	    dir: Loaded Directory view used for the biobank lookup.
+	    biobank_id: Biobank identifier that must always remain visible in the label.
+
+	Returns:
+	    The identifier alone on lookup failure or missing name, otherwise ``id (name)``.
+	"""
 	try:
 		biobank = dir.getBiobankById(biobank_id)
 	except Exception:
@@ -49,9 +58,22 @@ def _biobank_label(dir, biobank_id: str) -> str:
 
 
 class ContactAssignments(IPlugin):
+	"""Detect likely foreign-institution contact assignments across biobanks.
+
+	The plugin combines collection usage, unique main-contact ownership, institutional email domains, and addresses. It suppresses collaborative and ambiguous patterns and returns warnings without changing assignments.
+	"""
 	CHECK_ID_PREFIX = "CTA"
 
 	def check(self, dir, args):
+		"""Inspect contact ownership evidence and return probable cross-biobank assignment warnings.
+
+		Args:
+		    dir: Loaded Directory view providing contacts, biobanks, collections, ownership relationships, and withdrawal state.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    CTA warnings for strong cross-institution reuse or collection assignments; ambiguous reuse remains unreported here.
+		"""
 		warnings = []
 		log.info("Running probabilistic cross-biobank contact assignment checks (ContactAssignments)")
 

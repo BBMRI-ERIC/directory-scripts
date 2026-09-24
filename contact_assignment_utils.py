@@ -33,7 +33,14 @@ PUBLIC_EMAIL_DOMAINS = frozenset(
 
 
 def get_contact_ids(field) -> list[str]:
-    """Return referenced contact IDs from a Molgenis contact field."""
+    """Extract contact identifiers from supported EMX reference shapes.
+
+    Args:
+        field: Contact reference represented as a mapping, list, scalar identifier, or empty value.
+
+    Returns:
+        Referenced non-empty contact IDs in source order; unsupported shapes yield an empty list.
+    """
     if isinstance(field, dict):
         contact_id = field.get("id")
         return [contact_id] if contact_id else []
@@ -53,21 +60,42 @@ def get_contact_ids(field) -> list[str]:
 
 
 def get_email_domain(email: str) -> str:
-    """Return normalized email domain or empty string."""
+    """Extract a normalized domain from a contact email.
+
+    Args:
+        email: Candidate email string; values without ``@`` are treated as unavailable.
+
+    Returns:
+        The stripped lowercase domain, or an empty string for invalid input.
+    """
     if not isinstance(email, str) or "@" not in email:
         return ""
     return email.rsplit("@", 1)[1].strip().lower()
 
 
 def _normalize_text(value: str) -> str:
-    """Return a conservative lowercase normalized text token."""
+    """Normalize institution evidence to a lowercase single-spaced token.
+
+    Args:
+        value: Candidate address or locality string.
+
+    Returns:
+        The normalized text, or an empty string for non-string input.
+    """
     if not isinstance(value, str):
         return ""
     return " ".join(value.strip().lower().split())
 
 
 def is_institution_specific_domain(domain: str) -> bool:
-    """Return whether an email domain looks institution-specific enough for warnings."""
+    """Return whether an email domain is suitable as institution-identity evidence.
+
+    Args:
+        domain: Normalized domain compared with the configured public-email denylist.
+
+    Returns:
+        ``True`` for a non-empty non-public domain; otherwise ``False``.
+    """
     if not domain:
         return False
     if domain in PUBLIC_EMAIL_DOMAINS:
@@ -76,11 +104,13 @@ def is_institution_specific_domain(domain: str) -> bool:
 
 
 def get_contact_address_key(contact: dict) -> str:
-    """Return a normalized address-based institution key or empty string.
+    """Build conservative institution evidence from a contact address and locality.
 
-    Address is treated as institution evidence only when the street/address is present
-    together with at least one additional locality signal. City alone is intentionally
-    ignored because it is too weak for institution identity.
+    Args:
+        contact: Contact mapping containing address and optional ZIP, city, and country fields.
+
+    Returns:
+        A normalized compound key when street address and locality evidence exist, otherwise an empty string.
     """
     if not isinstance(contact, dict):
         return ""
@@ -97,7 +127,14 @@ def get_contact_address_key(contact: dict) -> str:
 
 
 def build_collection_contact_usage(dir) -> tuple[dict[str, list[str]], dict[str, Counter]]:
-    """Return contact -> collections and contact -> collection-counts-by-biobank maps."""
+    """Index collection-contact use globally and per owning biobank.
+
+    Args:
+        dir: Loaded Directory view providing visible collections and their contact references.
+
+    Returns:
+        A pair containing contact-to-collection IDs and contact-to-per-biobank usage counters; source records are unchanged.
+    """
     contact_to_collections: dict[str, list[str]] = defaultdict(list)
     contact_to_biobank_counts: dict[str, Counter] = defaultdict(Counter)
 
@@ -118,14 +155,13 @@ def build_biobank_contact_maps(dir) -> tuple[
     dict[str, set[str]],
     dict[str, dict[str, str]],
 ]:
-    """Return biobank main-contact mappings and domain associations.
+    """Build main-contact ownership and institution-signature indexes for biobanks.
+
+    Args:
+        dir: Loaded Directory view providing visible biobanks and resolvable contact records.
 
     Returns:
-        - biobank_id -> main contact id
-        - contact id -> biobank ids for which it is the biobank-level contact
-        - institution-specific main-contact email domain -> biobank ids
-        - normalized main-contact address key -> biobank ids
-        - biobank_id -> {"domain": ..., "address_key": ...}
+        Biobank-to-contact, contact-to-biobanks, domain-to-biobanks, address-to-biobanks, and per-biobank signature mappings; ambiguous or missing evidence is retained only where safe.
     """
     biobank_to_contact: dict[str, str] = {}
     contact_to_biobanks: dict[str, set[str]] = defaultdict(set)
@@ -162,7 +198,15 @@ def build_biobank_contact_maps(dir) -> tuple[
 
 
 def get_single_biobank_domain_owner(domain: str, domain_to_biobanks: dict[str, set[str]]) -> str | None:
-    """Return the unique biobank associated with a main-contact domain, if any."""
+    """Resolve a domain only when exactly one biobank uses it as main-contact evidence.
+
+    Args:
+        domain: Normalized institution-specific email domain.
+        domain_to_biobanks: Index from domains to biobank identifiers.
+
+    Returns:
+        The sole owning biobank ID, or ``None`` for absent or ambiguous ownership.
+    """
     owners = sorted(domain_to_biobanks.get(domain, set()))
     if len(owners) == 1:
         return owners[0]
@@ -174,7 +218,16 @@ def biobanks_same_institution(
     biobank_b: str,
     biobank_signatures: dict[str, dict[str, str]],
 ) -> bool:
-    """Return whether two biobanks share the same institution by domain or address."""
+    """Compare two biobanks using shared main-contact domain or address evidence.
+
+    Args:
+        biobank_a: First biobank identifier.
+        biobank_b: Second biobank identifier.
+        biobank_signatures: Per-biobank normalized domain and address keys.
+
+    Returns:
+        ``True`` for the same ID or one matching non-empty signature; otherwise ``False``.
+    """
     if biobank_a == biobank_b:
         return True
     signature_a = biobank_signatures.get(biobank_a, {})
@@ -195,7 +248,16 @@ def contact_matches_biobank_institution(
     biobank_id: str,
     biobank_signatures: dict[str, dict[str, str]],
 ) -> bool:
-    """Return whether a contact matches the institution of a biobank main contact."""
+    """Return whether a contact matches a biobank's institution signature.
+
+    Args:
+        contact: Contact record supplying candidate email-domain and address evidence.
+        biobank_id: Biobank whose main-contact signature is the comparison target.
+        biobank_signatures: Per-biobank normalized domain and address keys.
+
+    Returns:
+        ``True`` when either institution-specific domain or normalized address matches; otherwise ``False``.
+    """
     signature = biobank_signatures.get(biobank_id, {})
     domain = get_email_domain(contact.get("email", ""))
     if is_institution_specific_domain(domain) and domain and domain == signature.get("domain", ""):
@@ -210,7 +272,15 @@ def biobanks_all_same_institution(
     biobank_ids: list[str],
     biobank_signatures: dict[str, dict[str, str]],
 ) -> bool:
-    """Return whether every biobank in the list belongs to the same institution."""
+    """Return whether all supplied biobanks match the first institution signature.
+
+    Args:
+        biobank_ids: Ordered biobank identifiers to compare; zero or one item is trivially consistent.
+        biobank_signatures: Per-biobank normalized domain and address keys.
+
+    Returns:
+        ``True`` when every identifier belongs to the same inferred institution; otherwise ``False``.
+    """
     if len(biobank_ids) <= 1:
         return True
     first = biobank_ids[0]
@@ -224,7 +294,15 @@ def count_institution_groups(
     biobank_ids: list[str],
     biobank_signatures: dict[str, dict[str, str]],
 ) -> int:
-    """Return the number of institution groups represented by biobank IDs."""
+    """Count inferred institution groups among unique biobank identifiers.
+
+    Args:
+        biobank_ids: Biobank identifiers grouped in first-seen seed order after deduplication.
+        biobank_signatures: Per-biobank normalized domain and address keys used for pairwise grouping.
+
+    Returns:
+        The number of institution groups under the helper's domain-or-address equivalence heuristic.
+    """
     remaining = list(dict.fromkeys(biobank_ids))
     groups = 0
     while remaining:

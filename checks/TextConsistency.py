@@ -46,7 +46,20 @@ CHECK_DOCS = {
 
 
 class TextConsistency(IPlugin):
+	"""Convert deterministic narrative-versus-structure findings into QC warnings.
+
+	The plugin checks age, study design, FFPE material, and COVID diagnosis wording. It attaches conservative structured fix proposals but does not apply them.
+	"""
 	def check(self, dir, args):
+		"""Inspect collection names and descriptions and return structured-metadata consistency warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible collections, withdrawal state, and National Node identifiers.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    TXT warnings with reviewable age, type, material, or diagnosis fix proposals where supported.
+		"""
 		log.info('Running deterministic text consistency checks (TextConsistency)')
 		warnings = []
 		for collection in dir.getCollections():
@@ -55,6 +68,16 @@ class TextConsistency(IPlugin):
 		return warnings
 
 	def _build_warning(self, dir, collection, finding):
+		"""Convert one supported deterministic text finding into a warning.
+
+		Args:
+		    dir: Loaded Directory view used for Node and inherited withdrawal state.
+		    collection: Collection record targeted by the warning and fix proposals.
+		    finding: Finding with a supported TXT check ID, message, action, and suggested structured values.
+
+		Returns:
+		    A warning carrying check-specific fix proposals, or ``ValueError`` for an unsupported check ID.
+		"""
 		check_id = finding['check_id']
 		if check_id == 'TXT:AgeRange':
 			return DataCheckWarning(
@@ -111,6 +134,15 @@ class TextConsistency(IPlugin):
 		raise ValueError(f'Unsupported TextConsistency check_id {check_id!r}.')
 
 	def _age_fix_proposals(self, collection, finding):
+		"""Build uncertain scalar age proposals from a narrative age finding.
+
+		Args:
+		    collection: Collection record supplying current age metadata and entity identity.
+		    finding: TXT:AgeRange finding containing optional suggested low, high, and unit values.
+
+		Returns:
+		    One proposal per present suggested age field; all remain blocked for curator review.
+		"""
 		suggested_age = finding.get('suggested_age') or {}
 		fixes = []
 		for field in ('age_low', 'age_high', 'age_unit'):
@@ -135,6 +167,15 @@ class TextConsistency(IPlugin):
 		return fixes
 
 	def _study_type_fix_proposals(self, collection, finding):
+		"""Build uncertain collection-type additions from a narrative study-design finding.
+
+		Args:
+		    collection: Collection record supplying current type metadata and entity identity.
+		    finding: TXT:StudyType finding containing structured type suggestions.
+
+		Returns:
+		    Append proposals for each suggested type, or an empty list when the finding has none.
+		"""
 		suggested_types = finding.get('suggested_types') or []
 		if not suggested_types:
 			return []
@@ -156,6 +197,15 @@ class TextConsistency(IPlugin):
 		]
 
 	def _ffpe_fix_proposals(self, collection, finding):
+		"""Build a paraffin-embedded tissue addition from a filtered FFPE finding.
+
+		Args:
+		    collection: Collection record supplying current material metadata and entity identity.
+		    finding: TXT:FFPEMaterial finding containing material suggestions after false-positive suppression.
+
+		Returns:
+		    One almost-certain multi-value proposal, or an empty list when no material is suggested.
+		"""
 		suggested_materials = finding.get('suggested_materials') or []
 		if not suggested_materials:
 			return []
@@ -173,6 +223,15 @@ class TextConsistency(IPlugin):
 		]
 
 	def _covid_fix_proposals(self, collection, finding):
+		"""Build diagnosis additions or exclusive alternatives from a COVID text finding.
+
+		Args:
+		    collection: Collection record supplying current diagnoses and entity identity.
+		    finding: TXT:CovidDiag finding containing safe diagnoses or reviewer-choice alternative groups.
+
+		Returns:
+		    Almost-certain direct diagnosis proposals plus uncertain mutually exclusive acute-COVID alternatives.
+		"""
 		fixes = []
 		for diagnosis in finding.get('suggested_diagnoses') or []:
 			fixes.append(

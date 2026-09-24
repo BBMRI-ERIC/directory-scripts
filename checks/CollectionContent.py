@@ -272,6 +272,14 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
 
 
 def _ordered_unique(values):
+	"""Remove empty and duplicate values while preserving first-seen order.
+
+	Args:
+	    values: Iterable of candidate values whose stable unique subset is required.
+
+	Returns:
+	    A list containing each truthy value once in original order.
+	"""
 	ordered = []
 	seen = set()
 	for value in values:
@@ -283,10 +291,32 @@ def _ordered_unique(values):
 
 
 def _orpha_code_core(value):
+	"""Strip the optional ORPHA namespace prefix from a diagnosis code.
+
+	Args:
+	    value: ORPHA code with or without the ``ORPHA:`` prefix.
+
+	Returns:
+	    The code component used by the ORPHA-to-ICD mapping index.
+	"""
 	return re.sub('^ORPHA:', '', value)
 
 
 def _icd_to_orpha_safe_missing(plugin, collection, collection_nn, icd_code, mappings, existing_orpha_codes, *, allow_ntbt):
+	"""Build one safe ICD-10-to-ORPHA warning or an ambiguity warning.
+
+	Args:
+	    plugin: Calling plugin instance retained for compatibility with the crosswalk helper signature.
+	    collection: Collection record targeted by any generated warning and fix proposal.
+	    collection_nn: National Node identifier recorded on the warning.
+	    icd_code: Existing ICD-10 code used as the crosswalk source.
+	    mappings: Candidate ORPHA mappings with code and mapping-direction metadata.
+	    existing_orpha_codes: ORPHA code cores already present on the collection and therefore never reproposed.
+	    allow_ntbt: Whether narrower-ICD-to-broader-ORPHA mappings are accepted for this rare-disease context.
+
+	Returns:
+	    A suggestion with one conservative append proposal, an informational ambiguity warning, or ``None`` when nothing is missing.
+	"""
 	missing_exact = []
 	missing_ntbt = []
 	risky = []
@@ -346,6 +376,19 @@ def _icd_to_orpha_safe_missing(plugin, collection, collection_nn, icd_code, mapp
 
 
 def _orpha_to_icd_safe_missing(plugin, collection, collection_nn, orpha_code, mappings, existing_icd10_codes):
+	"""Build one safe ORPHA-to-ICD-10 warning or an ambiguity warning.
+
+	Args:
+	    plugin: Calling plugin instance retained for compatibility with the crosswalk helper signature.
+	    collection: Collection record targeted by any generated warning and fix proposal.
+	    collection_nn: National Node identifier recorded on the warning.
+	    orpha_code: Existing ORPHA code used as the crosswalk source.
+	    mappings: Candidate ICD-10 mappings with code and mapping-direction metadata.
+	    existing_icd10_codes: ICD-10 codes already present on the collection and therefore never reproposed.
+
+	Returns:
+	    A suggestion with one conservative append proposal, an informational ambiguity warning, or ``None`` when nothing is missing.
+	"""
 	missing_exact = []
 	missing_ntbt = []
 	risky = []
@@ -403,8 +446,21 @@ def _orpha_to_icd_safe_missing(plugin, collection, collection_nn, orpha_code, ma
 	return None
 
 class CollectionContent(IPlugin):
+	"""Validate collection content, counts, age metadata, and diagnosis crosswalks.
+
+	The plugin checks structured collection fields and emits conservative ORPHA/ICD-10 enrichment proposals only for accepted mapping directions. It returns warnings without writing to the Directory.
+	"""
 	CHECK_ID_PREFIX = "CC"
 	def check(self, dir, args):
+		"""Inspect visible collections and return content and diagnosis-crosswalk warnings.
+
+		Args:
+		    dir: Loaded Directory view providing collections, contacts, node identifiers, and the optional ORPHA mapper.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    CC warnings, with reviewable fix proposals for safe diagnosis additions where available.
+		"""
 		warnings = []
 		log.info("Running collection content checks (CollectionContent)")
 		orphacodes = dir.getOrphaCodesMapper()

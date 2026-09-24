@@ -50,12 +50,22 @@ CHECK_DOCS = {
 
 
 class MemberAreaConsistency(IPlugin):
-    """Check that member-country institutions are not duplicated into non-member areas."""
+    """Detect member-country institutions placed or duplicated in other staging areas.
+
+    The plugin compares country, ID-derived staging area, and normalized juridical person. It reports mismatches and duplicates without moving or editing entities.
+    """
     CHECK_ID_PREFIX = "MAC"
 
     @staticmethod
     def _normalize_country(value) -> str:
-        """Return an uppercase country code from a scalar or EMX-style wrapper."""
+        """Normalize a scalar or EMX reference wrapper to an uppercase country code.
+
+        Args:
+            value: Country scalar or mapping containing an ``id`` or ``name`` value.
+
+        Returns:
+            A stripped uppercase code, or an empty string when no value is available.
+        """
         if isinstance(value, dict):
             value = value.get("id") or value.get("name")
         if value is None:
@@ -64,7 +74,14 @@ class MemberAreaConsistency(IPlugin):
 
     @staticmethod
     def _normalize_institution_name(value) -> str:
-        """Return a normalized institution key for duplicate detection."""
+        """Normalize an institution name for case-insensitive duplicate detection.
+
+        Args:
+            value: Juridical-person value to collapse and case-fold.
+
+        Returns:
+            A whitespace-normalized case-folded key, or an empty string for ``None``.
+        """
         if value is None:
             return ""
         normalized = re.sub(r"\s+", " ", str(value).strip())
@@ -72,14 +89,29 @@ class MemberAreaConsistency(IPlugin):
 
     @staticmethod
     def _display_name(value) -> str:
-        """Return a human-readable institution name."""
+        """Normalize institution whitespace while preserving display case.
+
+        Args:
+            value: Juridical-person value rendered in warning messages.
+
+        Returns:
+            A stripped single-spaced display name, or an empty string for ``None``.
+        """
         if value is None:
             return ""
         return re.sub(r"\s+", " ", str(value).strip())
 
     @staticmethod
     def _safe_contact_email(directory: Directory, biobank_id: str) -> str:
-        """Return the primary biobank contact email when available."""
+        """Resolve a biobank's primary contact email without propagating lookup failures.
+
+        Args:
+            directory: Loaded Directory view used for primary-contact lookup.
+            biobank_id: Biobank identifier whose warning contact is requested.
+
+        Returns:
+            The stripped email for a mapping contact, otherwise an empty string.
+        """
         try:
             contact = directory.getBiobankContact(biobank_id)
         except Exception:
@@ -89,7 +121,15 @@ class MemberAreaConsistency(IPlugin):
         return str(contact.get("email", "")).strip()
 
     def check(self, directory: Directory, args):
-        """Run the member-area consistency checks."""
+        """Inspect biobank staging placement and return member-area consistency warnings.
+
+        Args:
+            directory: Loaded Directory view providing visible biobanks and their primary contacts.
+            args: Runner options accepted for the common plugin interface; this check discards them.
+
+        Returns:
+            MAC warnings for ISO staging mismatches, member institutions in non-member areas, and cross-area duplicates.
+        """
         del args
         warnings = []
         log.info("Running member-area consistency checks (MemberAreaConsistency)")

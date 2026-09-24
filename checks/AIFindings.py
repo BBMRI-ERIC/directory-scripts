@@ -30,9 +30,22 @@ CHECK_DOCS = {
 
 
 class AIFindings(IPlugin):
+	"""Expose checksum-valid AI-reviewed cache findings as Directory warnings.
+
+	The plugin reads shareable findings for entities in the active Directory scope, logs stale-cache diagnostics, and returns AI:Curated warnings. It never invokes a model or writes Directory data.
+	"""
 	CHECK_ID_PREFIX = 'AI'
 
 	def check(self, dir, args):
+		"""Load curated findings, discard entities outside the active scope, and return their warnings.
+
+		Args:
+		    dir: Loaded Directory view used to validate finding scope and derive National Node identifiers.
+		    args: Runner options controlling whether validation diagnostics from the cache loader are suppressed.
+
+		Returns:
+		    AI:Curated warnings built from valid cached findings for visible entities; the Directory is not modified.
+		"""
 		log.info('Running shareable AI-curated checks (AIFindings)')
 		warn = build_validation_warning_handler(
 			enabled=not bool(getattr(args, "suppress_validation_warnings", False)),
@@ -54,6 +67,15 @@ class AIFindings(IPlugin):
 		return warnings
 
 	def _build_warning(self, dir, finding):
+		"""Convert one validated cache finding into a Directory warning.
+
+		Args:
+		    dir: Loaded Directory view used to resolve a fallback National Node identifier.
+		    finding: Validated cached finding containing entity, severity, message, action, and optional contact metadata.
+
+		Returns:
+		    An AI:Curated ``DataCheckWarning`` preserving the finding's entity, severity, withdrawal state, and evidence text.
+		"""
 		entity_type = self._resolve_entity_type(finding)
 		severity = self._resolve_severity(finding)
 		return DataCheckWarning(
@@ -70,6 +92,14 @@ class AIFindings(IPlugin):
 		)
 
 	def _format_message(self, finding):
+		"""Prefix a cached finding message with its rule when one is present.
+
+		Args:
+		    finding: Cached finding containing a required message and optional rule identifier.
+
+		Returns:
+		    The original message, or a bracketed rule followed by that message.
+		"""
 		rule = finding.get('rule')
 		message = finding['message']
 		if not rule:
@@ -77,6 +107,14 @@ class AIFindings(IPlugin):
 		return f"[{rule}] {message}"
 
 	def _log_cache_issue(self, issue):
+		"""Log an actionable diagnostic for one stale or incompatible AI cache record.
+
+		Args:
+		    issue: Cache issue describing its reason, source path, scope, rule, and affected entities.
+
+		Returns:
+		    None. A warning is emitted through the module logger; the cache is not changed.
+		"""
 		if issue.reason == 'scope-mismatch':
 			log.warning(
 				'AI cache %s was generated for withdrawn scope %s, but the current run uses a different scope. Rerun the live AI-review workflow before trusting AI findings.',
@@ -99,6 +137,14 @@ class AIFindings(IPlugin):
 		)
 
 	def _resolve_entity_type(self, finding):
+		"""Map a supported cached entity-type token to the warning enum.
+
+		Args:
+		    finding: Cached finding whose ``entity_type`` must be BIOBANK or COLLECTION.
+
+		Returns:
+		    The corresponding ``DataCheckEntityType`` value.
+		"""
 		entity_type = finding['entity_type']
 		mapping = {
 			'BIOBANK': DataCheckEntityType.BIOBANK,
@@ -112,6 +158,14 @@ class AIFindings(IPlugin):
 		return mapping[entity_type]
 
 	def _resolve_severity(self, finding):
+		"""Map a supported cached severity token to the warning-level enum.
+
+		Args:
+		    finding: Cached finding whose ``severity`` must be ERROR, WARNING, or INFO.
+
+		Returns:
+		    The corresponding ``DataCheckWarningLevel`` value.
+		"""
 		severity = finding['severity']
 		mapping = {
 			'ERROR': DataCheckWarningLevel.ERROR,
@@ -126,6 +180,15 @@ class AIFindings(IPlugin):
 		return mapping[severity]
 
 	def _entity_exists_in_scope(self, dir, finding):
+		"""Return whether a cached finding targets a visible supported entity.
+
+		Args:
+		    dir: Loaded Directory view whose configured scope determines entity visibility.
+		    finding: Cached finding containing entity type and identifier.
+
+		Returns:
+		    ``True`` for a visible biobank or collection target; ``False`` for absent or unsupported targets.
+		"""
 		if finding['entity_type'] == 'COLLECTION':
 			return dir.getCollectionById(finding['entity_id']) is not None
 		if finding['entity_type'] == 'BIOBANK':
@@ -133,6 +196,15 @@ class AIFindings(IPlugin):
 		return False
 
 	def _resolve_nn(self, dir, finding):
+		"""Resolve the National Node stored on or implied by a cached finding.
+
+		Args:
+		    dir: Loaded Directory view used for entity-derived Node lookup.
+		    finding: Cached finding with an optional explicit ``nn`` and required entity identity.
+
+		Returns:
+		    The explicit Node identifier when present, otherwise the Node derived from the target biobank or collection.
+		"""
 		if finding.get('nn'):
 			return finding['nn']
 		if finding['entity_type'] == 'BIOBANK':

@@ -18,12 +18,28 @@ placeholderDescriptionPatterns = [
 ]
 
 def descriptionTooShort(s : str) -> bool:
+	"""Return whether a description is below the configured informative-length threshold.
+
+	Args:
+	    s: Description value measured after the helper's existing normalization rules.
+
+	Returns:
+	    ``True`` when the description is considered too short; otherwise ``False``.
+	"""
 	if len(s.split()) < minDescWords:
 		return True
 	else:
 		return False
 
 def descriptionIsPlaceholder(s : str) -> bool:
+	"""Return whether a description matches a known placeholder phrase.
+
+	Args:
+	    s: Description value checked case-insensitively against placeholder patterns.
+
+	Returns:
+	    ``True`` for placeholder content such as text still to be provided; otherwise ``False``.
+	"""
 	for pattern in placeholderDescriptionPatterns:
 		if pattern.match(s):
 			return True
@@ -99,8 +115,21 @@ CHECK_DOCS = {'SE:BBDescMissing': {'entity': 'BIOBANK',
                                                                'description.'}}
 
 class SemiemptyFields(IPlugin):
+	"""Detect missing, short, or placeholder descriptions and names.
+
+	The plugin applies deterministic text thresholds and placeholder patterns to visible Directory entities. It returns findings without rewriting narrative fields.
+	"""
 	CHECK_ID_PREFIX = "SE"
 	def check(self, dir, args):
+		"""Inspect entity text fields and return semi-empty or placeholder-content warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible biobanks, collections, contacts, and node identifiers.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    SEF warnings for missing, too-short, or placeholder names and descriptions.
+		"""
 		warnings = []
 		log.info("Running empty or semi-empty fields checks (SemiemptyFields)")
 		for biobank in dir.getBiobanks():

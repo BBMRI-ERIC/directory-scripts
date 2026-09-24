@@ -188,8 +188,21 @@ CHECK_DOCS = {'VID:BBExtPrefix': {'entity': 'BIOBANK',
                                                           'prefix)'}}
 
 class ValidateIDs(IPlugin):
+	"""Validate entity identifiers against staging-area and character rules.
+
+	The plugin checks biobank, collection, contact, and network IDs, including permitted non-country staging prefixes. It returns warnings without renaming entities.
+	"""
 	CHECK_ID_PREFIX = "VID"
 	def check(self, dir, args):
+		"""Inspect loaded entity identifiers and return prefix, hierarchy, country, and character warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible entities and ID-derived National Node identifiers.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    VID warnings for nonconforming identifiers and suspicious collection or network ownership prefixes.
+		"""
 		warnings = []
 		log.info("Running identifier validation checks (ValidateIDs)")
 

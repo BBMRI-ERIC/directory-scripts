@@ -23,7 +23,15 @@ MULTI_VALUE_COLLECTION_FIELDS = {
 
 
 def current_collection_field_value(collection: dict[str, Any], field: str) -> Any:
-    """Return a normalized collection field value for fix export."""
+    """Normalize one collection field for expected-current-value comparison.
+
+    Args:
+        collection: Collection record containing the field; the mapping is not mutated.
+        field: Collection field name whose scalar or multi-value representation is normalized.
+
+    Returns:
+        The field's canonical scalar or list value, with empty scalars represented as ``None`` and DUO identifiers normalized.
+    """
     if field in MULTI_VALUE_COLLECTION_FIELDS:
         values = parse_collection_multi_value_field(collection.get(field))
         if field == "data_use":
@@ -49,7 +57,24 @@ def make_collection_term_append_fix(
     exclusive_group: str = "",
     blocking_reason: str = "",
 ):
-    """Return a collection append fix for one ontology/code term."""
+    """Build an append proposal for one ontology or code term on a collection.
+
+    Args:
+        update_id: Stable update identifier recorded in the exported proposal.
+        module: Visible QC module prefix associated with the source warning.
+        collection: Collection record supplying the entity ID and expected current field value.
+        field: Multi-value collection field to which the term would be appended.
+        term_id: Canonical ontology or code identifier proposed for addition.
+        confidence: Reviewed confidence classification for the proposed addition.
+        human_explanation: Reviewer-facing explanation of the metadata correction.
+        rationale: Optional evidence and rule rationale retained with the proposal.
+        replace_required: Whether safe application requires replacement rather than ordinary append semantics.
+        exclusive_group: Optional mutually exclusive proposal group used during review.
+        blocking_reason: Optional reason automatic application must remain blocked pending review.
+
+    Returns:
+        A serializable collection fix proposal; neither the collection nor Directory data is changed.
+    """
     current_value = current_collection_field_value(collection, field)
     return make_fix_proposal(
         update_id=update_id,
@@ -82,7 +107,22 @@ def make_collection_scalar_set_fix(
     rationale: str = "",
     blocking_reason: str = "",
 ):
-    """Return a collection scalar set fix."""
+    """Build a scalar set proposal for one collection field.
+
+    Args:
+        update_id: Stable update identifier recorded in the exported proposal.
+        module: Visible QC module prefix associated with the source warning.
+        collection: Collection record supplying the entity ID and expected current field value.
+        field: Scalar collection field that would receive the proposed value.
+        proposed_value: Replacement scalar value presented to the reviewer.
+        confidence: Reviewed confidence classification for the proposed replacement.
+        human_explanation: Reviewer-facing explanation of the metadata correction.
+        rationale: Optional evidence and rule rationale retained with the proposal.
+        blocking_reason: Optional reason automatic application must remain blocked pending review.
+
+    Returns:
+        A serializable collection fix proposal; neither the collection nor Directory data is changed.
+    """
     return make_fix_proposal(
         update_id=update_id,
         module=module,
@@ -114,7 +154,25 @@ def make_collection_multi_value_fix(
     blocking_reason: str = "",
     exclusive_group: str = "",
 ):
-    """Return a collection multi-value fix."""
+    """Build an append or replacement proposal for a multi-value collection field.
+
+    Args:
+        update_id: Stable update identifier recorded in the exported proposal.
+        module: Visible QC module prefix associated with the source warning.
+        collection: Collection record supplying the entity ID and expected current field value.
+        field: Multi-value collection field targeted by the proposal.
+        proposed_values: Candidate values; falsey entries are removed while input order is retained.
+        confidence: Reviewed confidence classification for the proposed values.
+        human_explanation: Reviewer-facing explanation of the metadata correction.
+        rationale: Optional evidence and rule rationale retained with the proposal.
+        mode: Application mode, normally ``append`` but optionally a caller-approved replacement mode.
+        replace_required: Whether the proposal requires replacement semantics to be safe.
+        blocking_reason: Optional reason automatic application must remain blocked pending review.
+        exclusive_group: Optional mutually exclusive proposal group used during review.
+
+    Returns:
+        A serializable collection fix proposal with normalized current and proposed values; no source data is mutated.
+    """
     proposed = [value for value in proposed_values if value]
     return make_fix_proposal(
         update_id=update_id,
@@ -135,7 +193,15 @@ def make_collection_multi_value_fix(
 
 
 def build_fact_alignment_fix_proposals(collection: dict[str, Any], facts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return collection descriptor fixes derived conservatively from fact sheets."""
+    """Derive conservative collection-descriptor proposals from collection fact rows.
+
+    Args:
+        collection: Collection record whose structured descriptors and all-star totals are compared with its facts.
+        facts: Fact rows for that collection; aggregate markers are interpreted by the shared descriptor proposal logic.
+
+    Returns:
+        Independent fix proposals for safely derivable diagnoses, materials, sex, age, samples, or donors; no marginal rows are summed and inputs are unchanged.
+    """
     proposal = build_collection_descriptor_proposal(collection, facts, replace_existing=False)
     fix_proposals = []
     change_map = {change["field"]: change for change in proposal["changes"]}
@@ -221,7 +287,16 @@ def build_fact_k_anonymity_drop_fixes(
     *,
     k_limit: int,
 ) -> list[dict[str, Any]]:
-    """Return a fix proposal that drops fact-sheet rows violating donor k-anonymity."""
+    """Build a row-deletion proposal for fact rows below the donor k threshold.
+
+    Args:
+        collection: Collection record supplying the target entity identifier.
+        facts: Fact rows inspected for explicit positive donor counts below the threshold.
+        k_limit: Exclusive lower privacy threshold; donor counts from 1 through ``k_limit - 1`` violate it.
+
+    Returns:
+        An empty list when no identified row violates k-anonymity, otherwise one certain proposal listing the unique violating fact IDs.
+    """
     violating_ids = []
     for fact in facts:
         if donor_value_violates_k(fact.get("number_of_donors"), k_limit) and fact.get("id"):

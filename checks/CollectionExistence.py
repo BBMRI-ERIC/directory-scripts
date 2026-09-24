@@ -16,8 +16,21 @@ CHECK_DOCS = {'CEX:NoCollections': {'entity': 'BIOBANK',
                                                               'collection for biobank'}}
 
 class CollectionExistence(IPlugin):
+	"""Report visible biobanks that expose no collection.
+
+	The plugin identifies biobanks that cannot advertise negotiable resources because no collection is linked. It does not write Directory data.
+	"""
 	CHECK_ID_PREFIX = "CEX"
 	def check(self, dir, args):
+		"""Inspect visible biobanks and return missing-collection warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible biobanks and their linked collections.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    CE warnings for biobanks without collections.
+		"""
 		warnings = []
 		log.info("Running collection existence checks (CollectionExistence)")
 		for biobank in dir.getBiobanks():

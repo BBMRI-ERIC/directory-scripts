@@ -171,7 +171,14 @@ CHECK_DOCS = {'AP:BBAvailNone': {'entity': 'BIOBANK',
 
 
 def _has_meaningful_access_value(value):
-	"""Return whether an access-policy field contains a meaningful non-empty value."""
+	"""Return whether an access-policy value conveys non-empty affirmative content.
+
+	Args:
+	    value: Scalar or container value from an access-policy field; NaN and blank strings count as absent.
+
+	Returns:
+	    ``True`` for meaningful booleans, scalars, strings, or non-empty containers; otherwise ``False``.
+	"""
 	if value is None:
 		return False
 	if isinstance(value, bool):
@@ -187,7 +194,14 @@ def _has_meaningful_access_value(value):
 
 
 def _collection_has_generic_access_policy(collection):
-	"""Return whether the collection exposes any generic access-policy field."""
+	"""Return whether a collection supplies any generic access-policy metadata.
+
+	Args:
+	    collection: Collection record inspected for fee, joint-project, description, and URI access fields.
+
+	Returns:
+	    ``True`` when at least one generic access field is meaningful.
+	"""
 	for field_name in ('access_fee', 'access_joint_project', 'access_description', 'access_uri'):
 		if _has_meaningful_access_value(collection.get(field_name)):
 			return True
@@ -195,12 +209,32 @@ def _collection_has_generic_access_policy(collection):
 
 
 def _collection_requires_joint_project_duo(collection):
-	"""Return whether generic access metadata says joint-project access is required."""
+	"""Return whether a collection's generic policy requires joint-project access.
+
+	Args:
+	    collection: Collection record whose ``access_joint_project`` field is interpreted conservatively.
+
+	Returns:
+	    The meaningful-value interpretation of ``access_joint_project``.
+	"""
 	return _has_meaningful_access_value(collection.get('access_joint_project'))
 
 class AccessPolicies(IPlugin):
+	"""Validate biobank and collection access-policy metadata and DUO terms.
+
+	The plugin reports missing or contradictory access information and attaches conservative DUO fixes where the structured evidence is unambiguous. It does not write Directory data.
+	"""
 	CHECK_ID_PREFIX = "AP"
 	def check(self, dir, args):
+		"""Inspect access fields and return biobank- and collection-level policy warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible biobanks, collections, contacts, and node ownership.
+		    args: Runner options accepted for the common plugin interface; this check does not read them.
+
+		Returns:
+		    Access-policy warnings, including reviewable DUO fix proposals where applicable.
+		"""
 		warnings = []
 		log.info("Running access policy checks (AccessPolicies)")
 		for biobank in dir.getBiobanks():
@@ -239,6 +273,14 @@ class AccessPolicies(IPlugin):
 
 			# aux routine to translate DUO codes to URLs
 			def DUOs_to_url(DUO_list):
+				"""Convert one or more DUO identifiers to space-separated ontology URLs.
+
+				Args:
+				    DUO_list: Single DUO identifier or list of identifiers in colon notation.
+
+				Returns:
+				    Identifiers with colons converted to underscores and prefixed by the OBO PURL base, joined by spaces.
+				"""
 				if not isinstance(DUO_list, list):
 					DUO_list = [ DUO_list ]
 				replacements = [

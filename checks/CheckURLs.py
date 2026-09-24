@@ -25,6 +25,15 @@ pp = pprint.PrettyPrinter(indent=4)
 cache = None
 
 def testURL (URL : str, URLErrorWarning : DataCheckWarning) -> List[DataCheckWarning]:
+	"""Validate one URL locally and remotely, reusing the module disk cache.
+
+	Args:
+	    URL: URL string to validate for HTTP(S) scheme and optional reachability.
+	    URLErrorWarning: Preconfigured warning whose message is extended when validation fails.
+
+	Returns:
+	    A list containing the supplied warning for a detected failure, or an empty list for an accepted URL; the cached result may be reused on later calls.
+	"""
 	warnings = []
 	logString = "Testing URL " + URL
 	URL_connection_reset = False
@@ -108,8 +117,21 @@ CHECK_DOCS = {'URL:BBInvalid': {'entity': 'BIOBANK',
                    'summary': 'Missing URL'}}
 
 class CheckURLs(IPlugin):
+	"""Validate configured biobank and collection URLs with an optional remote probe.
+
+	The plugin performs local scheme checks and, unless disabled, cached HTTP requests. It records URL failures as warnings and never writes Directory data.
+	"""
 	CHECK_ID_PREFIX = "URL"
 	def check(self, dir, args):
+		"""Inspect URL fields and return formatting or reachability warnings.
+
+		Args:
+		    dir: Loaded Directory view providing visible biobanks, collections, contacts, and node identifiers.
+		    args: Runner options listing disabled remote checks and caches to purge; the URLs entries control network probes and the URL disk cache.
+
+		Returns:
+		    URL warnings for malformed, unreachable, or unsuccessful links.
+		"""
 		warnings = []
 		log.info("Running URL checks (CheckURLs)")
 		assert 'URLs' in __main__.remoteCheckList

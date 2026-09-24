@@ -29,11 +29,22 @@ CHECK_DOCS = {'SNM:SubcollNetMissing': {'entity': 'COLLECTION',
                                                                                'is.'}}
 
 class SubcollectionNetworkMembership(IPlugin):
-    """Check whether subcollections belong to the same network as their parent collections"""
+    """Validate that subcollections retain their parent collections' networks.
+
+    The plugin compares direct parent and child network memberships and returns missing-membership warnings without updating either collection.
+    """
     CHECK_ID_PREFIX = "SNM"
 
     def check(self, directory: Directory, _):
-        """Do the actual checking"""
+        """Inspect parent-child collection relationships and return network-membership warnings.
+
+        Args:
+            directory: Loaded Directory view providing collections, parent relationships, network membership, contacts, and node identifiers.
+            _: Unused compatibility value supplied by the plugin runner.
+
+        Returns:
+            SNM warnings for subcollections missing one or more parent networks.
+        """
         warnings = []
         log.info("Running subcollection network membership checks (SubcollectionNetworkMembership)")
         for collection in directory.getCollections():
