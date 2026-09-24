@@ -52,7 +52,24 @@ disabledChecks = {
 pp = pprint.PrettyPrinter(indent=4)
 
 class SafePluginManager(PluginManager):
+    """Load only plugins whose module contains a declared compatible class.
+
+    Plugin import failures are treated as invalid candidates so a malformed
+    optional check cannot abort discovery of the remaining checks.
+    """
+
     def isCorrectPlugin(self, candidate, category_name):
+        """Check whether a candidate module exposes the requested plugin type.
+
+        Args:
+            candidate: Yapsy candidate whose module is loaded for inspection.
+            category_name: Registered Yapsy category used to select the
+                compatible interface class.
+
+        Returns:
+            ``True`` only when the module defines a subclass of the category
+            interface; otherwise ``False``, including load failures.
+        """
         try:
             module = candidate.load()
             for element in vars(module).values():
@@ -118,7 +135,12 @@ EXIT_ABORTED = 3
 
 
 def collect_known_check_ids_and_prefixes():
-    """Collect check IDs/prefixes from loaded plugins for suppression diagnostics."""
+    """Collect check IDs and visible prefixes for suppression diagnostics.
+
+    Returns:
+        Two sets containing declared check IDs and plugin-prefix families from
+        the loaded Yapsy plugins.
+    """
     check_ids = set()
     check_prefixes = set()
     for plugin_info in simplePluginManager.getAllPlugins():
@@ -139,6 +161,13 @@ def collect_known_check_ids_and_prefixes():
 
 
 def main() -> int:
+    """Run configured quality checks and write the requested warning outputs.
+
+    Returns:
+        ``EXIT_OK`` after successful checking or ``EXIT_ABORTED`` when the
+        user interrupts the run. Directory access, XLSX output, and optional
+        fix-plan writing are controlled by parsed command-line arguments.
+    """
     args = parser.parse_args()
 
     if args.schema != "ERIC" and not args.token and not (args.username and args.password):

@@ -35,7 +35,15 @@ pp = pprint.PrettyPrinter(indent=4)
 
 
 def _build_warning_frame(rows: list[dict]) -> pd.DataFrame:
-    """Return a warnings dataframe with stable columns even when empty."""
+    """Return a warnings dataframe with stable columns even when empty.
+
+    Args:
+        rows: Warning dictionaries produced during per-biobank statistics
+            analysis; unspecified stable columns are represented as missing.
+
+    Returns:
+        New dataframe in the export's fixed warning-column order.
+    """
     return pd.DataFrame(
         rows,
         columns=[

@@ -24,6 +24,13 @@ STAT_0o775 = ( stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
 
 
 def main():
+    """Install certifi's CA bundle at Python's default OpenSSL certificate path.
+
+    Returns:
+        None. Installs or upgrades certifi, replaces the default CA file with a
+        symlink, and updates its permissions; subprocess and filesystem errors
+        propagate to the caller.
+    """
     openssl_dir, openssl_cafile = os.path.split(
         ssl.get_default_verify_paths().openssl_cafile)
 

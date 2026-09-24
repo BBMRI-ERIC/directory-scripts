@@ -14,7 +14,14 @@ from nncontacts import NNContacts
 
 @dataclass(frozen=True)
 class CountryPoint:
-    """Static display and map position metadata for one country."""
+    """Static display and map position metadata for one country.
+
+    Attributes:
+        name: Display name used in the Flourish workbook.
+        longitude: Point longitude in WGS84 decimal degrees.
+        latitude: Point latitude in WGS84 decimal degrees.
+        region: Flourish geographic-region label for the country.
+    """
 
     name: str
     longitude: float
@@ -71,7 +78,14 @@ TYPE_LABELS = {
 
 @dataclass(frozen=True)
 class FlourishPoint:
-    """Aggregated Directory observations for one displayed country."""
+    """Aggregated Directory observations for one displayed country.
+
+    Attributes:
+        country_code: Two-letter country code matching ``COUNTRY_POINTS``.
+        biobanks: Immutable IDs of selected biobanks in the displayed country.
+        collections: Immutable IDs of selected collections in that country.
+        types: Per-collection-type counts used in the Flourish HTML summary.
+    """
 
     country_code: str
     biobanks: frozenset[str]

@@ -73,7 +73,16 @@ DUO_TERM_METADATA = {
 
 
 def normalize_duo_term_id(term_id: str) -> str:
-    """Return a canonical DUO term id using the DUO:0000000 form."""
+    """Return a canonical DUO term ID using the ``DUO:0000000`` form.
+
+    Args:
+        term_id: Candidate DUO identifier using either ``DUO:`` or ``DUO_``
+            storage syntax.
+
+    Returns:
+        Canonical colon-separated identifier when the input uses underscore
+        syntax, otherwise the stripped value unchanged.
+    """
     value = str(term_id or "").strip()
     if not value:
         return value
@@ -83,7 +92,15 @@ def normalize_duo_term_id(term_id: str) -> str:
 
 
 def normalize_duo_term_ids(term_ids) -> list[str]:
-    """Return canonical DUO term ids, preserving first-seen order."""
+    """Return canonical DUO term IDs, preserving first-seen order.
+
+    Args:
+        term_ids: Existing iterable of stored DUO terms, with false-like input
+            treated as an empty sequence.
+
+    Returns:
+        De-duplicated canonical identifiers in first-seen order.
+    """
     normalized = []
     for term_id in term_ids or []:
         canonical = normalize_duo_term_id(term_id)
@@ -93,7 +110,15 @@ def normalize_duo_term_ids(term_ids) -> list[str]:
 
 
 def detect_duo_term_storage_style(term_ids) -> str:
-    """Return the preferred DUO storage style inferred from existing values."""
+    """Return the preferred DUO storage style inferred from existing values.
+
+    Args:
+        term_ids: Existing iterable of stored DUO terms examined in order.
+
+    Returns:
+        ``underscore`` or ``colon`` according to the first recognizable
+        stored value, defaulting to ``underscore`` for empty input.
+    """
     for term_id in term_ids or []:
         value = str(term_id or "").strip()
         if value.upper().startswith("DUO_"):
@@ -104,7 +129,16 @@ def detect_duo_term_storage_style(term_ids) -> str:
 
 
 def serialize_duo_term_id(term_id: str, *, style: str) -> str:
-    """Serialize a DUO term id in the requested style."""
+    """Serialize a DUO term ID in the requested style.
+
+    Args:
+        term_id: Identifier normalized before applying the requested style.
+        style: Target storage style; ``underscore`` changes a canonical prefix
+            while other values retain canonical colon syntax.
+
+    Returns:
+        The normalized identifier encoded for the selected storage convention.
+    """
     canonical = normalize_duo_term_id(term_id)
     if style == "underscore" and canonical.upper().startswith("DUO:"):
         return "DUO_" + canonical.split(":", 1)[1]
@@ -112,5 +146,16 @@ def serialize_duo_term_id(term_id: str, *, style: str) -> str:
 
 
 def get_duo_term_metadata(term_id: str) -> dict:
-    """Return validated DUO term metadata for a term id."""
+    """Return validated DUO term metadata for a term ID.
+
+    Args:
+        term_id: DUO identifier in any supported storage syntax.
+
+    Returns:
+        New dictionary copied from the checked-in metadata registry.
+
+    Raises:
+        KeyError: If the normalized identifier is not represented in the
+            registry.
+    """
     return dict(DUO_TERM_METADATA[normalize_duo_term_id(term_id)])

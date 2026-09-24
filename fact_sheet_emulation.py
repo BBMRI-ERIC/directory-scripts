@@ -243,19 +243,40 @@ DATA_CATALOGUE_RE = re.compile(
 
 
 def _is_numeric_count(value: Any) -> bool:
-    """Return whether ``value`` is an exact integer count."""
+    """Return whether ``value`` is an exact integer count.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        ``True`` only for ``int`` values that are not booleans.
+    """
     return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _json_safe_scalar(value: Any) -> Any:
-    """Replace non-finite floating-point values with JSON ``null``."""
+    """Replace non-finite floating-point values with JSON ``null``.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Original scalar unless it is a non-finite float, which becomes ``None``.
+    """
     if isinstance(value, float) and not math.isfinite(value):
         return None
     return value
 
 
 def _reference_value(value: Mapping[str, Any]) -> Any:
-    """Extract a stable scalar from an EMX reference object."""
+    """Extract a stable scalar from an EMX reference object.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Reference ``id``, ``name``, or ``label`` when available, otherwise a stable normalized tuple.
+    """
     for key in ("id", "name", "label"):
         if key in value:
             return value[key]
@@ -266,7 +287,14 @@ def _reference_value(value: Mapping[str, Any]) -> Any:
 
 
 def _normalise_value(value: Any) -> Any:
-    """Return a hashable, order-insensitive representation of Directory data."""
+    """Return a hashable, order-insensitive representation of Directory data.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Hashable normalized scalar or tuple, with missing and placeholder values represented by ``None``.
+    """
     if value is None:
         return None
     if isinstance(value, float) and math.isnan(value):
@@ -286,7 +314,14 @@ def _normalise_value(value: Any) -> Any:
 
 
 def _json_value(value: Any) -> Any:
-    """Convert normalized tuple-based values into JSON-safe values."""
+    """Convert normalized tuple-based values into JSON-safe values.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Recursively JSON-serializable version of tuple and mapping values.
+    """
     if isinstance(value, tuple):
         return [_json_value(item) for item in value]
     if isinstance(value, dict):
@@ -295,7 +330,14 @@ def _json_value(value: Any) -> Any:
 
 
 def _display_value(value: Any) -> str:
-    """Return a stable compact value for tabular output."""
+    """Return a stable compact value for tabular output.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Stable printable string, empty for missing values and JSON-encoded for compound values.
+    """
     if value is None:
         return ""
     if isinstance(value, tuple):
@@ -306,7 +348,14 @@ def _display_value(value: Any) -> str:
 
 
 def _bounded_review_value(value: Any) -> Any:
-    """Bound large prompt values while retaining size and checksum evidence."""
+    """Bound large prompt values while retaining size and checksum evidence.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Original-or-truncated JSON-safe value retaining bounded evidence and checksums for large content.
+    """
     if isinstance(value, str):
         if len(value) <= AI_REVIEW_MAX_TEXT_CHARS:
             return value
@@ -349,6 +398,14 @@ def _bounded_review_value(value: Any) -> Any:
 
 
 def _biobank_id(collection: Mapping[str, Any]) -> str:
+    """Return the parent biobank identifier stored by a collection reference.
+
+    Args:
+        collection: One Directory collection mapping under analysis.
+
+    Returns:
+        Referenced biobank ID, or an empty string when the reference is absent.
+    """
     value = collection.get("biobank")
     if isinstance(value, Mapping):
         return str(value.get("id", ""))
@@ -356,6 +413,14 @@ def _biobank_id(collection: Mapping[str, Any]) -> str:
 
 
 def _parent_id(collection: Mapping[str, Any]) -> str:
+    """Return the parent collection identifier stored by a collection reference.
+
+    Args:
+        collection: One Directory collection mapping under analysis.
+
+    Returns:
+        Referenced parent collection ID, or an empty string when absent.
+    """
     value = collection.get("parent_collection")
     if isinstance(value, Mapping):
         return str(value.get("id", ""))
@@ -363,6 +428,14 @@ def _parent_id(collection: Mapping[str, Any]) -> str:
 
 
 def _country(collection: Mapping[str, Any]) -> str:
+    """Return the upper-case reported country code for a collection.
+
+    Args:
+        collection: One Directory collection mapping under analysis.
+
+    Returns:
+        Upper-case country ID, or an empty string when no country is recorded.
+    """
     value = collection.get("country", "")
     if isinstance(value, Mapping):
         value = value.get("id", "")
@@ -370,14 +443,28 @@ def _country(collection: Mapping[str, Any]) -> str:
 
 
 def _normalise_name(value: Any) -> str:
-    """Normalize a collection name for conservative exact-name grouping."""
+    """Normalize a collection name for conservative exact-name grouping.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Case-folded, whitespace-normalized, punctuation-free grouping key.
+    """
     text = " ".join(str(value or "").casefold().split())
     return re.sub(r"[^a-z0-9]+", " ", text).strip()
 
 
 
 def _informative_text(value: Any) -> str:
-    """Return normalized informative prose, or an empty string for placeholders."""
+    """Return normalized informative prose, or an empty string for placeholders.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Normalized non-placeholder prose, or an empty string for absent or placeholder text.
+    """
     text = " ".join(str(value or "").split()).strip()
     if not text or text.casefold() in MISSING_TEXT_VALUES:
         return ""
@@ -387,7 +474,16 @@ def _informative_text(value: Any) -> str:
 
 
 def _bounded_snippet(text: str, match: re.Match[str], limit: int = 240) -> str:
-    """Return a bounded sentence-like snippet around a marker match."""
+    """Return a bounded sentence-like snippet around a marker match.
+
+    Args:
+        text: Normalized source text from which a bounded excerpt is selected.
+        match: Regular-expression match locating the relevant evidence in text.
+        limit: Maximum character count retained in the returned excerpt.
+
+    Returns:
+        Sentence-like marker context shortened to no more than ``limit`` characters.
+    """
     start = max(text.rfind(".", 0, match.start()) + 1, 0)
     end = text.find(".", match.end())
     end = len(text) if end < 0 else end + 1
@@ -401,12 +497,26 @@ def _bounded_snippet(text: str, match: re.Match[str], limit: int = 240) -> str:
 
 
 def _signature_value(value: Any) -> str:
-    """Serialize normalized data into one deterministic signature component."""
+    """Serialize normalized data into one deterministic signature component.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+
+    Returns:
+        Deterministic JSON string used as one comparison-signature component.
+    """
     return json.dumps(_json_value(value), sort_keys=True, ensure_ascii=True)
 
 
 def _operational_signature(collection: Mapping[str, Any]) -> tuple[str, ...]:
-    """Return a missingness-preserving signature for non-dimension fields."""
+    """Return a missingness-preserving signature for non-dimension fields.
+
+    Args:
+        collection: One Directory collection mapping under analysis.
+
+    Returns:
+        Tuple of serialized values for ``OPERATIONAL_FIELDS`` in their declared order.
+    """
     return tuple(
         _signature_value(_operational_value(field, collection)[0])
         for field in OPERATIONAL_FIELDS
@@ -416,7 +526,14 @@ def _operational_signature(collection: Mapping[str, Any]) -> tuple[str, ...]:
 def _dimension_variation_fields(
     members: Iterable[Mapping[str, Any]],
 ) -> list[str]:
-    """Return current fact-sheet fields with at least two populated values."""
+    """Return current fact-sheet fields with at least two populated values.
+
+    Args:
+        members: Collection mappings belonging to the candidate family.
+
+    Returns:
+        Current fact-sheet dimensions that have at least two populated family values.
+    """
     records = list(members)
     varying = []
     for field in CURRENT_FACT_DIMENSION_FIELDS[:3]:
@@ -438,7 +555,14 @@ def _dimension_variation_fields(
 
 
 def _diagnosis_partition(members: Iterable[Mapping[str, Any]]) -> bool:
-    """Return whether records contain at least two distinct diagnosis values."""
+    """Return whether records contain at least two distinct diagnosis values.
+
+    Args:
+        members: Collection mappings belonging to the candidate family.
+
+    Returns:
+        ``True`` when at least two distinct populated diagnosis values occur.
+    """
     values = []
     for member in members:
         value = _normalise_value(member.get("diagnosis_available"))
@@ -448,7 +572,15 @@ def _diagnosis_partition(members: Iterable[Mapping[str, Any]]) -> bool:
 
 
 def _shared_token_prefix(values: Iterable[Any], minimum_tokens: int) -> str:
-    """Return a shared normalized token prefix of the requested minimum length."""
+    """Return a shared normalized token prefix of the requested minimum length.
+
+    Args:
+        values: Values whose shared representation or storage style is assessed.
+        minimum_tokens: Minimum common leading-token count required for a prefix.
+
+    Returns:
+        Shared normalized leading words, or an empty string when the minimum is not met.
+    """
     token_lists = [_normalise_name(value).split() for value in values]
     if not token_lists or any(len(tokens) < minimum_tokens for tokens in token_lists):
         return ""
@@ -461,7 +593,15 @@ def _shared_token_prefix(values: Iterable[Any], minimum_tokens: int) -> str:
 
 
 def _description_frame(value: Any, token_count: int = 6) -> str:
-    """Return a diagnosis-oriented leading prose frame for corroboration."""
+    """Return a diagnosis-oriented leading prose frame for corroboration.
+
+    Args:
+        value: Raw Directory or derived value handled by this normalization helper.
+        token_count: Leading normalized token count retained for corroboration.
+
+    Returns:
+        Leading diagnosis-oriented normalized prose frame, or an empty string when unsupported.
+    """
     text = _informative_text(value)
     normalized = _normalise_name(text)
     if not re.search(
@@ -478,7 +618,14 @@ def _description_frame(value: Any, token_count: int = 6) -> str:
 
 
 def _specific_id_series_stem(collection_id: Any) -> str:
-    """Return a sufficiently specific delimited local-ID stem, if present."""
+    """Return a sufficiently specific delimited local-ID stem, if present.
+
+    Args:
+        collection_id: Directory collection identifier from which a local stem is derived.
+
+    Returns:
+        Delimited local-ID series stem, or an empty string when it is not sufficiently specific.
+    """
     local_id = str(collection_id or "").split(":collection:")[-1]
     tokens = [token for token in re.split(r"[_:/-]+", local_id) if token]
     if len(tokens) < 3:
@@ -492,7 +639,14 @@ def _specific_id_series_stem(collection_id: Any) -> str:
 
 
 def _future_dimension_prefix(name: Any) -> str:
-    """Return a conservative prefix for patterned anatomy/imaging names."""
+    """Return a conservative prefix for patterned anatomy/imaging names.
+
+    Args:
+        name: Collection or field name subjected to normalization or splitting.
+
+    Returns:
+        Case-folded leading name segment for a patterned series, or an empty string.
+    """
     text = " ".join(str(name or "").split()).strip()
     match = re.match(r"^([A-Za-z][A-Za-z0-9]{2,})[_:/-]", text)
     return match.group(1).casefold() if match else ""
@@ -506,7 +660,18 @@ def _top_level_family(
     stable_key: str,
     base_name: str = "",
 ) -> dict[str, Any]:
-    """Build one deterministic top-level candidate family."""
+    """Build one deterministic top-level candidate family.
+
+    Args:
+        members: Collection mappings belonging to the candidate family.
+        family_kind: Discovery family kind recorded in the constructed payload.
+        discovery_rule: Deterministic rule that produced the candidate family.
+        stable_key: Stable grouping key used to derive the family identifier.
+        base_name: Umbrella collection name used as the suffix boundary.
+
+    Returns:
+        New deterministic candidate-family mapping retaining sorted source members and target metadata.
+    """
     members = sorted(members, key=lambda item: str(item.get("id", "")))
     return {
         "family_id": _family_id("top-level", f"{stable_key}\0{discovery_rule}"),
@@ -528,7 +693,15 @@ def _append_unique_family(
     families: list[dict[str, Any]],
     family: dict[str, Any],
 ) -> None:
-    """Append one family while resolving only exact or contained overlap."""
+    """Append one family while resolving only exact or contained overlap.
+
+    Args:
+        families: Mutable candidate-family list receiving non-duplicate families.
+        family: Candidate family mapping assembled during discovery.
+
+    Returns:
+        None. Mutates ``families`` by appending or merging only non-duplicate candidate families.
+    """
     member_ids = frozenset(str(member.get("id", "")) for member in family["members"])
     for index, existing in enumerate(families):
         existing_ids = frozenset(
@@ -561,7 +734,15 @@ def _append_unique_family(
 
 
 def _family_id(kind: str, key: str) -> str:
-    """Return a stable compact family identifier."""
+    """Return a stable compact family identifier.
+
+    Args:
+        kind: Family identifier kind controlling its stable prefix.
+        key: Stable identifier key hashed or retained by the family-ID helper.
+
+    Returns:
+        Stable sibling key or hashed top-level identifier with its family-kind prefix.
+    """
     if kind == "siblings":
         return f"siblings:{key}"
     digest = sha256(key.encode("utf-8")).hexdigest()[:16]
@@ -569,7 +750,15 @@ def _family_id(kind: str, key: str) -> str:
 
 
 def _extract_name_suffix(name: Any, base_name: Any) -> str:
-    """Extract a separator-delimited suffix after a known umbrella name."""
+    """Extract a separator-delimited suffix after a known umbrella name.
+
+    Args:
+        name: Collection or field name subjected to normalization or splitting.
+        base_name: Umbrella collection name used as the suffix boundary.
+
+    Returns:
+        Separator-delimited member suffix after ``base_name``, or an empty string.
+    """
     name_text = " ".join(str(name or "").split()).strip()
     base_text = " ".join(str(base_name or "").split()).strip()
     if not name_text or not base_text:
@@ -583,7 +772,14 @@ def _extract_name_suffix(name: Any, base_name: Any) -> str:
 
 
 def _split_dimension_suffix(name: Any) -> tuple[str, str]:
-    """Split a collection name at its final dimension-like separator."""
+    """Split a collection name at its final dimension-like separator.
+
+    Args:
+        name: Collection or field name subjected to normalization or splitting.
+
+    Returns:
+        Pair of umbrella name and final suffix, or two empty strings when no separator exists.
+    """
     name_text = " ".join(str(name or "").split()).strip()
     matches = list(re.finditer(r"\s+(?:-|:|/|\u2013|\u2014)\s+", name_text))
     if not matches:
@@ -598,7 +794,15 @@ def _suffix_matches_structured_value(
     collection: Mapping[str, Any],
     suffix: str,
 ) -> bool:
-    """Return whether a name suffix exactly matches one structured dimension."""
+    """Return whether a name suffix exactly matches one structured dimension.
+
+    Args:
+        collection: One Directory collection mapping under analysis.
+        suffix: Name suffix tested against the collection's structured values.
+
+    Returns:
+        ``True`` only when the suffix equals one single-valued supported or future dimension.
+    """
     suffix_key = _normalise_name(suffix)
     if not suffix_key:
         return False
@@ -864,7 +1068,15 @@ def discover_candidate_families(
 
 
 def _operational_value(field: str, collection: Mapping[str, Any]) -> tuple[Any, str]:
-    """Return a normalized operational value and normalization note."""
+    """Return a normalized operational value and normalization note.
+
+    Args:
+        field: Directory field key selected for extraction or comparison.
+        collection: One Directory collection mapping under analysis.
+
+    Returns:
+        Pair of normalized field value and the normalization note applied to it.
+    """
     if field == "network_membership":
         value = []
         for alias in ("network", "networks"):
@@ -893,7 +1105,17 @@ def _compare_field(
     field: str,
     role: str,
 ) -> dict[str, Any]:
-    """Compare one field using equal, missing/unknown, and differing states."""
+    """Compare one field using equal, missing/unknown, and differing states.
+
+    Args:
+        family_id: Stable identifier of the candidate family being compared.
+        members: Collection mappings belonging to the candidate family.
+        field: Directory field key selected for extraction or comparison.
+        role: Comparison role that determines the field group and output label.
+
+    Returns:
+        Comparison record containing member values, missingness, normalization, and status.
+    """
     member_values = []
     normalized_values = []
     missing_ids = []
@@ -951,7 +1173,15 @@ def _boundary_evidence(
     *,
     source_fields: tuple[str, ...] = ("description", "name", "id"),
 ) -> list[dict[str, Any]]:
-    """Return member-specific marker evidence only where family values differ."""
+    """Return member-specific marker evidence only where family values differ.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        source_fields: Source fields searched for operational boundary evidence.
+
+    Returns:
+        Sorted boundary-marker evidence only for categories that differ across family members.
+    """
     candidates: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(
         lambda: defaultdict(list)
     )
@@ -1045,7 +1275,14 @@ def _boundary_evidence(
 def _description_evidence_model(
     family: Mapping[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Classify description differences and retain bounded audit evidence."""
+    """Classify description differences and retain bounded audit evidence.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+
+    Returns:
+        Pair of description classification evidence and underlying description-boundary rows.
+    """
     descriptions = [
         _informative_text(member.get("description")) for member in family["members"]
     ]
@@ -1101,7 +1338,14 @@ def _description_evidence_model(
 
 
 def _scientific_question_catalogue(family: Mapping[str, Any]) -> bool:
-    """Return whether evidence describes questions/data elements, not strata."""
+    """Return whether evidence describes questions/data elements, not strata.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+
+    Returns:
+        ``True`` when family prose appears to enumerate scientific questions or data elements.
+    """
     texts = " ".join(
         str(member.get(field, "") or "")
         for member in family["members"]
@@ -1111,7 +1355,15 @@ def _scientific_question_catalogue(family: Mapping[str, Any]) -> bool:
 
 
 def _single_dimension_value(collection: Mapping[str, Any], field: str) -> tuple[Any, bool]:
-    """Return one normalized dimension value and whether the source is multivalued."""
+    """Return one normalized dimension value and whether the source is multivalued.
+
+    Args:
+        collection: One Directory collection mapping under analysis.
+        field: Directory field key selected for extraction or comparison.
+
+    Returns:
+        Pair of normalized value and a flag stating whether it contains multiple source values.
+    """
     value = _normalise_value(collection.get(field))
     if value is None or value == ():
         return None, False
@@ -1123,7 +1375,14 @@ def _single_dimension_value(collection: Mapping[str, Any], field: str) -> tuple[
 
 
 def _name_suffixes(family: Mapping[str, Any]) -> dict[str, str]:
-    """Return member name suffixes relative to the family's umbrella name."""
+    """Return member name suffixes relative to the family's umbrella name.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+
+    Returns:
+        Collection-ID keyed suffixes for eligible sibling or top-level suffix families.
+    """
     base_name = family.get("base_name", "")
     if not base_name or family.get("family_kind") not in {
         "siblings",
@@ -1144,6 +1403,17 @@ def _dimension_confidence(
     structured_coverage: int,
     multivalued_count: int,
 ) -> str:
+    """Classify confidence in a candidate dimension from its source coverage.
+
+    Args:
+        member_count: Number of source collections in the candidate family.
+        coverage: Fraction or count evidence used to assess dimension confidence.
+        structured_coverage: Source records with a populated structured dimension.
+        multivalued_count: Source records that cannot yield a single dimension value.
+
+    Returns:
+        ``high``, ``medium``, or ``low`` confidence according to coverage and multiplicity.
+    """
     if coverage == member_count and structured_coverage == member_count and not multivalued_count:
         return "high"
     if coverage == member_count and not multivalued_count:
@@ -1161,7 +1431,20 @@ def _build_dimension_candidate(
     ontology: str,
     suffix_fallback: bool = False,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    """Build one dimension candidate and its per-member evidence rows."""
+    """Build one dimension candidate and its per-member evidence rows.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        source_field: Directory field from which candidate dimension values originate.
+        dimension: Proposed fact-sheet or future-dimension identifier.
+        classification: Reason the candidate dimension was recognized.
+        representability: Whether the dimension fits the current fact-sheet schema.
+        ontology: Ontology or Directory attribute supporting the dimension.
+        suffix_fallback: Whether name-suffix evidence supplements structured values.
+
+    Returns:
+        Candidate mapping or ``None``, together with the corresponding per-member evidence rows.
+    """
     has_structured_evidence = any(
         _single_dimension_value(member, source_field)[0] is not None
         for member in family["members"]
@@ -1253,7 +1536,14 @@ def _build_dimension_candidate(
 def _discover_dimensions(
     family: Mapping[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return deterministic dimension candidates and per-member evidence."""
+    """Return deterministic dimension candidates and per-member evidence.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+
+    Returns:
+        Candidate dimension mappings and their per-member source-value evidence rows.
+    """
     candidates = []
     values = []
 
@@ -1391,7 +1681,17 @@ def _score_family(
     dimensions: list[Mapping[str, Any]],
     identity_evidence: list[str],
 ) -> tuple[float, str]:
-    """Return conservative emulation score and categorical confidence."""
+    """Return conservative emulation score and categorical confidence.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        comparisons: Field-comparison records already calculated for the family.
+        dimensions: Candidate fact-dimension records derived for the family.
+        identity_evidence: Evidence that supports conceptual identity of family members.
+
+    Returns:
+        Bounded emulation score and its ``high``, ``medium``, or ``low`` confidence label.
+    """
     kind = family["family_kind"]
     if kind == "top_level_same_name":
         score = 0.65
@@ -1431,7 +1731,15 @@ def _identity_evidence(
     family: Mapping[str, Any],
     dimensions: list[Mapping[str, Any]],
 ) -> list[str]:
-    """Return conservative deterministic evidence for one conceptual family."""
+    """Return conservative deterministic evidence for one conceptual family.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        dimensions: Candidate fact-dimension records derived for the family.
+
+    Returns:
+        Deterministic conceptual-identity evidence labels derived from family structure and dimensions.
+    """
     if family["family_kind"] == "top_level_same_name":
         return ["same_normalized_top_level_name"]
     discovery_rule = family.get("discovery_rule", "")
@@ -1461,6 +1769,14 @@ def _identity_evidence(
 
 
 def _source_collection_rows(family: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build reviewable source-row records for every member of a candidate family.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+
+    Returns:
+        One report row per family member with source aggregates and populated report fields.
+    """
     rows = []
     for member in family["members"]:
         row = {
@@ -1498,7 +1814,15 @@ def _target_total_evidence(
     family: Mapping[str, Any],
     facts_by_collection: Mapping[str, list[dict[str, Any]]],
 ) -> dict[str, Any] | None:
-    """Return an existing or metadata-backed target total without summing."""
+    """Return an existing or metadata-backed target total without summing.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        facts_by_collection: Collection-ID keyed fact-sheet rows available for evidence.
+
+    Returns:
+        Existing target all-star or metadata total record, or ``None`` without summing source collections.
+    """
     target = family.get("target")
     target_id = family.get("target_collection_id", "")
     if not target or not target_id:
@@ -1544,7 +1868,19 @@ def _migration_analysis(
     facts_by_collection: Mapping[str, list[dict[str, Any]]],
     identity_evidence: list[str],
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Build migration readiness, non-additive previews, and blocked evidence."""
+    """Build migration readiness, non-additive previews, and blocked evidence.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        comparisons: Field-comparison records already calculated for the family.
+        dimensions: Candidate fact-dimension records derived for the family.
+        dimension_values: Per-source values associated with candidate dimensions.
+        facts_by_collection: Collection-ID keyed fact-sheet rows available for evidence.
+        identity_evidence: Evidence that supports conceptual identity of family members.
+
+    Returns:
+        Migration readiness mapping, non-additive proposed marginal rows, and unsupported-dimension rows.
+    """
     blockers = []
     conflicts = sorted(
         row["field"]
@@ -2120,7 +2456,15 @@ def _review_case(
     family: Mapping[str, Any],
     analysis: Mapping[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    """Build one bounded, evidence-linked external-review case."""
+    """Build one bounded, evidence-linked external-review case.
+
+    Args:
+        family: Candidate family mapping assembled during discovery.
+        analysis: Completed analysis tables used to assemble an advisory review case.
+
+    Returns:
+        Bounded advisory review case with family, migration, comparison, and dimension evidence.
+    """
     family_id = family["family_id"]
     migration = next(
         row for row in analysis["migration_mapping"] if row["family_id"] == family_id

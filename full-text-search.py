@@ -59,6 +59,16 @@ configure_logging(args)
 
 
 def _withdrawn_scope_label(args):
+    """Return the cache-directory label for the selected withdrawal scope.
+
+    Args:
+        args: Parsed CLI namespace exposing ``only_withdrawn`` and
+            ``include_withdrawn`` booleans.
+
+    Returns:
+        Stable cache label distinguishing active-only, combined, and
+        withdrawn-only indexes.
+    """
     if args.only_withdrawn:
         return "withdrawn-only"
     if args.include_withdrawn:
@@ -69,13 +79,31 @@ def _withdrawn_scope_label(args):
 indexdir = os.path.join("indexdir", args.schema, _withdrawn_scope_label(args))
 
 def _patch_whoosh_lockf():
+    """Replace incompatible Whoosh file locks with a Termux-safe lockf lock.
+
+    Returns:
+        None. Mutates imported Whoosh/filelock module classes when optional
+        platform modules are available; otherwise leaves them unchanged.
+    """
     try:
         import fcntl  # type: ignore
     except Exception:
         return
 
     class LockfLock(filelock.LockBase):
+        """Provide a nonblocking POSIX ``lockf`` implementation for Whoosh."""
+
         def acquire(self, blocking=False):
+            """Acquire the lock file using a POSIX advisory lock.
+
+            Args:
+                blocking: Whether to wait for an existing lock instead of
+                    returning immediately when it is already held.
+
+            Returns:
+                ``True`` after acquiring the file lock, or ``False`` when a
+                nonblocking acquisition cannot obtain it.
+            """
             flags = os.O_CREAT | os.O_WRONLY
             self.fd = os.open(self.filename, flags)
             mode = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
@@ -89,6 +117,14 @@ def _patch_whoosh_lockf():
                 return False
 
         def release(self):
+            """Release the held file descriptor and its advisory lock.
+
+            Returns:
+                None. Clears the lock descriptor after release.
+
+            Raises:
+                Exception: If callers release before a successful acquisition.
+            """
             if self.fd is None:
                 raise Exception("Lock was not acquired")
             fcntl.lockf(self.fd, fcntl.LOCK_UN)
@@ -132,6 +168,14 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
     writer = ix.writer()
 
     def getContact(contactId):
+        """Look up one indexed contact without aborting indexing on failure.
+
+        Args:
+            contactId: Directory contact identifier referenced by an entity.
+
+        Returns:
+            Contact mapping when the Directory resolves it, otherwise ``None``.
+        """
         contact = None
         try:
             contact = dir.getContact(contactId)
@@ -141,12 +185,28 @@ if 'index' in args.purgeCaches or not os.path.exists(indexdir):
 
 
     def getContactFullName(entity):
+        """Build one display name from optional contact-name components.
+
+        Args:
+            entity: Contact mapping, or ``None`` when no contact is assigned.
+
+        Returns:
+            Space-separated title and name components, or an empty string.
+        """
         if entity is None:
             return ""
         else:
             return " ".join(filter(None,[entity.get('title_before_name'), entity.get('first_name'), entity.get('last_name'), entity.get('title_after_name')]))
 
     def getAlsoKnown(entity):
+        """Serialize an entity's temporary ``also_known`` reference values.
+
+        Args:
+            entity: Directory entity mapping whose optional references are read.
+
+        Returns:
+            Newline-delimited reference IDs, or an empty string when absent.
+        """
         # TODO: this is a temporary hack - also_known needs to be properly handled by the Directory class and made accessible here
         also_known = []
         if entity.get('also_known'):

@@ -758,6 +758,28 @@ def test_qc_plugins_and_check_helpers_have_no_contract_violations() -> None:
     }
 
 
+def test_all_tracked_production_python_files_have_complete_contracts() -> None:
+    """Verify every tracked non-test Python definition has a full contract.
+
+    Returns:
+        None. The test fails with every remaining production documentation
+        violation, while test-only debt remains covered by the temporary
+        baseline until Task 7.
+    """
+    paths = tuple(
+        path for path in repository_contract_paths(REPO_ROOT)
+        if not path.parts[0] == "tests"
+    )
+    violations: list[str] = []
+    for path in paths:
+        violations.extend(
+            collect_contract_violations(
+                (REPO_ROOT / path).read_text(encoding="utf-8"), path.as_posix()
+            )
+        )
+    assert sorted(violations) == []
+
+
 def test_exporters_and_map_helpers_have_no_contract_violations() -> None:
     """Verify Task 5 exporters and transformations meet the documentation contract.
 

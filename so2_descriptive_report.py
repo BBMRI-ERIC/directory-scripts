@@ -45,6 +45,20 @@ class QuestionDefinition:
     structured selections that semantically enable that follow-up. An absent
     mapping retains the full parent response as context rather than inventing a
     routing rule.
+
+    Attributes:
+        question_id: Stable report question identifier from the editable schema.
+        column: Workbook column holding the primary response value.
+        question_type: Validated descriptive response classification.
+        label: Human-readable question wording shown in reports.
+        categories: Canonical ordered structured-answer categories.
+        delimiter: Separator used to split multi-choice source cells, if any.
+        parent_columns: Structured parent columns providing routing context.
+        applicability: Optional validated rule determining relevant responses.
+        parent_context_values: Parent selections that semantically enable text.
+        exclusive_categories: Categories that cannot co-occur with another answer.
+        category_aliases: Raw-to-canonical response label normalization map.
+        form_uid: Authoritative EUSurvey field UID matched to this question.
     """
 
     question_id: str
@@ -65,7 +79,21 @@ class QuestionDefinition:
 
 @dataclass(frozen=True)
 class AssociationHeatmapDefinition:
-    """Validated registry metadata for one approved association heatmap."""
+    """Validated registry metadata for one approved association heatmap.
+
+    Attributes:
+        definition_id: Stable registry key for the heatmap.
+        row_question_id: Descriptive question identifier represented on rows.
+        column_question_id: Descriptive question identifier represented on columns.
+        row_form_uid: Authoritative EUSurvey UID for the row question.
+        column_form_uid: Authoritative EUSurvey UID for the column question.
+        row_categories: Canonical categories retained on the row axis.
+        column_categories: Canonical categories retained on the column axis.
+        mode: Whether the approved association is default or exploratory.
+        title: Reader-facing heatmap title.
+        interpretation: Validated interpretation text for report readers.
+        conditional_summary: Whether conditional percentages accompany counts.
+    """
 
     definition_id: str
     row_question_id: str
@@ -82,7 +110,19 @@ class AssociationHeatmapDefinition:
 
 @dataclass(frozen=True)
 class SurveyWorkbook:
-    """Validated workbook provenance and the retained response rows."""
+    """Validated workbook provenance and the retained response rows.
+
+    Attributes:
+        source_path: Input workbook path as supplied to the loader.
+        source_sha256: SHA-256 checksum of the source workbook bytes.
+        worksheet: Worksheet selected for submitted-response analysis.
+        alias: EUSurvey export alias from the service rows.
+        export_date: EUSurvey export date from the service rows.
+        header_row: Zero-based worksheet row containing column headers.
+        responses: New dataframe containing retained nonblank response rows.
+        total_data_rows: Number of data rows before blank-row exclusion.
+        excluded_blank_rows: Number of source rows excluded as entirely blank.
+    """
 
     source_path: str
     source_sha256: str
@@ -333,7 +373,19 @@ def load_form_structure(path: str | Path) -> dict[str, Any]:
     matrix_title: str | None = None
 
     def register_question(question_id: str | None, question_type: str | None, label: str) -> None:
-        """Register one XML question after validating its identity and display text."""
+        """Register one XML question after validating identity and display text.
+
+        Args:
+            question_id: XML question identifier required to be unique.
+            question_type: XML response-type declaration required for reporting.
+            label: Visible question or matrix-row text used as the lookup key.
+
+        Returns:
+            None. Mutates the enclosing ``questions_by_id`` index.
+
+        Raises:
+            InputError: If required XML question metadata is absent or repeated.
+        """
         if not question_id or not question_type or not label:
             raise InputError("Form-structure XML has a question without id, type, or text.")
         if question_id in questions_by_id:
@@ -416,7 +468,22 @@ def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
     questions: dict[str, dict[str, Any]] = {}
 
     def add_question(label: str, response_type: str, mandatory: bool, dependencies: list[dict[str, str]], matrix_parent: str | None = None, matrix_row: str | None = None) -> None:
-        """Store one report-facing question after label uniqueness validation."""
+        """Store one report-facing question after label uniqueness validation.
+
+        Args:
+            label: Visible question or matrix-row wording used for matching.
+            response_type: EUSurvey response type normalized for reporting.
+            mandatory: Whether the manifest marks this question as required.
+            dependencies: Resolved parent-choice conditions controlling visibility.
+            matrix_parent: Optional enclosing matrix title for a matrix row.
+            matrix_row: Optional visible row label within ``matrix_parent``.
+
+        Returns:
+            None. Mutates the enclosing normalized ``questions`` index.
+
+        Raises:
+            InputError: If another form field has the same normalized label.
+        """
         key = _form_label(label)
         if key in questions:
             raise InputError(f"Form manifest has duplicate normalized question text: {label!r}.")
@@ -1614,7 +1681,14 @@ def build_descriptive_payload(
 
 @dataclass(frozen=True)
 class RenderedDescriptiveReport:
-    """Rendered report TeX and shared standalone-chart fragments."""
+    """Rendered report TeX and shared standalone-chart fragments.
+
+    Attributes:
+        tex: Complete self-contained TeX source for the descriptive report.
+        chart_fragments: TikZ fragments keyed by stable standalone chart names.
+        chart_documents: Complete TeX chart documents keyed by chart name.
+        chart_paths: Relative PDF paths associated with rendered chart names.
+    """
 
     tex: str
     chart_fragments: Mapping[str, str]
@@ -1968,6 +2042,14 @@ def _pie_label_layout(labels: Sequence[Mapping[str, Any]], label_bound: float = 
         groups[preferred].append({**label, "side": preferred})
 
     def occupied_height(items: Sequence[Mapping[str, Any]]) -> float:
+        """Calculate total vertical space needed by labels on one pie side.
+
+        Args:
+            items: Pie-label descriptors containing precomputed wrapped-line counts.
+
+        Returns:
+            Required TikZ height including inter-label gaps.
+        """
         return sum(_pie_label_height(int(item["lines"])) for item in items) + max(0, len(items) - 1) * _PIE_LABEL_GAP
 
     available = 2 * label_bound
@@ -2607,6 +2689,18 @@ def _association_definition_from_payload(value: Any, path: str) -> AssociationHe
             f"Descriptive statistics payload {path}.conditional_summary must be boolean."
         )
     def categories(field: str) -> tuple[str, ...]:
+        """Read a nonempty, duplicate-free category axis from serialized data.
+
+        Args:
+            field: Definition key selecting row or column category values.
+
+        Returns:
+            Immutable category labels preserving their payload order.
+
+        Raises:
+            InputError: If the serialized category list is empty, malformed, or
+                contains duplicates.
+        """
         values = _payload_array(definition.get(field), f"{path}.{field}")
         if not values or not all(isinstance(item, str) and item.strip() for item in values):
             raise InputError(
@@ -3441,7 +3535,18 @@ def render_descriptive_pdf(
         chart_dir_was_empty = target_charts is not None and target_charts.exists()
 
         def replace_file(source: Path, target: Path) -> None:
-            """Publish one file while retaining its prior value for rollback."""
+            """Publish one staged file while retaining prior content for rollback.
+
+            Args:
+                source: Existing staged file moved into the public target path.
+                target: Public output file replaced atomically within its parent.
+
+            Returns:
+                None. Mutates the enclosing publication and backup collections.
+
+            Raises:
+                OSError: If backup creation or replacement cannot complete.
+            """
             if target.exists():
                 descriptor, backup_name = tempfile.mkstemp(
                     prefix=".so2-report-backup-", dir=target.parent,
@@ -3454,7 +3559,18 @@ def render_descriptive_pdf(
             published.append(target)
 
         def replace_directory(source: Path, target: Path) -> None:
-            """Publish a staged directory while retaining its prior directory for rollback."""
+            """Publish a staged directory while retaining prior content for rollback.
+
+            Args:
+                source: Existing staged chart directory moved into public output.
+                target: Public chart directory replaced atomically in its parent.
+
+            Returns:
+                None. Mutates the enclosing publication and backup collections.
+
+            Raises:
+                OSError: If backup creation or directory replacement fails.
+            """
             if target.exists():
                 backup = Path(tempfile.mkdtemp(prefix=".so2-charts-backup-", dir=target.parent))
                 backup.rmdir()

@@ -177,9 +177,9 @@ def test_so2_modules_document_each_parameter_and_return_value():
                 if argument.arg not in {"self", "cls"}
             ]
             if function.args.vararg is not None:
-                parameters.append(function.args.vararg.arg)
+                parameters.append("*" + function.args.vararg.arg)
             if function.args.kwarg is not None:
-                parameters.append(function.args.kwarg.arg)
+                parameters.append("**" + function.args.kwarg.arg)
             if parameters:
                 assert "Args:" in docstring, (source_path.name, function.name)
                 args_section = docstring.split("Args:", 1)[1].split("Returns:", 1)[0]

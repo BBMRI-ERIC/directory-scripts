@@ -26,12 +26,34 @@ COLLECTIONS_SHEET = 'eu_bbmri_eric_collections'
 
 
 def _get_diagnosis_available_column(sheet):
+    """Locate the zero-based diagnosis column in a Directory workbook sheet.
+
+    Args:
+        sheet: OpenPyXL worksheet whose first row is the Directory header.
+
+    Returns:
+        Zero-based diagnosis column index, or ``None`` when the required
+        ``diagnosis_available`` header is absent.
+    """
     for col in sheet.iter_cols(max_row=1):
         if col[0].value == DIAGNOSIS_AVAILABLE_COLUMN:
             return col[0].col_idx - 1
 
 
 def add_orphacodes(directory_file, orphanet_file, output_file):
+    """Append conservative ORPHA mappings to ICD-10 diagnoses in a workbook.
+
+    Args:
+        directory_file: Source Directory EMX workbook containing the expected
+            collections sheet and diagnosis column.
+        orphanet_file: Orphanet XML mapping source loaded by ``OrphaCodes``.
+        output_file: Workbook path written after eligible ``NTBT`` and exact
+            ORPHA mappings have been appended.
+
+    Returns:
+        None. A modified workbook is saved to ``output_file``; invalid input
+        workbooks terminate through the command-line error path.
+    """
     orphacodes = OrphaCodes(orphanet_file)
     try:
         wb = openpyxl.load_workbook(directory_file)
@@ -68,6 +90,18 @@ def add_orphacodes(directory_file, orphanet_file, output_file):
 
 if __name__ == '__main__':
     def file_exist(file_argument):
+        """Validate an argparse path argument before workbook processing.
+
+        Args:
+            file_argument: Candidate filesystem path supplied for an input
+                workbook or Orphanet mapping file.
+
+        Returns:
+            The unchanged path when it exists.
+
+        Raises:
+            argparse.ArgumentTypeError: If the supplied path does not exist.
+        """
         if os.path.exists(file_argument):
             return file_argument
         raise argparse.ArgumentTypeError("File {} does not exist".format(file_argument))

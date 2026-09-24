@@ -57,6 +57,16 @@ dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 # From https://stackoverflow.com/questions/749796/pretty-printing-xml-in-python/38573964#38573964
 def prettify(element, indent='  '):
+    """Insert indentation whitespace into an XML subtree before serialization.
+
+    Args:
+        element: Root ``ElementTree`` node whose text and tail whitespace are
+            updated in place.
+        indent: Whitespace unit used once per XML nesting level.
+
+    Returns:
+        None. The supplied XML elements receive serialization formatting text.
+    """
     queue = [(0, element)]  # (level, element)
     while queue:
         level, element = queue.pop(0)

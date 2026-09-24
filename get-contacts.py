@@ -93,6 +93,16 @@ if args.negotiator:
 
 
     def printCollectionStdout(collectionList : List, headerStr : str):
+        """Print selected collections and their resolved parent biobanks.
+
+        Args:
+            collectionList: Directory collection mappings printed in iteration
+                order.
+            headerStr: Heading describing the collection group.
+
+        Returns:
+            None. Writes a human-readable list to standard output.
+        """
         print(headerStr + " - " + str(len(collectionList)) + " collections")
         for collection in collectionList:
             biobankId = dir.getCollectionBiobankId(collection['id'])
@@ -157,6 +167,14 @@ else:
     activeContacts = set()
 
     def initContact (contactId : str):
+        """Initialize one active contact's normalized display information.
+
+        Args:
+            contactId: Directory contact identifier not yet in ``activeContacts``.
+
+        Returns:
+            None. Mutates the enclosing contact ID, email, and name indexes.
+        """
         from nameparser import HumanName
 
         assert contactId not in activeContacts

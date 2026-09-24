@@ -603,7 +603,7 @@ def get_row_value(row: pd.Series, *column_names: str) -> Any:
 
     Args:
         row: One submitted survey response row.
-        column_names: Alternative survey column names checked in declared order.
+        *column_names: Alternative survey column names checked in declared order.
 
     Returns:
         Matched row value or an empty value when no candidate column is present."""

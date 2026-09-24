@@ -29,7 +29,12 @@ class FormInputError(ValueError):
 
 @dataclass(frozen=True)
 class RoutingAtom:
-    """One parent-choice condition that can make a field visible."""
+    """One parent-choice condition that can make a field visible.
+
+    Attributes:
+        parent_uid: UID of the parent field whose answer is evaluated.
+        choice_uid: UID of the parent choice that satisfies this condition.
+    """
 
     parent_uid: str
     choice_uid: str
@@ -37,7 +42,12 @@ class RoutingAtom:
 
 @dataclass(frozen=True)
 class RoutingExpression:
-    """Structured AND/OR conditions controlling a field's visibility."""
+    """Structured AND/OR conditions controlling a field's visibility.
+
+    Attributes:
+        operator: ``all`` or ``any`` relation applied to the routing atoms.
+        atoms: Immutable parent-choice conditions evaluated by the relation.
+    """
 
     operator: Literal["all", "any"]
     atoms: tuple[RoutingAtom, ...]
@@ -45,7 +55,13 @@ class RoutingExpression:
 
 @dataclass(frozen=True)
 class FormChoice:
-    """A selectable EUSurvey value or a matrix axis label."""
+    """A selectable EUSurvey value or a matrix axis label.
+
+    Attributes:
+        uid: EUSurvey identifier for the choice or matrix-axis value.
+        label: Reader-facing text retained from the source form.
+        position: Source ordering position used for deterministic rendering.
+    """
 
     uid: str
     label: str
@@ -54,7 +70,21 @@ class FormChoice:
 
 @dataclass(frozen=True)
 class FormField:
-    """Normalized EUSurvey field metadata required for response validation."""
+    """Normalized EUSurvey field metadata required for response validation.
+
+    Attributes:
+        uid: Stable EUSurvey field identifier.
+        title: Visible field wording retained from the active form.
+        field_type: Supported scalar, choice, or matrix response type.
+        mandatory: Whether EUSurvey requires a response when the field is shown.
+        readonly: Whether the field is displayed but cannot accept an answer.
+        hidden: Whether the field is not displayed to respondents.
+        position: Source order used to preserve the form's question sequence.
+        choices: Selectable values for ordinary structured questions.
+        shown_when: Optional normalized conditional-visibility expression.
+        matrix_rows: Matrix row definitions for matrix questions.
+        matrix_columns: Matrix column definitions for matrix questions.
+    """
 
     uid: str
     title: str
@@ -71,7 +101,16 @@ class FormField:
 
 @dataclass(frozen=True)
 class FormDefinition:
-    """Immutable form model with source hashes retained as provenance."""
+    """Immutable form model with source hashes retained as provenance.
+
+    Attributes:
+        survey_uid: Stable EUSurvey survey identifier from the archive.
+        survey_alias: Human-readable survey alias from the active member.
+        source_path: EUS archive or manifest source path used to build the model.
+        archive_sha256: SHA-256 checksum of the complete EUS archive.
+        active_member_sha256: SHA-256 checksum of the decoded active form member.
+        fields_by_uid: Immutable lookup of normalized fields keyed by EUS UID.
+    """
 
     survey_uid: str
     survey_alias: str
