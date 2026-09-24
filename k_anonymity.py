@@ -11,11 +11,27 @@ def positive_below_k_mask(values, threshold: int):
     The function is intentionally generic so it can be applied to pandas Series
     (vectorized comparison) and keeps one shared semantic definition for
     k-anonymity filters used by checks and table tooling.
+
+    Args:
+        values: Vector-like values supporting vectorized numeric comparisons.
+        threshold: Exclusive upper k-anonymity threshold.
+
+    Returns:
+        Boolean mask selecting values strictly above zero and below ``threshold``.
     """
     return (values > 0) & (values < threshold)
 
 
 def _parse_int(value: Any) -> int | None:
+    """Parse one optional donor-count value without raising for malformed text.
+
+    Args:
+        value: Native integer, boolean, numeric text, blank text, or missing
+            source value.
+
+    Returns:
+        Integer representation, or ``None`` when no integer can be recovered.
+    """
     if value is None:
         return None
     if isinstance(value, bool):
@@ -36,6 +52,13 @@ def donor_value_violates_k(value: Any, k_limit: int) -> bool:
 
     Violation rule is shared across checks and tooling:
     donor count is considered violating only when 0 < donors < k.
+
+    Args:
+        value: Raw donor-count value accepted by ``_parse_int``.
+        k_limit: Exclusive upper threshold for a privacy violation.
+
+    Returns:
+        ``True`` only for parsed counts satisfying ``0 < donors < k_limit``.
     """
     donors = _parse_int(value)
     if donors is None:

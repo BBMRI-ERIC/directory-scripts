@@ -48,6 +48,15 @@ QC_HELPER_PATHS = (
     "contact_assignment_utils.py",
     "text_consistency.py",
 )
+ANALYTICS_HELPER_PATHS = (
+    "geojsonutils.py",
+    "geocoding_2022.py",
+    "pddfutils.py",
+    "oomutils.py",
+    "orphacodes.py",
+    "icd10codeshelper.py",
+    "k_anonymity.py",
+)
 SECTION_PATTERN = re.compile(
     r"^(Args|Returns|Yields|Attributes|Raises):\s*$", re.MULTILINE
 )
@@ -743,6 +752,22 @@ def test_qc_plugins_and_check_helpers_have_no_contract_violations() -> None:
     """
     paths = sorted((REPO_ROOT / "checks").glob("*.py"))
     paths.extend(REPO_ROOT / name for name in QC_HELPER_PATHS)
+    assert {path.relative_to(REPO_ROOT).as_posix(): violations_for_path(path)
+            for path in paths} == {
+        path.relative_to(REPO_ROOT).as_posix(): [] for path in paths
+    }
+
+
+def test_exporters_and_map_helpers_have_no_contract_violations() -> None:
+    """Verify Task 5 exporters and transformations meet the documentation contract.
+
+    Returns:
+        None. The test fails with per-file diagnostics when an exporter, map
+        transformation, or analytics helper has an incomplete explicit contract.
+    """
+    paths = sorted(REPO_ROOT.glob("exporter-*.py"))
+    paths.extend(sorted((REPO_ROOT / "R-maps").glob("*.py")))
+    paths.extend(REPO_ROOT / name for name in ANALYTICS_HELPER_PATHS)
     assert {path.relative_to(REPO_ROOT).as_posix(): violations_for_path(path)
             for path in paths} == {
         path.relative_to(REPO_ROOT).as_posix(): [] for path in paths

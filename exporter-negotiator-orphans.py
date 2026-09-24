@@ -32,12 +32,31 @@ pp = pprint.PrettyPrinter(indent=4)
 
 
 def get_staging_area_from_id(collection_id):
+    """Extract a staging-area prefix from an optional collection identifier.
+
+    Args:
+        collection_id: Collection identifier in any value form accepted by the
+            shared National Node parser.
+
+    Returns:
+        Staging-area prefix or an empty string for a missing identifier.
+    """
     if not collection_id:
         return ""
     return NNContacts.extract_staging_area(str(collection_id))
 
 
 def get_parent_chain_ids(collection, collection_map):
+    """Walk a collection's available parents while detecting missing links/cycles.
+
+    Args:
+        collection: Starting collection mapping with optional parent reference.
+        collection_map: Collection-ID-to-mapping lookup used for parent traversal.
+
+    Returns:
+        Newly allocated nearest-first parent identifier list. Missing links and
+        cycles stop traversal after a warning.
+    """
     parents = []
     seen = set()
     current = collection
@@ -57,10 +76,27 @@ def get_parent_chain_ids(collection, collection_map):
 
 
 def get_nn_from_biobank_id(biobank_id):
+    """Extract the shared staging-area prefix from a biobank identifier.
+
+    Args:
+        biobank_id: Biobank identifier accepted by ``NNContacts`` parsing.
+
+    Returns:
+        Parsed staging-area prefix or parser-defined empty/unknown value.
+    """
     return NNContacts.extract_staging_area(biobank_id)
 
 
 def get_nn_for_collection(collection_id, collection):
+    """Resolve collection National Node from parent biobank or collection ID.
+
+    Args:
+        collection_id: Collection identifier used for orphan fallback parsing.
+        collection: Loaded collection mapping, or falsey value for an orphan row.
+
+    Returns:
+        Parent-biobank staging prefix when loaded, otherwise collection-ID prefix.
+    """
     if collection:
         biobank_id = collection['biobank']['id']
         return get_nn_from_biobank_id(biobank_id)
@@ -487,6 +523,17 @@ if args.outputXLSX:
         last_col_index = len(output_columns) - 1
 
         def border_flags(is_top=False, is_bottom=False, is_left=False, is_right=False):
+            """Build XlsxWriter border options for one rendered summary cell.
+
+            Args:
+                is_top: Whether to add a top border.
+                is_bottom: Whether to add a bottom border.
+                is_left: Whether to add a left border.
+                is_right: Whether to add a right border.
+
+            Returns:
+                New XlsxWriter format-option mapping containing requested borders.
+            """
             flags = {}
             if is_top:
                 flags['top'] = 2
@@ -499,6 +546,17 @@ if args.outputXLSX:
             return flags
 
         def make_format(base, italic=False, bold=False, borders=None):
+            """Create one worksheet format by extending base rendering options.
+
+            Args:
+                base: Base XlsxWriter option mapping copied before extension.
+                italic: Whether to enable italic font.
+                bold: Whether to enable bold font.
+                borders: Optional border-option mapping from ``border_flags``.
+
+            Returns:
+                Workbook format object created from a new merged options mapping.
+            """
             fmt = dict(base)
             if italic:
                 fmt['italic'] = True

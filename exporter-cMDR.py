@@ -57,15 +57,42 @@ dir = Directory(**build_directory_kwargs(args, pp=pp))
 
 
 def buildDirectoryEntityURL(entity_route: str, entity_id: str) -> str:
+    """Build the public web-view URL for a cMDR export entity.
+
+    Args:
+        entity_route: Web route segment for the entity type.
+        entity_id: Directory identifier inserted without URL escaping.
+
+    Returns:
+        URL based on the module-global Directory schema and target.
+    """
     base_url = dir.getDirectoryUrl().rstrip('/')
     return f"{base_url}/{dir.getSchema()}/directory/#/{entity_route}/{entity_id}"
 
 
 def _sort_rows(rows: list[dict]) -> list[dict]:
+    """Sort copied row references by country then required identifier.
+
+    Args:
+        rows: Entity-row mappings with optional ``country`` and required ``id``.
+
+    Returns:
+        Newly allocated list containing the original row mappings in sort order.
+    """
     return sorted(rows, key=lambda row: (row.get('country', ''), row['id']))
 
 
 def _grouped_stdout(rows: list[dict], entity_label: str, formatter) -> None:
+    """Print country-grouped entity rows using a caller-provided formatter.
+
+    Args:
+        rows: Pre-sorted row mappings grouped by their ``country`` value.
+        entity_label: Singular label printed with ``none`` for an empty input.
+        formatter: Callable converting one row mapping to display text.
+
+    Returns:
+        None. Writes directly to standard output.
+    """
     if not rows:
         print(f"{entity_label}: none")
         return
@@ -79,6 +106,15 @@ def _grouped_stdout(rows: list[dict], entity_label: str, formatter) -> None:
 
 
 def _reorder_columns(df: pd.DataFrame, preferred_columns: list[str]) -> pd.DataFrame:
+    """Return a dataframe view with preferred present columns placed first.
+
+    Args:
+        df: Source dataframe whose data is not copied.
+        preferred_columns: Desired leading columns; absent names are ignored.
+
+    Returns:
+        Dataframe selected in stable preferred-then-remaining column order.
+    """
     ordered_columns = [column for column in preferred_columns if column in df.columns]
     ordered_columns.extend(column for column in df.columns if column not in ordered_columns)
     return df.loc[:, ordered_columns]
@@ -89,6 +125,18 @@ def _build_country_summary(
     collection_rows: list[dict],
     study_rows: list[dict],
 ) -> list[dict[str, int | str]]:
+    """Build per-country counts for the linked cMDR entity rows.
+
+    Args:
+        biobank_rows: Biobank rows containing one country value.
+        collection_rows: Collection rows containing one country value.
+        study_rows: Study rows whose comma-separated country field may contain
+            multiple contributing countries.
+
+    Returns:
+        Newly allocated country-sorted rows with biobank, collection, and study
+        counts.
+    """
     country_codes = sorted(
         {
             row.get('country', '')
@@ -125,6 +173,15 @@ def _build_country_summary(
 
 
 def _get_collection_coordinates(collection: dict) -> tuple[list[float] | None, str]:
+    """Resolve a collection's coordinates, falling back to its parent biobank.
+
+    Args:
+        collection: Linked collection mapping with a required biobank reference.
+
+    Returns:
+        Coordinate pair plus ``collection`` or ``biobank`` provenance, or
+        ``(None, '')`` when neither record has valid coordinates.
+    """
     coordinates = get_entity_coordinates(collection)
     if coordinates is not None:
         return coordinates, 'collection'
@@ -138,6 +195,18 @@ def _get_collection_coordinates(collection: dict) -> tuple[list[float] | None, s
 
 
 def _get_study_coordinates(study_id: str) -> tuple[list[float] | None, str, str]:
+    """Resolve a study's coordinates through study, collection, then biobank.
+
+    Args:
+        study_id: Existing study identifier resolved through the global Directory.
+
+    Returns:
+        Coordinates, provenance label, and entity ID that supplied them; all are
+        empty when no linked entity yields valid coordinates.
+
+    Raises:
+        DirectoryStructure: If ``study_id`` cannot be loaded by the Directory.
+    """
     study = dir.getStudyById(study_id, raise_on_missing=True)
     coordinates = get_entity_coordinates(study)
     if coordinates is not None:

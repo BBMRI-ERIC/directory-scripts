@@ -325,6 +325,17 @@ for collection in dir.getCollections():
                     pediatricOnlyCancerOnlyCollectionDonorsExplicit += collection['number_of_donors']
 
 def countCountriesInstitutions(biobanks, institutions : set, countries : set):
+    """Accumulate country and juridical-person counts for selected biobank IDs.
+
+    Args:
+        biobanks: Iterable of biobank identifiers resolved through the global
+            Directory instance.
+        institutions: Mutable set receiving nonblank juridical-person names.
+        countries: Mutable set receiving each resolved biobank country value.
+
+    Returns:
+        None. Mutates both supplied sets and logs blank juridical-person values.
+    """
     for biobankId in biobanks:
         biobank = dir.getBiobankById(biobankId)
         biobankJuridicalPerson = biobank['juridical_person'].strip()
@@ -350,6 +361,15 @@ pd_pediatricOnlyCancerOnlyBiobanks = pd.DataFrame(pediatricOnlyCancerOnlyBiobank
 
 
 def printCollectionStdout(collectionList: List, headerStr: str):
+    """Log a categorized Mission Cancer collection list with parent biobanks.
+
+    Args:
+        collectionList: Cancer-selected collection mappings to render in order.
+        headerStr: Human-readable category heading preceding the count.
+
+    Returns:
+        None. Records summary lines through the module logger.
+    """
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])

@@ -25,7 +25,13 @@ POLICY_VERSION = "1"
 
 @dataclass(frozen=True)
 class CategoryRule:
-    """One versioned biobank-category mapping rule."""
+    """One versioned biobank-category mapping rule.
+
+    Attributes:
+        name: Stable row/category label used in reports.
+        types: Directory collection type tags contributing votes for this category.
+        supported: Whether this version implements source mapping for the category.
+    """
 
     name: str
     types: frozenset[str]
@@ -64,7 +70,17 @@ EXCEL_INVALID_SHEET_CHARS = "[]:*?/\\"
 
 @dataclass(frozen=True)
 class BiobankClassification:
-    """Classification result and frontier evidence for one biobank."""
+    """Classification result and frontier evidence for one biobank.
+
+    Attributes:
+        category: Selected report category after tie-breaking.
+        votes: Category-to-frontier-collection vote counts.
+        frontier_ids: Collection IDs that supplied supported type votes.
+        mixed: Whether more than one category received a vote.
+        tie: Whether the highest vote count was shared.
+        provisional: Whether hierarchy evidence forced a fallback classification.
+        fallback_reason: Explanation for a fallback to ``others``, if any.
+    """
 
     category: str
     votes: dict[str, int]
@@ -76,7 +92,12 @@ class BiobankClassification:
 
 @dataclass(frozen=True)
 class SourceResult:
-    """Availability and provenance of one report source."""
+    """Availability and provenance of one report source.
+
+    Attributes:
+        available: Whether the source can provide numeric values.
+        reason: Human-readable provenance or unavailability explanation.
+    """
     available: bool
     reason: str
 
@@ -114,6 +135,17 @@ def classify_biobank_collections(collections):
     # Validate every component before pruning the supported voting frontier.
     states = {}
     def validate(cid):
+        """Validate parent ancestry for one collection before frontier pruning.
+
+        Args:
+            cid: Collection ID in the enclosing biobank's ``by_id`` mapping.
+
+        Returns:
+            None. Updates the enclosing DFS state map or raises on a cycle.
+
+        Raises:
+            ValueError: If the enclosing parent graph contains a cycle.
+        """
         state = states.get(cid, 0)
         if state == 1:
             raise ValueError(f"collection hierarchy cycle detected at {cid!r}")
@@ -133,6 +165,18 @@ def classify_biobank_collections(collections):
     mapped = {typ: rule.name for rule in CATEGORY_POLICY for typ in rule.types}
     votes, frontier = Counter(), []
     def walk(cid, stack):
+        """Traverse one hierarchy branch until a supported category supplies a vote.
+
+        Args:
+            cid: Current collection ID in the enclosing biobank hierarchy.
+            stack: Ancestor IDs used to detect a recursive cycle.
+
+        Returns:
+            None. Mutates the enclosing vote counter and frontier list.
+
+        Raises:
+            ValueError: If a traversal cycle is detected.
+        """
         if cid in stack:
             raise ValueError(f"collection hierarchy cycle detected at {cid!r}")
         item = by_id[cid]
@@ -235,7 +279,11 @@ def build_report_model(directory):
     }
 
 def _unsupported_rows() -> frozenset[str]:
-    """Return report rows whose version-one values are unavailable."""
+    """Return categories intentionally unsupported by the current mapping policy.
+
+    Returns:
+        Immutable set of policy row names rendered as unavailable rather than zero.
+    """
     return frozenset(rule.name for rule in CATEGORY_POLICY if not rule.supported)
 
 
@@ -247,7 +295,20 @@ def _rendered_cell_value(
     *,
     for_xlsx: bool,
 ) -> Any:
-    """Return a display value while preserving unavailable-versus-zero semantics."""
+    """Render a report cell while preserving unavailable-versus-zero semantics.
+
+    Args:
+        model: Precomputed report model holding source-availability metadata.
+        row_name: Category row whose support state affects rendering.
+        metric: Metric key selecting its source-availability rules.
+        value: Aggregated numeric value or missing internal value.
+        for_xlsx: Whether unavailable data should become a blank rather than
+            stdout's ``N/A`` marker.
+
+    Returns:
+        Numeric value, XLSX blank ``None``, or stdout ``N/A`` according to source
+        availability and output medium.
+    """
     unavailable = (
         row_name in _unsupported_rows()
         or (
@@ -270,7 +331,17 @@ def _rendered_cell_value(
 
 
 def _node_table_values(model: Mapping[str, Any], node: str, *, for_xlsx: bool) -> list[list[Any]]:
-    """Return fixed-order rendered values for one Node without recalculating metrics."""
+    """Build fixed-order rendered metric rows for one National Node.
+
+    Args:
+        model: Precomputed report model with per-Node aggregate counters.
+        node: Existing normalized Node key in ``model['nodes']``.
+        for_xlsx: Whether values are rendered for blank-capable XLSX cells.
+
+    Returns:
+        Newly allocated rows in the order specified by ``ROWS`` and
+        ``METRIC_COLUMNS`` without recalculating metrics.
+    """
     rows = model["nodes"][node]
     return [
         [
@@ -291,7 +362,16 @@ def _node_table_values(model: Mapping[str, Any], node: str, *, for_xlsx: bool) -
 
 
 def _format_stdout_table(model: Mapping[str, Any], node: str) -> list[str]:
-    """Format one Node table with deterministic two-line grouped headers."""
+    """Format one National Node table with aligned grouped headers.
+
+    Args:
+        model: Precomputed report model passed to ``_node_table_values``.
+        node: Existing normalized Node key to render.
+
+    Returns:
+        Newly allocated ordered display lines, including two header rows and a
+        separator.
+    """
     values = _node_table_values(model, node, for_xlsx=False)
     groups = ["Category", *(group for group, _, _, _ in METRIC_COLUMNS)]
     labels = ["", *(label for _, label, _, _ in METRIC_COLUMNS)]
@@ -301,6 +381,14 @@ def _format_stdout_table(model: Mapping[str, Any], node: str) -> list[str]:
     ]
 
     def line(row: list[Any]) -> str:
+        """Pad one rendered value row to the enclosing column widths.
+
+        Args:
+            row: Header or data values matching the enclosing width sequence.
+
+        Returns:
+            Pipe-separated left-aligned text for standard output.
+        """
         return " | ".join(str(value).ljust(widths[index]) for index, value in enumerate(row))
 
     separator = "-+-".join("-" * width for width in widths)
@@ -329,7 +417,15 @@ def render_stdout(model: Mapping[str, Any], stream=sys.stdout) -> None:
 
 
 def _safe_sheet_name(node: str) -> str:
-    """Return the deterministic Excel-compatible name for one normalized Node."""
+    """Convert one Node label to an Excel-compatible deterministic sheet name.
+
+    Args:
+        node: Normalized Node label that may contain Excel-invalid characters.
+
+    Returns:
+        Sanitized, nonempty, at-most-31-character worksheet name. Collision
+        detection is intentionally delegated to ``_sheet_names``.
+    """
     sanitized = "".join("_" if character in EXCEL_INVALID_SHEET_CHARS else character for character in node)
     sanitized = sanitized.strip().strip("'") or "UNKNOWN"
     return sanitized[:31].rstrip("'") or "UNKNOWN"
@@ -363,7 +459,17 @@ def _sheet_names(nodes) -> dict[str, str]:
 
 
 def _write_node_sheet(workbook, sheet, model: Mapping[str, Any], node: str) -> None:
-    """Write one grouped Node report sheet from already aggregated values."""
+    """Write one formatted Node statistics worksheet from precomputed aggregates.
+
+    Args:
+        workbook: XlsxWriter workbook used to allocate cell formats.
+        sheet: Existing worksheet receiving headers, metrics, problems, and legend.
+        model: Precomputed report model; no Directory reads occur here.
+        node: Existing normalized Node key selecting metric rows and problems.
+
+    Returns:
+        None. Mutates the workbook and worksheet in place.
+    """
     title_format = workbook.add_format({"bold": True, "align": "center", "valign": "vcenter", "border": 1, "bg_color": "#D9EAF7"})
     header_format = workbook.add_format({"bold": True, "align": "center", "text_wrap": True, "border": 1, "bg_color": "#EDF3F8"})
     row_format = workbook.add_format({"border": 1})

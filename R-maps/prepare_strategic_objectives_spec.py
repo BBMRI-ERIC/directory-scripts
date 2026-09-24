@@ -11,6 +11,18 @@ from pathlib import Path
 
 
 def _load_raw_spec(path: Path) -> dict:
+    """Read a raw strategic-objectives mapping from JSON or TOML.
+
+    Args:
+        path: Input path whose suffix selects JSON or TOML decoding.
+
+    Returns:
+        Parsed top-level mapping from the source file.
+
+    Raises:
+        SystemExit: If the filename suffix is not a supported source format.
+        OSError: If the file cannot be read.
+    """
     if path.suffix.lower() == ".json":
         return json.loads(path.read_text(encoding="utf-8"))
     if path.suffix.lower() in {".toml", ".tml"}:
@@ -21,10 +33,27 @@ def _load_raw_spec(path: Path) -> dict:
 
 
 def _is_country_code(value: str) -> bool:
+    """Test whether text is exactly an uppercase two-letter country code.
+
+    Args:
+        value: Candidate text, accepting an empty string.
+
+    Returns:
+        ``True`` only for two uppercase ASCII letters.
+    """
     return bool(re.fullmatch(r"[A-Z]{2}", value or ""))
 
 
 def _normalize_lead_country(raw: str) -> str:
+    """Normalize a country or HQ-prefixed co-lead code.
+
+    Args:
+        raw: Uppercase source country token or ``HQ-XX`` representation.
+
+    Returns:
+        Bare two-letter code for recognized forms, otherwise the original text or
+        an empty string.
+    """
     if _is_country_code(raw):
         return raw
     match = re.fullmatch(r"HQ-([A-Z]{2})", raw or "")
@@ -34,6 +63,14 @@ def _normalize_lead_country(raw: str) -> str:
 
 
 def _normalize_names(value) -> list[str]:
+    """Normalize a co-lead name scalar or sequence to a string list.
+
+    Args:
+        value: Missing value, single name string, or iterable of name values.
+
+    Returns:
+        Newly allocated list, preserving a single string as one name.
+    """
     if value is None:
         return []
     if isinstance(value, str):
@@ -42,6 +79,15 @@ def _normalize_names(value) -> list[str]:
 
 
 def _normalize_goal(goal: dict) -> dict:
+    """Normalize one goal while retaining unrecognized source fields.
+
+    Args:
+        goal: Raw goal mapping in either supported strategic-objective shape.
+
+    Returns:
+        Newly allocated normalized goal mapping with stable known keys and copied
+        extra source fields.
+    """
     normalized_leads = []
     for entry in goal.get("co_leads", []) or []:
         country_raw = str(entry.get("country", "")).strip().upper()
@@ -67,6 +113,15 @@ def _normalize_goal(goal: dict) -> dict:
 
 
 def _normalize_objectives(raw: dict) -> list[dict]:
+    """Normalize either supported strategic-objectives source shape.
+
+    Args:
+        raw: Raw top-level mapping with an ``objectives`` list or legacy ``SO1``
+        through ``SO8`` mappings.
+
+    Returns:
+        Newly allocated normalized objective list in source iteration order.
+    """
     objectives = []
     if isinstance(raw.get("objectives"), list):
         source_objectives = raw["objectives"]
@@ -112,6 +167,16 @@ def _normalize_objectives(raw: dict) -> list[dict]:
 
 
 def normalize_spec(raw: dict) -> dict:
+    """Construct the stable JSON specification consumed by map tooling.
+
+    Args:
+        raw: Raw strategic-objectives source mapping accepted by
+            ``_normalize_objectives``.
+
+    Returns:
+        Newly allocated schema-versioned mapping with note and normalized
+        objectives.
+    """
     schema_version = int(raw.get("schema_version", 1))
     note = str(raw.get("note", "")).strip()
     objectives = _normalize_objectives(raw)
@@ -124,6 +189,16 @@ def normalize_spec(raw: dict) -> dict:
 
 
 def main() -> None:
+    """Normalize a strategic-objectives source file and write or print JSON.
+
+    Returns:
+        None. Reads CLI-selected input, writes JSON to stdout for ``-`` output,
+        or overwrites the requested local output path without creating parents.
+
+    Raises:
+        SystemExit: If source format is unsupported.
+        OSError: If the input or requested output cannot be accessed.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", default="-")

@@ -27,7 +27,16 @@ from directory import Directory
 
 
 def biobank_is_covid(biobank: dict) -> bool:
-    """Return True when a biobank is part of a COVID network/capability."""
+    """Heuristically identify COVID-related biobank metadata.
+
+    Args:
+        biobank: Directory biobank mapping with optional network and capability
+            fields.
+
+    Returns:
+        ``True`` when a configured field or the string form of the record
+        contains ``covid19`` case-insensitively.
+    """
     for field_name in ("network", "networks", "capabilities"):
         value = biobank.get(field_name)
         if value is None:
@@ -38,7 +47,17 @@ def biobank_is_covid(biobank: dict) -> bool:
 
 
 def derive_covid_ids(directory: Directory) -> set[str]:
-    """Return the set of COVID-network biobank identifiers."""
+    """Collect visible identifiers for biobanks matching the COVID heuristic.
+
+    Args:
+        directory: Loaded Directory whose configured scope selects biobanks.
+
+    Returns:
+        Newly allocated set of matching biobank identifiers.
+
+    Raises:
+        RuntimeError: If no visible biobank matches the heuristic.
+    """
     covid_ids = {
         biobank["id"]
         for biobank in directory.getBiobanks()
@@ -50,7 +69,20 @@ def derive_covid_ids(directory: Directory) -> set[str]:
 
 
 def load_feature_collection(path: Path) -> dict:
-    """Load a GeoJSON FeatureCollection."""
+    """Read and validate a GeoJSON FeatureCollection mapping from disk.
+
+    Args:
+        path: Existing JSON file expected to have top-level type
+            ``FeatureCollection``.
+
+    Returns:
+        Parsed JSON mapping without copying nested features.
+
+    Raises:
+        OSError: If the file cannot be read.
+        json.JSONDecodeError: If the file is not valid JSON.
+        ValueError: If the JSON is not a FeatureCollection.
+    """
     with path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     if data.get("type") != "FeatureCollection":
@@ -59,6 +91,16 @@ def load_feature_collection(path: Path) -> dict:
 
 
 def main() -> None:
+    """Filter a full GeoJSON export to visible COVID-related biobanks.
+
+    Returns:
+        None. Parses CLI arguments, loads Directory data, and writes an indented
+        FeatureCollection to the requested path after creating parent folders.
+
+    Raises:
+        FileNotFoundError: If the required full GeoJSON input is absent.
+        RuntimeError: If Directory or GeoJSON filtering produces no matches.
+    """
     parser = build_parser()
     add_logging_arguments(parser)
     add_directory_auth_arguments(parser)

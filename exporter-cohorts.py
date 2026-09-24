@@ -158,6 +158,15 @@ pd_cohortCollections = pd.DataFrame(cohortCollections)
 pddfutils.tidyCollectionDf(pd_cohortCollections)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
+    """Print a cohort collection list with its resolved parent biobanks.
+
+    Args:
+        collectionList: Cohort collection mappings to render in existing order.
+        headerStr: Human-readable category heading preceding the count.
+
+    Returns:
+        None. Writes summary and collection lines to standard output.
+    """
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])

@@ -230,6 +230,15 @@ pd_covidProspective = pd.DataFrame(covidProspective)
 pd_covidOther = pd.DataFrame(covidOther)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
+    """Print a categorized COVID collection list with parent biobanks.
+
+    Args:
+        collectionList: COVID-selected collection mappings to render in order.
+        headerStr: Human-readable category heading preceding the count.
+
+    Returns:
+        None. Writes summary and collection lines to standard output.
+    """
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])

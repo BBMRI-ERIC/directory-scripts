@@ -201,7 +201,15 @@ TABLE_COLUMNS = {
 
 
 def _parse_country_values(values: list[str] | None) -> list[str]:
-    """Normalize repeated, space-separated, or comma-separated country codes."""
+    """Normalize repeated comma-separated country CLI values in first-seen order.
+
+    Args:
+        values: Optional parser values, each of which may contain comma-separated
+            country codes.
+
+    Returns:
+        Newly allocated uppercase unique country list preserving first appearance.
+    """
     countries = []
     for value in values or []:
         for item in value.split(","):
@@ -212,7 +220,16 @@ def _parse_country_values(values: list[str] | None) -> list[str]:
 
 
 def _directory_url(directory: Directory, route: str, entity_id: str) -> str:
-    """Return the Directory web-view URL for an entity."""
+    """Build a Directory web-view URL, preserving blank IDs as blank links.
+
+    Args:
+        directory: Loaded Directory supplying base URL and active schema.
+        route: Web route segment for the referenced entity type.
+        entity_id: Entity identifier inserted without URL escaping.
+
+    Returns:
+        Public entity URL or an empty string when ``entity_id`` is blank.
+    """
     if not entity_id:
         return ""
     base_url = directory.getDirectoryUrl().rstrip("/")
@@ -220,7 +237,15 @@ def _directory_url(directory: Directory, route: str, entity_id: str) -> str:
 
 
 def _flatten_field_comparisons(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Put each compared collection value on its own bounded workbook row."""
+    """Expand comparison evidence so every member value becomes one workbook row.
+
+    Args:
+        rows: Comparison mappings containing shared metadata and ``member_values``.
+
+    Returns:
+        Newly allocated flattened rows with bounded scalar values and derived
+        distinct/missing counts.
+    """
     flattened = []
     for comparison in rows:
         base = {
@@ -248,7 +273,14 @@ def _flatten_field_comparisons(rows: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def _tabular_value(value: Any) -> Any:
-    """Serialize nested evidence predictably while preserving scalar types."""
+    """Render nested report values as deterministic JSON while preserving scalars.
+
+    Args:
+        value: Scalar or nested evidence value extracted from analysis output.
+
+    Returns:
+        JSON text for mappings/sequences or the original scalar object unchanged.
+    """
     if isinstance(value, (dict, list, tuple)):
         return json.dumps(value, sort_keys=True, ensure_ascii=True)
     return value
@@ -259,7 +291,18 @@ def _make_dataframe(
     rows: list[dict[str, Any]],
     directory: Directory,
 ) -> pd.DataFrame:
-    """Create one sorted, hyperlink-ready report dataframe."""
+    """Build a stable report dataframe and add hidden Directory hyperlink columns.
+
+    Args:
+        table_name: Analysis table key selecting preferred columns and special
+            flattening rules.
+        rows: Source analysis rows copied into the output dataframe.
+        directory: Loaded Directory used to create entity web-view URLs.
+
+    Returns:
+        Newly allocated dataframe sorted by the stable columns available for the
+        selected table.
+    """
     if table_name == "field_comparisons":
         rows = _flatten_field_comparisons(rows)
     output_rows = []
@@ -319,7 +362,15 @@ def _make_dataframe(
 
 
 def _xlsx_options(dataframe: pd.DataFrame) -> dict[str, Any]:
-    """Return hyperlink and hidden-column options for a report dataframe."""
+    """Build XLSX writer options for hyperlink-capable report identifier columns.
+
+    Args:
+        dataframe: Prepared report dataframe containing optional URL companion
+            columns.
+
+    Returns:
+        New options mapping with hyperlink pairs and URL columns to hide.
+    """
     hyperlink_columns = []
     hidden_columns = []
     for column in (
@@ -339,7 +390,15 @@ def _xlsx_options(dataframe: pd.DataFrame) -> dict[str, Any]:
 
 
 def _print_report(analysis: dict[str, list[dict[str, Any]]]) -> None:
-    """Print country-grouped candidate details and totals."""
+    """Print deterministic candidate-family detail and aggregate summaries.
+
+    Args:
+        analysis: Complete emulation analysis mapping with candidate, source,
+            migration, and dimension tables.
+
+    Returns:
+        None. Writes the human-readable report to standard output.
+    """
     families = analysis["candidate_families"]
     migration_by_family = {
         row["family_id"]: row for row in analysis["migration_mapping"]
@@ -447,7 +506,12 @@ def _print_report(analysis: dict[str, list[dict[str, Any]]]) -> None:
 
 
 def build_argument_parser():
-    """Build the standalone exporter argument parser."""
+    """Build the standalone fact-sheet-emulation exporter argument parser.
+
+    Returns:
+        Configured parser defining read-only analysis, output, scope, and review
+        packet options without parsing arguments.
+    """
     parser = build_parser(
         description=(
             "Detect collection families that may historically emulate fact sheets. "
@@ -498,7 +562,12 @@ def build_argument_parser():
 
 
 def main() -> None:
-    """Run the fact-sheet emulation exporter."""
+    """Run read-only fact-sheet-emulation analysis and selected local exports.
+
+    Returns:
+        None. Parses CLI arguments, loads Directory data, and may write XLSX and
+        AI-review packet files; it never updates Directory records.
+    """
     parser = build_argument_parser()
     args = parser.parse_args()
     configure_logging(args)

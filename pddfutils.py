@@ -10,11 +10,32 @@ import pandas as pd
 
 
 def _sort_by_existing_columns(df: pd.DataFrame, columns: list):
+    """Sort a dataframe in place by the requested columns that are present.
+
+    Args:
+        df: Dataframe mutated when at least one requested column exists.
+        columns: Priority-ordered candidate column names.
+
+    Returns:
+        None. ``df`` is sorted ascending in place or left unchanged.
+    """
     sort_columns = [column for column in columns if column in df]
     if sort_columns:
         df.sort_values(by=sort_columns, ascending=True, inplace=True)
 
 def extractContactDetails (df : pd.DataFrame):
+    """Flatten the optional ``contact`` column into export-friendly fields.
+
+    Args:
+        df: Dataframe mutated in place; a mapping-valued ``contact`` column is
+            replaced by email, name, address, and phone columns when present.
+
+    Returns:
+        None. The original ``contact`` column is removed after extraction.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     if 'contact' in df:
         df['contact_email'] = df['contact'].apply(lambda c: c['email'] if type(c) is dict and 'email' in c else "")
@@ -26,6 +47,16 @@ def extractContactDetails (df : pd.DataFrame):
         del df['contact']
 
 def linearizeStructures (df : pd.DataFrame, rules : list):
+    """Convert configured structured dataframe columns to comma-separated text.
+
+    Args:
+        df: Dataframe mutated in place for columns named by ``rules``.
+        rules: ``(column, attribute)`` pairs selecting a dictionary attribute or
+            string form for each list/scalar value.
+
+    Returns:
+        None. Missing columns are ignored and present columns are overwritten.
+    """
     for (col, attr) in rules:
         if col in df:
             #df[col] = df[col].map(lambda v: ",".join(map(lambda x: x[attr] if type(x) is dict and attr in x else x, (v if type(v) is list else [v]))) if v and (type(v) is dict or type(v) is list) else "")
@@ -33,6 +64,18 @@ def linearizeStructures (df : pd.DataFrame, rules : list):
             df[col] = df[col].map(lambda v: ",".join(str(x.get(attr, '')) if isinstance(x, dict) and attr else str(x) for x in (v if isinstance(v, list) else [v])) if v else "")
 
 def tidyCollectionDf (df : pd.DataFrame):
+    """Normalize a collection export dataframe in place and sort it by identity.
+
+    Args:
+        df: Collection dataframe whose nested fields are flattened and whose
+            contact and list columns are made spreadsheet-friendly.
+
+    Returns:
+        None. ``df`` is mutated and sorted by available ``country`` and ``id``.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     linearizeStructures(df, [('country',''),('biobank','name'),('network','name'),('parent_collection','id')])
     for col in ('order_of_magnitude','order_of_magnitude_donors'):
@@ -53,6 +96,18 @@ def tidyCollectionDf (df : pd.DataFrame):
     _sort_by_existing_columns(df, ['country', 'id'])
 
 def tidyBiobankDf (df : pd.DataFrame):
+    """Normalize a biobank export dataframe in place and remove internal fields.
+
+    Args:
+        df: Biobank dataframe whose nested values and contact details are
+            flattened before unsupported operational columns are removed.
+
+    Returns:
+        None. ``df`` is mutated and sorted by available ``country`` and ``id``.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     linearizeStructures(df, [('country','id'), ('network','name'), ('covid19biobank','id'), ('capabilities','id'), ('quality','id')])
     extractContactDetails(df)
@@ -69,6 +124,18 @@ def tidyBiobankDf (df : pd.DataFrame):
     _sort_by_existing_columns(df, ['country', 'id'])
 
 def tidyServiceDf (df : pd.DataFrame):
+    """Normalize service parent and type fields for spreadsheet export.
+
+    Args:
+        df: Service dataframe mutated in place; biobank and service-type
+            structures are rendered as text and rows are sorted by ``id``.
+
+    Returns:
+        None. ``df`` is modified in place.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     if 'biobank' in df:
         df['biobank'] = df['biobank'].map(
@@ -88,6 +155,18 @@ def tidyServiceDf (df : pd.DataFrame):
     _sort_by_existing_columns(df, ['id'])
 
 def tidyStudyDf (df : pd.DataFrame):
+    """Normalize study metadata and linked collection identifiers in place.
+
+    Args:
+        df: Study dataframe whose country, sex, collection, and alias structures
+            are flattened for export.
+
+    Returns:
+        None. ``df`` is modified and sorted by available ``country`` and ``id``.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     linearizeStructures(df, [('national_node', 'id'), ('country', '')])
     for col in ('sex',):
@@ -107,6 +186,18 @@ def tidyStudyDf (df : pd.DataFrame):
     _sort_by_existing_columns(df, ['country', 'id'])
 
 def tidyContactDf (df : pd.DataFrame):
+    """Normalize contact country and entity-reference columns in place.
+
+    Args:
+        df: Contact dataframe whose linked biobank, collection, and network
+            mappings are converted to comma-separated identifiers.
+
+    Returns:
+        None. ``df`` is modified and sorted by available ``country`` and ``id``.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     for col in ('country',):
         if col in df:
@@ -125,6 +216,18 @@ def tidyContactDf (df : pd.DataFrame):
     _sort_by_existing_columns(df, ['country', 'id'])
 
 def tidyNetworkDf (df : pd.DataFrame):
+    """Normalize network references and sort a dataframe for export.
+
+    Args:
+        df: Network dataframe whose country, contact, and entity-reference
+            structures are flattened in place.
+
+    Returns:
+        None. ``df`` is modified and sorted by available ``country`` and ``id``.
+
+    Raises:
+        AssertionError: If ``df`` is not a pandas dataframe.
+    """
     assert isinstance(df, pd.DataFrame)
     linearizeStructures(df, [('country', 'id'), ('contact', 'id')])
     for col in ('contacts', 'biobanks', 'collections'):

@@ -91,7 +91,12 @@ else:
 ###############
 
 def geocoding_cache_dir() -> str:
-    """Return the persistent global geocoding cache directory."""
+    """Return the configured persistent directory for geocoding cache entries.
+
+    Returns:
+        Path below ``DIRECTORY_CACHE_ROOT`` when configured, otherwise below the
+        current working directory. The directory is not created here.
+    """
     cache_root = os.environ.get('DIRECTORY_CACHE_ROOT')
     if cache_root:
         return str(Path(cache_root) / 'data-check-cache' / 'geocoding')
@@ -99,7 +104,15 @@ def geocoding_cache_dir() -> str:
 
 
 def geocoding_cache_key(contactID, lookBy):
-    """Return a stable cache key for one contact lookup signature."""
+    """Build a stable cache key for one contact-address lookup variant.
+
+    Args:
+        contactID: Optional Directory contact identifier separating cached keys.
+        lookBy: Ordered address fragments included in the lookup query.
+
+    Returns:
+        SHA-256-based cache key that changes when nonblank query fragments change.
+    """
     look_by_text = ' | '.join(str(value).strip() for value in lookBy if str(value).strip())
     digest = hashlib.sha256(look_by_text.encode('utf-8')).hexdigest()
     if contactID:
@@ -108,7 +121,17 @@ def geocoding_cache_key(contactID, lookBy):
 
 
 def biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contactID):
-    """Return a stable cache key for one biobank fallback-coordinate situation."""
+    """Build a stable key for a biobank coordinate/fallback source situation.
+
+    Args:
+        biobankID: Biobank identifier anchoring the cache entry.
+        longitude_raw: Raw biobank longitude participating in cache invalidation.
+        latitude_raw: Raw biobank latitude participating in cache invalidation.
+        contactID: Optional contact identifier used for address fallback.
+
+    Returns:
+        SHA-256-based key that changes with any nonblank source component.
+    """
     source_text = ' | '.join(
         str(value).strip()
         for value in (biobankID, longitude_raw, latitude_raw, contactID)
@@ -119,7 +142,18 @@ def biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contact
 
 
 def get_cached_biobank_coordinates(geocodingCache, biobankID, longitude_raw, latitude_raw, contactID):
-    """Return cached fallback coordinates for one biobank/source signature."""
+    """Return resolved coordinates cached for the exact biobank source signature.
+
+    Args:
+        geocodingCache: Mapping-like disk cache holding keyed resolution records.
+        biobankID: Biobank identifier for the requested fallback situation.
+        longitude_raw: Current raw longitude used to validate cache freshness.
+        latitude_raw: Current raw latitude used to validate cache freshness.
+        contactID: Optional fallback contact identifier.
+
+    Returns:
+        Stored coordinate pair only for a resolved cache entry, otherwise ``None``.
+    """
     cacheKey = biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contactID)
     cachedEntry = geocodingCache.get(cacheKey)
     if cachedEntry and cachedEntry.get('status') == 'resolved':
@@ -136,7 +170,20 @@ def cache_biobank_coordinates(
     coordinates,
     source,
 ):
-    """Persist fallback coordinates for one biobank/source signature."""
+    """Persist a resolved biobank coordinate pair in the supplied cache.
+
+    Args:
+        geocodingCache: Mutable mapping-like cache receiving one resolution entry.
+        biobankID: Biobank identifier for the cached fallback situation.
+        longitude_raw: Current raw longitude recorded for traceability.
+        latitude_raw: Current raw latitude recorded for traceability.
+        contactID: Optional contact identifier recorded with the entry.
+        coordinates: Resolved longitude/latitude pair retained in the cache.
+        source: Text identifying the coordinate source.
+
+    Returns:
+        None. Mutates ``geocodingCache`` immediately.
+    """
     cacheKey = biobank_coordinate_cache_key(biobankID, longitude_raw, latitude_raw, contactID)
     geocodingCache[cacheKey] = {
         'status': 'resolved',
@@ -149,7 +196,16 @@ def cache_biobank_coordinates(
 
 
 def format_coordinate_pair(coordinates):
-    """Return a compact human-readable coordinate pair for warnings."""
+    """Format a coordinate pair defensively for warning messages.
+
+    Args:
+        coordinates: Sequence-like longitude/latitude pair, or missing/malformed
+            input from a cache or live lookup.
+
+    Returns:
+        Six-decimal display text for numeric pairs, repr-based text for malformed
+        pairs, or ``unknown`` when fewer than two values are available.
+    """
     if not coordinates or len(coordinates) < 2:
         return "unknown"
     try:
@@ -159,7 +215,20 @@ def format_coordinate_pair(coordinates):
 
 
 def safe_geocode(query: str):
-    """Resolve one geocoding query or disable live geocoding for this run."""
+    """Resolve one query with retries and disable live lookup after service failure.
+
+    Args:
+        query: Fully composed address query submitted to the configured Nominatim
+            geocoder.
+
+    Returns:
+        ``(status, location)`` where status is ``resolved``, ``not_found``, or
+        ``disabled`` and location is populated only for a successful lookup.
+
+    Side Effects:
+        Sleeps for rate limiting/retries and may replace the global geocoder,
+        SSL context, next-request timestamp, and enabled flag.
+    """
     global geolocator
     global geocodingEnabled
     global geocodingNextRequestMonotonic
@@ -238,11 +307,23 @@ def safe_geocode(query: str):
 
 
 def lookForCoordinates(contactID, personsContactsById, lookForCoordinatesFeatures, geocodingCache, allowLiveLookup = True):
-    '''
-    Look for coordinates based on biobank contact.
+    """Resolve contact-address coordinates from cache and optionally live geocoding.
 
-    NOTE: Address fails a lot, maybe only by first field? But the separator is not consistent.
-    '''
+    Args:
+        contactID: Directory contact identifier used to find address fields.
+        personsContactsById: Mapping of contact identifiers to Directory records.
+        lookForCoordinatesFeatures: Ordered contact fields used to build query
+            variants from most to least specific.
+        geocodingCache: Mutable cache storing successful and unsuccessful lookups.
+        allowLiveLookup: Whether cache misses may call the external geocoder.
+
+    Returns:
+        Resolved longitude/latitude pair, or ``None`` when no usable contact,
+        cached result, or permitted live result exists.
+
+    Side Effects:
+        May write cache records and make rate-limited external geocoding requests.
+    """
     contact = personsContactsById.get(contactID)
     if not contact:
         return None
@@ -295,7 +376,17 @@ def lookForCoordinates(contactID, personsContactsById, lookForCoordinatesFeature
 
 
 def dmm_to_dd(coord: str):
-    "Convert coordinates in DMM format to decimal degrees"
+    """Convert a directional degrees-and-decimal-minutes string to decimal degrees.
+
+    Args:
+        coord: Text in the legacy ``N|S|E|W<degrees> <minutes>`` representation.
+
+    Returns:
+        Signed decimal-degree value.
+
+    Raises:
+        ValueError: If the coordinate does not match the expected DMM format.
+    """
     pattern = r'([NSWE])(\d+) (\d+\.\d+)'
     match = re.match(pattern, coord)
 
@@ -315,7 +406,18 @@ def dmm_to_dd(coord: str):
 
 
 def _parse_decimal_coordinate_component(raw_value, label, minimum, maximum):
-    """Parse one stored decimal coordinate component and report its own issue."""
+    """Parse and range-check one decimal coordinate component without raising.
+
+    Args:
+        raw_value: Stored numeric or textual component to parse.
+        label: Human-readable component name inserted in any diagnostic.
+        minimum: Inclusive valid lower bound.
+        maximum: Inclusive valid upper bound.
+
+    Returns:
+        ``(value, None)`` for a valid float, or ``(None, diagnostic)`` for a
+        parse or range failure.
+    """
     cleaned = re.sub(r',', r'.', str(raw_value))
     try:
         value = float(cleaned)
@@ -329,7 +431,18 @@ def _parse_decimal_coordinate_component(raw_value, label, minimum, maximum):
 
 
 def parse_decimal_coordinates(longitude_raw, latitude_raw):
-    """Parse stored Directory coordinates into validated decimal lon/lat."""
+    """Parse stored longitude and latitude into one validated GeoJSON-order pair.
+
+    Args:
+        longitude_raw: Stored decimal longitude, accepting comma decimal syntax.
+        latitude_raw: Stored decimal latitude, accepting comma decimal syntax.
+
+    Returns:
+        Newly allocated ``[longitude, latitude]`` float pair.
+
+    Raises:
+        ValueError: If either component cannot be parsed or is outside range.
+    """
     longitude, longitude_issue = _parse_decimal_coordinate_component(longitude_raw, "longitude", -180, 180)
     latitude, latitude_issue = _parse_decimal_coordinate_component(latitude_raw, "latitude", -90, 90)
 
@@ -340,6 +453,11 @@ def parse_decimal_coordinates(longitude_raw, latitude_raw):
     return [longitude, latitude]
 
 def disableSSLCheck():
+    """Disable certificate and hostname checks for geopy's global SSL context.
+
+    Returns:
+        None. Replaces ``geopy.geocoders.options.default_ssl_context`` globally.
+    """
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -347,11 +465,19 @@ def disableSSLCheck():
 
 
 def sendEmail(sender, receivers, message):
-   '''
-   Sender: String containing sender email.
-   Receivers: List containing receivers emails.
-   Message: String containing the message.
-   '''
+   """Send one message through the local SMTP relay and print the outcome.
+
+   Args:
+      sender: Envelope sender address.
+      receivers: Recipient-address list passed unchanged to ``sendmail``.
+      message: Fully formatted message body.
+
+   Returns:
+      None. The function prints a success or SMTP failure message to stdout.
+
+   Side Effects:
+      Opens a connection to the local SMTP service and attempts delivery.
+   """
    try:
       smtpObj = smtplib.SMTP('localhost')
       smtpObj.sendmail(sender, receivers, message)         

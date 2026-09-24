@@ -60,6 +60,20 @@ configure_logging(args)
 qual_label = {}
 
 def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfCombinedQual : pd.DataFrame, combQualLabel : str):
+    """Write quality-label biobank, collection, and combined frames to XLSX.
+
+    Args:
+        filename: XLSX destination created or replaced by the shared writer.
+        dfBiobanks: Prepared biobank quality dataframe.
+        biobanksLabel: Biobank worksheet name.
+        dfCollections: Prepared collection quality dataframe.
+        collectionsLabel: Collection worksheet name.
+        dfCombinedQual: Prepared combined-quality dataframe.
+        combQualLabel: Combined-quality worksheet name.
+
+    Returns:
+        None. Delegates non-atomic local file writing to ``write_xlsx_tables``.
+    """
     write_xlsx_tables(
         filename,
         [
@@ -70,7 +84,15 @@ def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, bi
     )
 
 def replacebyQMvalues(df, include_headers=False):
-    ''' Replace values by more readable ones indicated by QM (hardcoded) '''
+    """Replace raw quality-level codes with predefined reader-facing labels.
+
+    Args:
+        df: Source dataframe copied by pandas ``replace`` before substitutions.
+        include_headers: Whether matching column names are renamed as well.
+
+    Returns:
+        New dataframe with recognized values, and optionally headers, replaced.
+    """
     
     QMmapping = {"accredited":"3rd-level audit (accredited)", "eric":"2nd-level audit (ERIC)"}
 

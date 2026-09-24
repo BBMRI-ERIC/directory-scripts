@@ -109,11 +109,40 @@ targetColls = []
 
 ### Functions
 def buildDirectoryEntityURL(entity_route: str, entity_id: str) -> str:
+    """Build the public web-view URL for an already loaded Directory entity.
+
+    Args:
+        entity_route: Web route segment such as ``biobank`` or ``collection``.
+        entity_id: Directory identifier inserted without URL escaping.
+
+    Returns:
+        URL using the module-global Directory target and schema.
+    """
     base_url = dir.getDirectoryUrl().rstrip('/')
     return f"{base_url}/{dir.getSchema()}/directory/#/{entity_route}/{entity_id}"
 
 
 def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM):
+    """Enrich selected collections and accumulate explicit and OoM count totals.
+
+    Args:
+        collections: Selected Directory collection mappings, mutated with contact
+            records and web URLs when eligible for the configured scope.
+        allCollectionSamplesExplicit: Running explicit-sample total to extend.
+        allCollectionDonorsExplicit: Running explicit-donor total to extend.
+        allCollectionSamplesIncOoM: Running sample total including top-level OoM
+            estimates to extend.
+        allCollectionDonorsIncOoM: Running donor total including top-level OoM
+            estimates to extend.
+
+    Returns:
+        Tuple containing module-global active/withdrawn collection lists, all
+        updated totals, and the mutable selected-biobank ID set.
+
+    Side Effects:
+        Mutates module-global export collections, biobank sets, country set, and
+        supplied collection mappings.
+    """
     for collection in collections:
         log.debug("Analyzing collection " + collection['id'])
         biobankId = dir.getCollectionBiobankId(collection['id'])
@@ -173,6 +202,15 @@ def analyseCollections(collections, allCollectionSamplesExplicit, allCollectionD
     return allCollections, withdrawnCollections, allCollectionSamplesExplicit, allCollectionDonorsExplicit, allCollectionSamplesIncOoM, allCollectionDonorsIncOoM, allBiobanks
 
 def analyseBBs():
+    """Add visible biobanks that were not reached through selected collections.
+
+    Returns:
+        The module-global mutable set of selected biobank identifiers.
+
+    Side Effects:
+        Enriches source biobank mappings with web URLs and updates global active
+        and withdrawn biobank sets.
+    """
     for biobank in dir.getBiobanks():
         biobankId = biobank['id']
         if 'contact' in biobank:
@@ -192,6 +230,15 @@ def analyseBBs():
     return allBiobanks
 
 def printCollectionStdout(collectionList: List):
+    """Log one readable collection/parent-biobank line per selected collection.
+
+    Args:
+        collectionList: Ordered collection mappings to describe using the global
+            Directory relationship lookup.
+
+    Returns:
+        None. Records are emitted through the module logger.
+    """
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])
         biobank = dir.getBiobankById(biobankId)
@@ -199,6 +246,14 @@ def printCollectionStdout(collectionList: List):
     log.info("\n\n")
 
 def analyseServices():
+    """Collect visible services, their parent biobanks, and withdrawn membership.
+
+    Returns:
+        None. Results are retained in module-global service and biobank lists.
+
+    Side Effects:
+        Mutates global service/biobank collections and source service mappings.
+    """
     for service in dir.getServices():
         biobankId = dir.getServiceBiobankId(service['id'])
         biobank = dir.getBiobankById(biobankId)
@@ -214,6 +269,15 @@ def analyseServices():
 
 
 def _study_has_withdrawn_collection(study: dict) -> bool:
+    """Test whether a study links to any collection considered withdrawn.
+
+    Args:
+        study: Study mapping whose identifier is resolved through the global
+            Directory instance.
+
+    Returns:
+        ``True`` on the first withdrawn linked collection; otherwise ``False``.
+    """
     for collection_id in dir.getStudyCollectionIds(study['id']):
         if dir.isCollectionWithdrawn(collection_id):
             return True
@@ -221,6 +285,14 @@ def _study_has_withdrawn_collection(study: dict) -> bool:
 
 
 def analyseStudies():
+    """Collect visible studies and derive parent-biobank withdrawal context.
+
+    Returns:
+        None. Results are appended to module-global study and biobank collections.
+
+    Side Effects:
+        Adds public URLs to source mappings and mutates global export state.
+    """
     for study in dir.getStudies():
         studyBiobankIds = dir.getStudyBiobankIds(study['id'])
         for biobankId in studyBiobankIds:
@@ -235,6 +307,15 @@ def analyseStudies():
 
 
 def _collect_reference_ids(value):
+    """Extract reference IDs from one Directory relationship representation.
+
+    Args:
+        value: Mapping or list of mappings with optional ``id`` fields.
+
+    Returns:
+        Newly allocated ordered ID list; scalar and malformed values produce an
+        empty list.
+    """
     if isinstance(value, dict):
         reference_id = value.get('id')
         return [reference_id] if reference_id else []
@@ -248,6 +329,16 @@ def _collect_reference_ids(value):
 
 
 def _collect_scope_contact_ids(biobank_ids, collections, networks):
+    """Collect contact IDs referenced by the selected entity scope.
+
+    Args:
+        biobank_ids: Biobank identifiers resolved through the global Directory.
+        collections: Selected collection mappings.
+        networks: Selected network mappings.
+
+    Returns:
+        Newly allocated set of referenced contact IDs.
+    """
     contact_ids = set()
     for biobank_id in biobank_ids:
         biobank = dir.getBiobankById(biobank_id)
@@ -265,6 +356,15 @@ def _collect_scope_contact_ids(biobank_ids, collections, networks):
 
 
 def _collect_scope_network_ids(biobank_ids, collections):
+    """Collect network IDs referenced by selected biobanks and collections.
+
+    Args:
+        biobank_ids: Biobank identifiers resolved through the global Directory.
+        collections: Selected collection mappings.
+
+    Returns:
+        Newly allocated set of referenced network IDs.
+    """
     network_ids = set()
     for biobank_id in biobank_ids:
         biobank = dir.getBiobankById(biobank_id)
@@ -279,6 +379,14 @@ def _collect_scope_network_ids(biobank_ids, collections):
 
 
 def analyseNetworks():
+    """Collect networks referenced by active and withdrawn selected entities.
+
+    Returns:
+        None. Appends matching network mappings to module-global export lists.
+
+    Side Effects:
+        Mutates global network lists and source mappings by adding web URLs.
+    """
     selected_network_ids = _collect_scope_network_ids(allBiobanks, allCollections)
     selected_withdrawn_network_ids = _collect_scope_network_ids(withdrawnBiobanks, withdrawnCollections)
     network_by_id = {network['id']: network for network in dir.getNetworks()}
@@ -299,6 +407,14 @@ def analyseNetworks():
 
 
 def analyseContacts():
+    """Collect contacts referenced by active and withdrawn selected entities.
+
+    Returns:
+        None. Appends matching contact mappings to module-global export lists.
+
+    Side Effects:
+        Mutates global contact lists and source mappings by adding web URLs.
+    """
     selected_contact_ids = _collect_scope_contact_ids(allBiobanks, allCollections, allNetworks)
     selected_withdrawn_contact_ids = _collect_scope_contact_ids(withdrawnBiobanks, withdrawnCollections, withdrawnNetworks)
     for contact_id in sorted(selected_contact_ids):
@@ -314,6 +430,14 @@ def analyseContacts():
 
 
 def printServiceStdout(serviceList: List):
+    """Log readable service and parent-biobank lines.
+
+    Args:
+        serviceList: Ordered service mappings resolved through the global Directory.
+
+    Returns:
+        None. Lines are emitted through the module logger.
+    """
     for service in serviceList:
         biobankId = dir.getServiceBiobankId(service['id'])
         biobank = dir.getBiobankById(biobankId)
@@ -324,6 +448,14 @@ def printServiceStdout(serviceList: List):
 
 
 def printStudyStdout(studyList: List):
+    """Log readable study and linked-biobank lines.
+
+    Args:
+        studyList: Ordered study mappings resolved through the global Directory.
+
+    Returns:
+        None. Lines are emitted through the module logger.
+    """
     for study in studyList:
         studyTitle = study.get('title', '')
         studyBiobankIds = dir.getStudyBiobankIds(study['id'])
@@ -337,6 +469,14 @@ def printStudyStdout(studyList: List):
     log.info("\n\n")
 
 def printContactStdout(contactList: List):
+    """Log readable contact labels for an ordered contact list.
+
+    Args:
+        contactList: Contact mappings whose name or email is rendered.
+
+    Returns:
+        None. Lines are emitted through the module logger.
+    """
     for contact in contactList:
         contactName = " ".join([value for value in [contact.get('first_name'), contact.get('last_name')] if value])
         label = contactName if contactName else contact.get('email', '')
@@ -345,6 +485,14 @@ def printContactStdout(contactList: List):
 
 
 def printNetworkStdout(networkList: List):
+    """Log readable network labels for an ordered network list.
+
+    Args:
+        networkList: Network mappings whose IDs and names are rendered.
+
+    Returns:
+        None. Lines are emitted through the module logger.
+    """
     for network in networkList:
         log.info("   Network: " + network['id'] + " - " + network.get('name', ''))
     log.info("\n\n")
@@ -366,6 +514,27 @@ def outputExcelDirectoryEntities(
     networksLabel : str,
     extraSheets = None,
 ):
+    """Write configured Directory entity frames to one multi-sheet XLSX file.
+
+    Args:
+        filename: XLSX destination overwritten by ``write_xlsx_tables``.
+        dfBiobanks: Active biobank dataframe for the primary sheet.
+        biobanksLabel: Primary biobank sheet name.
+        dfCollections: Active collection dataframe for the primary sheet.
+        collectionsLabel: Primary collection sheet name.
+        dfServices: Active service dataframe for the primary sheet.
+        servicesLabel: Primary service sheet name.
+        dfStudies: Active study dataframe for the primary sheet.
+        studiesLabel: Primary study sheet name.
+        dfContacts: Active contact dataframe for the primary sheet.
+        contactsLabel: Primary contact sheet name.
+        dfNetworks: Active network dataframe for the primary sheet.
+        networksLabel: Primary network sheet name.
+        extraSheets: Optional additional ``write_xlsx_tables`` sheet tuples.
+
+    Returns:
+        None. The XLSX writer creates or replaces ``filename``.
+    """
     sheet_specs = [
         (dfBiobanks, biobanksLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),
         (dfCollections, collectionsLabel, True, {"hyperlink_columns": [("id", "directoryURL")]}),

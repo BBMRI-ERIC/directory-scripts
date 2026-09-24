@@ -45,6 +45,23 @@ from xlsxutils import write_xlsx_tables
 # Functions
 
 def getCollBBNetwork(network, networkname, biobankId, biobank, coll_list : list, bb_list : list, checkedBbsIds : list):
+    """Append a network-matching collection and its biobank only once.
+
+    Args:
+        network: Current collection network reference mapping.
+        networkname: Network identifier selected by the enclosing export loop.
+        biobankId: Parent biobank identifier for the enclosing ``collection``.
+        biobank: Parent biobank mapping appended on its first encounter.
+        coll_list: Mutable selected-collection list to extend on a match.
+        bb_list: Mutable selected-biobank list to extend on first match.
+        checkedBbsIds: Mutable biobank-ID list used for deduplication.
+
+    Returns:
+        The same three mutable lists after any matching additions.
+
+    Side Effects:
+        Reads the enclosing global ``collection`` and may mutate all list inputs.
+    """
     if network['id'] == networkname:
         coll_list.append(collection)
         if biobankId not in checkedBbsIds:
@@ -53,6 +70,23 @@ def getCollBBNetwork(network, networkname, biobankId, biobank, coll_list : list,
     return coll_list, bb_list, checkedBbsIds
 
 def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFrame, df_coll : pd.DataFrame, df_collFactsSampleNumber : pd.DataFrame):
+    """Append cohort collection, quality, and all-star fact evidence to dataframes.
+
+    Args:
+        collList: Selected collection mappings to summarize.
+        network: Network label written into every appended row.
+        entity: Entity label written into every appended row.
+        df: Mutable aggregate-statistics dataframe.
+        df_coll: Mutable collection-detail dataframe.
+        df_collFactsSampleNumber: Mutable all-star sample-evidence dataframe.
+
+    Returns:
+        The same three mutated dataframes in aggregate/detail/fact order.
+
+    Side Effects:
+        Appends rows, reads global warning/error IDs and Directory state, and logs
+        one line per collection.
+    """
     for coll in collList:
         nrSampDonProv = 'N'
         collsFactsSamples = 0
@@ -95,6 +129,21 @@ def addColletion2Df(collList : list, network : str, entity : str, df : pd.DataFr
     return df, df_coll, df_collFactsSampleNumber
 
 def addBB2Df(BBList : list, network : str, entity : str, df : pd.DataFrame, df_bb : pd.DataFrame):
+    """Append cohort biobank placeholder statistics and detail rows.
+
+    Args:
+        BBList: Selected biobank mappings to add.
+        network: Network label written into every appended row.
+        entity: Entity label written into every appended row.
+        df: Mutable aggregate-statistics dataframe.
+        df_bb: Mutable biobank-detail dataframe.
+
+    Returns:
+        The same two mutated dataframes in aggregate/detail order.
+
+    Side Effects:
+        Appends placeholder values for biobank-only rows and logs each biobank.
+    """
     for biobank_cohort in BBList:
         df.loc[len(df)] = [network,entity,str(biobank_cohort['country']['id']),'NA','NA',int(0),'NA','NA']
         df_bb.loc[len(df_bb)] = [network,entity,str(biobank_cohort['country']['id']),str(biobank_cohort['name']),str(biobank_cohort['id'])]
@@ -102,6 +151,25 @@ def addBB2Df(BBList : list, network : str, entity : str, df : pd.DataFrame, df_b
     return df, df_bb
 
 def outputExcelBiobanksCollections(filename : str, dfBiobanks : pd.DataFrame, biobanksLabel : str, dfCollections : pd.DataFrame, collectionsLabel : str, dfStats : pd.DataFrame, statsLabel : str, dfStats2 : pd.DataFrame, statsLabel2 : str, numberSamplesFacts : pd.DataFrame, samplesFactsLabel : str, extraSheets = None):
+    """Write the BBMRI Cohorts frames and optional sheets to one XLSX workbook.
+
+    Args:
+        filename: Destination XLSX path created or replaced by the shared writer.
+        dfBiobanks: Biobank-detail dataframe.
+        biobanksLabel: Biobank worksheet name.
+        dfCollections: Collection-detail dataframe.
+        collectionsLabel: Collection worksheet name.
+        dfStats: First aggregate-statistics dataframe.
+        statsLabel: First statistics worksheet name.
+        dfStats2: Second aggregate-statistics dataframe.
+        statsLabel2: Second statistics worksheet name.
+        numberSamplesFacts: All-star fact sample-evidence dataframe.
+        samplesFactsLabel: Fact-evidence worksheet name.
+        extraSheets: Optional additional writer sheet specifications.
+
+    Returns:
+        None. Delegates non-atomic workbook creation to ``write_xlsx_tables``.
+    """
     sheet_specs = [
         (dfBiobanks, biobanksLabel),
         (dfCollections, collectionsLabel),

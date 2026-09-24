@@ -10,7 +10,17 @@ from dms2dec.dms_convert import dms2dec
 
 
 def dmm_to_dd(coord: str) -> float:
-    """Convert a DMM coordinate such as ``E027 03.008`` to decimal degrees."""
+    """Convert a directional degrees-and-decimal-minutes coordinate to decimal degrees.
+
+    Args:
+        coord: Text in the accepted ``N|S|E|W<degrees> <minutes>`` format.
+
+    Returns:
+        Signed decimal degrees, with south and west values made negative.
+
+    Raises:
+        ValueError: If ``coord`` does not match the accepted DMM representation.
+    """
     pattern = r'([NSWE])(\d+) (\d+\.\d+)'
     match = re.match(pattern, coord)
     if not match:
@@ -23,6 +33,16 @@ def dmm_to_dd(coord: str) -> float:
 
 
 def _normalize_coordinate_component(value: Any) -> Optional[float]:
+    """Normalize one stored coordinate value to a decimal component.
+
+    Args:
+        value: Numeric value, decimal text, DMS text, DMM text, or blank value
+            read from Directory metadata.
+
+    Returns:
+        A new float for parseable values, or ``None`` for missing values. Invalid
+        nonblank representations propagate the parser's ``ValueError``.
+    """
     if value is None:
         return None
     if isinstance(value, (int, float)):
@@ -39,7 +59,16 @@ def _normalize_coordinate_component(value: Any) -> Optional[float]:
 
 
 def get_entity_coordinates(entity: dict[str, Any]) -> Optional[list[float]]:
-    """Return ``[longitude, latitude]`` from an entity when available."""
+    """Return valid ``[longitude, latitude]`` coordinates from an entity mapping.
+
+    Args:
+        entity: Directory entity record containing optional ``longitude`` and
+            ``latitude`` values in decimal, DMS, or DMM form.
+
+    Returns:
+        A newly allocated GeoJSON-order coordinate pair, or ``None`` when either
+        component is absent or outside its geographic range.
+    """
     longitude = _normalize_coordinate_component(entity.get('longitude'))
     latitude = _normalize_coordinate_component(entity.get('latitude'))
     if longitude is None or latitude is None:
@@ -52,7 +81,16 @@ def get_entity_coordinates(entity: dict[str, Any]) -> Optional[list[float]]:
 
 
 def make_point_feature(properties: dict[str, Any], coordinates: list[float]) -> dict[str, Any]:
-    """Create a GeoJSON point feature."""
+    """Create one GeoJSON Point feature without copying its supplied members.
+
+    Args:
+        properties: Feature-property mapping retained by reference in the result.
+        coordinates: Longitude/latitude coordinate list retained by reference in
+            the Point geometry.
+
+    Returns:
+        GeoJSON Feature mapping containing the supplied properties and Point.
+    """
     return {
         'type': 'Feature',
         'properties': properties,
@@ -64,6 +102,19 @@ def make_point_feature(properties: dict[str, Any], coordinates: list[float]) -> 
 
 
 def write_feature_collection(path: str, features: list[dict[str, Any]]) -> None:
-    """Write a GeoJSON FeatureCollection to disk."""
+    """Serialize supplied features as an indented GeoJSON FeatureCollection.
+
+    Args:
+        path: Destination file overwritten directly; its parent directory must
+            already exist.
+        features: Ordered feature mappings written without validation or copying.
+
+    Returns:
+        None. The destination is created or replaced non-atomically.
+
+    Raises:
+        OSError: If the destination cannot be opened or written.
+        TypeError: If a supplied value is not JSON serializable.
+    """
     with open(path, 'w', encoding='utf-8') as outfile:
         json.dump({'type': 'FeatureCollection', 'features': features}, outfile, indent=4)

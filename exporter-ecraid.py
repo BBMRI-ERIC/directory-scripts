@@ -116,6 +116,15 @@ for b in ecraidRelevantBiobankIds:
 pd_ecraidRelevantBiobanks = pd.DataFrame(ecraidRelevantBiobanks, columns=biobank_columns)
 
 def printCollectionStdout(collectionList : List, headerStr : str):
+    """Print a categorized ECRAID collection list with parent biobanks.
+
+    Args:
+        collectionList: ECRAID-selected collection mappings to render in order.
+        headerStr: Human-readable category heading preceding the count.
+
+    Returns:
+        None. Writes summary and collection lines to standard output.
+    """
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])

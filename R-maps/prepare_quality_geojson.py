@@ -28,7 +28,15 @@ from geojsonutils import get_entity_coordinates, make_point_feature, write_featu
 
 
 def normalize_quality_level(value: object) -> str:
-    """Normalize a quality level to the map's expected qual_id contract."""
+    """Normalize a stored quality assessment level to the map category.
+
+    Args:
+        value: Raw assessment value from a quality-information table or legacy
+            combined-quality field.
+
+    Returns:
+        ``eric``, ``accredited``, or ``Other`` for every input value.
+    """
     value_str = str(value).strip().lower()
     if value_str == "eric":
         return "eric"
@@ -38,7 +46,15 @@ def normalize_quality_level(value: object) -> str:
 
 
 def extract_quality_reference_ids(entity: dict) -> list[str]:
-    """Return referenced quality row ids from an entity."""
+    """Extract ordered nonblank quality-row identifiers from an entity record.
+
+    Args:
+        entity: Directory biobank or collection mapping with optional ``quality``
+            reference list.
+
+    Returns:
+        Newly allocated list of ``id`` values from mapping references only.
+    """
     refs = entity.get("quality") or []
     out = []
     for ref in refs:
@@ -48,7 +64,16 @@ def extract_quality_reference_ids(entity: dict) -> list[str]:
 
 
 def build_quality_level_maps(directory: Directory) -> tuple[dict[str, str], dict[str, str]]:
-    """Return raw-table id -> assess-level maps for biobanks and collections."""
+    """Build quality-row-to-map-level lookups for all loaded quality records.
+
+    Args:
+        directory: Loaded Directory providing scope-independent raw quality
+            information for biobanks and collections.
+
+    Returns:
+        Two newly allocated mappings: biobank quality-row IDs then collection
+        quality-row IDs, each mapped to a rendering category.
+    """
     biobank_rows = directory.getBiobankQualityInfo(scope="all")
     collection_rows = directory.getCollectionQualityInfo(scope="all")
     biobank_map = {
@@ -63,7 +88,17 @@ def build_quality_level_maps(directory: Directory) -> tuple[dict[str, str], dict
 
 
 def derive_entity_quality_levels(entity: dict, raw_quality_map: dict[str, str]) -> list[str]:
-    """Return the quality levels to render for one entity."""
+    """Resolve all map quality levels assigned to one Directory entity.
+
+    Args:
+        entity: Biobank or collection mapping with quality references and
+            optionally legacy ``combined_quality`` values.
+        raw_quality_map: Mapping from raw quality-row IDs to normalized levels.
+
+    Returns:
+        Newly allocated level list from raw references, or normalized legacy
+        combined-quality values when no raw references are present.
+    """
     levels = [
         raw_quality_map.get(reference_id, "Other")
         for reference_id in extract_quality_reference_ids(entity)
@@ -76,7 +111,17 @@ def derive_entity_quality_levels(entity: dict, raw_quality_map: dict[str, str]) 
 
 
 def collection_coordinates(collection: dict, biobank_by_id: dict[str, dict]) -> Optional[list[float]]:
-    """Return collection coordinates, falling back to the parent biobank when needed."""
+    """Resolve collection coordinates, falling back only to its parent biobank.
+
+    Args:
+        collection: Directory collection record with optional own coordinates and
+            parent-biobank reference.
+        biobank_by_id: Loaded biobank mapping used for parent-coordinate fallback.
+
+    Returns:
+        Newly allocated longitude/latitude list from the collection or its parent,
+        or ``None`` when neither has valid coordinates.
+    """
     coordinates = get_entity_coordinates(collection)
     if coordinates is not None:
         return coordinates
@@ -103,7 +148,18 @@ def make_quality_features(
     quality_map: dict[str, str],
     coordinate_getter,
 ) -> list[dict]:
-    """Build one point feature per quality designation."""
+    """Build a point feature for every resolved quality designation.
+
+    Args:
+        entities: Ordered biobank or collection records to render.
+        entity_type: Text stored in each feature to distinguish source entity type.
+        quality_map: Raw quality-row ID to normalized level mapping.
+        coordinate_getter: Callable resolving one entity to coordinates or None.
+
+    Returns:
+        Newly allocated features for entities that have at least one level and
+        valid coordinates. Multiple levels produce multiple features.
+    """
     features: list[dict] = []
     for entity in entities:
         quality_levels = derive_entity_quality_levels(entity, quality_map)
@@ -130,6 +186,15 @@ def make_quality_features(
 
 
 def main() -> None:
+    """Write quality-designation point features from current Directory content.
+
+    Returns:
+        None. Parses CLI options, creates output parents, and overwrites the
+        requested GeoJSON file through ``write_feature_collection``.
+
+    Raises:
+        RuntimeError: If no visible entity yields a quality map feature.
+    """
     parser = build_parser()
     add_logging_arguments(parser)
     add_directory_auth_arguments(parser)

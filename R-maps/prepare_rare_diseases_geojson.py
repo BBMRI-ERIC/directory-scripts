@@ -59,7 +59,19 @@ RD_NETWORK_SUBSTRINGS = (
 
 
 def load_feature_collection(path: Path) -> dict[str, Any]:
-    """Load a GeoJSON FeatureCollection."""
+    """Read and validate a GeoJSON FeatureCollection mapping.
+
+    Args:
+        path: Existing JSON input path.
+
+    Returns:
+        Parsed mapping retaining the JSON feature order.
+
+    Raises:
+        OSError: If the input cannot be read.
+        json.JSONDecodeError: If it is invalid JSON.
+        ValueError: If the top-level type is not FeatureCollection.
+    """
     with path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     if data.get("type") != "FeatureCollection":
@@ -68,7 +80,15 @@ def load_feature_collection(path: Path) -> dict[str, Any]:
 
 
 def normalize_ids(value: Any) -> list[str]:
-    """Return a flat list of id-like strings from a Directory field."""
+    """Flatten a scalar, mapping, or list field to usable identifier strings.
+
+    Args:
+        value: Optional Directory relationship field in scalar, mapping, or list
+            representation.
+
+    Returns:
+        Newly allocated identifier list, preferring mapping ``id`` then ``name``.
+    """
     if value is None:
         return []
     if isinstance(value, dict):
@@ -88,14 +108,29 @@ def normalize_ids(value: Any) -> list[str]:
 
 
 def normalize_country_code(value: Any) -> str:
-    """Normalize a Directory country field to a short code."""
+    """Normalize a country scalar or reference mapping to uppercase display text.
+
+    Args:
+        value: Country value or mapping containing ``id``, ``code``, or ``name``.
+
+    Returns:
+        Stripped uppercase identifier, or an empty string for missing values.
+    """
     if isinstance(value, dict):
         value = value.get("id") or value.get("code") or value.get("name")
     return str(value or "").strip().upper()
 
 
 def collection_types(collection: dict[str, Any]) -> list[str]:
-    """Return normalized collection types."""
+    """Extract collection type values as uppercase nonblank strings.
+
+    Args:
+        collection: Directory collection mapping with optional scalar or list
+            ``type`` field.
+
+    Returns:
+        Newly allocated normalized type list.
+    """
     value = collection.get("type")
     if value is None:
         return []
@@ -105,12 +140,27 @@ def collection_types(collection: dict[str, Any]) -> list[str]:
 
 
 def collection_is_rd(collection: dict[str, Any]) -> bool:
-    """Return True when a collection is rare-disease related."""
+    """Return whether a collection explicitly has the ``RD`` type tag.
+
+    Args:
+        collection: Directory collection mapping evaluated through
+            ``collection_types``.
+
+    Returns:
+        ``True`` when normalized types include ``RD``.
+    """
     return "RD" in collection_types(collection)
 
 
 def biobank_network_ids(biobank: dict[str, Any]) -> list[str]:
-    """Return normalized network ids for a biobank."""
+    """Collect network/capability identifiers from all supported biobank fields.
+
+    Args:
+        biobank: Directory biobank mapping with optional network relationships.
+
+    Returns:
+        Newly allocated list preserving field and source-list ordering.
+    """
     ids = normalize_ids(biobank.get("network"))
     ids.extend(normalize_ids(biobank.get("networks")))
     ids.extend(normalize_ids(biobank.get("capabilities")))
@@ -118,7 +168,15 @@ def biobank_network_ids(biobank: dict[str, Any]) -> list[str]:
 
 
 def biobank_has_rd_network(biobank: dict[str, Any]) -> bool:
-    """Return True when the biobank is explicitly part of an RD network."""
+    """Return whether a biobank relationship ID matches an RD network token.
+
+    Args:
+        biobank: Directory biobank mapping evaluated through its network IDs.
+
+    Returns:
+        ``True`` when any normalized network/capability ID contains a configured
+        rare-disease token.
+    """
     for network_id in biobank_network_ids(biobank):
         normalized = network_id.lower()
         if any(token in normalized for token in RD_NETWORK_SUBSTRINGS):
@@ -127,7 +185,15 @@ def biobank_has_rd_network(biobank: dict[str, Any]) -> bool:
 
 
 def biobank_has_rd_collection(biobank: dict[str, Any], collection_type_by_id: dict[str, list[str]]) -> bool:
-    """Return True when any of the biobank collections is an RD collection."""
+    """Return whether a referenced biobank collection has the explicit RD type.
+
+    Args:
+        biobank: Directory biobank mapping with collection references.
+        collection_type_by_id: Collection-ID-to-normalized-type lookup.
+
+    Returns:
+        ``True`` if at least one referenced collection type list includes ``RD``.
+    """
     for collection_id in normalize_ids(biobank.get("collections")):
         if collection_is_rd({"type": collection_type_by_id.get(collection_id, [])}):
             return True
@@ -135,12 +201,27 @@ def biobank_has_rd_collection(biobank: dict[str, Any], collection_type_by_id: di
 
 
 def biobank_is_rd(biobank: dict[str, Any], collection_type_by_id: dict[str, list[str]]) -> bool:
-    """Return True when a biobank should appear on the rare-disease map."""
+    """Determine whether a biobank belongs on the rare-disease map.
+
+    Args:
+        biobank: Directory biobank mapping to evaluate.
+        collection_type_by_id: Collection-ID-to-normalized-type lookup.
+
+    Returns:
+        ``True`` for an RD-tagged collection or configured RD network membership.
+    """
     return biobank_has_rd_collection(biobank, collection_type_by_id) or biobank_has_rd_network(biobank)
 
 
 def biobank_membership_role(biobank: dict[str, Any]) -> str:
-    """Return the point color role for the rare-disease map."""
+    """Classify a biobank country as member or non-member map role.
+
+    Args:
+        biobank: Directory biobank mapping with optional country value.
+
+    Returns:
+        ``member`` for configured member countries, otherwise ``non_member``.
+    """
     country = normalize_country_code(biobank.get("country"))
     if country not in MEMBER_COUNTRIES:
         return "non_member"
@@ -148,7 +229,14 @@ def biobank_membership_role(biobank: dict[str, Any]) -> str:
 
 
 def build_collection_type_index(directory: Directory) -> dict[str, list[str]]:
-    """Return collection id -> normalized type list."""
+    """Index all visible collection IDs by their normalized type lists.
+
+    Args:
+        directory: Loaded Directory whose configured scope supplies collections.
+
+    Returns:
+        Newly allocated mapping excluding collections without an identifier.
+    """
     index: dict[str, list[str]] = {}
     for collection in directory.getCollections():
         collection_id = collection.get("id")
@@ -159,6 +247,16 @@ def build_collection_type_index(directory: Directory) -> dict[str, list[str]]:
 
 
 def main() -> None:
+    """Filter a full GeoJSON export to visible rare-disease biobanks.
+
+    Returns:
+        None. Parses CLI arguments, creates output parents, and overwrites an
+        indented FeatureCollection containing selected features.
+
+    Raises:
+        FileNotFoundError: If the required full GeoJSON input is absent.
+        RuntimeError: If no eligible Directory ID or matching GeoJSON feature exists.
+    """
     parser = build_parser()
     add_logging_arguments(parser)
     add_directory_auth_arguments(parser)

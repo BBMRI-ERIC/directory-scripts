@@ -248,6 +248,15 @@ pd_collectionsObesityDiagnosed = pd.DataFrame(collectionsObesityDiagnosed)
 
 
 def printCollectionStdout(collectionList: List, headerStr: str):
+    """Log a categorized obesity collection list with parent biobanks.
+
+    Args:
+        collectionList: Obesity-selected collection mappings to render in order.
+        headerStr: Human-readable category heading preceding the count.
+
+    Returns:
+        None. Records summary lines through the module logger.
+    """
     print(headerStr + " - " + str(len(collectionList)) + " collections")
     for collection in collectionList:
         biobankId = dir.getCollectionBiobankId(collection['id'])

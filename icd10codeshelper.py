@@ -20,8 +20,18 @@ obesity_diag_ranges = ['E65-E68']
 
 
 class ICD10CodesHelper:
+   """Classify ICD-10 codes, code ranges, and chapter identifiers for exporters."""
 
    def isCancerCode(code : str) -> bool:
+      """Classify an ICD-10 code or range as cancer-related when parseable.
+
+      Args:
+         code: Exact ICD-10 block, subcode, or hyphenated range to classify.
+
+      Returns:
+         ``True`` or ``False`` for recognized forms, or ``None`` for an
+         unparseable representation.
+      """
       if code in ['C7A', 'C7B', 'D3A']:
          return True
       m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
@@ -45,6 +55,15 @@ class ICD10CodesHelper:
       return None
 
    def isCancerChapter(code : str) -> bool:
+      """Classify a Roman-numeral ICD-10 chapter as the cancer chapter.
+
+      Args:
+         code: Roman chapter numeral expected by the legacy chapter model.
+
+      Returns:
+         ``True`` for chapter II, ``False`` for another known chapter, or
+         ``None`` for an unrecognized value.
+      """
       if code not in cancer_chapters_roman:
          return None
       log.debug("ICD10 chapter detected: %s" % (code))
@@ -54,6 +73,14 @@ class ICD10CodesHelper:
          return False
 
    def isObesityCode(code : str) -> bool:
+      """Classify an ICD-10 code or configured range as obesity-related.
+
+      Args:
+         code: Exact ICD-10 block, subcode, or supported range to classify.
+
+      Returns:
+         ``True`` for E65--E68 or a configured range, otherwise ``False``.
+      """
       m = re.search(r'^(?P<block>[A-Z])(?P<code>\d{1,2})(\.(?P<subcode>\d+))?$', code)
       if m:
          log.debug("ICD-10 block detected: %s, code: %s, subcode %s" % (m.group('block'), m.group('code'), m.group('subcode')))
