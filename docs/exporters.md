@@ -9,104 +9,26 @@ withdrawn-scope, and logging conventions documented in
 
 | Script | Summary |
 |---|---|
-| `exporter-all.py` | Export all major Directory entity classes and aggregate collection statistics. |
-| `exporter-bbmri-cohorts.py` | Report BBMRI Cohorts network statistics and associated QC findings. |
-| `exporter-cMDR.py` | Export study-linked biobanks and collections, including geospatial output. |
-| `exporter-cohorts.py` | Export cohort and population-based collections. |
-| `exporter-country.py` | Report biobank and collection counts by country. |
-| `exporter-covid.py` | Export COVID-relevant collections and biobanks. |
-| `exporter-ecraid.py` | Export collections and institutions relevant to ECRAID. |
-| `exporter-fact-sheet-emulation.py` | Identify collection families that may historically emulate fact sheets and report migration candidates. |
-| `exporter-flourish-nn.py` | Export National-Node/country collection statistics for a Flourish points map. |
-| `exporter-institutions.py` | Export juridical persons grouped by country. |
-| `exporter-mission-cancer.py` | Export cancer and pediatric-cancer collections. |
-| `exporter-negotiator-orphans.py` | Analyze Negotiator representative coverage and assignment candidates. |
-| `exporter-nn-biobank-stats.py` | Export per-National-Node biobank statistics from Directory and Negotiator evidence. |
-| `exporter-obesity.py` | Export obesity and pediatric-obesity collections. |
-| `exporter-pediatric.py` | Export pediatric and pediatric-only collections. |
-| `exporter-quality-label.py` | Export quality assessments for biobanks and collections. |
+| [`exporter-all.py`](#exporter-all) | Export all major Directory entity classes and aggregate collection statistics. |
+| [`exporter-bbmri-cohorts.py`](#exporter-bbmri-cohorts) | Report BBMRI Cohorts network statistics and associated QC findings. |
+| [`exporter-cMDR.py`](#exporter-cmdr) | Export study-linked biobanks and collections, including geospatial output. |
+| [`exporter-cohorts.py`](#exporter-cohorts) | Export cohort and population-based collections. |
+| [`exporter-country.py`](#exporter-country) | Report biobank and collection counts by country. |
+| [`exporter-covid.py`](#exporter-covid) | Export COVID-relevant collections and biobanks. |
+| [`exporter-ecraid.py`](#exporter-ecraid) | Export collections and institutions relevant to ECRAID. |
+| [`exporter-fact-sheet-emulation.py`](#exporter-fact-sheet-emulation) | Identify collection families that may historically emulate fact sheets and report migration candidates. |
+| [`exporter-flourish-nn.py`](#exporter-flourish-nn) | Export National-Node/country collection statistics for a Flourish points map. |
+| [`exporter-institutions.py`](#exporter-institutions) | Export juridical persons grouped by country. |
+| [`exporter-mission-cancer.py`](#exporter-mission-cancer) | Export cancer and pediatric-cancer collections. |
+| [`exporter-negotiator-orphans.py`](#exporter-negotiator-orphans) | Analyze Negotiator representative coverage and assignment candidates. |
+| [`exporter-nn-biobank-stats.py`](#exporter-nn-biobank-stats) | Export per-National-Node biobank statistics from Directory and Negotiator evidence. |
+| [`exporter-obesity.py`](#exporter-obesity) | Export obesity and pediatric-obesity collections. |
+| [`exporter-pediatric.py`](#exporter-pediatric) | Export pediatric and pediatric-only collections. |
+| [`exporter-quality-label.py`](#exporter-quality-label) | Export quality assessments for biobanks and collections. |
 
 ## Exporter details
 
-### `exporter-flourish-nn.py`
-
-- **Purpose:** Generate a `Points` worksheet directly for Flourish, with map coordinates, organisation and collection totals, and HTML collection-type summaries linked to the Directory catalogue.
-- **Scope:** Default runs include member/observer staging areas. `--include-ext` adds `EXT` records reported in a member/observer country to that country; `--include-all-countries` also outputs non-member reported countries. Standard `-w` and `--only-withdrawn` options select withdrawn content.
-- **Output:** `-X flourish-points.xlsx` writes the seven logical columns `Name`, `Longitude`, `Latitude`, `Geographic regions`, `Organisations`, `Collections`, and `Collection types`. Stdout provides the same country-sorted totals and type counts.
-
-```bash
-python3 exporter-flourish-nn.py -X flourish-points.xlsx
-python3 exporter-flourish-nn.py --include-ext -X flourish-points.xlsx
-python3 exporter-flourish-nn.py --include-all-countries -w -X flourish-points.xlsx
-```
-
-### `exporter-nn-biobank-stats.py`
-
-- **Purpose:** Summarize active Directory biobanks per National Node, including
-  collection-derived biobank categories, actual Negotiator coverage, and
-  biobank- and collection-level quality labels.
-- **Input:** Select exactly one Negotiator registration source. Use
-  `--negotiator-representatives-xlsx` for the current representatives workbook,
-  whose first sheet must contain `network_name`, `biobank_name`,
-  `resource_name`, `resource_source_id`, and `representatives_emails`. Use
-  `--negotiator-orphans-xlsx` for output from
-  `exporter-negotiator-orphans.py`; only its `negotiator_collection_stats`
-  worksheet is read. The old positional workbook remains a deprecated alias
-  for `--negotiator-representatives-xlsx`. `--negotiator-api` is reserved and
-  currently exits with a not-implemented error. Only active Directory entities
-  are counted.
-- **Output:** Stdout prints alphabetically ordered Node tables. `-X` creates one
-  worksheet per Node, including virtual `EXT`, with the same aggregated values,
-  a problems table, legend, and provenance metadata.
-- **Classification:** A versioned category policy walks each biobank's
-  top-most supported collection frontier. `HOSPITAL` and
-  `POPULATION_BASED` cast votes; a supported parent stops traversal of its
-  descendants. A tie follows report-row order, so hospital-integrated wins
-  over population-based. Human biomonitoring, environmental, plant
-  biodiversity, domestic animals, wildlife animals, and museum categories
-  are not yet mapped; the exporter warns and currently assigns such holdings
-  to `others`.
-- **Availability:** Federated Platform inventory is not available in this
-  version. It is shown as `N/A` on stdout and blank in XLSX, which means
-  unavailable rather than zero. The same unavailable convention applies to
-  unsupported category rows and missing optional quality tables. Supported
-  categories with no members show numeric zero for available metrics.
-- **Negotiator:** Only direct, non-empty representative assignments count.
-  `fully`, `partially`, and `missing` partition biobanks with active
-  collections; `no_collections` is intentionally omitted from those columns.
-  Parent or same-biobank assignment candidates reported by
-  `exporter-negotiator-orphans.py` remain advisory and are never counted as
-  registrations. Accordingly, orphan-report columns such as `auto_by_parent`
-  and `auto_by_biobank` are ignored; only direct, non-empty
-  `representatives_emails` values count.
-  Resource IDs outside the active Directory scope are retained as unmatched
-  evidence, not counted as represented collections or biobanks.
-- **Quality labels:** Organization columns count unique biobanks and collection
-  columns count unique collections, grouped by the parent biobank's Node and
-  category. A label assessed as both levels is counted once as `Accredited`,
-  which takes precedence over `ERIC`.
-- **Problems and emergency mode:** The problems table counts active biobanks
-  with neither collections nor services; normal runs warn for each affected
-  Node, while `-v`/`-d` list IDs. `--emergency-skip-dag-checks` permits a
-  best-effort run through broken collection hierarchies, but classifications
-  affected by hierarchy corruption are provisional and should not be used as
-  authoritative statistics. Every collection component is checked, including
-  cycles disconnected from top-level collections; an affected biobank falls
-  back to provisional `others`, and the warning identifies the missing parent
-  or cycle location. Workbook metadata records the actual schema and whether
-  DAG validation was skipped.
-
-```bash
-python3 exporter-nn-biobank-stats.py \
-  --negotiator-representatives-xlsx representatives.xlsx \
-  -X nn-biobank-stats.xlsx
-
-python3 exporter-nn-biobank-stats.py \
-  --negotiator-orphans-xlsx negotiator-orphans.xlsx \
-  -X nn-biobank-stats.xlsx
-```
-
-### `exporter-all.py`
+### <a id="exporter-all"></a>`exporter-all.py`
 
 - **Purpose:** Produce the broadest tabular export of Directory content and a
   high-level inventory of the selected scope.
@@ -132,7 +54,7 @@ creates explicit links up to that limit, leaves additional display cells as
 plain text, and emits one summary warning instead of thousands of per-cell
 warnings.
 
-### `exporter-bbmri-cohorts.py`
+### <a id="exporter-bbmri-cohorts"></a>`exporter-bbmri-cohorts.py`
 
 - **Purpose:** Analyze biobanks and collections participating in the BBMRI
   Cohorts networks.
@@ -148,7 +70,7 @@ python3 exporter-bbmri-cohorts.py \
   -XWE bbmri-cohorts-warnings.xlsx
 ```
 
-### `exporter-cMDR.py`
+### <a id="exporter-cmdr"></a>`exporter-cMDR.py`
 
 - **Purpose:** Show Directory study/trial linkage in both directions: from
   collections to studies and from studies to collections and biobanks.
@@ -163,7 +85,7 @@ python3 exporter-cMDR.py -X cMDR.xlsx
 python3 exporter-cMDR.py -G cMDR-map.geojson
 ```
 
-### `exporter-cohorts.py`
+### <a id="exporter-cohorts"></a>`exporter-cohorts.py`
 
 - **Purpose:** Inventory `COHORT` and `POPULATION_BASED` collections.
 - **Output:** Collection listings, countries, biobank/collection totals,
@@ -175,7 +97,7 @@ python3 exporter-cMDR.py -G cMDR-map.geojson
 python3 exporter-cohorts.py -X cohorts.xlsx
 ```
 
-### `exporter-country.py`
+### <a id="exporter-country"></a>`exporter-country.py`
 
 - **Purpose:** Provide a compact country-level overview of Directory coverage.
 - **Output:** Biobank and collection counts by country, optional XLSX output,
@@ -187,7 +109,7 @@ python3 exporter-country.py
 python3 exporter-country.py -X countries.xlsx
 ```
 
-### `exporter-covid.py`
+### <a id="exporter-covid"></a>`exporter-covid.py`
 
 - **Purpose:** Identify collections relevant to COVID-19 through diagnoses,
   control/prospective characteristics, and COVID network membership.
@@ -201,7 +123,7 @@ python3 exporter-country.py -X countries.xlsx
 python3 exporter-covid.py -X covid.xlsx
 ```
 
-### `exporter-ecraid.py`
+### <a id="exporter-ecraid"></a>`exporter-ecraid.py`
 
 - **Purpose:** Identify collections and institutions relevant to ECRAID.
 - **Output:** Separate BSL-2/BSL-3 and pathogen-material collection groups,
@@ -213,7 +135,7 @@ python3 exporter-covid.py -X covid.xlsx
 python3 exporter-ecraid.py -X ecraid.xlsx
 ```
 
-### `exporter-fact-sheet-emulation.py`
+### <a id="exporter-fact-sheet-emulation"></a>`exporter-fact-sheet-emulation.py`
 
 - **Purpose:** Find sibling or conservatively grouped top-level collection
   families that may be historical substitutes for fact-sheet dimensions rather
@@ -329,7 +251,19 @@ python3 exporter-fact-sheet-emulation.py \
   -X fact-sheet-emulation-advanced.xlsx
 ```
 
-### `exporter-institutions.py`
+### <a id="exporter-flourish-nn"></a>`exporter-flourish-nn.py`
+
+- **Purpose:** Generate a `Points` worksheet directly for Flourish, with map coordinates, organisation and collection totals, and HTML collection-type summaries linked to the Directory catalogue.
+- **Scope:** Default runs include member/observer staging areas. `--include-ext` adds `EXT` records reported in a member/observer country to that country; `--include-all-countries` also outputs non-member reported countries. Standard `-w` and `--only-withdrawn` options select withdrawn content.
+- **Output:** `-X flourish-points.xlsx` writes the seven logical columns `Name`, `Longitude`, `Latitude`, `Geographic regions`, `Organisations`, `Collections`, and `Collection types`. Stdout provides the same country-sorted totals and type counts.
+
+```bash
+python3 exporter-flourish-nn.py -X flourish-points.xlsx
+python3 exporter-flourish-nn.py --include-ext -X flourish-points.xlsx
+python3 exporter-flourish-nn.py --include-all-countries -w -X flourish-points.xlsx
+```
+
+### <a id="exporter-institutions"></a>`exporter-institutions.py`
 
 - **Purpose:** Extract the juridical persons responsible for Directory
   biobanks.
@@ -341,7 +275,7 @@ python3 exporter-fact-sheet-emulation.py \
 python3 exporter-institutions.py -X institutions.xlsx
 ```
 
-### `exporter-mission-cancer.py`
+### <a id="exporter-mission-cancer"></a>`exporter-mission-cancer.py`
 
 - **Purpose:** Analyze cancer-relevant and pediatric-cancer Directory holdings.
 - **Output:** Cancer-only, cancer-control, prospective, pediatric, and
@@ -355,7 +289,7 @@ python3 exporter-mission-cancer.py \
   -O en_product1.xml -X mission-cancer.xlsx
 ```
 
-### `exporter-negotiator-orphans.py`
+### <a id="exporter-negotiator-orphans"></a>`exporter-negotiator-orphans.py`
 
 - **Purpose:** Compare a Negotiator representative workbook with Directory
   collections and identify missing representative assignments.
@@ -369,7 +303,73 @@ python3 exporter-negotiator-orphans.py representatives.xlsx \
   -X negotiator-orphans.xlsx
 ```
 
-### `exporter-obesity.py`
+### <a id="exporter-nn-biobank-stats"></a>`exporter-nn-biobank-stats.py`
+
+- **Purpose:** Summarize active Directory biobanks per National Node, including
+  collection-derived biobank categories, actual Negotiator coverage, and
+  biobank- and collection-level quality labels.
+- **Input:** Select exactly one Negotiator registration source. Use
+  `--negotiator-representatives-xlsx` for the current representatives workbook,
+  whose first sheet must contain `network_name`, `biobank_name`,
+  `resource_name`, `resource_source_id`, and `representatives_emails`. Use
+  `--negotiator-orphans-xlsx` for output from
+  `exporter-negotiator-orphans.py`; only its `negotiator_collection_stats`
+  worksheet is read. The old positional workbook remains a deprecated alias
+  for `--negotiator-representatives-xlsx`. `--negotiator-api` is reserved and
+  currently exits with a not-implemented error. Only active Directory entities
+  are counted.
+- **Output:** Stdout prints alphabetically ordered Node tables. `-X` creates one
+  worksheet per Node, including virtual `EXT`, with the same aggregated values,
+  a problems table, legend, and provenance metadata.
+- **Classification:** A versioned category policy walks each biobank's
+  top-most supported collection frontier. `HOSPITAL` and
+  `POPULATION_BASED` cast votes; a supported parent stops traversal of its
+  descendants. A tie follows report-row order, so hospital-integrated wins
+  over population-based. Human biomonitoring, environmental, plant
+  biodiversity, domestic animals, wildlife animals, and museum categories
+  are not yet mapped; the exporter warns and currently assigns such holdings
+  to `others`.
+- **Availability:** Federated Platform inventory is not available in this
+  version. It is shown as `N/A` on stdout and blank in XLSX, which means
+  unavailable rather than zero. The same unavailable convention applies to
+  unsupported category rows and missing optional quality tables. Supported
+  categories with no members show numeric zero for available metrics.
+- **Negotiator:** Only direct, non-empty representative assignments count.
+  `fully`, `partially`, and `missing` partition biobanks with active
+  collections; `no_collections` is intentionally omitted from those columns.
+  Parent or same-biobank assignment candidates reported by
+  `exporter-negotiator-orphans.py` remain advisory and are never counted as
+  registrations. Accordingly, orphan-report columns such as `auto_by_parent`
+  and `auto_by_biobank` are ignored; only direct, non-empty
+  `representatives_emails` values count.
+  Resource IDs outside the active Directory scope are retained as unmatched
+  evidence, not counted as represented collections or biobanks.
+- **Quality labels:** Organization columns count unique biobanks and collection
+  columns count unique collections, grouped by the parent biobank's Node and
+  category. A label assessed as both levels is counted once as `Accredited`,
+  which takes precedence over `ERIC`.
+- **Problems and emergency mode:** The problems table counts active biobanks
+  with neither collections nor services; normal runs warn for each affected
+  Node, while `-v`/`-d` list IDs. `--emergency-skip-dag-checks` permits a
+  best-effort run through broken collection hierarchies, but classifications
+  affected by hierarchy corruption are provisional and should not be used as
+  authoritative statistics. Every collection component is checked, including
+  cycles disconnected from top-level collections; an affected biobank falls
+  back to provisional `others`, and the warning identifies the missing parent
+  or cycle location. Workbook metadata records the actual schema and whether
+  DAG validation was skipped.
+
+```bash
+python3 exporter-nn-biobank-stats.py \
+  --negotiator-representatives-xlsx representatives.xlsx \
+  -X nn-biobank-stats.xlsx
+
+python3 exporter-nn-biobank-stats.py \
+  --negotiator-orphans-xlsx negotiator-orphans.xlsx \
+  -X nn-biobank-stats.xlsx
+```
+
+### <a id="exporter-obesity"></a>`exporter-obesity.py`
 
 - **Purpose:** Analyze obesity-relevant collections and their pediatric
   subsets.
@@ -383,7 +383,7 @@ python3 exporter-negotiator-orphans.py representatives.xlsx \
 python3 exporter-obesity.py -O en_product1.xml -X obesity.xlsx
 ```
 
-### `exporter-pediatric.py`
+### <a id="exporter-pediatric"></a>`exporter-pediatric.py`
 
 - **Purpose:** Analyze pediatric-relevant and pediatric-only collections from
   collection age ranges.
@@ -397,7 +397,7 @@ python3 exporter-obesity.py -O en_product1.xml -X obesity.xlsx
 python3 exporter-pediatric.py -X pediatric.xlsx
 ```
 
-### `exporter-quality-label.py`
+### <a id="exporter-quality-label"></a>`exporter-quality-label.py`
 
 - **Purpose:** Export quality-standard assessments attached to biobanks and
   collections.
