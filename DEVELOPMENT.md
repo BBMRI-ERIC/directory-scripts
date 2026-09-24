@@ -698,7 +698,7 @@ human sign-off.
 - Keep short options globally consistent inside one CLI: do not reuse `-t` for tool-specific meanings in scripts that already expose `-t/--token` via shared auth helpers.
 - Use explicit runtime validation for assumptions that depend on input/data/config.
 - Prefer clear exceptions and actionable messages over silent fallback.
-- For reusable/public Python APIs, keep docstrings complete and consistent.
+- Python documentation contract: every explicit class, method, function, nested helper, fixture, and test in every tracked `*.py` file needs a purpose docstring. Use Google-style sections: every non-`self`/`cls` positional-only, positional, keyword-only, variadic, and keyword-variadic input requires an `Args:` entry with a nonempty description; value-producing functions require nonempty `Returns:`; generators require nonempty `Yields:`; procedures require `Returns:` explicitly stating `None`; and `__init__` requires `Args:` but no `Returns:`. Dataclasses must document every generated field with a nonempty `Attributes:` entry. When material, document ownership, mutability, optionality, ordering, side effects, and user-facing exceptions without inventing guarantees. The AST regression test enumerates only `git ls-files '*.py'`, retains a temporary deterministic baseline during remediation, and must end as a zero-violation test once the documentation batches are complete.
 - For helper entry points that may be called from tests with ad hoc `argparse.Namespace` objects, access optional CLI attributes defensively with `getattr(..., None)` instead of assuming every parser-added attribute is present.
 
 ## Testing

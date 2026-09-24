@@ -30,7 +30,7 @@
 - Python 3 scripts with 4-space indentation and PEP 8-inspired layout; keep existing vim modelines intact.
 - Prefer `snake_case` for variables/functions and short, descriptive script names; follow existing `exporter-*.py` and `data-check.py` naming patterns.
 - Keep scripts runnable as standalone CLIs with argparse flags and clear help text.
-- For reusable modules and public APIs, keep class/method/function docstrings complete and consistent (one style per file, e.g. Google-style).
+- Every explicit class, method, function, nested helper, fixture, and test in a tracked Python file must have a complete Google-style documentation contract; see `DEVELOPMENT.md` for required sections and semantics.
 
 ## Design Principles
 - `directory.py` is the single abstraction for Directory API access. Keep it lean, well documented, and the sole location for shared API calls.
