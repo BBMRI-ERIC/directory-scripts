@@ -14,7 +14,15 @@ MAX_TRUNCATION_DETAILS = 50
 
 
 def _excel_cell_text(value):
-    """Return the text Excel will effectively receive for long object values."""
+    """Return text requiring Excel length checks, leaving scalar values alone.
+
+    Args:
+        value: Candidate DataFrame cell value.
+
+    Returns:
+        The original string, ``str(value)`` for non-scalar objects, or ``None``
+        for non-string pandas scalars that Excel should receive unchanged.
+    """
     if isinstance(value, str):
         return value
     if pd.api.types.is_scalar(value):
@@ -23,7 +31,15 @@ def _excel_cell_text(value):
 
 
 def _truncate_excel_cell_value(value):
-    """Return a value safe for writing to one Excel cell."""
+    """Return a cell value that respects Excel's 32,767-character text limit.
+
+    Args:
+        value: Candidate scalar or object cell value.
+
+    Returns:
+        Original value when it needs no text truncation; otherwise a string cut to
+        the Excel limit with ``EXCEL_TRUNCATION_MARKER`` appended.
+    """
     cell_text = _excel_cell_text(value)
     if cell_text is None:
         return value
@@ -36,14 +52,36 @@ def _truncate_excel_cell_value(value):
 
 
 def _format_entity_fragment(entity_id) -> str:
-    """Return an optional log fragment identifying the affected entity."""
+    """Return an optional log fragment identifying the affected entity.
+
+    Args:
+        entity_id: Optional ID value extracted from an affected DataFrame row.
+
+    Returns:
+        Empty text for missing IDs, otherwise a comma-prefixed log fragment.
+    """
     if entity_id in (None, ""):
         return ""
     return f", entity_id={entity_id}"
 
 
 def _truncate_long_text_cells(dataframe: pd.DataFrame, sheet_name: str) -> pd.DataFrame:
-    """Truncate cells that exceed Excel's hard text-size limit."""
+    """Truncate cells that exceed Excel's hard text-size limit.
+
+    Args:
+        dataframe: Source frame. Empty frames are returned unchanged; nonempty
+            frames are copied before any cell values are replaced.
+        sheet_name: Sheet label included in truncation logs.
+
+    Returns:
+        Original empty frame or a copied frame with overlong text/object values
+        replaced by Excel-safe strings. Values are not truncated merely because
+        their scalar representation is long.
+
+    Side Effects:
+        Emits warning, info, and debug logs describing truncation counts, up to
+        50 detailed records, and exact original/truncated values.
+    """
     if dataframe.empty:
         return dataframe
 
@@ -122,24 +160,31 @@ def _truncate_long_text_cells(dataframe: pd.DataFrame, sheet_name: str) -> pd.Da
 
 
 def write_xlsx_tables(filename: str, sheets) -> None:
-    """Write one or more dataframes to an XLSX workbook.
+    """Write DataFrame sheet specifications to a single XlsxWriter workbook.
 
     Args:
-        filename: Output workbook path.
-        sheets: Iterable of `(dataframe, sheet_name)`,
-            `(dataframe, sheet_name, index)`, or
-            `(dataframe, sheet_name, index, options)` tuples.
-            Supported options currently include
-            `hyperlink_columns=[(display_column, url_column), ...]` and
-            `hide_columns=[column_name, ...]`.
-            Cell values exceeding Excel's 32,767-character text limit are
-            truncated in the workbook output only.
-            Automatic URL conversion is disabled; requested hyperlinks are
-            capped at Excel's per-worksheet limit and excess display cells
-            remain plain text.
+        filename: XLSX destination. Its parent directory must already exist; the
+            writer opens the path in write mode and overwrites an existing file.
+        sheets: Iterable of 2-, 3-, or 4-item specifications:
+            ``(dataframe, sheet_name)``, ``(..., index)``, or
+            ``(..., index, options)``. Options may name display/URL column pairs
+            in ``hyperlink_columns`` and columns to hide in ``hide_columns``.
+
+    Returns:
+        None.
 
     Raises:
-        ValueError: If any sheet specification has an unsupported shape.
+        ValueError: If a sheet specification has a length other than 2, 3, or 4.
+        OSError: If the destination cannot be opened or finalized. Output is
+            written directly, not atomically staged, so a failure can leave a
+            partial or truncated workbook.
+
+    Side Effects:
+        Creates or overwrites ``filename``, logs the destination and truncation/
+        hyperlink-limit warnings, and consumes ``sheets`` once. Source frames are
+        not mutated; nonempty frames are copied only when preparing truncation.
+        Automatic URL conversion is disabled; explicit hyperlink formulas stop at
+        Excel's per-sheet limit and later display cells remain plain text.
     """
     log.info("Writing XLSX export to %s", filename)
     with pd.ExcelWriter(

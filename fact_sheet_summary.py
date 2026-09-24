@@ -74,7 +74,16 @@ ALL_BUT_ONE_ROW_COLUMNS = [
 
 
 def _unique_collections(collections: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return collections de-duplicated by id while preserving first occurrence."""
+    """Return collections de-duplicated by id while preserving first occurrence.
+
+    Args:
+        collections: Collection mappings with required ``id`` values; read without
+            mutation.
+
+    Returns:
+        New list retaining the first mapping for each ID in input order. Missing
+        ``id`` keys propagate ``KeyError``.
+    """
     unique = []
     seen_ids = set()
     for collection in collections:
@@ -87,17 +96,39 @@ def _unique_collections(collections: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def _is_numeric_count(value: Any) -> bool:
-    """Return whether a fact count value is numeric enough for reporting."""
+    """Return whether a fact count value is numeric enough for reporting.
+
+    Args:
+        value: Candidate fact-sheet count.
+
+    Returns:
+        ``True`` only for non-Boolean integers; strings and floats are excluded.
+    """
     return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _is_populated_fact_row(fact: dict[str, Any]) -> bool:
-    """Return whether a fact row has a numeric sample or donor count."""
+    """Return whether a fact row has a numeric sample or donor count.
+
+    Args:
+        fact: Fact row inspected without mutation.
+
+    Returns:
+        Whether at least one configured sample/donor field is a non-Boolean int.
+    """
     return any(_is_numeric_count(fact.get(field)) for field in COUNT_FIELDS)
 
 
 def _value_id_and_label(value: Any) -> tuple[str, str]:
-    """Return stable id and human label for a fact dimension value."""
+    """Return stable id and human label for a fact dimension value.
+
+    Args:
+        value: Raw dimension scalar or EMX wrapper mapping.
+
+    Returns:
+        Stable ``(id, label)`` strings. Mappings prefer id/name/label for the ID
+        and label/name/id for display; ``None`` yields two empty strings.
+    """
     if isinstance(value, dict):
         value_id = str(value.get("id") or value.get("name") or value.get("label") or "")
         value_label = str(value.get("label") or value.get("name") or value.get("id") or "")
@@ -109,13 +140,30 @@ def _value_id_and_label(value: Any) -> tuple[str, str]:
 
 
 def _row_count_value(fact: dict[str, Any], field: str) -> int | None:
-    """Return an integer fact count or None when the field is not populated."""
+    """Return an integer fact count or None when the field is not populated.
+
+    Args:
+        fact: Fact row read without mutation.
+        field: Count field to retrieve.
+
+    Returns:
+        Non-Boolean integer field value, or ``None`` for absent/unsupported data.
+    """
     value = fact.get(field)
     return value if _is_numeric_count(value) else None
 
 
 def _build_all_star_row(collection: dict[str, Any], fact: dict[str, Any]) -> dict[str, Any]:
-    """Return one populated all-star observation row."""
+    """Return one populated all-star observation row.
+
+    Args:
+        collection: Collection supplying identity and optional display name.
+        fact: Populated all-star fact row supplying identity and counts.
+
+    Returns:
+        New flat observation mapping. Inputs are read-only; non-integer counts
+        become ``None`` rather than being coerced.
+    """
     return {
         "collection_id": collection["id"],
         "collection_name": collection.get("name", ""),
@@ -133,7 +181,21 @@ def _build_all_but_one_row(
     value_label: str,
     matching_margin_rows: int,
 ) -> dict[str, Any]:
-    """Return one populated all-but-one-star observation row."""
+    """Return one populated all-but-one-star observation row.
+
+    Args:
+        collection: Collection supplying ID and optional name.
+        fact: Populated matching marginal fact row.
+        dimension: Sole concrete fact dimension.
+        value_id: Stable identifier of that dimension value.
+        value_label: Human-readable dimension value label.
+        matching_margin_rows: Number of matching margin rows in this collection,
+            retained to prevent unsafe aggregate sums.
+
+    Returns:
+        New row mapping with source provenance and nullable integer counts; inputs
+        are not mutated.
+    """
     return {
         "collection_id": collection["id"],
         "collection_name": collection.get("name", ""),
@@ -157,7 +219,20 @@ def _build_no_star_fallback_row(
     value_id: str,
     value_label: str,
 ) -> dict[str, Any]:
-    """Return one assumption-violating contribution derived from no-star rows."""
+    """Build one explicitly unsafe distribution contribution from concrete rows.
+
+    Args:
+        collection: Collection supplying ID and optional name.
+        facts: Populated fully concrete rows sharing the selected value.
+        dimension: Dimension represented by the fallback value.
+        value_id: Stable value identifier.
+        value_label: Human-readable value label.
+
+    Returns:
+        New row mapping that sums eligible source counts and retains every source
+        fact ID. It is marked ``no_star_fallback`` because intersections may
+        overlap or omit data and therefore are not authoritative marginals.
+    """
     fact_ids = [str(fact.get("id", "")) for fact in facts]
     return {
         "collection_id": collection["id"],
@@ -183,7 +258,16 @@ def _build_no_star_fallback_row(
 
 
 def _format_observation_values(rows: list[dict[str, Any]], field: str) -> str:
-    """Format row-level count values without summing them."""
+    """Format row-level count values without summing them.
+
+    Args:
+        rows: Flat summary rows read without mutation.
+        field: Count field whose non-``None`` observations to render.
+
+    Returns:
+        Semicolon-separated ``collection_id:fact_id=value`` evidence without any
+        aggregation, in input row order.
+    """
     values = []
     for row in rows:
         value = row.get(field)
@@ -196,7 +280,17 @@ def _format_observation_values(rows: list[dict[str, Any]], field: str) -> str:
 def _sum_one_value_row_per_collection(
     rows: list[dict[str, Any]],
 ) -> tuple[int, int, int]:
-    """Sum value rows only across collections with one row for that value."""
+    """Sum value rows only across collections with one row for that value.
+
+    Args:
+        rows: Rows for one dimension/value across collections; read without
+            mutation.
+
+    Returns:
+        ``(eligible_collection_count, sample_total, donor_total)``. A collection
+        contributes only when it has exactly one row and that row reports exactly
+        one matching margin, avoiding duplicate marginal aggregation.
+    """
     rows_by_collection: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         rows_by_collection[row["collection_id"]].append(row)
@@ -222,7 +316,16 @@ def _sum_one_value_row_per_collection(
 def _build_all_but_one_value_rows(
     all_but_one_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Group authoritative contributions by distribution value only."""
+    """Group authoritative contributions by distribution value only.
+
+    Args:
+        all_but_one_rows: Authoritative marginal observation rows; read only.
+
+    Returns:
+        New rows grouped by dimension/ID/label and sorted by that key. Totals use
+        only collections eligible under ``_sum_one_value_row_per_collection``;
+        raw observations remain in provenance strings.
+    """
     grouped_rows: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in all_but_one_rows:
         key = (row["dimension"], row["value_id"], row["value_label"])
@@ -266,7 +369,16 @@ def _build_all_but_one_value_rows(
 def _build_no_star_fallback_value_rows(
     fallback_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Group unsafe no-star fallback contributions in a separate stream."""
+    """Group unsafe no-star fallback contributions in a separate stream.
+
+    Args:
+        fallback_rows: Unsafe concrete-row contributions; read without mutation.
+
+    Returns:
+        New sorted grouped rows with all authoritative counts zero and
+        ``assumption_violating=True``. Fallback amounts are summed separately
+        rather than merged into authoritative distributions.
+    """
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in fallback_rows:
         grouped[(row["dimension"], row["value_id"], row["value_label"])].append(row)
@@ -296,7 +408,17 @@ def _sum_all_star_totals_for_margin_collections(
     all_star_rows: list[dict[str, Any]],
     collection_ids_with_margins: set[str],
 ) -> tuple[int, int, int]:
-    """Sum one all-star total per collection that also has marginal rows."""
+    """Sum one all-star total per collection that also has marginal rows.
+
+    Args:
+        all_star_rows: Populated all-star observations; read without mutation.
+        collection_ids_with_margins: Collection IDs that have populated marginal
+            observations.
+
+    Returns:
+        ``(eligible_collection_count, sample_total, donor_total)`` using only
+        requested collections with exactly one all-star row.
+    """
     all_star_rows_by_collection: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in all_star_rows:
         if row["collection_id"] in collection_ids_with_margins:
@@ -321,7 +443,15 @@ def _sum_all_star_totals_for_margin_collections(
 def _sum_one_all_star_total_per_collection(
     all_star_rows: list[dict[str, Any]],
 ) -> tuple[int, int, int]:
-    """Sum all-star totals across collections with one populated all-star row."""
+    """Sum all-star totals across collections with one populated all-star row.
+
+    Args:
+        all_star_rows: Populated all-star observations; read without mutation.
+
+    Returns:
+        ``(eligible_collection_count, sample_total, donor_total)`` across only
+        collections with exactly one all-star row, preventing duplicate totals.
+    """
     all_star_rows_by_collection: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in all_star_rows:
         all_star_rows_by_collection[row["collection_id"]].append(row)
@@ -342,7 +472,14 @@ def _sum_one_all_star_total_per_collection(
 
 
 def _format_dimension_value(row: dict[str, Any]) -> str:
-    """Return a compact label for one grouped all-but-one-star value."""
+    """Return a compact label for one grouped all-but-one-star value.
+
+    Args:
+        row: Grouped distribution row containing value ID and label.
+
+    Returns:
+        Label, ID, combined ``label (id)`` text when they differ, or ``(blank)``.
+    """
     value_id = row["value_id"]
     value_label = row["value_label"]
     if value_id and value_label and value_id != value_label:
@@ -356,13 +493,25 @@ def build_fact_sheet_summary(
     *,
     allow_no_star_fact_sums: bool = False,
 ) -> dict[str, Any]:
-    """Return non-additive fact-sheet summaries for selected collections.
+    """Build authoritative and explicitly unsafe fact-sheet summary streams.
 
-    Fact-sheet rows are aggregation observations, not mutually exclusive records.
-    This function exposes row-level all-star observations and all-but-one-star
-    marginal observations. It only sums one compatible row per collection across
-    collections: one all-star row per collection for all-star totals, and one
-    all-but-one row per collection and value for per-value marginal totals.
+    Args:
+        collections: Collection mappings to summarize. Duplicate IDs are ignored
+            after their first occurrence; input mappings are not mutated.
+        directory: Directory-like object providing ``getCollectionFacts(id)``.
+        allow_no_star_fact_sums: Enable fallback sums from fully concrete rows
+            only where no marginal exists. Those results remain isolated and
+            marked assumption-violating.
+
+    Returns:
+        New totals, all-star observations, authoritative all-but-one-star rows
+        and distributions, and separate optional no-star fallback streams.
+        All-star totals include only one-populated-row collections; marginal sums
+        include only one-valid-margin-per-collection contributions.
+
+    Side Effects:
+        Calls ``directory.getCollectionFacts`` once per unique collection ID;
+        exceptions from that method propagate. No local files are written.
     """
     collections = _unique_collections(collections)
     all_star_rows = []
@@ -539,7 +688,18 @@ def build_fact_sheet_summary_frames(
     *,
     allow_no_star_fact_sums: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Return dataframe views of the fact-sheet summary."""
+    """Build four schema-fixed DataFrame views of the fact-sheet summary.
+
+    Args:
+        collections: Collection mappings forwarded to ``build_fact_sheet_summary``.
+        directory: Fact provider forwarded to the summary builder.
+        allow_no_star_fact_sums: Forwarded fallback switch. Fallback rows are not
+            included in this fixed four-frame return value.
+
+    Returns:
+        New DataFrames for totals, all-star observations, authoritative grouped
+        distributions, and authoritative marginal rows, in that order.
+    """
     summary = build_fact_sheet_summary(
         collections,
         directory,
@@ -551,7 +711,16 @@ def build_fact_sheet_summary_frames(
 def _build_fact_sheet_summary_frames(
     summary: dict[str, Any],
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Return dataframe views for an already-built fact-sheet summary."""
+    """Return dataframe views for an already-built fact-sheet summary.
+
+    Args:
+        summary: Summary mapping in ``build_fact_sheet_summary`` shape; read only.
+
+    Returns:
+        New schema-fixed DataFrames for totals, all-star rows, grouped
+        authoritative distributions, and margin rows. Missing expected keys
+        propagate ``KeyError``.
+    """
     return (
         pd.DataFrame([summary["totals"]], columns=SUMMARY_COLUMNS),
         pd.DataFrame(summary["all_star_rows"], columns=ALL_STAR_COLUMNS),
@@ -569,7 +738,18 @@ def build_fact_sheet_xlsx_tables(
     *,
     allow_no_star_fact_sums: bool = False,
 ) -> list[tuple[pd.DataFrame, str, bool]]:
-    """Return XLSX sheet specs for non-additive fact-sheet summaries."""
+    """Build XlsxWriter-compatible sheet specifications for fact-sheet output.
+
+    Args:
+        collections: Collection mappings forwarded to the summary builder.
+        directory: Fact provider forwarded to the summary builder.
+        allow_no_star_fact_sums: Include a fifth no-star fallback sheet when true;
+            the sheet remains separate from authoritative distributions.
+
+    Returns:
+        New ``(DataFrame, sheet_name, index)`` tuples with indexes disabled. This
+        function only prepares tables; it performs no filesystem writes.
+    """
     summary = build_fact_sheet_summary(
         collections,
         directory,
@@ -603,7 +783,22 @@ def print_fact_sheet_summary(
     *,
     allow_no_star_fact_sums: bool = False,
 ) -> None:
-    """Print a compact non-additive fact-sheet summary for selected collections."""
+    """Print a concise fact-sheet aggregation report to standard output.
+
+    Args:
+        collections: Collection mappings forwarded to the summary builder.
+        directory: Fact provider forwarded to the summary builder.
+        label: First-line report heading.
+        allow_no_star_fact_sums: Include and prominently warn about separate,
+            non-authoritative no-star fallback evidence.
+
+    Returns:
+        None.
+
+    Side Effects:
+        Calls the Directory for facts through the summary builder and prints totals
+        and distributions. Directory failures propagate; no files are written.
+    """
     summary = build_fact_sheet_summary(
         collections,
         directory,

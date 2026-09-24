@@ -12,7 +12,14 @@ from oomutils import estimate_count_from_oom_or_none
 
 
 def _normalize_scalar(value: Any) -> Any:
-    """Return the scalar identifier/value from EMX-style scalar wrappers."""
+    """Return the scalar identifier/value from EMX-style scalar wrappers.
+
+    Args:
+        value: Raw field value, optionally an EMX-style mapping with `id` or `name`.
+
+    Returns:
+        Mapping `id` in preference to `name`, or the original object unchanged.
+    """
     if isinstance(value, dict):
         if "id" in value:
             return value["id"]
@@ -22,18 +29,39 @@ def _normalize_scalar(value: Any) -> Any:
 
 
 def _normalize_country(value: Any) -> str:
-    """Return country identifier from a raw country field."""
+    """Return country identifier from a raw country field.
+
+    Args:
+        value: Raw country value or an EMX-style scalar wrapper.
+
+    Returns:
+        String form of the normalized scalar, or an empty string for `None`.
+    """
     scalar_value = _normalize_scalar(value)
     return "" if scalar_value is None else str(scalar_value)
 
 
 def extract_staging_area_from_id(entity_id: str) -> str:
-    """Return the staging-area code encoded in a Directory entity id."""
+    """Return the staging-area code encoded in a Directory entity id.
+
+    Args:
+        entity_id: Directory entity ID forwarded to the canonical NN parser.
+
+    Returns:
+        Normalized staging prefix, or an empty string for an unparseable ID.
+    """
     return NNContacts.extract_staging_area(entity_id)
 
 
 def _sort_biobank_rows(rows: list[dict[str, Any]]) -> None:
-    """Sort biobank rows according to the requested staging-area semantics."""
+    """Sort biobank rows according to the requested staging-area semantics.
+
+    Args:
+        rows: Mutable biobank-row list sorted in place.
+
+    Returns:
+        None. Sorts pure-EXT views by country then ID; all other views by ID only.
+    """
     if rows and all(row.get("staging_area") == "EXT" for row in rows):
         rows.sort(key=lambda row: (str(row.get("country", "")), str(row.get("id", ""))))
         return
@@ -41,7 +69,14 @@ def _sort_biobank_rows(rows: list[dict[str, Any]]) -> None:
 
 
 def _normalize_multi_value_list(value: Any) -> list[str]:
-    """Return a normalized list of scalar values from a list-like field."""
+    """Return a normalized list of scalar values from a list-like field.
+
+    Args:
+        value: Missing, scalar, list, or EMX-style wrapper value from a multi-value field.
+
+    Returns:
+        New list of nonblank scalar strings in input order; it does not de-duplicate.
+    """
     if value in (None, ""):
         return []
     if not isinstance(value, list):
@@ -56,21 +91,42 @@ def _normalize_multi_value_list(value: Any) -> list[str]:
 
 
 def _format_counter(counter: Counter) -> str:
-    """Return a compact deterministic counter representation."""
+    """Return a compact deterministic counter representation.
+
+    Args:
+        counter: Counter whose keys and counts are rendered without mutation.
+
+    Returns:
+        Empty string for no entries, otherwise sorted `key=count` pairs joined by `; `.
+    """
     if not counter:
         return ""
     return "; ".join(f"{key}={counter[key]}" for key in sorted(counter))
 
 
 def _is_withdrawn(entity: dict[str, Any] | None) -> bool:
-    """Return whether an entity is marked as withdrawn."""
+    """Return whether an entity is marked as withdrawn.
+
+    Args:
+        entity: Optional entity mapping whose `withdrawn` value is interpreted by truthiness.
+
+    Returns:
+        `False` for a missing entity; otherwise boolean withdrawal state.
+    """
     if entity is None:
         return False
     return bool(entity.get("withdrawn"))
 
 
 def _normalize_filter_values(values: list[str] | None) -> set[str]:
-    """Return normalized uppercase filter values."""
+    """Return normalized uppercase filter values.
+
+    Args:
+        values: Optional CLI values, each of which may contain comma-separated terms.
+
+    Returns:
+        New set of nonblank, stripped uppercase terms. Repeated terms collapse.
+    """
     if not values:
         return set()
     normalized = set()
@@ -88,7 +144,18 @@ def _build_breakdown_rows(
     label: str,
     counter: Counter,
 ) -> list[dict[str, Any]]:
-    """Return normalized breakdown rows for one biobank."""
+    """Return normalized breakdown rows for one biobank.
+
+    Args:
+        biobank_id: ID copied into every returned breakdown row.
+        biobank_name: Name copied into every returned breakdown row.
+        label: Dynamic category column name.
+        counter: Category counts rendered without mutation.
+
+    Returns:
+        Newly allocated rows ordered by category key, each with biobank context,
+        `label`, and `count`.
+    """
     return [
         {
             "biobank_id": biobank_id,
@@ -104,7 +171,15 @@ def _build_breakdown_summary_rows(
     rows: list[dict[str, Any]],
     label: str,
 ) -> list[dict[str, Any]]:
-    """Return overall totals for a breakdown table."""
+    """Return overall totals for a breakdown table.
+
+    Args:
+        rows: Breakdown rows whose dynamic category and `count` fields are read.
+        label: Dynamic category key present in every input and output row.
+
+    Returns:
+        Newly allocated total rows grouped by `label` and ordered by category key.
+    """
     totals = Counter()
     for row in rows:
         totals[row[label]] += row["count"]
@@ -124,7 +199,22 @@ def build_directory_stats(
     staging_area_filters: list[str] | None = None,
     collection_type_filters: list[str] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Build multi-table Directory statistics for all loaded biobanks."""
+    """Build multi-table Directory statistics for all loaded biobanks.
+
+    Args:
+        directory: Loaded Directory abstraction providing biobanks, collections,
+            services, hierarchy/countability helpers, and fact-sheet records.
+        country_filters: Optional country terms; comma-separated values are accepted
+            and normalized case-insensitively.
+        staging_area_filters: Optional staging-prefix terms normalized like countries.
+        collection_type_filters: Optional collection-type terms. A collection must
+            intersect this set to contribute, while selected empty biobanks remain.
+
+    Returns:
+        New table mapping containing per-biobank rows, per-biobank and total type
+        breakdowns, and fact-sheet warning rows. Source Directory records are read
+        but not mutated; filters affect biobanks and their included collections.
+    """
     normalized_country_filters = _normalize_filter_values(country_filters)
     normalized_staging_area_filters = _normalize_filter_values(staging_area_filters)
     normalized_collection_type_filters = _normalize_filter_values(
@@ -391,7 +481,17 @@ def build_biobank_stats(
     staging_area_filters: list[str] | None = None,
     collection_type_filters: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Build the main per-biobank statistics rows."""
+    """Build the main per-biobank statistics rows.
+
+    Args:
+        directory: Loaded Directory abstraction passed to `build_directory_stats`.
+        country_filters: Optional normalized-country selection input.
+        staging_area_filters: Optional normalized staging-area selection input.
+        collection_type_filters: Optional normalized collection-type selection input.
+
+    Returns:
+        The newly created `biobank_rows` table from `build_directory_stats`.
+    """
     return build_directory_stats(
         directory,
         country_filters=country_filters,
@@ -401,7 +501,16 @@ def build_biobank_stats(
 
 
 def build_stats_summary(rows: list[dict[str, Any]]) -> dict[str, int]:
-    """Build a summary row for per-biobank stats output."""
+    """Build a summary row for per-biobank stats output.
+
+    Args:
+        rows: Per-biobank rows in this module's output schema. Breakdown strings
+            must use the module's `key=count; ...` format.
+
+    Returns:
+        New aggregate-count mapping, including totals parsed from the three
+        breakdown fields. Malformed breakdown strings propagate parsing errors.
+    """
     top_level_collection_type_totals = Counter()
     subcollection_type_totals = Counter()
     service_type_totals = Counter()

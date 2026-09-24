@@ -19,23 +19,50 @@ DEFAULT_DIRECTORY_TOKEN = os.getenv("DIRECTORYTOKEN")
 
 
 class ExtendAction(argparse.Action):
-    """Compatibility helper for Python versions without argparse extend."""
+    """Implement argparse's extend action for callers needing legacy support."""
 
     def __call__(self, parser, namespace, values, option_string=None):
+        """Append parsed values to the namespace destination.
+
+        Args:
+            parser: Parser dispatching this action; it is not otherwise used.
+            namespace: Parsed namespace mutated at this action's destination.
+            values: Iterable of values produced for the option occurrence.
+            option_string: Option spelling that triggered the action, unused here.
+
+        Returns:
+            None. Mutates `namespace.<dest>` to a list containing prior and new values.
+        """
         items = getattr(namespace, self.dest) or []
         items.extend(values)
         setattr(namespace, self.dest, items)
 
 
 def build_parser(*args, **kwargs) -> argparse.ArgumentParser:
-    """Create an ArgumentParser with the shared extend action registered."""
+    """Create an ArgumentParser with the shared extend action registered.
+
+    Args:
+        *args: Positional arguments forwarded unchanged to `argparse.ArgumentParser`.
+        **kwargs: Keyword arguments forwarded unchanged to `argparse.ArgumentParser`.
+
+    Returns:
+        New parser with `action="extend"` registered to use `ExtendAction`.
+    """
     parser = argparse.ArgumentParser(*args, **kwargs)
     parser.register("action", "extend", ExtendAction)
     return parser
 
 
 def configure_logging(args) -> None:
-    """Configure logging based on standard verbose/debug flags."""
+    """Configure logging based on standard verbose/debug flags.
+
+    Args:
+        args: Namespace exposing `debug` and `verbose` booleans. Debug takes
+            precedence over verbose.
+
+    Returns:
+        None. Configures the process root logger through `logging.basicConfig`.
+    """
     if args.debug:
         log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
     elif args.verbose:
@@ -49,12 +76,29 @@ def _add_hidden_aliases(
     option_strings: Iterable[str],
     **kwargs,
 ) -> None:
+    """Register suppressed-help aliases with identical argument configuration.
+
+    Args:
+        parser: Parser mutated by `add_argument` calls.
+        option_strings: Legacy option spellings to register without help output.
+        **kwargs: Argument configuration shared by every alias.
+
+    Returns:
+        None. Mutates `parser` by adding each hidden alias.
+    """
     for option_string in option_strings:
         parser.add_argument(option_string, help=argparse.SUPPRESS, **kwargs)
 
 
 def add_logging_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add standard verbose/debug flags."""
+    """Add standard verbose/debug flags.
+
+    Args:
+        parser: Parser receiving `-v/--verbose` and `-d/--debug` store-true flags.
+
+    Returns:
+        None. Mutates `parser` with standard logging destinations `verbose` and `debug`.
+    """
     parser.add_argument(
         "-v",
         "--verbose",
@@ -78,7 +122,17 @@ def add_xlsx_output_argument(
     default_filename: Optional[str] = None,
     help_text: str = "write results to the provided XLSX file",
 ) -> None:
-    """Add the shared primary XLSX output option."""
+    """Add the shared primary XLSX output option.
+
+    Args:
+        parser: Parser receiving the primary XLSX output option.
+        dest: Namespace attribute holding a one-item path list or `None`.
+        default_filename: Optional default path wrapped into the same one-item list.
+        help_text: Help text for the visible option.
+
+    Returns:
+        None. Registers `-X/--output-xlsx` and a hidden `--output-XLSX` alias.
+    """
     default_value = [default_filename] if default_filename is not None else None
     parser.add_argument(
         "-X",
@@ -105,7 +159,19 @@ def add_optional_xlsx_output_argument(
     short_option: Optional[str] = None,
     legacy_long_options: Optional[Iterable[str]] = None,
 ) -> None:
-    """Add an optional XLSX file path argument with optional legacy aliases."""
+    """Add an optional XLSX file path argument with optional legacy aliases.
+
+    Args:
+        parser: Parser receiving this output option.
+        dest: Namespace attribute holding the supplied one-item path list.
+        long_option: Visible long option spelling.
+        help_text: Help text for the visible option.
+        short_option: Optional visible short option spelling inserted before the long one.
+        legacy_long_options: Optional hidden aliases with the same destination.
+
+    Returns:
+        None. Mutates `parser` with the configured option and aliases.
+    """
     option_strings = [long_option]
     if short_option is not None:
         option_strings.insert(0, short_option)
@@ -120,7 +186,14 @@ def add_optional_xlsx_output_argument(
 
 
 def add_no_stdout_argument(parser: argparse.ArgumentParser) -> None:
-    """Add the shared stdout suppression flag."""
+    """Add the shared stdout suppression flag.
+
+    Args:
+        parser: Parser receiving the stdout-suppression flag.
+
+    Returns:
+        None. Registers `-N/--no-stdout` and the hidden legacy alias at `nostdout`.
+    """
     parser.add_argument(
         "-N",
         "--no-stdout",
@@ -137,7 +210,14 @@ def add_no_stdout_argument(parser: argparse.ArgumentParser) -> None:
 
 
 def add_fact_sheet_summary_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add the explicit opt-in for assumption-violating no-star sums."""
+    """Add the explicit opt-in for assumption-violating no-star sums.
+
+    Args:
+        parser: Parser receiving the unsafe no-star fact-sheet fallback opt-in.
+
+    Returns:
+        None. Registers a store-true `allow_no_star_fact_sums` namespace field.
+    """
     parser.add_argument(
         "--allow-no-star-fact-sums",
         dest="allow_no_star_fact_sums",
@@ -150,13 +230,27 @@ def add_fact_sheet_summary_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def warn_if_no_star_fact_sums_enabled(args) -> None:
-    """Log the common unsafe-fallback warning when the opt-in is enabled."""
+    """Log the common unsafe-fallback warning when the opt-in is enabled.
+
+    Args:
+        args: Namespace that may expose `allow_no_star_fact_sums`.
+
+    Returns:
+        None. Emits the canonical warning through module logging only when opted in.
+    """
     if getattr(args, "allow_no_star_fact_sums", False):
         log.warning(NO_STAR_FACT_SUMS_WARNING)
 
 
 def add_validation_warning_argument(parser: argparse.ArgumentParser) -> None:
-    """Add shared suppression for non-fatal local validation warnings."""
+    """Add shared suppression for non-fatal local validation warnings.
+
+    Args:
+        parser: Parser receiving the local-validation-warning suppression flag.
+
+    Returns:
+        None. Registers a store-true `suppress_validation_warnings` field.
+    """
     parser.add_argument(
         "--suppress-validation-warnings",
         dest="suppress_validation_warnings",
@@ -173,7 +267,19 @@ def add_withdrawn_scope_arguments(
     include_help_text: str = "include withdrawn entities in the check/export run",
     only_help_text: str = "run only on withdrawn entities",
 ) -> None:
-    """Add shared flags for withdrawn-scope selection."""
+    """Add shared flags for withdrawn-scope selection.
+
+    Args:
+        parser: Parser receiving the two withdrawn-scope flags.
+        include_dest: Destination set by `-w/--include-withdrawn`.
+        only_dest: Destination set by `--only-withdrawn`; callers resolve its
+            relationship to include scope.
+        include_help_text: Visible help for the include flag.
+        only_help_text: Visible help for the only-withdrawn flag, or suppression text.
+
+    Returns:
+        None. Mutates `parser`; the flags are deliberately not an argparse mutex.
+    """
     parser.add_argument(
         "-w",
         "--include-withdrawn",
@@ -195,7 +301,16 @@ def add_include_withdrawn_argument(
     dest: str = "include_withdrawn",
     help_text: str = "include withdrawn entities in the check/export run",
 ) -> None:
-    """Backward-compatible wrapper for include-withdrawn-only use."""
+    """Backward-compatible wrapper for include-withdrawn-only use.
+
+    Args:
+        parser: Parser receiving the compatibility include-withdrawn option.
+        dest: Namespace destination for the include flag.
+        help_text: Visible help text for that flag.
+
+    Returns:
+        None. Delegates registration and hides an unused only-withdrawn option.
+    """
     add_withdrawn_scope_arguments(
         parser,
         include_dest=dest,
@@ -213,7 +328,19 @@ def add_purge_cache_arguments(
     include_purge_all: bool = True,
     include_purge_cache: bool = True,
 ) -> None:
-    """Add shared cache purging options."""
+    """Add shared cache purging options.
+
+    Args:
+        parser: Parser receiving one or both cache-purge options.
+        cache_choices: Iterable of permitted cache names. It is copied for the
+            all-caches constant and used as choices for selected caches.
+        dest: Namespace destination for the selected cache-name list.
+        include_purge_all: Whether to register `--purge-all-caches`.
+        include_purge_cache: Whether to register `--purge-cache`.
+
+    Returns:
+        None. Mutates `parser`; selected values extend through the registered action.
+    """
     if include_purge_all:
         parser.add_argument(
             "--purge-all-caches",
@@ -234,7 +361,16 @@ def add_purge_cache_arguments(
 
 
 def add_directory_auth_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add username/password and token arguments for Directory login."""
+    """Add username/password and token arguments for Directory login.
+
+    Args:
+        parser: Parser receiving username, password, and token options whose defaults
+            were read from the environment at module import.
+
+    Returns:
+        None. Registers `-u/-p/-t` authentication destinations; token is an
+        alternative to username/password for downstream connection builders.
+    """
     parser.add_argument(
         "-u",
         "--username",
@@ -264,7 +400,17 @@ def add_directory_schema_argument(
     default: str = "ERIC",
     dest: str = "schema",
 ) -> None:
-    """Add the standard Directory schema/staging-area argument."""
+    """Add the standard Directory schema/staging-area argument.
+
+    Args:
+        parser: Parser receiving schema selection and emergency DAG bypass flags.
+        default: Default Directory schema/staging-area name.
+        dest: Namespace destination for the visible schema option and hidden alias.
+
+    Returns:
+        None. Registers `-P/--schema`, hidden `--package`, and
+        `emergency_skip_dag_checks`.
+    """
     parser.add_argument(
         "-P",
         "--schema",
@@ -289,7 +435,16 @@ def add_directory_schema_argument(
 
 
 def build_directory_kwargs(args, *, pp=None) -> dict:
-    """Build normalized keyword arguments for Directory(...)."""
+    """Build normalized keyword arguments for Directory(...).
+
+    Args:
+        args: Namespace whose optional common CLI fields are read defensively.
+        pp: Optional progress/printer object passed through as `pp`.
+
+    Returns:
+        New keyword mapping for `Directory(...)`. `only_withdrawn` implies
+        `include_withdrawn_entities`; credentials are included only when present.
+    """
     include_withdrawn = bool(
         getattr(args, "include_withdrawn", False)
         or getattr(args, "only_withdrawn", False)
@@ -322,7 +477,18 @@ def add_remote_check_disable_arguments(
     *,
     dest: str = "disableChecksRemote",
 ) -> None:
-    """Add QC-only remote check disable arguments."""
+    """Add QC-only remote check disable arguments.
+
+    Args:
+        parser: Parser receiving remote-check disable options.
+        remote_check_choices: Allowed remote check identifiers; all identifiers are
+            copied into the all-remote constant.
+        dest: Namespace destination holding selected identifiers.
+
+    Returns:
+        None. Registers `-r/--disable-checks-all-remote` and the extendable
+        `--disable-checks-remote` option.
+    """
     parser.add_argument(
         "-r",
         "--disable-checks-all-remote",
@@ -347,7 +513,16 @@ def add_plugin_disable_argument(
     *,
     dest: str = "disablePlugins",
 ) -> None:
-    """Add QC-only plugin disable argument."""
+    """Add QC-only plugin disable argument.
+
+    Args:
+        parser: Parser receiving the plugin-disable option.
+        plugin_choices: Allowed plugin/check identifiers enforced by argparse.
+        dest: Namespace destination holding the extended selection.
+
+    Returns:
+        None. Registers the extendable `--disable-plugins` option.
+    """
     parser.add_argument(
         "--disable-plugins",
         dest=dest,

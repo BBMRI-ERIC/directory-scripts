@@ -13,7 +13,7 @@ from __future__ import annotations
 
 
 class NNContacts:
-    """Central registry of BBMRI Node contacts and staging-area helpers."""
+    """Centralize BBMRI node contacts, staging prefixes, and schema conventions."""
 
     DEFAULT_ESCALATION_EMAILS = (
         "petr.holub@bbmri-eric.eu, e.van.enckevort@rug.nl, a.w.hodselmans@rug.nl"
@@ -87,25 +87,58 @@ class NNContacts:
 
     @classmethod
     def normalize_code(cls, code: str | None) -> str:
-        """Return a normalized uppercase code."""
+        """Return a normalized uppercase code.
+
+        Args:
+            code: Text-like code, or ``None`` for a missing value.
+
+        Returns:
+            Stripped uppercase text, or an empty string for ``None``.
+        """
         if code is None:
             return ""
         return str(code).strip().upper()
 
     @classmethod
     def get_contacts(cls, code: str | None) -> str:
-        """Return routing contacts for a node/staging area code."""
+        """Return routing contacts for a node/staging area code.
+
+        Args:
+            code: Node or staging-area code normalized before lookup.
+
+        Returns:
+            Configured comma-separated contacts, or the default escalation
+            recipients when no exact code mapping exists.
+        """
         normalized = cls.normalize_code(code)
         return cls.NODE_TO_EMAILS.get(normalized, cls.DEFAULT_ESCALATION_EMAILS)
 
     @classmethod
     def has_contacts(cls, code: str | None) -> bool:
-        """Return whether contacts are defined for the code."""
+        """Return whether contacts are defined for the code.
+
+        Args:
+            code: Node or staging-area code normalized before membership lookup.
+
+        Returns:
+            Whether the normalized code has an explicit contact mapping.
+        """
         return cls.normalize_code(code) in cls.NODE_TO_EMAILS
 
     @classmethod
     def compose_recipients(cls, code: str | None, extra_recipients: str = "") -> str:
-        """Return a combined warning-recipient string."""
+        """Return a combined warning-recipient string.
+
+        Args:
+            code: Node or staging-area code whose configured/default contacts
+                are used.
+            extra_recipients: Optional caller-provided recipient text;
+                surrounding commas and whitespace are removed before concatenation.
+
+        Returns:
+            Comma-separated extra recipients followed by resolved contacts,
+            omitting blank components without parsing or de-duplicating addresses.
+        """
         recipients = []
         extra_recipients = str(extra_recipients).strip().strip(",")
         if extra_recipients:
@@ -115,17 +148,41 @@ class NNContacts:
 
     @classmethod
     def is_member_node(cls, code: str | None) -> bool:
-        """Return whether the code is a BBMRI member-node country code."""
+        """Return whether the code is a BBMRI member-node country code.
+
+        Args:
+            code: Candidate node code normalized before lookup.
+
+        Returns:
+            Whether the code is a configured member node, excluding global
+            ``EU`` and ``IARC`` staging areas.
+        """
         return cls.normalize_code(code) in cls.MEMBER_NODE_CODES
 
     @classmethod
     def is_iso_country_code(cls, code: str | None) -> bool:
-        """Return whether the code is recognized as an ISO-like alpha-2 country code."""
+        """Return whether the code is recognized as an ISO-like alpha-2 country code.
+
+        Args:
+            code: Candidate alpha-2 code normalized before lookup.
+
+        Returns:
+            Whether the code is present in the module's ISO-like code registry.
+        """
         return cls.normalize_code(code) in cls.ISO_3166_ALPHA2_CODES
 
     @classmethod
     def extract_staging_area(cls, entity_id: str | None) -> str:
-        """Return the staging-area prefix encoded in a Directory entity id."""
+        """Return the staging-area prefix encoded in a Directory entity id.
+
+        Args:
+            entity_id: Directory ID expected to contain at least three
+                colon-separated segments, with the third beginning ``PREFIX_...``.
+
+        Returns:
+            Normalized third-segment prefix, or an empty string for malformed or
+            missing IDs.
+        """
         if not isinstance(entity_id, str) or not entity_id:
             return ""
         parts = entity_id.split(":")
@@ -135,7 +192,14 @@ class NNContacts:
 
     @classmethod
     def is_global_staging_area(cls, code: str | None) -> bool:
-        """Return whether the staging area is a global BBMRI-managed area."""
+        """Return whether the staging area is a global BBMRI-managed area.
+
+        Args:
+            code: Candidate staging-area code normalized before lookup.
+
+        Returns:
+            Whether the code is one of the global BBMRI-managed areas.
+        """
         return cls.normalize_code(code) in cls.GLOBAL_STAGING_AREA_CODES
 
     @classmethod
@@ -147,9 +211,15 @@ class NNContacts:
     ) -> bool:
         """Return whether a staging area represents a non-member/global area.
 
-        Non-member areas are either explicitly known global areas (such as EXT/EU/IARC),
-        or prefixes that differ from the country and do not correspond to an ISO-like
-        alpha-2 country code.
+        Args:
+            staging_area: Prefix or area code normalized before classification.
+            country: Optional reported country used to identify an unknown
+                non-country staging prefix.
+
+        Returns:
+            ``True`` for configured non-member/global areas and for a non-ISO
+            prefix that differs from its reported country; ``False`` for missing
+            prefixes.
         """
         normalized_staging = cls.normalize_code(staging_area)
         normalized_country = cls.normalize_code(country)
@@ -164,12 +234,27 @@ class NNContacts:
 
     @classmethod
     def is_permitted_non_country_prefix(cls, code: str | None) -> bool:
-        """Return whether a non-country staging-area prefix is explicitly allowed."""
+        """Return whether a non-country staging-area prefix is explicitly allowed.
+
+        Args:
+            code: Candidate staging prefix normalized before lookup.
+
+        Returns:
+            Whether the code is explicitly permitted as a non-country prefix.
+        """
         return cls.normalize_code(code) in cls.PERMITTED_NON_COUNTRY_PREFIX_CODES
 
     @classmethod
     def expected_schema_name(cls, staging_area: str | None) -> str:
-        """Return the expected schema name for a staging-area prefix."""
+        """Return the expected schema name for a staging-area prefix.
+
+        Args:
+            staging_area: Prefix or node code normalized before schema derivation.
+
+        Returns:
+            Explicit special mapping, ``BBMRI-<member-node>``, or the normalized
+            unknown prefix itself; missing input yields an empty string.
+        """
         normalized = cls.normalize_code(staging_area)
         if not normalized:
             return ""
@@ -181,13 +266,29 @@ class NNContacts:
 
     @classmethod
     def schema_matches_staging_area(cls, schema: str | None, staging_area: str | None) -> bool:
-        """Return whether a schema name matches the expected staging-area schema."""
+        """Return whether a schema name matches the expected staging-area schema.
+
+        Args:
+            schema: Candidate schema name compared case-insensitively after
+                stripping.
+            staging_area: Prefix from which the expected schema is derived.
+
+        Returns:
+            Whether both normalized names are nonempty and exactly equal.
+        """
         normalized_schema = cls.normalize_code(schema)
         expected_schema = cls.normalize_code(cls.expected_schema_name(staging_area))
         return bool(normalized_schema and expected_schema and normalized_schema == expected_schema)
 
     @classmethod
     def labels_as_node_scope(cls, code: str | None) -> bool:
-        """Return whether the code should be labeled as a BBMRI node scope."""
+        """Return whether the code should be labeled as a BBMRI node scope.
+
+        Args:
+            code: Candidate label normalized before node-scope classification.
+
+        Returns:
+            Whether the code is a member node or the global ``EU`` node scope.
+        """
         normalized = cls.normalize_code(code)
         return normalized in cls.MEMBER_NODE_CODES or normalized == "EU"

@@ -9,18 +9,27 @@ from molgenis_emx2_pyclient import Client
 
 
 class DirectorySession(Client):
-    """Provide the legacy context-manager shape used by repository CLIs.
-
-    The current `molgenis_emx2_pyclient` exposes `Client`, while older code in this
-    repository used `DirectorySession`. The write-capable tools only need a client
-    that can be used in a `with` block and signs out on exit, so this wrapper keeps
-    that surface stable without depending on the removed legacy package layout.
-    """
+    """Adapt the EMX2 client to the context-manager contract used by local CLIs."""
 
     def __enter__(self) -> "DirectorySession":
+        """Enter the underlying client context and return this compatibility session.
+
+        Returns:
+            This `DirectorySession` after the parent context manager has entered.
+        """
         super().__enter__()
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
+        """Delegate context cleanup to the parent and never suppress exceptions.
+
+        Args:
+            exc_type: Exception class raised in the context, or `None` on success.
+            exc: Exception instance raised in the context, or `None` on success.
+            tb: Traceback associated with `exc`, or `None` on success.
+
+        Returns:
+            Always `False`, so Python propagates an exception from the context.
+        """
         super().__exit__(exc_type, exc, tb)
         return False

@@ -17,7 +17,20 @@ DEFAULT_WARNING_SUPPRESSIONS_PATH = Path(__file__).resolve().parent / "warning-s
 
 @dataclass
 class WarningSuppressionLoadResult:
-    """Detailed warning-suppression load result."""
+    """Normalized suppression configuration and recoverable load diagnostics.
+
+    Attributes:
+        suppressions: Legacy alias for ``warning_suppressions``; maps check IDs
+            to entity IDs and their stored reasons.
+        warning_suppressions: Entries enabled for warning suppression, keyed by
+            check ID then entity ID.
+        fix_suppressions: Entries enabled for fix-proposal suppression, keyed
+            by check ID then entity ID.
+        entries: Validated v2 records, including records that suppress only
+            fixes or only warnings.
+        issues: Non-fatal file-level JSON or payload-shape errors. Per-record
+            validation errors are reported through the optional warning callback.
+    """
 
     suppressions: dict[str, dict[str, str]]
     warning_suppressions: dict[str, dict[str, str]]
@@ -27,7 +40,18 @@ class WarningSuppressionLoadResult:
 
 
 def serialize_suppression_entries(entries: list[WarningSuppressionEntryModel]) -> dict[str, Any]:
-    """Return a canonical JSON payload for suppression entries."""
+    """Build the canonical version-2 JSON payload for suppression entries.
+
+    Args:
+        entries: Validated records to serialize. The list and its records are
+            read-only to this function; records are emitted sorted by check ID
+            and entity ID.
+
+    Returns:
+        A newly allocated ``{"version": 2, "suppressions": [...]}`` mapping.
+        Optional false/empty fields are omitted except explicit false suppression
+        flags; each record's ``extras`` is copied last and can add keys.
+    """
     serialized = []
     for entry in sorted(entries, key=lambda item: (item.check_id, item.entity_id)):
         payload: dict[str, Any] = {
@@ -56,7 +80,21 @@ def serialize_suppression_entries(entries: list[WarningSuppressionEntryModel]) -
 
 
 def write_suppression_entries(path: str | Path, entries: list[WarningSuppressionEntryModel]) -> None:
-    """Write entries to JSON file in canonical v2 list format."""
+    """Serialize suppression entries as indented canonical JSON at ``path``.
+
+    Args:
+        path: Destination file. Its parent directory must already exist.
+            An existing file is truncated and replaced in place.
+        entries: Validated records passed to ``serialize_suppression_entries``;
+            they are not mutated.
+
+    Returns:
+        None.
+
+    Raises:
+        OSError: If the destination cannot be opened or written. The write is
+            direct rather than atomic, so a failure can leave a partial file.
+    """
     payload = serialize_suppression_entries(entries)
     output_path = Path(path)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -67,7 +105,20 @@ def load_warning_suppressions(
     *,
     warn=None,
 ) -> dict[str, dict[str, str]]:
-    """Return ``check_id -> entity_id -> reason`` suppressions from JSON."""
+    """Load only warning-enabled suppression mappings from a JSON file.
+
+    Args:
+        path: JSON path, or ``None`` to disable suppression loading.
+        warn: Optional callable receiving recoverable parse or record-validation
+            messages.
+
+    Returns:
+        A ``check_id -> entity_id -> reason`` mapping. Missing paths, ``None``,
+        invalid JSON, and invalid top-level payloads yield an empty mapping.
+
+    Raises:
+        OSError: If an existing file cannot be read.
+    """
     return load_warning_suppressions_detailed(path, warn=warn).warning_suppressions
 
 
@@ -76,7 +127,21 @@ def load_warning_suppressions_detailed(
     *,
     warn=None,
 ) -> WarningSuppressionLoadResult:
-    """Return detailed suppression load result for diagnostics and tooling."""
+    """Load, validate, and partition legacy or v2 warning suppressions.
+
+    Args:
+        path: JSON path, or ``None`` to return an empty result without file I/O.
+        warn: Optional callable invoked for invalid JSON, invalid payload shape,
+            and invalid individual records.
+
+    Returns:
+        Normalized v2 entries plus warning and fix lookup maps. Missing paths
+        and file-level parse/shape errors return empty maps; the latter are also
+        recorded in ``issues``.
+
+    Raises:
+        OSError: If an existing path cannot be opened for reading.
+    """
     if path is None:
         return WarningSuppressionLoadResult(
             suppressions={},
@@ -148,7 +213,21 @@ def summarize_suppression_diagnostics(
     known_entities: dict[str, set[str]] | None = None,
     today_value: date | None = None,
 ) -> list[str]:
-    """Return non-fatal diagnostics (expired, stale entity IDs, unknown checks)."""
+    """Diagnose stale suppression metadata without changing the entries.
+
+    Args:
+        entries: Validated suppression records to inspect; not mutated.
+        known_check_ids: Complete check/update IDs currently known to the caller.
+        known_check_prefixes: Accepted check families used when an exact ID is
+            absent, including slash-separated update-plan IDs.
+        known_entities: Optional entity IDs grouped by declared entity type.
+        today_value: Date used for expiry comparisons; defaults to today.
+
+    Returns:
+        Human-readable diagnostics for unknown check families, invalid or expired
+        dates, and stale typed or untyped entity IDs. Empty/omitted reference
+        sets deliberately suppress the corresponding diagnostic.
+    """
     diagnostics: list[str] = []
     check_ids = known_check_ids or set()
     check_prefixes = known_check_prefixes or set()
@@ -203,6 +282,20 @@ def _parse_suppressions_payload(
     warn=None,
     source: str = "warning suppressions",
 ) -> list[WarningSuppressionEntryModel]:
+    """Parse a version-2 list payload or a supported legacy mapping.
+
+    Args:
+        payload: Decoded JSON value. False-y values mean no suppressions.
+        warn: Optional callback for malformed individual records.
+        source: Text prefix included in callbacks and exceptions.
+
+    Returns:
+        Newly constructed validated records, preserving supported input order.
+
+    Raises:
+        ValueError: If a truthy payload is neither an object nor an object with
+            a list-compatible ``suppressions`` member.
+    """
     if not payload:
         return []
     if isinstance(payload, dict) and "suppressions" in payload:
@@ -218,6 +311,18 @@ def _parse_suppression_map(
     warn=None,
     source: str,
 ) -> list[WarningSuppressionEntryModel]:
+    """Convert legacy check-ID mappings into validated v2 records.
+
+    Args:
+        payload: Legacy ``check_id -> list|mapping`` JSON object.
+        warn: Optional callback for unsupported values and invalid records.
+        source: Text prefix for warning context.
+
+    Returns:
+        Validated records in mapping iteration order. List values become records
+        with blank reasons; objects may share metadata and specify entities as a
+        list or an entity-to-reason map.
+    """
     entries: list[WarningSuppressionEntryModel] = []
     for check_id, value in payload.items():
         if isinstance(value, list):
@@ -271,6 +376,19 @@ def _parse_suppression_map(
 
 
 def _parse_suppression_list(items: Any, *, warn=None, source: str) -> list[WarningSuppressionEntryModel]:
+    """Validate the v2 ``suppressions`` list while retaining valid records.
+
+    Args:
+        items: Candidate list of JSON-object records.
+        warn: Optional callback for non-object or model-invalid items.
+        source: Text prefix and list index context for callbacks.
+
+    Returns:
+        Newly validated records in list order; invalid entries are skipped.
+
+    Raises:
+        ValueError: If ``items`` is not a list.
+    """
     if not isinstance(items, list):
         raise ValueError("'suppressions' must be a list.")
     entries: list[WarningSuppressionEntryModel] = []
@@ -291,6 +409,17 @@ def _entries_to_suppression_map(
     *,
     target: str,
 ) -> dict[str, dict[str, str]]:
+    """Build a reason lookup for warning-only or fix-only suppression.
+
+    Args:
+        entries: Validated records to filter; not mutated.
+        target: ``"warning"`` or ``"fix"``. Other values include every
+            record because neither exclusion condition applies.
+
+    Returns:
+        Newly allocated ``check_id -> entity_id -> reason`` lookup. Later
+        duplicate records replace the reason for the same key.
+    """
     suppressions: dict[str, dict[str, str]] = {}
     for record in entries:
         if target == "warning" and not record.suppress_warning:
@@ -307,6 +436,16 @@ def _validate_entry(
     context: str,
     warn=None,
 ) -> WarningSuppressionEntryModel | None:
+    """Parse one suppression record and report model errors non-fatally.
+
+    Args:
+        payload: Candidate record mapping passed to the validation model.
+        context: Prefix identifying the source record in validation output.
+        warn: Optional callback used by ``warn_from_validation_error``.
+
+    Returns:
+        A validated model, or ``None`` after reporting a ``ValidationError``.
+    """
     try:
         return WarningSuppressionEntryModel.parse_obj(payload)
     except ValidationError as exc:

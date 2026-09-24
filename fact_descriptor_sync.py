@@ -29,7 +29,16 @@ AGE_LABEL_HIGH_SUPPORT_THRESHOLD = 5
 
 
 def normalize_descriptor_value(value: Any) -> str:
-    """Return a string descriptor value from scalars or EMX wrapper dicts."""
+    """Return a string descriptor value from scalars or EMX wrapper dicts.
+
+    Args:
+        value: Scalar, pandas-missing value, or EMX wrapper mapping. Mappings
+            prefer ``name`` over ``id`` and are read without mutation.
+
+    Returns:
+        Stripped text, or ``""`` for missing values. Non-missing non-string
+        scalars use their normal string representation.
+    """
     if isinstance(value, dict):
         if "name" in value:
             return normalize_descriptor_value(value["name"])
@@ -41,7 +50,16 @@ def normalize_descriptor_value(value: Any) -> str:
 
 
 def parse_collection_multi_value_field(value: Any) -> list[str]:
-    """Return ordered descriptor values from collection JSON or CSV/TSV rows."""
+    """Return ordered descriptor values from collection JSON or CSV/TSV rows.
+
+    Args:
+        value: Collection field stored as comma-separated text, an EMX list, a
+            scalar, or a missing value.
+
+    Returns:
+        New ordered, nonempty values. Strings split on commas but retain duplicate
+        tokens; lists and scalar values are normalized and de-duplicated.
+    """
     if _is_missing_value(value) or value == "":
         return []
     if isinstance(value, str):
@@ -52,7 +70,15 @@ def parse_collection_multi_value_field(value: Any) -> list[str]:
 
 
 def ordered_unique(values: Any) -> list[str]:
-    """Return non-empty values in original order without duplicates."""
+    """Return non-empty values in original order without duplicates.
+
+    Args:
+        values: Iterable of raw descriptor values consumed once.
+
+    Returns:
+        New list of first-seen nonempty normalized strings. Input containers and
+        nested wrapper mappings are not mutated.
+    """
     seen = set()
     ordered = []
     for value in values:
@@ -65,7 +91,15 @@ def ordered_unique(values: Any) -> list[str]:
 
 
 def collect_fact_descriptor_values(facts: list[dict[str, Any]]) -> dict[str, list[str]]:
-    """Return ordered non-star descriptor values observed in fact rows."""
+    """Return ordered non-star descriptor values observed in fact rows.
+
+    Args:
+        facts: Fact-row mappings to inspect without mutation.
+
+    Returns:
+        New ordered-unique values for diagnosis, sex, and sample material. Star
+        aggregates are excluded from all three descriptor fields.
+    """
     diagnoses = []
     sexes = []
     materials = []
@@ -90,7 +124,17 @@ def effective_fact_materials(
     fact_materials: list[str],
     collection_materials: list[str],
 ) -> list[str]:
-    """Return fact-sheet material values that should align with collection metadata."""
+    """Return fact-sheet material values that should align with collection metadata.
+
+    Args:
+        fact_materials: Already normalized material values from fact rows.
+        collection_materials: Existing normalized collection materials.
+
+    Returns:
+        Non-``NAV`` fact materials when present. ``NAV`` is proposed only when it
+        is the sole fact material and collection metadata is empty, preventing it
+        from overwriting meaningful material information.
+    """
     non_nav = [value for value in fact_materials if value != "NAV"]
     if non_nav:
         return non_nav
@@ -103,7 +147,17 @@ def fact_descriptor_values_for_comparison(
     facts: list[dict[str, Any]],
     collection: dict[str, Any],
 ) -> dict[str, list[str]]:
-    """Return fact descriptor values normalized for collection-level comparison."""
+    """Return fact descriptor values normalized for collection-level comparison.
+
+    Args:
+        facts: Fact rows used to derive descriptor evidence.
+        collection: Collection metadata used only to decide whether sole ``NAV``
+            material is effective. Neither input is mutated.
+
+    Returns:
+        New diagnosis, sex, and material value lists suitable for proposal
+        comparison, with the ``NAV`` exception applied to materials.
+    """
     values = collect_fact_descriptor_values(facts)
     values["materials"] = effective_fact_materials(
         values["materials"],
@@ -113,19 +167,43 @@ def fact_descriptor_values_for_comparison(
 
 
 def is_icd10_code(value: str) -> bool:
-    """Return whether a diagnosis value uses the Directory ICD-10 URI form."""
+    """Return whether a diagnosis value uses the Directory ICD-10 URI form.
+
+    Args:
+        value: Normalized diagnosis text to classify.
+
+    Returns:
+        Whether the text begins with the Directory ICD URI prefix, ignoring case.
+    """
     return value.upper().startswith(ICD10_PREFIX.upper())
 
 
 def icd10_code_core(value: str) -> str:
-    """Return the ICD-10 code core without the Directory URI prefix."""
+    """Return the ICD-10 code core without the Directory URI prefix.
+
+    Args:
+        value: Diagnosis text in potential Directory ICD URI form.
+
+    Returns:
+        Uppercase code after the exact prefix length, or ``""`` when the value
+        does not have that prefix. Only the prefix test is case-insensitive.
+    """
     if not is_icd10_code(value):
         return ""
     return value[len(ICD10_PREFIX):].upper()
 
 
 def icd10_covers(existing_value: str, candidate_value: str) -> bool:
-    """Return whether an ICD-10 metadata value covers a more specific candidate."""
+    """Return whether an ICD-10 metadata value covers a more specific candidate.
+
+    Args:
+        existing_value: Existing collection diagnosis in Directory ICD URI form.
+        candidate_value: Fact-derived diagnosis in the same form.
+
+    Returns:
+        ``True`` for equal cores or when an undotted existing ICD category is a
+        dot-prefix of the candidate; unrelated/non-ICD values return ``False``.
+    """
     existing_code = icd10_code_core(existing_value)
     candidate_code = icd10_code_core(candidate_value)
     if not existing_code or not candidate_code:
@@ -138,7 +216,16 @@ def icd10_covers(existing_value: str, candidate_value: str) -> bool:
 
 
 def diagnosis_is_covered(existing_values: list[str], candidate_value: str) -> bool:
-    """Return whether a diagnosis is already represented by existing metadata."""
+    """Return whether a diagnosis is already represented by existing metadata.
+
+    Args:
+        existing_values: Existing normalized metadata values; read only.
+        candidate_value: Fact-derived diagnosis to test.
+
+    Returns:
+        Whether an exact value or a broad undotted ICD parent already represents
+        the candidate.
+    """
     return any(
         existing_value == candidate_value or icd10_covers(existing_value, candidate_value)
         for existing_value in existing_values
@@ -151,7 +238,18 @@ def merge_diagnosis_values(
     *,
     replace_existing: bool,
 ) -> list[str]:
-    """Return the diagnosis list after applying append-or-replace semantics."""
+    """Merge fact-derived diagnoses with conservative ICD parent coverage.
+
+    Args:
+        current_values: Existing normalized collection diagnoses; not mutated.
+        fact_values: Normalized fact-derived diagnoses in desired append order.
+        replace_existing: When true, discard existing values not exactly present
+            in facts and not broad ICD parents of a fact value.
+
+    Returns:
+        New first-seen-unique merged diagnoses. In append mode all existing values
+        stay; candidates already exact or ICD-covered are not added.
+    """
     if replace_existing:
         kept_values = [
             value
@@ -175,7 +273,17 @@ def merge_descriptor_values(
     *,
     replace_existing: bool,
 ) -> list[str]:
-    """Return the generic append-or-replace merge for multi-value fields."""
+    """Return the generic append-or-replace merge for multi-value fields.
+
+    Args:
+        current_values: Existing normalized values; not mutated.
+        fact_values: Fact-derived values in desired order.
+        replace_existing: Return only normalized fact values instead of appending.
+
+    Returns:
+        New merged list. Append mode preserves existing ordering and appends only
+        candidates not already present; replace mode removes duplicates from facts.
+    """
     if replace_existing:
         return ordered_unique(fact_values)
     merged = list(current_values)
@@ -186,7 +294,18 @@ def merge_descriptor_values(
 
 
 def derive_age_range_update(facts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Return a conservative age-range proposal from fact rows."""
+    """Derive one conservative age span from supported fact-sheet age groups.
+
+    Args:
+        facts: Fact-row mappings to inspect without mutation. Recognized labels,
+            numeric ranges, and open-ended ``>`` ranges supply evidence.
+
+    Returns:
+        New mapping with ``age_low``, ``age_high``, ``age_unit``, and notes. Mixed
+        units yield no derived fields; open upper ranges yield ``age_high=None``.
+        When a label row has support >=5, label rows supported by zero donors and
+        samples are ignored as non-evidence.
+    """
     parsed_rows = []
     for fact in facts:
         age_range = normalize_descriptor_value(fact.get("age_range"))
@@ -279,7 +398,19 @@ def build_collection_descriptor_proposal(
     *,
     replace_existing: bool = False,
 ) -> dict[str, Any]:
-    """Return proposed collection-descriptor updates derived from fact rows."""
+    """Build a non-writing collection metadata proposal from its fact rows.
+
+    Args:
+        collection: Current collection metadata; read without mutation.
+        facts: Associated fact rows; read without mutation.
+        replace_existing: Permit descriptor/age replacement. All-star sample and
+            donor totals may still replace numeric totals without this option.
+
+    Returns:
+        New ``current``, ``proposed``, ``changes``, fact evidence, all-star flag,
+        global notes, and per-field notes. By default descriptors only append,
+        age bounds only widen compatible ranges, and ``NAV`` is guarded as above.
+    """
     fact_values = fact_descriptor_values_for_comparison(facts, collection)
     fact_sheet = analyze_collection_fact_sheet(collection, facts)
     current = {
@@ -372,7 +503,17 @@ def apply_descriptor_proposal_to_dataframe_row(
     row: dict[str, Any],
     proposal: dict[str, Any],
 ) -> dict[str, Any]:
-    """Return a DataFrame-row dict updated with a descriptor proposal."""
+    """Return a DataFrame-row dict updated with a descriptor proposal.
+
+    Args:
+        row: Existing tabular row to copy; it is not mutated.
+        proposal: Result of ``build_collection_descriptor_proposal`` supplying a
+            ``proposed`` mapping.
+
+    Returns:
+        New row dictionary with multi-value fields comma-joined and nullable
+        numeric/unit fields represented as empty strings for CSV/TSV output.
+    """
     updated = dict(row)
     proposed = proposal["proposed"]
     for field in ("diagnosis_available", "materials", "sex"):
@@ -384,6 +525,15 @@ def apply_descriptor_proposal_to_dataframe_row(
 
 
 def _coerce_optional_int(value: Any) -> int | None:
+    """Convert an optional descriptor value to an integer when possible.
+
+    Args:
+        value: Potential integer scalar, text, or missing pandas value.
+
+    Returns:
+        Integer conversion result, or ``None`` for missing and conversion-failing
+        values. Float values follow Python ``int`` truncation semantics.
+    """
     if _is_missing_value(value) or value == "":
         return None
     if isinstance(value, int):
@@ -395,7 +545,15 @@ def _coerce_optional_int(value: Any) -> int | None:
 
 
 def _is_missing_value(value: Any) -> bool:
-    """Return whether a scalar should be treated as an unset descriptor value."""
+    """Return whether a scalar should be treated as an unset descriptor value.
+
+    Args:
+        value: Value passed to ``pandas.isna``.
+
+    Returns:
+        Boolean scalar missingness result, or ``False`` when pandas returns a
+        non-scalar value or raises ``TypeError``/``ValueError``.
+    """
     try:
         return bool(pd.isna(value))
     except (TypeError, ValueError):
@@ -403,6 +561,16 @@ def _is_missing_value(value: Any) -> bool:
 
 
 def _parse_age_range_bounds(age_range: str) -> tuple[int | None, int | None, str | None]:
+    """Parse a recognized age label, numeric interval, or open-ended interval.
+
+    Args:
+        age_range: Normalized fact-sheet age text to parse.
+
+    Returns:
+        ``(low, high, unit)`` where labels use the Directory lookup, ``a-b`` and
+        ``>a`` patterns default to YEAR if no unit word is present, and unknown
+        text yields ``(None, None, None)``.
+    """
     label_key = age_range.strip().upper()
     if label_key in AGE_RANGE_LABEL_BOUNDS:
         low, high, unit = AGE_RANGE_LABEL_BOUNDS[label_key]
@@ -426,7 +594,22 @@ def _age_field_should_update(
     *,
     replace_existing: bool,
 ) -> bool:
-    """Return whether one age field should be updated from derived fact-sheet span."""
+    """Return whether one age field should be updated from derived fact-sheet span.
+
+    Args:
+        field: One of ``age_low``, ``age_high``, or ``age_unit``.
+        current: Current age metadata mapping; read without mutation.
+        age_update: Derived age mapping from ``derive_age_range_update``.
+        replace_existing: Permit every non-null derived value to replace current
+            metadata without compatibility checks.
+
+    Returns:
+        Whether the named derived value may be applied. Replacement mode accepts
+        every non-null derived value. Append mode accepts any non-null field when
+        the current unit is missing; otherwise it fills a missing low bound or
+        widens finite bounds only when units are compatible. With an existing
+        unit, a missing upper bound is not replaced by a finite one.
+    """
     derived_value = age_update[field]
     if derived_value is None:
         return False
@@ -469,6 +652,14 @@ def _age_field_should_update(
 
 
 def _infer_age_range_unit(age_range: str) -> str | None:
+    """Infer a Directory age unit from a free-text range label.
+
+    Args:
+        age_range: Age text searched case-insensitively for unit words.
+
+    Returns:
+        First matching unit in priority order DAY, WEEK, MONTH, YEAR, or ``None``.
+    """
     normalized = age_range.strip().lower()
     if "day" in normalized:
         return "DAY"
@@ -482,7 +673,15 @@ def _infer_age_range_unit(age_range: str) -> str | None:
 
 
 def _fact_row_support_count(fact: dict[str, Any]) -> int | None:
-    """Return the strongest available row support from sample/donor counts."""
+    """Return the strongest available row support from sample/donor counts.
+
+    Args:
+        fact: Fact row whose sample and donor counts are read without mutation.
+
+    Returns:
+        Largest successfully coerced count, or ``None`` when neither count is
+        available. Negative counts are not rejected by this helper.
+    """
     donors = _coerce_optional_int(fact.get("number_of_donors"))
     samples = _coerce_optional_int(fact.get("number_of_samples"))
     counts = [count for count in (donors, samples) if isinstance(count, int)]

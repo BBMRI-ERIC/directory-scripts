@@ -20,7 +20,15 @@ TIMESTAMP_KEYS = {"timestamp", "mg_insertedOn", "mg_updatedOn"}
 
 @dataclass(frozen=True)
 class AICacheIssue:
-    """Describe a stale or incompatible AI cache payload."""
+    """Describe a stale or incompatible AI cache payload.
+
+    Attributes:
+        path: Repository JSON file whose cache record was rejected or is stale.
+        rule: AI rule named by the payload, or inferred from its first finding.
+        withdrawn_scope: Scope recorded in the payload when it was generated.
+        reason: Stable machine-readable reason for invalidating the payload subset.
+        entity_ids: Sorted immutable IDs affected by the issue, when applicable.
+    """
 
     path: Path
     rule: str
@@ -31,7 +39,12 @@ class AICacheIssue:
 
 @dataclass(frozen=True)
 class AICacheLoadResult:
-    """Return AI findings together with cache validation issues."""
+    """Return AI findings together with cache validation issues.
+
+    Attributes:
+        findings: Reusable finding mappings owned by the returned list.
+        issues: Scope or checksum validation issues owned by the returned list.
+    """
 
     findings: list[dict[str, Any]]
     issues: list[AICacheIssue]
@@ -39,7 +52,13 @@ class AICacheLoadResult:
 
 @dataclass(frozen=True)
 class AICachePayload:
-    """Validated payload loaded from one AI cache JSON file."""
+    """Validated payload loaded from one AI cache JSON file.
+
+    Attributes:
+        path: JSON source file from which this payload was read.
+        data: Normalized payload mapping returned by the validation model.
+        findings: Normalized findings contained in `data`; the list is shared with it.
+    """
 
     path: Path
     data: dict[str, Any]
@@ -47,7 +66,15 @@ class AICachePayload:
 
 
 def get_ai_cache_paths(schema: str) -> list[Path]:
-    """Return JSON cache files for a schema, ordered by filename."""
+    """Return JSON cache files for a schema, ordered by filename.
+
+    Args:
+        schema: Exact schema directory name below the repository AI-cache root.
+
+    Returns:
+        Existing regular `*.json` paths in lexicographic filename order; an empty
+        list when the schema directory does not exist.
+    """
     schema_dir = AI_CACHE_ROOT / schema
     if not schema_dir.exists():
         return []
@@ -55,7 +82,16 @@ def get_ai_cache_paths(schema: str) -> list[Path]:
 
 
 def get_withdrawn_scope_label(directory: Any) -> str:
-    """Return the normalized withdrawn-scope label for a Directory-like object."""
+    """Return the normalized withdrawn-scope label for a Directory-like object.
+
+    Args:
+        directory: Directory-like object whose ``only_withdrawn_entities`` and
+            ``include_withdrawn_entities`` flags are inspected defensively.
+
+    Returns:
+        One of `only-withdrawn`, `include-withdrawn`, or `active-only`, with the
+        only-withdrawn flag taking precedence.
+    """
     if bool(getattr(directory, "only_withdrawn_entities", False)):
         return "only-withdrawn"
     if bool(getattr(directory, "include_withdrawn_entities", False)):
@@ -64,7 +100,16 @@ def get_withdrawn_scope_label(directory: Any) -> str:
 
 
 def load_ai_findings(schema: str, *, warn=None) -> list[dict[str, Any]]:
-    """Load and validate AI-curated findings for one schema."""
+    """Load and validate AI-curated findings for one schema.
+
+    Args:
+        schema: Cache schema directory to load.
+        warn: Optional callback receiving one message for malformed JSON or a
+            payload validation error; no warning is emitted when it is `None`.
+
+    Returns:
+        A newly assembled list of normalized findings from every valid payload.
+    """
     findings: list[dict[str, Any]] = []
     for payload in load_ai_payloads(schema, warn=warn):
         findings.extend(payload.findings)
@@ -72,7 +117,17 @@ def load_ai_findings(schema: str, *, warn=None) -> list[dict[str, Any]]:
 
 
 def load_ai_findings_for_directory(directory: Any, *, warn=None) -> AICacheLoadResult:
-    """Load AI findings and keep only records whose cached source data still matches."""
+    """Load AI findings and keep only records whose cached source data still matches.
+
+    Args:
+        directory: Directory-like object supplying schema, current scoped entities,
+            and optionally an immutable checksum snapshot.
+        warn: Optional callback passed to payload loading for non-fatal file errors.
+
+    Returns:
+        Reusable normalized findings and all detected scope/checksum issues. Stale
+        entities are excluded from findings but remain represented by issues.
+    """
     if hasattr(directory, "prepare_ai_cache_checksum_state"):
         directory.prepare_ai_cache_checksum_state()
     findings: list[dict[str, Any]] = []
@@ -87,7 +142,16 @@ def load_ai_findings_for_directory(directory: Any, *, warn=None) -> AICacheLoadR
 
 
 def load_ai_payloads(schema: str, *, warn=None) -> list[AICachePayload]:
-    """Load validated AI cache payloads for one schema."""
+    """Load validated AI cache payloads for one schema.
+
+    Args:
+        schema: Cache schema directory to scan.
+        warn: Optional callback for invalid JSON or `ValidationError` details.
+
+    Returns:
+        Validated payload objects in path order. Invalid files are skipped rather
+        than aborting the load.
+    """
     payloads: list[AICachePayload] = []
     for path in get_ai_cache_paths(schema):
         try:
@@ -104,7 +168,15 @@ def load_ai_payloads(schema: str, *, warn=None) -> list[AICachePayload]:
 
 
 def compute_entity_checksum(entity: dict[str, Any]) -> str:
-    """Return a stable checksum for an entity, excluding runtime metadata."""
+    """Return a stable checksum for an entity, excluding runtime metadata.
+
+    Args:
+        entity: Entity mapping to hash without mutating it.
+
+    Returns:
+        SHA-256 hex digest of the canonicalized entity, excluding timestamp and
+        `mg_` metadata keys.
+    """
     return compute_checksum(entity)
 
 
@@ -113,7 +185,19 @@ def compute_source_checksum(
     entity: dict[str, Any],
     fields: Iterable[str],
 ) -> str:
-    """Return a stable checksum for the source fields used by one AI rule."""
+    """Return a stable checksum for the source fields used by one AI rule.
+
+    Args:
+        entity_type: Entity family expected by qualified field names.
+        entity: Entity mapping from which configured source values are projected.
+        fields: Plain or `ENTITY.field` field specifications to include.
+
+    Returns:
+        SHA-256 hex digest of the projected source values.
+
+    Raises:
+        ValueError: If a qualified field belongs to another entity type.
+    """
     source_projection = {
         field: _extract_field_value(entity_type, entity, field) for field in fields
     }
@@ -123,8 +207,12 @@ def compute_source_checksum(
 def compute_checksum(value: Any) -> str:
     """Return a stable checksum for nested data structures.
 
-    Timestamps and `mg_*` runtime metadata are excluded so that pure update-metadata
-    changes do not invalidate the AI cache.
+    Args:
+        value: JSON-like value to canonicalize and hash; it is never mutated.
+
+    Returns:
+        Deterministic SHA-256 hex digest. Mapping keys and list items are ordered
+        canonically before JSON serialization.
     """
     canonical = _canonicalize(value)
     encoded = json.dumps(
@@ -137,7 +225,18 @@ def compute_checksum(value: Any) -> str:
 
 
 def _validate_payload(path: Path, payload: Any) -> AICachePayload:
-    """Validate one cache payload and return its normalized representation."""
+    """Validate one cache payload and return its normalized representation.
+
+    Args:
+        path: Source JSON path retained in the returned object.
+        payload: Decoded JSON value to validate and normalize.
+
+    Returns:
+        Payload object containing the model's normalized mapping and its findings.
+
+    Raises:
+        ValidationError: If the payload does not satisfy the cache schema.
+    """
     model = AICachePayloadModel.parse_obj(payload)
     normalized_payload = model.dict()
     findings = normalized_payload["findings"]
@@ -148,7 +247,18 @@ def _validate_payload_against_directory(
     payload: AICachePayload,
     directory: Any,
 ) -> tuple[list[dict[str, Any]], list[AICacheIssue]]:
-    """Return reusable findings plus script-level cache issues for one payload."""
+    """Return reusable findings plus script-level cache issues for one payload.
+
+    Args:
+        payload: Previously validated cache payload to compare with live scope.
+        directory: Directory-like object used to retrieve current entities and,
+            where supported, checksum snapshot entities.
+
+    Returns:
+        Newly allocated `(findings, issues)` lists. Findings for added, removed,
+        or changed entities are excluded; a scope mismatch is reported but does
+        not itself remove findings.
+    """
     issues: list[AICacheIssue] = []
     reusable_findings = list(payload.findings)
     expected_scope = payload.data.get("withdrawn_scope", "active-only")
@@ -244,7 +354,18 @@ def _validate_payload_against_directory(
 
 
 def _get_entities_in_scope(directory: Any, entity_type: str) -> list[dict[str, Any]]:
-    """Return current Directory entities for the given entity type and scope."""
+    """Return current Directory entities for the given entity type and scope.
+
+    Args:
+        directory: Directory-like object providing scoped biobank/collection reads.
+        entity_type: Supported cache entity family, `BIOBANK` or `COLLECTION`.
+
+    Returns:
+        A new list copied from the matching Directory iterator.
+
+    Raises:
+        ValueError: If `entity_type` is unsupported by the AI cache.
+    """
     if entity_type == "BIOBANK":
         return list(directory.getBiobanks())
     if entity_type == "COLLECTION":
@@ -258,7 +379,18 @@ def _get_checksum_entity(
     entity_id: str,
     fallback_entity: dict[str, Any],
 ) -> dict[str, Any]:
-    """Return the immutable checksum basis for one entity when available."""
+    """Return the immutable checksum basis for one entity when available.
+
+    Args:
+        directory: Directory-like object that may expose `get_ai_checksum_entity`.
+        entity_type: Entity family supplied to that optional getter.
+        entity_id: Entity ID supplied to that optional getter.
+        fallback_entity: Current scoped entity returned when no snapshot is available.
+
+    Returns:
+        Snapshot mapping when the optional getter returns one; otherwise the exact
+        `fallback_entity` object without copying it.
+    """
     getter = getattr(directory, "get_ai_checksum_entity", None)
     if getter is None:
         return fallback_entity
@@ -269,14 +401,33 @@ def _get_checksum_entity(
 
 
 def _infer_rule_from_payload(findings: list[dict[str, Any]]) -> str:
-    """Infer the rule name for legacy payloads lacking top-level metadata."""
+    """Infer the rule name for legacy payloads lacking top-level metadata.
+
+    Args:
+        findings: Normalized finding mappings from a legacy cache payload.
+
+    Returns:
+        First finding's `rule` coerced to text, or `Unknown` for an empty list.
+    """
     if not findings:
         return "Unknown"
     return str(findings[0].get("rule", "Unknown"))
 
 
 def _extract_field_value(entity_type: str, entity: dict[str, Any], field: str) -> Any:
-    """Extract a local entity field using `ENTITY.field` or plain `field` syntax."""
+    """Extract a local entity field using `ENTITY.field` or plain `field` syntax.
+
+    Args:
+        entity_type: Entity family against which a qualified field prefix is checked.
+        entity: Mapping read without mutation.
+        field: Plain key or `ENTITY.key` qualified source-field specification.
+
+    Returns:
+        Field value from `entity`, or `None` when the unqualified key is absent.
+
+    Raises:
+        ValueError: If a nonempty qualifier differs from `entity_type`.
+    """
     if "." in field:
         prefix, field_name = field.split(".", 1)
         if prefix and prefix != entity_type:
@@ -289,7 +440,15 @@ def _extract_field_value(entity_type: str, entity: dict[str, Any], field: str) -
 
 
 def _canonicalize(value: Any) -> Any:
-    """Return a stable, timestamp-free representation for hashing."""
+    """Return a stable, timestamp-free representation for hashing.
+
+    Args:
+        value: JSON-like value to transform without mutating its containers.
+
+    Returns:
+        Canonical nested value with ignored metadata removed from mappings and
+        list items sorted by their canonical JSON representation.
+    """
     if isinstance(value, dict):
         normalized = {}
         for key in sorted(value):
@@ -312,5 +471,12 @@ def _canonicalize(value: Any) -> Any:
 
 
 def _should_ignore_checksum_key(key: str) -> bool:
-    """Return whether a dict key should be ignored for checksum purposes."""
+    """Return whether a dict key should be ignored for checksum purposes.
+
+    Args:
+        key: Mapping key considered during checksum canonicalization.
+
+    Returns:
+        `True` for configured timestamps and all `mg_` runtime metadata keys.
+    """
     return key in TIMESTAMP_KEYS or key.startswith("mg_")

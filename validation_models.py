@@ -13,9 +13,21 @@ from typing import Any, Optional
 
 
 class ValidationError(ValueError):
-    """Structured validation error with machine-readable ``errors()`` output."""
+    """Aggregate local validation failures in a Pydantic-compatible error shape.
+
+    Attributes:
+        _errors: Original validation-record list retained internally; `errors()`
+            returns a shallow copy of this list.
+    """
 
     def __init__(self, errors: list[dict[str, Any]]):
+        """Initialize the exception and derive its semicolon-separated message.
+
+        Args:
+            errors: Structured records with optional `loc` and `msg` keys. The list
+                itself is retained, so callers that own it must not mutate it after
+                construction if they require stable exception details.
+        """
         self._errors = errors
         message = "; ".join(
             f"{'.'.join(str(part) for part in error.get('loc', ()))}: {error.get('msg', 'invalid value')}"
@@ -26,19 +38,57 @@ class ValidationError(ValueError):
         super().__init__(message)
 
     def errors(self) -> list[dict[str, Any]]:
+        """Return a shallow copy of the structured validation records.
+
+        Returns:
+            New outer list containing the original record mappings; mappings are not
+            deep-copied.
+        """
         return list(self._errors)
 
 
 def _make_error(loc: tuple[str | int, ...], msg: str) -> dict[str, Any]:
+    """Create one validation record in the compatibility error format.
+
+    Args:
+        loc: Field/index path identifying the invalid input location.
+        msg: Human-readable validation message.
+
+    Returns:
+        New mapping with exactly `loc` and `msg` keys.
+    """
     return {"loc": loc, "msg": msg}
 
 
 def _raise_if_errors(errors: list[dict[str, Any]]) -> None:
+    """Raise aggregated validation errors only when the supplied list is nonempty.
+
+    Args:
+        errors: Accumulated validation records retained by a raised `ValidationError`.
+
+    Returns:
+        None when `errors` is empty.
+
+    Raises:
+        ValidationError: If at least one record was accumulated.
+    """
     if errors:
         raise ValidationError(errors)
 
 
 def _non_empty_string(value: Any, *, field_name: str) -> str:
+    """Coerce a required field to stripped, nonempty text.
+
+    Args:
+        value: Required input value; non-`None` values are stringified then stripped.
+        field_name: Field path used in the structured error record.
+
+    Returns:
+        Stripped string value.
+
+    Raises:
+        ValidationError: If the value is missing or becomes empty after stripping.
+    """
     if value is None:
         raise ValidationError([_make_error((field_name,), "field is required")])
     text = str(value).strip()
@@ -55,6 +105,21 @@ def _get_string(
     required: bool = True,
     default: Optional[str] = None,
 ) -> Optional[str]:
+    """Read one string field, honoring aliases and required/default semantics.
+
+    Args:
+        payload: Input mapping read without mutation.
+        field_name: Preferred key and error-location name.
+        aliases: Fallback keys searched after the preferred key.
+        required: Whether a present value must be nonempty and absence raises.
+        default: Value returned for an absent/`None` optional field.
+
+    Returns:
+        Stripped required value, stringified optional value, or `default`.
+
+    Raises:
+        ValidationError: If a required field is absent, null, or blank.
+    """
     for key in (field_name, *aliases):
         if key in payload:
             value = payload[key]
@@ -74,6 +139,20 @@ def _get_list(
     field_name: str,
     default: Optional[list[Any]] = None,
 ) -> list[Any]:
+    """Read a list field or return a fresh list made from its default.
+
+    Args:
+        payload: Input mapping read without mutation.
+        field_name: Required list key when present.
+        default: Optional fallback sequence copied into a new list for absent/blank
+            fields.
+
+    Returns:
+        Existing payload list without copying, or a newly allocated fallback list.
+
+    Raises:
+        ValidationError: If a present nonblank value is not a list.
+    """
     if field_name not in payload:
         return [] if default is None else list(default)
     value = payload[field_name]
@@ -86,15 +165,33 @@ def _get_list(
 
 @dataclass
 class _BaseModel:
-    """Small base class exposing ``dict()`` for compatibility."""
+    """Provide the minimal ``dict()`` compatibility API shared by local models.
+
+    Attributes:
+        This compatibility base declares no fields of its own; dataclass
+        subclasses define the validated fields serialized by ``dict()``.
+    """
 
     def dict(self) -> dict[str, Any]:
+        """Return a shallow mapping of this instance's stored attributes.
+
+        Returns:
+            New dictionary copied from `__dict__`; nested mutable values remain shared.
+        """
         return dict(self.__dict__)
 
 
 @dataclass
 class ToolConnectionSettingsModel(_BaseModel):
-    """Validate common Directory connection settings for local CLIs."""
+    """Validate common Directory connection settings for local CLIs.
+
+    Attributes:
+        directory_target: Required Directory endpoint/target string, stripped.
+        directory_username: Username required only when no token is supplied.
+        directory_password: Password required only when no token is supplied.
+        directory_token: Stripped token, or `None`; its presence permits blank
+            username and password.
+    """
 
     directory_target: str
     directory_username: str = ""
@@ -103,11 +200,32 @@ class ToolConnectionSettingsModel(_BaseModel):
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "ToolConnectionSettingsModel":
+        """Validate and normalize local Directory connection settings.
+
+        Args:
+            payload: JSON-like mapping with target and either token or credentials.
+
+        Returns:
+            New normalized settings model. With a token, username/password are
+            stringified but not required.
+
+        Raises:
+            ValidationError: If input is not a mapping or required credentials/target
+                are missing or blank.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         errors: list[dict[str, Any]] = []
 
         def parse_required(name: str) -> str:
+            """Parse one required payload field while accumulating validation errors.
+
+            Args:
+                name: Payload key and validation-field name.
+
+            Returns:
+                Stripped value, or an empty placeholder after recording its error.
+            """
             try:
                 return _non_empty_string(payload.get(name), field_name=name)
             except ValidationError as exc:
@@ -137,7 +255,17 @@ class ToolConnectionSettingsModel(_BaseModel):
 
 @dataclass
 class TableModifierSettingsModel(ToolConnectionSettingsModel):
-    """Validate resolved ``directory-tables-modifier.py`` runtime settings."""
+    """Validate resolved ``directory-tables-modifier.py`` runtime settings.
+
+    Attributes:
+        schema_name: Required schema name, accepting legacy input key `schema`.
+        table: Required target table name.
+        file_format: One of `auto`, `csv`, or `tsv`.
+        separator: Optional single-character delimiter, with `\\t`/`tab` normalized
+            to a literal tab.
+        tsv_quote_char: Required single-character quote marker for TSV parsing.
+        tsv_escape_char: Optional single-character TSV escape marker.
+    """
 
     schema_name: str = ""
     table: str = ""
@@ -148,12 +276,34 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "TableModifierSettingsModel":
+        """Validate resolved table-modifier connection and delimited-file settings.
+
+        Args:
+            payload: JSON-like mapping containing base connection fields and table
+                settings, including optional legacy `schema`.
+
+        Returns:
+            New model with normalized delimiter aliases and inherited credentials.
+
+        Raises:
+            ValidationError: If required fields, connection settings, format, or
+                delimiter/quote/escape constraints are invalid.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         base = ToolConnectionSettingsModel.parse_obj(payload)
         errors: list[dict[str, Any]] = []
 
         def parse_non_empty(field_name: str, aliases: tuple[str, ...] = ()) -> str:
+            """Parse a required field, optionally accepting its first present alias.
+
+            Args:
+                field_name: Preferred key and error location.
+                aliases: Fallback keys searched only when the preferred value is null.
+
+            Returns:
+                Stripped value, or an empty placeholder after adding an error.
+            """
             value = payload.get(field_name)
             if value is None:
                 for alias in aliases:
@@ -222,19 +372,46 @@ class TableModifierSettingsModel(ToolConnectionSettingsModel):
 
 @dataclass
 class FactsheetUpdaterSettingsModel(ToolConnectionSettingsModel):
-    """Validate resolved ``collection-factsheet-descriptor-updater.py`` settings."""
+    """Validate resolved ``collection-factsheet-descriptor-updater.py`` settings.
+
+    Attributes:
+        schema_name: Required write schema, accepting legacy input key `schema`.
+        collection_id: Required Directory collection ID to update.
+    """
 
     schema_name: str = ""
     collection_id: str = ""
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "FactsheetUpdaterSettingsModel":
+        """Validate connection settings plus a fact-sheet update target.
+
+        Args:
+            payload: JSON-like mapping with base connection values, schema, and
+                collection ID.
+
+        Returns:
+            New settings model with normalized inherited connection values.
+
+        Raises:
+            ValidationError: If the input, connection settings, schema, or collection
+                ID is invalid.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         base = ToolConnectionSettingsModel.parse_obj(payload)
         errors: list[dict[str, Any]] = []
 
         def parse_non_empty(field_name: str, aliases: tuple[str, ...] = ()) -> str:
+            """Parse a required field while collecting its validation failure.
+
+            Args:
+                field_name: Preferred payload key and error location.
+                aliases: Keys checked when the preferred value is null.
+
+            Returns:
+                Stripped value, or an empty placeholder after recording an error.
+            """
             value = payload.get(field_name)
             if value is None:
                 for alias in aliases:
@@ -262,7 +439,21 @@ class FactsheetUpdaterSettingsModel(ToolConnectionSettingsModel):
 
 @dataclass
 class WarningSuppressionEntryModel(_BaseModel):
-    """Normalized warning-suppression record."""
+    """Normalized warning-suppression record.
+
+    Attributes:
+        check_id: Required nonblank warning or fix check identifier.
+        entity_id: Required nonblank affected Directory entity ID.
+        entity_type: Optional uppercase entity kind limited to supported warning types.
+        suppress_warning: Whether matching warnings are hidden; defaults to true.
+        suppress_fix: Whether attached fix proposals are hidden; defaults to true.
+        reason: Free-text suppression rationale, preserving whitespace except `None`.
+        added_by: Optional stripped actor identifier.
+        added_on: Optional date-like `YYYY-MM-DD` text, or empty text.
+        expires_on: Optional date-like `YYYY-MM-DD` text, or empty text.
+        ticket: Optional stripped tracking reference.
+        extras: Unrecognized input keys preserved by reference for round-tripping.
+    """
 
     check_id: str
     entity_id: str
@@ -278,6 +469,18 @@ class WarningSuppressionEntryModel(_BaseModel):
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "WarningSuppressionEntryModel":
+        """Validate and normalize a canonical warning-suppression entry.
+
+        Args:
+            payload: JSON-like mapping; unknown keys are retained as `extras`.
+
+        Returns:
+            New normalized suppression model with permissive boolean spellings.
+
+        Raises:
+            ValidationError: If required identifiers, entity type, boolean spellings,
+                or coarse date format/ranges are invalid.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         errors: list[dict[str, Any]] = []
@@ -307,6 +510,15 @@ class WarningSuppressionEntryModel(_BaseModel):
             )
 
         def parse_optional_bool(field_name: str, default: bool) -> bool:
+            """Normalize an optional boolean while appending invalid-value errors.
+
+            Args:
+                field_name: Payload key and error location.
+                default: Value used for missing and invalid input.
+
+            Returns:
+                Native boolean, accepted case-insensitive string spelling, or default.
+            """
             value = payload.get(field_name)
             if value is None:
                 return default
@@ -322,6 +534,15 @@ class WarningSuppressionEntryModel(_BaseModel):
             return default
 
         def parse_optional_date(field_name: str) -> str:
+            """Normalize an optional coarse ISO date while collecting format errors.
+
+            Args:
+                field_name: Payload key and error location.
+
+            Returns:
+                Empty text for missing input, otherwise stripped text even when an
+                error is recorded; calendar-day validity is not checked.
+            """
             value = payload.get(field_name)
             if value in (None, ""):
                 return ""
@@ -378,7 +599,15 @@ class WarningSuppressionEntryModel(_BaseModel):
 
 @dataclass
 class AICheckedEntityModel(_BaseModel):
-    """Validated checked-entity checksum record."""
+    """Validated checked-entity checksum record.
+
+    Attributes:
+        entity_id: Required nonblank Directory entity identifier.
+        entity_type: Required `BIOBANK` or `COLLECTION` family.
+        entity_checksum: Required nonblank digest of the full checked entity.
+        source_checksum: Required nonblank digest of the rule's source fields.
+        extras: Unrecognized input keys preserved by reference for round-tripping.
+    """
 
     entity_id: str
     entity_type: str
@@ -388,11 +617,31 @@ class AICheckedEntityModel(_BaseModel):
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "AICheckedEntityModel":
+        """Validate one AI-cache checksum record and preserve unknown fields.
+
+        Args:
+            payload: JSON-like mapping containing identifiers and both checksums.
+
+        Returns:
+            New normalized record with unrecognized keys placed in `extras`.
+
+        Raises:
+            ValidationError: If the input is not a mapping, required strings are
+                absent/blank, or the entity type is unsupported.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         errors: list[dict[str, Any]] = []
 
         def req(name: str) -> str:
+            """Parse one required string and aggregate a validation error if needed.
+
+            Args:
+                name: Payload key and validation-field name.
+
+            Returns:
+                Stripped required value, or empty placeholder after recording failure.
+            """
             try:
                 return _non_empty_string(payload.get(name), field_name=name)
             except ValidationError as exc:
@@ -422,6 +671,12 @@ class AICheckedEntityModel(_BaseModel):
         )
 
     def dict(self) -> dict[str, Any]:
+        """Serialize this checksum record and merge preserved unknown fields.
+
+        Returns:
+            New mapping with canonical fields followed by `extras`; colliding extras
+            intentionally override canonical keys because of the merge order.
+        """
         out = {
             "entity_id": self.entity_id,
             "entity_type": self.entity_type,
@@ -434,7 +689,22 @@ class AICheckedEntityModel(_BaseModel):
 
 @dataclass
 class AIFindingModel(_BaseModel):
-    """Validated AI-curated finding record."""
+    """Validated AI-curated finding record.
+
+    Attributes:
+        rule: Required nonblank AI rule identifier.
+        entity_id: Required nonblank affected Directory entity ID.
+        entity_type: Required `BIOBANK` or `COLLECTION` family.
+        severity: Required `ERROR`, `WARNING`, or `INFO` severity string.
+        message: Required nonblank finding explanation.
+        action: Required nonblank proposed action text.
+        fields: Stringified source field identifiers; empty/null input becomes empty.
+        email: Optional value stringified without stripping; null becomes empty.
+        nn: Optional node/staging value stringified without stripping; null becomes empty.
+        withdrawn: Optional withdrawal value stringified without stripping; null becomes
+            empty.
+        extras: Unrecognized input keys preserved by reference for round-tripping.
+    """
 
     rule: str
     entity_id: str
@@ -450,11 +720,31 @@ class AIFindingModel(_BaseModel):
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "AIFindingModel":
+        """Validate and normalize one AI-curated finding mapping.
+
+        Args:
+            payload: JSON-like finding mapping. Unknown keys are retained as extras.
+
+        Returns:
+            New normalized finding model.
+
+        Raises:
+            ValidationError: If required values, entity type, severity, or optional
+                fields-list type are invalid.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         errors: list[dict[str, Any]] = []
 
         def req(name: str) -> str:
+            """Parse a required finding field while collecting any failure.
+
+            Args:
+                name: Payload key and validation-field name.
+
+            Returns:
+                Stripped required value, or empty placeholder after recording failure.
+            """
             try:
                 return _non_empty_string(payload.get(name), field_name=name)
             except ValidationError as exc:
@@ -514,6 +804,11 @@ class AIFindingModel(_BaseModel):
         )
 
     def dict(self) -> dict[str, Any]:
+        """Serialize the finding with copied field names and preserved extras.
+
+        Returns:
+            New mapping; `fields` is copied, while unknown `extras` are merged last.
+        """
         out = {
             "rule": self.rule,
             "entity_id": self.entity_id,
@@ -532,7 +827,18 @@ class AIFindingModel(_BaseModel):
 
 @dataclass
 class AICachePayloadModel(_BaseModel):
-    """Validated shareable AI cache file payload."""
+    """Validated shareable AI cache file payload.
+
+    Attributes:
+        schema_name: Optional cache schema text, accepting legacy input key `schema`.
+        rule: Optional rule text; an empty input rule becomes `None`.
+        generator: Generator marker string, defaulting to `legacy` when blank/missing.
+        withdrawn_scope: Scope limited to the three supported cache scope labels.
+        checked_fields: Stringified checked-source field names.
+        checked_entities: Validated checksum records for the reviewed entity scope.
+        findings: Validated AI-curated findings; the payload must explicitly include it.
+        extras: Unrecognized input keys preserved by reference for round-tripping.
+    """
 
     schema_name: Optional[str]
     rule: Optional[str]
@@ -545,6 +851,20 @@ class AICachePayloadModel(_BaseModel):
 
     @classmethod
     def parse_obj(cls, payload: Any) -> "AICachePayloadModel":
+        """Validate a complete shareable AI-cache JSON payload.
+
+        Args:
+            payload: JSON-like cache object with optional metadata and required
+                `findings`; legacy `schema` is accepted.
+
+        Returns:
+            New normalized payload model with nested records validated and unknown
+            top-level fields retained as extras.
+
+        Raises:
+            ValidationError: If the object shape, scope, nested lists, or nested
+                records fail validation. Nested locations are prefixed with indexes.
+        """
         if not isinstance(payload, dict):
             raise ValidationError([_make_error((), "input must be a JSON object")])
         errors: list[dict[str, Any]] = []
@@ -641,6 +961,12 @@ class AICachePayloadModel(_BaseModel):
         )
 
     def dict(self) -> dict[str, Any]:
+        """Serialize the payload with newly allocated nested output lists.
+
+        Returns:
+            New mapping containing canonical metadata, serialized nested models, and
+            preserved extras merged last.
+        """
         out = {
             "schema_name": self.schema_name,
             "rule": self.rule,

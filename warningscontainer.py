@@ -30,27 +30,72 @@ ENTITY_LIST_HEADERS = (
 
 
 class WarningsContainer:
+    """Accumulate QC warnings by national node and recipient group.
 
+    Attributes:
+        disabledChecks: Check-ID lookup of entity IDs to suppress. Values may be
+            dictionaries carrying reasons or legacy sets.
+        suppressedWarnings: Warning objects rejected by ``disabledChecks`` in
+            arrival order. Retained warnings stay in private indexes.
+    """
     def __init__(self, disabledChecks=None):
-        # TODO
+        """Initialize empty warning indexes and suppression state.
+
+        Args:
+            disabledChecks: Optional ``check_id -> entity_ids`` mapping. The
+                mapping is retained by reference, so later caller mutations
+                affect suppression; ``None`` creates a new empty map.
+        """
         self.__warnings = {}
         self.__warningsNNs = {}
         self.disabledChecks = {} if disabledChecks is None else disabledChecks
         self.suppressedWarnings = []
 
     def _is_disabled(self, warning: DataCheckWarning) -> bool:
+        """Return whether this warning's check and entity are suppressed.
+
+        Args:
+            warning: Warning whose check ID and Directory entity ID are looked
+                up in the current ``disabledChecks`` mapping.
+
+        Returns:
+            ``True`` when the entity occurs in a reason dictionary or legacy set
+            for the warning's check ID.
+        """
         check_suppressions = self.disabledChecks.get(warning.dataCheckID, {})
         if isinstance(check_suppressions, set):
             return warning.directoryEntityID in check_suppressions
         return warning.directoryEntityID in check_suppressions
 
     def _suppression_reason(self, warning: DataCheckWarning) -> str:
+        """Return the stored reason for a dictionary-based suppression.
+
+        Args:
+            warning: Warning whose check and entity keys select the reason.
+
+        Returns:
+            The mapped reason, or an empty string when the suppression is absent
+            or represented by a legacy set.
+        """
         check_suppressions = self.disabledChecks.get(warning.dataCheckID, {})
         if isinstance(check_suppressions, dict):
             return check_suppressions.get(warning.directoryEntityID, "")
         return ""
 
     def newWarning(self, warning : DataCheckWarning):
+        """Store an enabled warning or retain a suppressed warning for debugging.
+
+        Args:
+            warning: Warning object to index. It is retained by reference rather
+                than copied, so caller mutations remain visible in outputs.
+
+        Returns:
+            None.
+
+        Side Effects:
+            Appends to private node/recipient indexes or ``suppressedWarnings``
+            and emits a debug log entry for suppression.
+        """
         if self._is_disabled(warning):
             self.suppressedWarnings.append(warning)
             reason = self._suppression_reason(warning)
@@ -76,6 +121,15 @@ class WarningsContainer:
         self.__warnings.setdefault(warning_key,[]).append(warning)
 
     def dumpWarnings(self):
+        """Print retained warnings grouped by recipient key to standard output.
+
+        Returns:
+            None.
+
+        Side Effects:
+            Calls ``print`` and each warning's ``dump`` method. Groups are sorted
+            lexicographically; warnings sort by entity ID then severity value.
+        """
         for wk in sorted(self.__warnings):
             print(wk + ":")
             for w in sorted(self.__warnings[wk], key=lambda x: x.directoryEntityID + ":" + str(x.level.value)):
@@ -83,14 +137,31 @@ class WarningsContainer:
             print("")
 
     def getWarnings(self):
-        """Return all non-suppressed warnings as a flat list."""
+        """Return all non-suppressed warnings as a flat list.
+
+        Returns:
+            A new flat list of retained warning references in recipient-group
+            insertion order. Suppressed warnings are excluded.
+        """
         warnings = []
         for warning_list in self.__warnings.values():
             warnings.extend(warning_list)
         return warnings
 
     def dumpSuppressedWarningsDebug(self, max_items: int = 100):
-        """Log suppressed warnings for debug troubleshooting."""
+        """Log suppressed warnings for debug troubleshooting.
+
+        Args:
+            max_items: Maximum number of individual warnings to log after the
+                summary. Negative values follow normal list-slice semantics.
+
+        Returns:
+            None.
+
+        Side Effects:
+            Emits debug logs, including stored reasons when available. Does not
+            alter retained or suppressed warning objects.
+        """
         total = len(self.suppressedWarnings)
         if total == 0:
             log.debug("No warnings were suppressed in this run.")
@@ -118,13 +189,41 @@ class WarningsContainer:
 
     @staticmethod
     def _write_headers(worksheet, headers, bold):
+        """Write row-zero labels and configured widths to an XlsxWriter sheet.
+
+        Args:
+            worksheet: Open XlsxWriter worksheet receiving the header row.
+            headers: Ordered ``(label, width)`` pairs to write from column zero.
+            bold: XlsxWriter format applied to every header cell.
+
+        Returns:
+            None.
+
+        Side Effects:
+            Mutates ``worksheet`` by writing strings and column widths; XlsxWriter
+            failures propagate.
+        """
         for col_idx, (header, width) in enumerate(headers):
             worksheet.write_string(0, col_idx, header, bold)
             worksheet.set_column(col_idx, col_idx, width)
 
     @staticmethod
     def _write_cell(worksheet, row, col, value):
-        """Write a worksheet cell while preserving booleans and avoiding type errors."""
+        """Write one cell while preserving booleans and blank values.
+
+        Args:
+            worksheet: Open XlsxWriter worksheet to mutate.
+            row: Zero-based destination row.
+            col: Zero-based destination column.
+            value: ``bool`` is written as Boolean, ``None`` as blank, and every
+                other value as its string representation.
+
+        Returns:
+            None.
+
+        Side Effects:
+            Writes directly to ``worksheet`` and propagates XlsxWriter failures.
+        """
         if isinstance(value, bool):
             worksheet.write_boolean(row, col, value)
             return
@@ -134,6 +233,27 @@ class WarningsContainer:
         worksheet.write_string(row, col, str(value))
 
     def dumpWarningsXLSX(self, filename : List[str], allBiobanks: dict, allCollections: dict, allNNs_sheet: bool = False):
+        """Write retained warnings and optional entity inventories to one workbook.
+
+        Args:
+            filename: Sequence whose first item is the XLSX destination path.
+                Its parent directory must exist; the file is created or overwritten.
+            allBiobanks: Optional ``biobank_id -> withdrawn`` inventory. A
+                truthy mapping produces an ``AllBiobanks`` sheet.
+            allCollections: Optional ``collection_id -> withdrawn`` inventory.
+                A truthy mapping produces an ``AllCollections`` sheet.
+            allNNs_sheet: Whether to add an ``ALL`` sheet duplicating every
+                retained warning across node-specific sheets.
+
+        Returns:
+            None.
+
+        Side Effects:
+            Creates an XlsxWriter workbook at ``filename[0]`` and writes node,
+            aggregate, and requested inventory sheets. The output is not staged
+            or atomically published; failures from workbook creation, writes, or
+            ``close`` propagate and can leave an incomplete output file.
+        """
         workbook = xlsxwriter.Workbook(filename[0])
         bold = workbook.add_format({'bold': True})
 

@@ -17,6 +17,23 @@ CONTRACT_FIXTURE_EXEMPTIONS = frozenset(
         Path("tests/fixtures/docstring_contract/missing_nested.py"),
     }
 )
+SHARED_HELPER_PATHS = (
+    "ai_cache.py",
+    "cli_common.py",
+    "directory_session_compat.py",
+    "directory_stats_utils.py",
+    "nncontacts.py",
+    "validation_models.py",
+    "validation_helpers.py",
+    "warning_suppressions.py",
+    "warningscontainer.py",
+    "customwarnings.py",
+    "fix_proposals.py",
+    "fact_descriptor_sync.py",
+    "fact_sheet_summary.py",
+    "fact_sheet_utils.py",
+    "xlsxutils.py",
+)
 SECTION_PATTERN = re.compile(
     r"^(Args|Returns|Yields|Attributes|Raises):\s*$", re.MULTILINE
 )
@@ -466,6 +483,27 @@ def repository_contract_violations(repo_root: Path) -> list[str]:
     return sorted(violations)
 
 
+def violations_for_path(path: Path) -> list[str]:
+    """Return contract diagnostics for one tracked Python file.
+
+    Args:
+        path: Absolute path to a Python source file under ``REPO_ROOT``.
+
+    Returns:
+        Sorted diagnostics for ``path`` using its repository-relative name.
+
+    Raises:
+        ValueError: If ``path`` is not located beneath ``REPO_ROOT``.
+    """
+    try:
+        relative_path = path.relative_to(REPO_ROOT)
+    except ValueError as error:
+        raise ValueError(f"Path is outside repository root: {path}") from error
+    return collect_contract_violations(
+        path.read_text(encoding="utf-8"), relative_path.as_posix()
+    )
+
+
 def _fixture_source(name: str) -> str:
     """Return UTF-8 source text from a named documentation-contract fixture.
 
@@ -643,6 +681,29 @@ def test_repository_fixture_exemptions_retain_valid_source_coverage() -> None:
     assert invalid_fixture in CONTRACT_FIXTURE_EXEMPTIONS
     assert valid_fixture in repository_contract_paths(REPO_ROOT)
     assert invalid_fixture not in repository_contract_paths(REPO_ROOT)
+
+
+def test_directory_contract_has_no_violations() -> None:
+    """Verify the shared Directory API meets the strict documentation contract.
+
+    Returns:
+        None. The test fails when ``directory.py`` has an incomplete explicit
+        definition contract.
+    """
+    assert violations_for_path(REPO_ROOT / "directory.py") == []
+
+
+def test_shared_helpers_have_no_contract_violations() -> None:
+    """Verify all Task 2 shared helpers meet the strict documentation contract.
+
+    Returns:
+        None. The test fails with per-file diagnostics for incomplete helper
+        contracts.
+    """
+    paths = [REPO_ROOT / name for name in SHARED_HELPER_PATHS]
+    assert {path.name: violations_for_path(path) for path in paths} == {
+        path.name: [] for path in paths
+    }
 
 
 def test_tracked_python_files_have_a_documentation_baseline() -> None:

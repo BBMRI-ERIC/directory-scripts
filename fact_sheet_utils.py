@@ -16,12 +16,28 @@ NO_STAR_FACT_SUMS_WARNING = (
 
 
 def _is_numeric_count(value: Any) -> bool:
-    """Return whether a value is an integer count rather than a boolean."""
+    """Return whether a value is an integer count rather than a boolean.
+
+    Args:
+        value: Candidate count from collection or fact-sheet metadata.
+
+    Returns:
+        ``True`` only for ``int`` instances other than ``bool``; floats, numeric
+        strings, and missing values are deliberately excluded.
+    """
     return isinstance(value, int) and not isinstance(value, bool)
 
 
 def normalize_fact_dimension_value(value: Any) -> Any:
-    """Return a comparable scalar value for a fact-sheet dimension cell."""
+    """Extract a comparable value from an EMX dimension wrapper when possible.
+
+    Args:
+        value: Raw fact dimension value, potentially an ``id``/``name`` mapping.
+
+    Returns:
+        Mapping ``id`` preferentially, otherwise mapping ``name``, or the
+        original object unchanged. The input mapping is not mutated.
+    """
     if isinstance(value, dict):
         if "id" in value:
             return value["id"]
@@ -31,7 +47,15 @@ def normalize_fact_dimension_value(value: Any) -> Any:
 
 
 def count_star_dimensions(fact: dict[str, Any], dimension_keys=FACT_DIMENSION_KEYS) -> int:
-    """Count how many dimensions of a fact row are aggregated as ``*``."""
+    """Count how many dimensions of a fact row are aggregated as ``*``.
+
+    Args:
+        fact: Fact-row mapping to inspect without mutation.
+        dimension_keys: Ordered dimension keys that define aggregation scope.
+
+    Returns:
+        Number of selected dimensions whose normalized value is exactly ``"*"``.
+    """
     return sum(
         1
         for key in dimension_keys
@@ -40,7 +64,14 @@ def count_star_dimensions(fact: dict[str, Any], dimension_keys=FACT_DIMENSION_KE
 
 
 def has_fact_sheet(collection: dict[str, Any]) -> bool:
-    """Return whether a collection advertises at least one fact-sheet row."""
+    """Return whether a collection advertises at least one fact-sheet row.
+
+    Args:
+        collection: Collection mapping whose ``facts`` field is inspected.
+
+    Returns:
+        Whether ``facts`` is truthy; this does not validate row shape or content.
+    """
     return bool(collection.get("facts"))
 
 
@@ -48,7 +79,15 @@ def get_all_star_rows(
     facts: list[dict[str, Any]],
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> list[dict[str, Any]]:
-    """Return rows where all tracked dimensions are aggregated as ``*``."""
+    """Return rows where all tracked dimensions are aggregated as ``*``.
+
+    Args:
+        facts: Fact-row mappings to filter without copying or mutation.
+        dimension_keys: Dimensions which must all normalize to ``"*"``.
+
+    Returns:
+        New list of references to fully aggregated input rows, preserving order.
+    """
     return [
         fact
         for fact in facts
@@ -63,7 +102,17 @@ def get_all_but_one_star_rows(
     facts: list[dict[str, Any]],
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> list[dict[str, Any]]:
-    """Return rows with one concrete dimension and stars in all others."""
+    """Return rows with one concrete dimension and stars in all others.
+
+    Args:
+        facts: Fact-row mappings to filter without mutation.
+        dimension_keys: Dimensions defining the required one-concrete/all-star
+            pattern.
+
+    Returns:
+        New list of rows with exactly one nonblank, non-star dimension and stars
+        in every remaining selected dimension. Missing dimensions disqualify rows.
+    """
     rows = []
     for fact in facts:
         values = {
@@ -85,7 +134,16 @@ def get_no_star_rows(
     facts: list[dict[str, Any]],
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> list[dict[str, Any]]:
-    """Return fully concrete rows with no missing or aggregate dimensions."""
+    """Return fully concrete rows with no missing or aggregate dimensions.
+
+    Args:
+        facts: Fact-row mappings to filter without mutation.
+        dimension_keys: Dimensions that must each have a concrete value.
+
+    Returns:
+        New list of rows with no selected dimension equal to missing, empty, or
+        ``"*"``; returned rows remain references to the input mappings.
+    """
     return [
         fact
         for fact in facts
@@ -100,7 +158,17 @@ def get_dimension_values(
     facts: list[dict[str, Any]],
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> dict[str, list[Any]]:
-    """Collect normalized non-star values present for each fact dimension."""
+    """Collect normalized non-star values present for each fact dimension.
+
+    Args:
+        facts: Fact-row mappings to inspect without mutation.
+        dimension_keys: Keys for which concrete values should be collected.
+
+    Returns:
+        New mapping to sorted unique normalized values, excluding ``None``, empty
+        strings, and ``"*"``. Values must be mutually sortable or ``sorted``
+        propagates ``TypeError``.
+    """
     values: dict[str, set[Any]] = {key: set() for key in dimension_keys}
     for fact in facts:
         for key in dimension_keys:
@@ -116,7 +184,17 @@ def get_matching_one_star_rows(
     expected_value: Any,
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> list[dict[str, Any]]:
-    """Return all rows aggregated on every dimension except one expected value."""
+    """Return all rows aggregated on every dimension except one expected value.
+
+    Args:
+        facts: Fact-row mappings to filter without mutation.
+        dimension_key: Sole concrete dimension required in matching rows.
+        expected_value: Value required after EMX-wrapper normalization.
+        dimension_keys: Full aggregation dimension set.
+
+    Returns:
+        New ordered list of matching all-but-one-star row references.
+    """
     normalized_expected = normalize_fact_dimension_value(expected_value)
     rows = []
     for fact in facts:
@@ -138,7 +216,19 @@ def _fact_dimension_and_value(
     fact: dict[str, Any],
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> tuple[str, Any]:
-    """Return the concrete dimension and value from an all-but-one-star row."""
+    """Return the concrete dimension and value from an all-but-one-star row.
+
+    Args:
+        fact: Candidate all-but-one-star row; it is not changed.
+        dimension_keys: Dimensions in which exactly one concrete value is required.
+
+    Returns:
+        The concrete dimension key and its normalized value.
+
+    Raises:
+        ValueError: If the selected dimensions contain anything other than one
+            concrete (nonblank, non-star) value.
+    """
     concrete = [
         (key, normalize_fact_dimension_value(fact.get(key)))
         for key in dimension_keys
@@ -157,7 +247,23 @@ def _append_oom_warning(
     count_name: str,
     oom_name: str,
 ) -> None:
-    """Append an OoM consistency warning without failing on malformed metadata."""
+    """Append an OoM consistency warning without failing on malformed metadata.
+
+    Args:
+        warnings: Mutable diagnostic list to extend in place.
+        count: Aggregate sample/donor count, considered only when a non-Boolean
+            integer.
+        oom_value: Collection order-of-magnitude descriptor to parse.
+        count_name: Count field name embedded in mismatch diagnostic codes.
+        oom_name: OoM field name embedded in diagnostic codes and messages.
+
+    Returns:
+        None.
+
+    Side Effects:
+        Appends one invalid-OoM or out-of-range diagnostic mapping when relevant.
+        Malformed OoM metadata is converted to a diagnostic rather than raising.
+    """
     if not _is_numeric_count(count) or oom_value in (None, ""):
         return
     try:
@@ -192,7 +298,21 @@ def analyze_collection_fact_sheet(
     facts: list[dict[str, Any]],
     dimension_keys=FACT_DIMENSION_KEYS,
 ) -> dict[str, Any]:
-    """Summarize aggregate-row consistency for one collection fact sheet."""
+    """Analyze one collection's all-star and all-but-one-star fact aggregates.
+
+    Args:
+        collection: Collection metadata used for total and OoM comparisons; not
+            mutated.
+        facts: Fact-row mappings for the collection; not mutated.
+        dimension_keys: Dimensions defining all-star and marginal patterns.
+
+    Returns:
+        New analysis mapping with aggregate counts, selected all-star row,
+        marginal completeness/missing/duplicate evidence, donor presence, and
+        diagnostic dictionaries. An all-star row is authoritative only when
+        exactly one exists; it is compared to collection totals and each marginal
+        only when their counts are non-Boolean integers.
+    """
     all_star_rows = get_all_star_rows(facts, dimension_keys)
     all_star_row = all_star_rows[0] if len(all_star_rows) == 1 else None
     all_star_samples = None if all_star_row is None else all_star_row.get("number_of_samples")
