@@ -3,6 +3,17 @@
 from nncontacts import NNContacts
 
 
+def test_member_country_classification_is_not_limited_to_contact_directory():
+    """Countries remain members/observers without inventing missing contact emails.
+
+    Returns:
+        None. Slovenia, Qatar and Denmark are eligible countries, but EXT is not.
+    """
+    for code in ("SI", "QA", "DK"):
+        assert NNContacts.is_member_node(code)
+    assert not NNContacts.is_member_node("EXT")
+
+
 def test_nncontacts_exposes_central_member_and_contact_metadata():
     """Verify nncontacts exposes central member and contact metadata.
 

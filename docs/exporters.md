@@ -256,11 +256,15 @@ python3 exporter-fact-sheet-emulation.py \
 - **Purpose:** Generate a `Points` worksheet directly for Flourish, with map coordinates, organisation and collection totals, and HTML collection-type summaries linked to the Directory catalogue.
 - **Scope:** Default runs include member/observer staging areas. `--include-ext` adds `EXT` records reported in a member/observer country to that country; `--include-all-countries` also outputs non-member reported countries. Standard `-w` and `--only-withdrawn` options select withdrawn content.
 - **Output:** `-X flourish-points.xlsx` writes the seven logical columns `Name`, `Longitude`, `Latitude`, `Geographic regions`, `Organisations`, `Collections`, and `Collection types`. Stdout provides the same country-sorted totals and type counts.
+- **Exceptions:** IARC / WHO is a separate point at its Lyon headquarters (25 avenue Tony Garnier), with links to its selected Directory biobanks. Cyprus is displayed in Europe. Slovenia is included as a member country; Qatar's `EXT_QBB` records appear under Qatar with `--include-ext`, without inventing a `QA_` staging area.
+- **Missing registrations:** Member/observer countries with no selected records generate a warning, not a fabricated zero-count row. As checked on 2026-10-09, this cached snapshot contains no Danish biobanks or collections, including under `EXT`. Denmark will appear automatically when eligible records are registered. Recheck after registration using `--include-ext --purge-cache directory`; a stale cache may also omit newly registered records.
+- **Reference metadata:** Membership is maintained independently of email contacts in `nncontacts.py`, based on the [official node list](https://www.bbmri-eric.eu/national-nodes/). The IARC pin uses destination coordinates from its [official visitor map](https://www.iarc.who.int/cards_page/visitor-information/), not the cached city-centre coordinates.
 
 ```bash
 python3 exporter-flourish-nn.py -X flourish-points.xlsx
 python3 exporter-flourish-nn.py --include-ext -X flourish-points.xlsx
 python3 exporter-flourish-nn.py --include-all-countries -w -X flourish-points.xlsx
+python3 exporter-flourish-nn.py -v --include-ext --purge-cache directory -X flourish-points.xlsx
 ```
 
 ### <a id="exporter-institutions"></a>`exporter-institutions.py`

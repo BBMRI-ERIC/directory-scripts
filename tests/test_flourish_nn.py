@@ -3,6 +3,37 @@
 from flourish_nn import COUNTRY_POINTS, FlourishPoint, assigned_country, build_points, dataframe, html_summary
 
 
+def test_missing_nodes_and_iarc_follow_node_scope():
+    """Represent SI and IARC directly, and Qatar's EXT records only with opt-in.
+
+    Returns:
+        None. Country/staging exceptions preserve normal EXT switch semantics.
+    """
+    for code in ("SI", "DK", "QA", "IARC"):
+        assert assigned_country(code, "FR", include_ext=False, include_all_countries=False) == code
+    assert assigned_country("EXT", "QA", include_ext=True, include_all_countries=False) == "QA"
+    assert assigned_country("EXT", "QA", include_ext=False, include_all_countries=False) is None
+    assert assigned_country("EU", "FR", include_ext=True, include_all_countries=True) is None
+
+
+def test_iarc_premises_region_and_node_specific_link():
+    """Use the IARC headquarters pin rather than a French-country aggregate/link.
+
+    Returns:
+        None. IARC coordinates match its official map and Cyprus is in Europe.
+    """
+    point = FlourishPoint("IARC", frozenset({"bbmri-eric:ID:IARC_IARC_Biobank"}), frozenset(), {})
+    row = dataframe([point], "https://directory.bbmri-eric.eu").iloc[0]
+    assert row["Name"] == "IARC / WHO"
+    assert row["Longitude"] == 4.8273207
+    assert row["Latitude"] == 45.7266385
+    assert row["Geographic regions"] == "Europe"
+    assert "#/biobank/bbmri-eric:ID:IARC_IARC_Biobank" in row["Collection types"]
+    assert "Countries=IARC" not in row["Collection types"]
+    assert COUNTRY_POINTS["CY"].region == "Europe"
+    assert COUNTRY_POINTS["DK"].name == "Denmark"
+
+
 def test_ext_country_switches():
     """EXT records require the requested inclusion switch and country scope.
 
@@ -13,6 +44,51 @@ def test_ext_country_switches():
     assert assigned_country("EXT", "AT", include_ext=True, include_all_countries=False) == "AT"
     assert assigned_country("EXT", "US", include_ext=True, include_all_countries=False) is None
     assert assigned_country("EXT", "US", include_ext=False, include_all_countries=True) == "US"
+
+
+def test_iarc_collection_only_scope_retains_a_directory_link():
+    """Link selected collections if their biobank is outside the withdrawn scope.
+
+    Returns:
+        None. Collection-only IARC output has a usable exact-entity link.
+    """
+    cid = "bbmri-eric:ID:IARC_IARC_Biobank:collection:IARC"
+    point = FlourishPoint("IARC", frozenset(), frozenset({cid}), {"OTHER": 1})
+    html = html_summary(point, "https://directory.bbmri-eric.eu")
+    assert f"#/collection/{cid}" in html
+    assert "Countries=IARC" not in html
+
+
+def test_exception_aggregation_and_missing_denmark_warning(caplog):
+    """Count real exception records and diagnose absent nodes without making up rows.
+
+    Args:
+        caplog: Pytest log capture used to check the missing-Directory warning.
+
+    Returns:
+        None. SI/IARC/Qatar counts are exact; DK appears automatically once populated.
+    """
+    from unittest.mock import Mock
+
+    directory = Mock()
+    banks = {"si": "SI", "iarc": "IARC", "qbb": "EXT"}
+    countries = {"si": "SI", "iarc": "FR", "qbb": "QA"}
+    directory.getBiobanks.return_value = [{"id": bid} for bid in banks]
+    directory.getCollections.return_value = [{"id": bid, "type": [{"id": "SAMPLE"}]} for bid in banks]
+    directory.getBiobankNN.side_effect = banks.__getitem__
+    directory.getCollectionNN.side_effect = banks.__getitem__
+    directory.getBiobankCountry.side_effect = countries.__getitem__
+    directory.getCollectionCountry.side_effect = countries.__getitem__
+    points = build_points(directory, include_ext=True, include_all_countries=False)
+    assert {p.country_code for p in points} == {"SI", "IARC", "QA"}
+    assert all(len(p.biobanks) == len(p.collections) == p.types["SAMPLE"] == 1 for p in points)
+    assert "DK" in caplog.text and "no selected Directory records" in caplog.text
+    banks["dk"], countries["dk"] = "DK", "DK"
+    directory.getBiobanks.return_value.append({"id": "dk"})
+    caplog.clear()
+    points = build_points(directory, include_ext=True, include_all_countries=False)
+    assert next(p for p in points if p.country_code == "DK").biobanks == frozenset({"dk"})
+    assert "DK" not in caplog.text
 
 
 def test_html_summary_and_points_columns():

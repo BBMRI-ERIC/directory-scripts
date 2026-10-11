@@ -50,7 +50,13 @@ class NNContacts:
     # Backward-compatible alias used throughout the legacy scripts.
     NNtoEmails = NODE_TO_EMAILS
 
-    MEMBER_NODE_CODES = frozenset(code for code in NODE_TO_EMAILS if code not in {"EU", "IARC"})
+    # Member/observer countries are independent of which contact emails we have.
+    # https://www.bbmri-eric.eu/national-nodes/ (verified 2026-10-09)
+    MEMBER_NODE_CODES = frozenset({
+        "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI",
+        "GR", "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL", "QA", "SE",
+        "SI", "SK", "TR",
+    })
     GLOBAL_STAGING_AREA_CODES = frozenset({"EU", "IARC"})
     NON_MEMBER_STAGING_AREA_CODES = frozenset({"EXT"}) | GLOBAL_STAGING_AREA_CODES
     PERMITTED_NON_COUNTRY_PREFIX_CODES = NON_MEMBER_STAGING_AREA_CODES

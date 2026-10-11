@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+import logging
 from typing import Any, Mapping
 
 import pandas as pd
@@ -35,9 +36,10 @@ COUNTRY_POINTS: Mapping[str, CountryPoint] = {
     "BE": CountryPoint("Belgium", 4.36761, 50.8371, "Europe"),
     "BG": CountryPoint("Bulgaria", 23.3238, 42.7105, "Europe"),
     "CH": CountryPoint("Switzerland", 7.44821, 46.948, "Europe"),
-    "CY": CountryPoint("Cyprus", 33.3736, 35.1676, "Asia"),
+    "CY": CountryPoint("Cyprus", 33.3736, 35.1676, "Europe"),
     "CZ": CountryPoint("Czech Republic", 14.4205, 50.0878, "Europe"),
     "DE": CountryPoint("Germany", 13.4115, 52.5235, "Europe"),
+    "DK": CountryPoint("Denmark", 12.5683, 55.6761, "Europe"),
     "EE": CountryPoint("Estonia", 24.7586, 59.4392, "Europe"),
     "ES": CountryPoint("Spain", -3.70327, 40.4167, "Europe"),
     "FI": CountryPoint("Finland", 24.9525, 60.1608, "Europe"),
@@ -64,6 +66,9 @@ COUNTRY_POINTS: Mapping[str, CountryPoint] = {
     "UK": CountryPoint("United Kingdom", -0.126236, 51.5002, "Europe"),
     "US": CountryPoint("United States", -77.032, 38.8895, "North America"),
     "VN": CountryPoint("Vietnam", 105.825, 21.0069, "Asia"),
+    # Destination coordinates, not map-camera coordinates, in IARC's visitor map:
+    # https://www.iarc.who.int/cards_page/visitor-information/
+    "IARC": CountryPoint("IARC / WHO", 4.8273207, 45.7266385, "Europe"),
 }
 TYPE_LABELS = {
     "SAMPLE": "Sample", "POPULATION_BASED": "Population-based", "HOSPITAL": "Hospital",
@@ -81,7 +86,7 @@ class FlourishPoint:
     """Aggregated Directory observations for one displayed country.
 
     Attributes:
-        country_code: Two-letter country code matching ``COUNTRY_POINTS``.
+        country_code: Two-letter country code or IARC matching ``COUNTRY_POINTS``.
         biobanks: Immutable IDs of selected biobanks in the displayed country.
         collections: Immutable IDs of selected collections in that country.
         types: Per-collection-type counts used in the Flourish HTML summary.
@@ -94,7 +99,7 @@ class FlourishPoint:
 
 
 def assigned_country(staging_area: str, country: str, *, include_ext: bool, include_all_countries: bool) -> str | None:
-    """Return the display country allowed by the Node/EXT selection switches.
+    """Return the display country or IARC point allowed by the selection switches.
 
     Args:
         staging_area: Entity staging-area code from its Directory identity.
@@ -103,8 +108,11 @@ def assigned_country(staging_area: str, country: str, *, include_ext: bool, incl
         include_all_countries: Whether every EXT reported country is included.
 
     Returns:
-        Included output country code, or ``None`` when the entity is excluded.
+        Included output country code or IARC; ``None`` for excluded entities.
+        IARC stays separate from France; Qatar's EXT entries require EXT opt-in.
     """
+    if staging_area == "IARC":
+        return "IARC"
     if staging_area == "EXT" and (include_all_countries or (include_ext and NNContacts.is_member_node(country))):
         return country
     if staging_area == "EXT":
@@ -123,7 +131,8 @@ def build_points(directory: Directory, *, include_ext: bool, include_all_countri
         include_all_countries: Whether non-member reported-country points are emitted.
 
     Returns:
-        Country-name-sorted aggregate points.
+        Country/name-sorted points, including a separate IARC point. Missing
+        member/observer countries are logged, not synthesized as zero-count rows.
 
     Raises:
         ValueError: If an emitted country has no checked-in Flourish metadata.
@@ -142,6 +151,14 @@ def build_points(directory: Directory, *, include_ext: bool, include_all_countri
         values[code]["collections"].add(cid)
         values[code]["types"].update(Directory.getListOfEntityAttributeIds(collection, "type"))
     result = []
+    missing = NNContacts.MEMBER_NODE_CODES - values.keys()
+    if missing:
+        logging.getLogger(__name__).warning(
+            "Member/observer countries with no selected Directory records: %s. "
+            "No count is invented; check registrations, withdrawn scope, EXT "
+            "inclusion and cache freshness (--purge-cache directory).",
+            ", ".join(sorted(missing)),
+        )
     for code, value in values.items():
         if code not in COUNTRY_POINTS:
             raise ValueError(f"No Flourish point metadata for emitted country {code!r}.")
@@ -157,14 +174,22 @@ def html_summary(point: FlourishPoint, directory_url: str) -> str:
         directory_url: Directory base URL used for the catalogue hyperlink.
 
     Returns:
-        HTML text for the Flourish Collection types column.
+        HTML text for the Flourish Collection types column. IARC links to its
+        selected biobanks (or selected collections in a collection-only scope)
+        rather than using a nonexistent country filter.
     """
     lines = ["<br>"]
     for type_id, count in sorted(point.types.items(), key=lambda item: (-item[1], TYPE_LABELS.get(item[0], item[0]))):
         if count:
             lines.append(f"• {TYPE_LABELS.get(type_id, type_id.title().replace('_', ' '))}: {count}<br>")
     url = directory_url.rstrip("/")
-    lines.append(f'<a href="{url}/ERIC/directory/#/catalogue?Countries={point.country_code}" target="_blank">See all</a>')
+    if point.country_code == "IARC":
+        entity_type = "biobank" if point.biobanks else "collection"
+        entity_ids = point.biobanks or point.collections
+        for entity_id in sorted(entity_ids):
+            lines.append(f'<a href="{url}/ERIC/directory/#/{entity_type}/{entity_id}" target="_blank">See {entity_type}</a>')
+    else:
+        lines.append(f'<a href="{url}/ERIC/directory/#/catalogue?Countries={point.country_code}" target="_blank">See all</a>')
     return "\n".join(lines)
 
 

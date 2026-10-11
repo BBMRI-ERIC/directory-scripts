@@ -99,6 +99,8 @@ operation.
     output only after a complete workbook has been written.
 - `exporter-flourish-nn.py`
   - owns direct Flourish `Points` export. Country point metadata is checked-in data, not a runtime XLSX template. Member/observer staging areas are included by default; EXT content is included only through its explicit switches and is assigned to reported country under the documented rules.
+  - shared membership in `nncontacts.py` must not be derived from available contact emails: SI, QA and DK are eligible even without known contacts. EXT, EU and IARC are not country nodes. IARC is explicitly represented as a separate Flourish point at its current Lyon premises (longitude 4.8273207, latitude 45.7266385), not merged into France. Its HTML links to selected biobanks, never `Countries=IARC`. Cyprus uses the Europe display region.
+  - Qatar's `EXT_QBB` counts use reported country QA with `--include-ext`; no fake staging identity is created. Missing nodes cause a visible warning, not an invented count or placeholder entity. DK metadata is ready for future records; rechecking requires refreshing the Directory cache after registration. Withdrawal filtering and all-country selection remain unchanged.
   - collection type figures are non-exclusive selected-collection observations. Column G must begin with `<br>`, omit zero counts, and end with the country catalogue link.
   - Negotiator registration sources are explicit and mutually exclusive:
     current representatives XLSX, orphan-export XLSX, or the reserved future
