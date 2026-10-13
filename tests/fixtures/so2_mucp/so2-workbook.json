@@ -1,0 +1,9 @@
+{
+  "worksheet": "Content",
+  "service_rows": [["Alias", "SO2_SYNTHETIC"], ["Export Date", "2026-10-02"], []],
+  "headers": ["Country", "Name of Institution", "BiobankID in the Directory (if available)", "Samples"],
+  "responses": [
+    ["AT", "Synthetic institute", "AT_SYNTHETIC", "Serum;Plasma"],
+    ["AT", "Synthetic institute", "AT_SYNTHETIC", "Serum;Plasma"]
+  ]
+}

@@ -266,9 +266,10 @@ def test_describe_passes_association_heatmap_registry_provenance_and_excludes_ex
                 The constructed descriptive payload fixture.
             """
             captured.update(kwargs)
-            return {"payload_type": "so2_descriptive_statistics"}
+            return {"payload_type": "so2_descriptive_statistics", "questions": [], "provenance": {}}
 
     monkeypatch.setattr(module, "_load_descriptive_report_module", lambda: DescriptiveStub)
+    monkeypatch.setattr("so2_response_merging.merge_descriptive_responses", lambda workbook, *_args: (workbook, {"received_submissions": len(workbook.responses)}))
     args = module.build_cli().parse_args([
         "describe", "-i", str(write_descriptive_workbook(tmp_path)),
         "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
@@ -543,6 +544,31 @@ def test_describe_overwrite_replaces_existing_json(tmp_path):
     assert json.loads(output_json.read_text(encoding="utf-8"))["payload_type"] == "so2_descriptive_statistics"
 
 
+def test_describe_cannot_overwrite_response_identity_input(tmp_path):
+    """Protect reviewed identity evidence even when output overwrite is enabled.
+
+    Args:
+        tmp_path: Isolated directory containing synthetic survey inputs and mapping.
+
+    Returns:
+        None after verifying output/input alias rejection and unchanged mapping bytes.
+    """
+    module = load_module()
+    identity_path = tmp_path / "identities.json"
+    original = '{"schema_version": 1, "reviewed_sources": {}, "country_overrides": {}}'
+    identity_path.write_text(original, encoding="utf-8")
+    args = module.build_cli().parse_args([
+        "describe", "-i", str(write_descriptive_workbook(tmp_path)),
+        "--descriptive-schema", str(write_descriptive_schema(tmp_path)),
+        "--form-json", str(write_descriptive_form_manifest(tmp_path)),
+        "--association-heatmap-registry", str(write_empty_association_registry(tmp_path)),
+        "--response-identities", str(identity_path), "-o", str(identity_path), "--overwrite",
+    ])
+    with pytest.raises(module.InputError):
+        module.run_describe(args)
+    assert identity_path.read_text(encoding="utf-8") == original
+
+
 def test_describe_records_report_relative_chart_paths_before_writing_payload(
     tmp_path, monkeypatch,
 ):
@@ -662,7 +688,8 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
             return {
                 "payload_type": "so2_descriptive_statistics",
                 "payload_version": "1",
-                "questions": [{}],
+                "questions": [{"categories": [], "pie_categories": []}],
+                "provenance": {},
             }
 
         @staticmethod
@@ -731,6 +758,7 @@ def test_describe_records_report_relative_chart_paths_before_writing_payload(
         "--output-chart-dir", str(chart_dir),
         "--include-parent-context", "--max-piechart-ratio", "16:9",
     ])
+    monkeypatch.setattr("so2_response_merging.merge_descriptive_responses", lambda workbook, *_args: (workbook, {"received_submissions": len(workbook.responses)}))
 
     assert module.run_describe(args) == module.EXIT_OK
     payload = json.loads(output_json.read_text(encoding="utf-8"))

@@ -2554,9 +2554,7 @@ def test_missing_bar_is_distinct_and_ordinal_exceptions_are_separated():
         ],
     )
 
-    fragment = module.render_descriptive_tex(report_payload(ordinal), None).chart_fragments[
-        "12-frequency"
-    ]
+    fragment = module._bar_fragment(ordinal)
 
     assert "Ordered scale" in fragment
     assert "Exceptional categories" in fragment

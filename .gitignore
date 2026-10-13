@@ -20,3 +20,26 @@ __pycache__/
 /bbmri-directory-members-pilot.geojson
 /bbmri-directory-covid-pilot.geojson
 /bbmri-directory-quality-pilot.geojson
+# private survey response exports and raw questionnaire archives
+/Content_Export_SO2_*
+/SO2_*.eus
+/SO2_*.euc
+/survey-mappings/SO2_*.eus
+/survey-mappings/SO2_*.euc
+/BBMRI_Work_Programme_presentation*SO2*.pptx
+/DraftSO2Analysis_*.pdf
+/survey_results.json
+/survey_results.schema.json
+/institutions_responded_to_both_surveys.xlsx
+/multi-country-proj/
+# local Josephine scoring inputs and response-derived reference vectors
+/josephine*
+/tests/fixtures/so2_readiness_reference.json
+/survey-mappings/so2_2025_readiness_reference.json
+/survey-mappings/mucp_reviewed_quantities.json
+/survey-mappings/so2_2025_response_identities.json
+# sensitive generated survey reports, review packets and chart bundles
+/so2-*
+# agent plans and isolated local workspaces are not publication artifacts
+/superpowers/
+/.codex-worktrees/

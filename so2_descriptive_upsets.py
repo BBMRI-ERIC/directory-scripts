@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import csv
+import io
 import json
 from pathlib import Path
 import re
@@ -318,13 +319,15 @@ for (definition in manifest$definitions) {
   plot_data <- data
   names(plot_data)[match(sets, names(plot_data))] <- labels
   plot <- ComplexUpset::upset(plot_data, labels, sort_intersections_by = \"cardinality\", min_size = 1, width_ratio = 0.2,
+    height_ratio = if (definition$id == "q_018") 1.5 else 0.5,
     set_sizes = (
       ComplexUpset::upset_set_size() +
       ggplot2::geom_text(ggplot2::aes(label = ggplot2::after_stat(count)), hjust = 1.1, stat = \"count\") +
       ggplot2::expand_limits(y = max_set_count * 1.15)
     ),
     matrix = ComplexUpset::intersection_matrix(geom = ggplot2::geom_point(size = 2.3)))
-  ggplot2::ggsave(file.path(bundle_dir, definition$upset_pdf), plot, width = 10, height = 7, units = \"in\")
+  figure_width <- if (definition$id == "q_018") 16 else 10
+  ggplot2::ggsave(file.path(bundle_dir, definition$upset_pdf), plot, width = figure_width, height = 7, units = \"in\")
   probabilities <- vapply(sets, function(set) mean(data[[set]]), numeric(1))
   observed_table <- table(apply(data[sets], 1, paste, collapse = \"|\"))
   keys <- names(observed_table)
@@ -444,4 +447,226 @@ def validate_upset_asset_bundle(payload: Mapping[str, Any], registry_path: str |
             (directory / paths[0]).resolve().as_posix(),
             (directory / paths[1]).resolve().as_posix(),
         )
+    return ValidatedUpSetAssets("complete", figures)
+
+
+def _combined_renderer_source() -> str:
+    """Adapt the tested R renderer to labelled unique-biobank evidence patterns.
+
+    Returns:
+        R source with wrapped whole-figure annotations and self-identifying
+        deviation patterns; the legacy SO2 renderer remains unchanged.
+    """
+    source = _renderer_source().replace('"ggplot2", "jsonlite")', '"ggplot2", "jsonlite", "patchwork")').replace(
+        "  ggplot2::ggsave(file.path(bundle_dir, definition$upset_pdf)",
+        "  plot <- plot + patchwork::plot_annotation(title = definition$title, "
+        'subtitle = paste(strwrap(definition$interpretation, width = 100), collapse = "\\n"))\n'
+        "  ggplot2::ggsave(file.path(bundle_dir, definition$upset_pdf)",
+    )
+    source = source.replace('sort_intersections_by = "cardinality", min_size = 1, width_ratio = 0.2,',
+        'sort_intersections = FALSE, sort_sets = FALSE, encode_sets = FALSE, keep_empty_groups = TRUE, min_size = 1, width_ratio = 0.2,\n'
+        '    base_annotations = list("Intersection size" = ComplexUpset::intersection_size() + ggplot2::scale_x_discrete(limits = pattern_names, labels = bar_ids)),')
+    source = source.replace('  plot <- ComplexUpset::upset(', '''  prepared <- ComplexUpset::upset_data(plot_data, labels, sort_intersections = FALSE,
+    sort_sets = FALSE, encode_sets = FALSE, keep_empty_groups = TRUE, min_size = 1)
+  bars <- definition$intersections
+  bar_ids <- vapply(bars, function(bar) bar$bar_id, character(1))
+  pattern_names <- vapply(bars, function(bar) {
+    positions <- match(unlist(bar$biobank_ids), data$observation_id)
+    if (anyNA(positions)) stop("Unknown intersection member")
+    observed <- unique(prepared$with_sizes$intersection[positions])
+    if (length(observed) != 1) stop("Intersection membership disagrees with ComplexUpset")
+    if (as.integer(prepared$sizes$exclusive_intersection[[observed]]) != bar$count)
+      stop("Intersection count disagrees with ComplexUpset")
+    observed
+  }, character(1))
+  plot <- ComplexUpset::upset(''')
+    source = source.replace('matrix = ComplexUpset::intersection_matrix(geom = ggplot2::geom_point(size = 2.3)))',
+        'matrix = ComplexUpset::intersection_matrix(geom = ggplot2::geom_point(size = 2.3)) +\n'
+        '      ggplot2::scale_x_discrete(limits = pattern_names, labels = bar_ids))')
+    source = source.replace('  ggplot2::ggsave(file.path(bundle_dir, definition$upset_pdf)', '''  # ComplexUpset installs its own scales after annotations; apply the shared
+  # catalogue order to the completed panels, then verify the built plot itself.
+  for (index in seq_along(plot$patches$plots)) {
+    panel <- plot$patches$plots[[index]]
+    if (!inherits(panel, "ggplot")) next
+    limits <- ggplot2::ggplot_build(panel)$layout$panel_scales_x[[1]]$get_limits()
+    if (setequal(limits, pattern_names))
+      plot$patches$plots[[index]] <- panel + ggplot2::scale_x_discrete(limits = pattern_names, labels = bar_ids)
+  }
+  main_limits <- ggplot2::ggplot_build(plot)$layout$panel_scales_x[[1]]$get_limits()
+  if (setequal(main_limits, pattern_names))
+    plot <- plot + ggplot2::scale_x_discrete(limits = pattern_names, labels = bar_ids) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 9), axis.ticks.x = ggplot2::element_line()) +
+      ggplot2::labs(x = "Intersection bar ID")
+  verified_panels <- 0L
+  verified_counts <- FALSE
+  for (panel in c(plot$patches$plots, list(plot))) {
+    if (!inherits(panel, "ggplot")) next
+    built <- ggplot2::ggplot_build(panel)
+    limits <- built$layout$panel_scales_x[[1]]$get_limits()
+    if (!setequal(limits, pattern_names)) next
+    if (!identical(as.character(limits), unname(pattern_names)))
+      stop(paste("Rendered bar order mismatch:", paste(limits, collapse="|"), "expected", paste(pattern_names, collapse="|")))
+    verified_panels <- verified_panels + 1L
+    for (layer_index in seq_along(built$data)) {
+      if (!inherits(panel$layers[[layer_index]]$geom, c("GeomBar", "GeomCol"))) next
+      layer <- built$data[[layer_index]]
+      if (!all(c("y", "x") %in% names(layer))) next
+      counts <- layer$y[match(seq_along(bars), as.numeric(layer$x))]
+      if (identical(as.integer(counts), as.integer(vapply(bars, function(bar) bar$count, numeric(1)))))
+        verified_counts <- TRUE
+    }
+  }
+  if (verified_panels < 2L || !verified_counts)
+    stop(paste("Cannot verify rendered bar/matrix correspondence:", verified_panels, verified_counts))
+  ggplot2::ggsave(file.path(bundle_dir, definition$upset_pdf)''')
+    source = source.replace('deviation_sha256 = sha256(file.path(bundle_dir, definition$deviation_pdf)))',
+        'deviation_sha256 = sha256(file.path(bundle_dir, definition$deviation_pdf)),\n'
+        '    intersections = lapply(bars, function(bar) list(bar_id = bar$bar_id, pattern = unlist(bar$pattern), count = bar$count)))')
+    source = source.replace('bundle_version = "1"', 'bundle_version = "2"')
+    source = source.replace(
+        "  dev_plot <- ggplot2::ggplot(deviation, ggplot2::aes(intersection, deviation))",
+        '  deviation$label <- vapply(strsplit(keys, "|", fixed = TRUE), function(bits) {\n'
+        '    selected <- labels[bits == "TRUE"]\n'
+        '    if (!length(selected)) "None selected in represented scopes" else paste(selected, collapse = " + " )\n'
+        "  }, character(1))\n"
+        '  deviation$label <- vapply(deviation$label, function(label) paste(strwrap(label, width = 65), collapse = "\\n"), character(1))\n'
+        "  dev_plot <- ggplot2::ggplot(deviation, ggplot2::aes(deviation, factor(label, levels = rev(unique(label)))))",
+    ).replace("ggplot2::geom_hline(yintercept = 0)", "ggplot2::geom_vline(xintercept = 0)")
+    source = source.replace('x = "Intersection", y = "Observed minus expected"',
+                            'x = "Observed minus expected (independent reporting events)", y = "Reported pattern"')
+    return source.replace('height = 5, units = "in"', 'height = max(5, 0.65 * nrow(deviation)), units = "in"')
+
+
+def _matrix_csv_bytes(matrix: Mapping[str, Any]) -> bytes:
+    """Serialize one event matrix identically for generation and asset validation.
+
+    Args:
+        matrix: Canonical identity/boolean event rows and their ordered set column names.
+
+    Returns:
+        UTF-8 CSV bytes with deterministic headers, quoting and line endings.
+    """
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=["observation_id", "country", "institution", *matrix["sets"]])
+    writer.writeheader()
+    writer.writerows(matrix["rows"])
+    return buffer.getvalue().encode("utf-8")
+
+
+def write_matrix_upset_bundle(matrices: Sequence[Mapping[str, Any]], output_dir: Path,
+                              canonical_material: Mapping[str, Any]) -> None:
+    """Prepare optional ComplexUpset inputs from explicit unique-biobank event matrices.
+
+    Args:
+        matrices: Scope-aware matrices carrying projection/state/denominator diagnostics.
+        output_dir: New staging directory; an existing output is never removed here.
+        canonical_material: Analytical input/registry/cohort hashes independent of output paths.
+
+    Returns:
+        None. CSV, manifest and reusable external R renderer are written to the stage.
+    """
+    from survey_evidence import fingerprint
+    target = Path(output_dir)
+    target.mkdir()
+    definitions = []
+    for matrix in matrices:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", matrix["id"]):
+            raise InputError("Unsafe combined UpSet definition ID")
+        if matrix.get("omission_reason"):
+            continue
+        name = matrix["id"]
+        punctuation = str.maketrans({"\u2019": "'", "\u2018": "'", "\u2013": "-", "\u2014": "-"})
+        labels = [_short_display_label(value).translate(punctuation) for value in matrix["set_labels"]]
+        if len(labels) != len(set(labels)):
+            labels = [f"{label[:44]} #{index}" for index, label in enumerate(labels, 1)]
+        content = _matrix_csv_bytes(matrix)
+        (target / f"{name}.csv").write_bytes(content)
+        definitions.append({"id": name, "title": matrix["title"], "csv": f"{name}.csv",
+                            "sets": matrix["sets"], "set_labels": labels, "full_set_labels": matrix["set_labels"],
+                            "csv_sha256": sha256(content).hexdigest(),
+                            "projection": matrix["projection"], "interpretation": matrix.get("interpretation", ""),
+                            "upset_pdf": f"{name}-upset.pdf", "deviation_pdf": f"{name}-deviation.pdf"})
+        from survey_combined_intersections import build_intersection_catalogue
+        definitions[-1]["intersections"] = build_intersection_catalogue(matrix)
+    material = {"matrices": matrices, "inputs": canonical_material, "renderer_sha256": sha256(_combined_renderer_source().encode()).hexdigest()}
+    manifest = {"bundle_version": "2", "canonical_sha256": fingerprint(material),
+                "analytical_unit": "unique_selected_biobank", "definitions": definitions,
+                "omissions": [{"id": item["id"], "reason": item["omission_reason"]} for item in matrices if item.get("omission_reason")]}
+    (target / "input-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=True) + "\n")
+    source = _combined_renderer_source()
+    (target / "render-descriptive-upsets.R").write_text(source)
+
+
+def validate_matrix_upset_bundle(matrices: Sequence[Mapping[str, Any]], canonical_material: Mapping[str, Any],
+                                 assets_dir: Path) -> ValidatedUpSetAssets:
+    """Validate cohort/projection-bound external figures before combined-report publication.
+
+    Args:
+        matrices: Fresh scope-aware expected matrices, including omitted definitions.
+        canonical_material: Current input/registry/cohort fingerprint material.
+        assets_dir: Read-only external R bundle directory; an empty directory is an omission state.
+
+    Returns:
+        Immutable empty or complete figure state, with verified PDF bytes and safe paths.
+    """
+    from survey_evidence import fingerprint
+    directory = Path(assets_dir)
+    if not directory.is_dir():
+        raise InputError("Combined UpSet asset directory does not exist")
+    if not any(directory.iterdir()):
+        return ValidatedUpSetAssets("empty", {})
+    try:
+        incoming = json.loads((directory / "input-manifest.json").read_text(encoding="utf-8"))
+        outgoing = json.loads((directory / "output-manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InputError("Combined UpSet asset manifest is missing or invalid") from exc
+    if not isinstance(incoming, dict) or not isinstance(outgoing, dict):
+        raise InputError("Combined UpSet asset manifest must be an object")
+    renderer = directory / "render-descriptive-upsets.R"
+    if (renderer.is_symlink() or not renderer.is_file()
+            or renderer.read_bytes() != _combined_renderer_source().encode()):
+        raise InputError("Combined UpSet renderer script mismatch")
+    material = {"matrices": matrices, "inputs": canonical_material, "renderer_sha256": sha256(_combined_renderer_source().encode()).hexdigest()}
+    expected = fingerprint(material)
+    if incoming.get("canonical_sha256") != expected or outgoing.get("canonical_sha256") != expected:
+        raise InputError("Combined UpSet cohort/projection hash mismatch")
+    if incoming.get("bundle_version") != "2" or outgoing.get("bundle_version") != "2" or incoming.get("analytical_unit") != "unique_selected_biobank":
+        raise InputError("Unsupported combined UpSet manifest version/unit")
+    expected_ids = [item["id"] for item in matrices if not item.get("omission_reason")]
+    if [item["id"] for item in incoming.get("definitions", [])] != expected_ids:
+        raise InputError("Combined UpSet definition mismatch")
+    figures = {}
+    by_id = {matrix["id"]: matrix for matrix in matrices}
+    for definition in incoming["definitions"]:
+        matrix = by_id[definition["id"]]
+        csv_name = definition.get("csv")
+        if csv_name != matrix["id"] + ".csv" or Path(csv_name).name != csv_name:
+            raise InputError("Unsafe combined UpSet CSV path")
+        csv_path = directory / csv_name
+        expected_csv = sha256(_matrix_csv_bytes(matrix)).hexdigest()
+        if (csv_path.is_symlink() or not csv_path.is_file()
+                or definition.get("csv_sha256") != expected_csv
+                or sha256(csv_path.read_bytes()).hexdigest() != expected_csv):
+            raise InputError("Combined UpSet CSV hash mismatch")
+        if (definition.get("sets") != matrix["sets"] or definition.get("full_set_labels") != matrix["set_labels"]
+                or definition.get("projection") != matrix["projection"]):
+            raise InputError("Combined UpSet set/projection mismatch")
+        output = outgoing.get("outputs", {}).get(definition["id"], {})
+        from survey_combined_intersections import build_intersection_catalogue
+        catalogue = build_intersection_catalogue(matrix)
+        expected_bars = [{key: bar[key] for key in ("bar_id", "pattern", "count")} for bar in catalogue]
+        if definition.get("intersections") != catalogue or output.get("intersections") != expected_bars:
+            raise InputError("Combined UpSet rendered bar identity/count mismatch")
+        paths = []
+        for key in ("upset_pdf", "deviation_pdf"):
+            name = definition.get(key)
+            if not isinstance(name, str) or Path(name).name != name or not name.endswith(".pdf"):
+                raise InputError("Unsafe combined UpSet PDF path")
+            path = directory / name
+            if path.is_symlink() or output.get(key) != name or not path.is_file():
+                raise InputError("Missing or unsafe combined UpSet PDF")
+            if sha256(path.read_bytes()).hexdigest() != output.get(key.replace("_pdf", "_sha256")):
+                raise InputError("Combined UpSet PDF hash mismatch")
+            paths.append(path.resolve().as_posix())
+        figures[definition["id"]] = UpSetFigure(*paths)
     return ValidatedUpSetAssets("complete", figures)

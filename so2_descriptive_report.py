@@ -93,6 +93,8 @@ class AssociationHeatmapDefinition:
         title: Reader-facing heatmap title.
         interpretation: Validated interpretation text for report readers.
         conditional_summary: Whether conditional percentages accompany counts.
+        presentation: Optional reviewed tick labels and at-most-three-line axis
+            titles; canonical categories remain unchanged for statistics.
     """
 
     definition_id: str
@@ -106,6 +108,7 @@ class AssociationHeatmapDefinition:
     title: str
     interpretation: str
     conditional_summary: bool
+    presentation: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -274,6 +277,10 @@ def load_association_heatmap_registry(path: str | Path) -> tuple[AssociationHeat
                 definition["interpretation"], f"association definitions[{position}].interpretation"
             ),
             conditional_summary=conditional_summary,
+            presentation=_validate_association_presentation(
+                definition.get("presentation"), definition["row_categories"],
+                definition["column_categories"],
+            ),
         ))
         if any("|" in category for category in (*definitions[-1].row_categories, *definitions[-1].column_categories)):
             raise InputError("Association category values must not contain '|'.")
@@ -447,7 +454,9 @@ def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
 
     Returns:
         Provenance and question metadata indexed by normalized report labels;
-        matrix rows are exposed as individual report questions.
+        matrix rows are exposed as individual report questions. field_bindings
+        retains actual manifest UIDs, types, requiredness and choice UIDs/labels
+        for consumers that require authoritative structured-answer validation.
 
     Raises:
         InputError: If the manifest cannot be loaded or does not expose a
@@ -523,6 +532,14 @@ def load_form_manifest_structure(path: str | Path) -> dict[str, Any]:
         "archive_sha256": form.archive_sha256,
         "active_member_sha256": form.active_member_sha256,
         "questions": questions,
+        "field_bindings": {
+            field.uid: {
+                "uid": field.uid, "field_type": field.field_type,
+                "mandatory": field.mandatory,
+                "choices": [{"uid": choice.uid, "label": choice.label} for choice in field.choices],
+            }
+            for field in form.fields_by_uid.values()
+        },
     }
 
 
@@ -996,7 +1013,8 @@ def _percentage(count: int, base: int) -> float | None:
 
     Returns:
         Percentage rounded to four decimals, or ``None`` when ``base`` is zero."""
-    return None if base == 0 else round(count * 100 / base, 4)
+    from survey_descriptive import percentage
+    return percentage(count, base)
 
 
 def _applicability_summary(
@@ -1171,7 +1189,7 @@ def _association_definition_payload(definition: AssociationHeatmapDefinition) ->
     Returns:
         JSON-serializable metadata preserving exact registry category order.
     """
-    return {
+    result = {
         "definition_id": definition.definition_id,
         "row_question_id": definition.row_question_id,
         "column_question_id": definition.column_question_id,
@@ -1184,6 +1202,51 @@ def _association_definition_payload(definition: AssociationHeatmapDefinition) ->
         "interpretation": definition.interpretation,
         "conditional_summary": definition.conditional_summary,
     }
+    if definition.presentation is not None:
+        result["presentation"] = _validate_association_presentation(
+            definition.presentation, definition.row_categories, definition.column_categories,
+        )
+    return result
+
+
+def _validate_association_presentation(
+    presentation: Any,
+    row_categories: Sequence[str],
+    column_categories: Sequence[str],
+) -> dict[str, Any] | None:
+    """Validate and copy manually reviewed heatmap display metadata.
+
+    Args:
+        presentation: Optional mapping with row/column tick-label maps and axis lines.
+        row_categories: Exact canonical statistical values requiring row labels.
+        column_categories: Exact canonical statistical values requiring column labels.
+
+    Returns:
+        Independent JSON-compatible copy of complete display metadata, or None
+        when no curated presentation was supplied. Counts/categories are unchanged.
+
+    Raises:
+        InputError: If tick coverage is incomplete, labels ambiguous, or an axis
+            title does not contain one to three nonblank lines.
+    """
+    if presentation is None:
+        return None
+    required = {"row_tick_labels", "column_tick_labels", "row_axis_lines", "column_axis_lines"}
+    if not isinstance(presentation, Mapping) or set(presentation) != required:
+        raise InputError("Heatmap presentation must contain tick labels and axis lines.")
+    result = {}
+    for axis, categories in (("row", row_categories), ("column", column_categories)):
+        labels = presentation[f"{axis}_tick_labels"]
+        if not isinstance(labels, Mapping) or set(labels) != set(categories):
+            raise InputError(f"Heatmap {axis} labels must cover exactly the canonical categories.")
+        if any(not isinstance(value, str) or not value.strip() for value in labels.values()) or len(set(labels.values())) != len(labels):
+            raise InputError(f"Heatmap {axis} tick labels must be nonblank and distinct.")
+        lines = presentation[f"{axis}_axis_lines"]
+        if not isinstance(lines, (list, tuple)) or not 1 <= len(lines) <= 3 or any(not isinstance(line, str) or not line.strip() for line in lines):
+            raise InputError(f"Heatmap {axis} title must contain one to three nonblank lines.")
+        result[f"{axis}_tick_labels"] = dict(labels)
+        result[f"{axis}_axis_lines"] = list(lines)
+    return result
 
 
 def _association_definitions_sha256(
@@ -1281,6 +1344,19 @@ def build_association_heatmap_payload(
             "diagnostics": diagnostics,
         }
     return pairs
+
+
+def normalize_structured_answer(question: QuestionDefinition, raw_answer: Any) -> tuple[list[str], list[str]]:
+    """Expose validated SO2 answer normalization for other survey adapters.
+
+    Args:
+        question: Descriptive definition providing categories, aliases and delimiter semantics.
+        raw_answer: Original source cell, preserving blank versus explicit negative selections.
+
+    Returns:
+        Canonical selected labels and repeated literal selections, without dropping contradictions.
+    """
+    return _structured_answers(question, raw_answer)
 
 
 def _structured_question_payload(
@@ -1688,12 +1764,35 @@ class RenderedDescriptiveReport:
         chart_fragments: TikZ fragments keyed by stable standalone chart names.
         chart_documents: Complete TeX chart documents keyed by chart name.
         chart_paths: Relative PDF paths associated with rendered chart names.
+        diagnostics: Explicit generic-renderer notices, empty for legacy reports.
     """
 
     tex: str
     chart_fragments: Mapping[str, str]
     chart_documents: Mapping[str, str]
     chart_paths: Mapping[str, str]
+    diagnostics: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RenderedStatisticsBody:
+    """Rendered generic statistics body and reusable standalone chart assets.
+
+    Attributes:
+        tex: TeX body without a document preamble or document environment.
+        chart_fragments: Reusable TikZ fragments keyed by stable chart names.
+        chart_documents: Standalone chart documents keyed by stable chart names.
+        chart_paths: Relative PDF paths requested by the caller, when any.
+        diagnostics: Human-readable chart or figure omission notices.
+        evidence_fragments: Deferred source tables keyed by clickable evidence labels.
+    """
+
+    tex: str
+    chart_fragments: Mapping[str, str]
+    chart_documents: Mapping[str, str]
+    chart_paths: Mapping[str, str]
+    diagnostics: tuple[str, ...] = ()
+    evidence_fragments: Mapping[str, str] = field(default_factory=dict)
 
 
 _TEX_ESCAPE = {
@@ -1821,7 +1920,14 @@ def _category_label(category: Mapping[str, Any]) -> str:
     percentage = category.get("percent")
     if percentage is None:
         return f"{value}: {count} (no percentage base)"
-    basis = "all included rows" if category["value"] == "Missing" else "answering rows"
+    basis = {
+        "oIB": "unique overlapping biobanks",
+        "oAB": "biobanks with an answer",
+        "included_rows": "all included rows",
+        "answering_rows": "answering rows",
+    }.get(category.get("percent_basis"),
+          "all included rows" if category["value"] == "Missing" else "answering rows")
+    basis = category.get("percent_basis_label", basis)
     return f"{value}: {count} ({float(percentage):.1f}\\% of {basis})"
 
 
@@ -1838,7 +1944,7 @@ def _bar_end_label(category: Mapping[str, Any]) -> str:
     percentage = category.get("percent")
     if percentage is None:
         return f"{count} (no percentage base)"
-    basis = "oIR" if category["value"] == "Missing" else "oAR"
+    basis = category.get("percent_basis", "oIR" if category["value"] == "Missing" else "oAR")
     return f"{count} ({float(percentage):.1f}\\% {basis})"
 
 
@@ -1981,16 +2087,20 @@ def _bar_charts(categories: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(fragments)
 
 
-def _bar_fragment(question: Mapping[str, Any]) -> str:
+def _bar_fragment(question: Mapping[str, Any], descending: bool = False) -> str:
     """Render a question's categorical bars, separating ordinal exceptions.
 
     Args:
         question: Validated question payload containing category counts.
+        descending: Whether to display all categories by decreasing count;
+            ties preserve source order. False retains the shared ordinal ordering.
 
     Returns:
         TeX for one or more compatible bar-chart pages.
     """
     categories = question["categories"]
+    if descending:
+        return _bar_charts(sorted(categories, key=lambda category: -int(category["count"])))
     if question["question_type"] != "ordinal":
         return _bar_charts(categories)
     ordered = [
@@ -2099,18 +2209,29 @@ def _pie_label_layout(labels: Sequence[Mapping[str, Any]], label_bound: float = 
     return layout
 
 
-def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: float = 4 / 3) -> str:
+def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: float = 4 / 3, donut: bool = False) -> str:
     """Render a pie whose leader lines connect each segment to its label.
 
     Args:
         question: Validated categorical question payload with pie categories.
+            Optional pie_basis_labels supplies presentation-only all/answered_only
+            denominator wording for combined profiles; percentages are unchanged.
         answered_only: Whether the Missing category is excluded from this chart.
         max_ratio: Maximum permitted horizontal-to-vertical chart ratio.
+        donut: Whether to hollow the center for standalone SO2 presentation;
+            True also fits the chart and labels to printable width. False preserves
+            combined-report pies. Counts and labels are unchanged.
 
     Returns:
         Complete TikZ markup with labels near slice centers and within the pie's
         fixed vertical extent.
     """
+    basis_labels = question.get("pie_basis_labels")
+    if basis_labels is not None and (
+        not isinstance(basis_labels, Mapping) or set(basis_labels) != {"all", "answered_only"}
+        or any(not isinstance(value, str) or not value.strip() for value in basis_labels.values())
+    ):
+        raise InputError("Pie basis labels require nonempty all and answered_only display text.")
     categories = [
         category for category in question["pie_categories"]
         if int(category["count"]) > 0
@@ -2118,6 +2239,14 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: f
     ]
     total = sum(int(category["count"]) for category in categories)
     title = "answered rows only" if answered_only else "including Missing"
+    if question.get("analytical_unit") == "unique_overlapping_biobank":
+        title = "biobanks with non-missing evidence" if answered_only else "all overlapping biobanks"
+    elif question.get("analytical_unit") == "unique_selected_biobank":
+        title = "biobanks with answers" if answered_only else "all selected biobanks responding to this survey"
+    elif question.get("analytical_unit") == "source_reporting_unit":
+        title = "reporting units with answers" if answered_only else "all selected reporting units responding to this survey"
+    elif question.get("analytical_unit") == "reviewed_biobank_or_unresolved_submission":
+        title = "observations with answers" if answered_only else "including Missing"
     if total == 0:
         return "\n".join([
             r"\begin{tikzpicture}",
@@ -2140,10 +2269,22 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: f
         else:
             color = colors[non_missing_index % len(colors)]
             non_missing_index += 1
+        percent_basis = category.get("percent_basis")
+        percent = category.get("percent")
+        basis_label = {
+            "oIB": "unique overlapping biobanks",
+            "oAB": "biobanks with an answer",
+        }.get(percent_basis)
+        label = f"{_tex(category['value'])}: {count} ({100 * count / total:.1f}\\%)"
+        if basis_label is not None and percent is not None:
+            basis_label = "biobanks with non-missing evidence" if answered_only else "unique overlapping biobanks"
+            if basis_labels is not None:
+                basis_label = _tex(basis_labels["answered_only" if answered_only else "all"])
+            label = f"{_tex(category['value'])}: {count} ({100 * count / total:.1f}\\% of {basis_label})"
         segments.append({
             "index": index, "category": category, "start": start, "end": end,
             "middle": middle, "color": color,
-            "label": f"{_tex(category['value'])}: {count} ({100 * count / total:.1f}\\%)",
+            "label": label,
             "lines": max(1, ceil(len(str(category["value"])) / 42)),
         })
         start = end
@@ -2184,7 +2325,11 @@ def _pie_fragment(question: Mapping[str, Any], answered_only: bool, max_ratio: f
                 rf"\fill[{segment['color']}] (-1.90,{y - 0.06:.2f}) rectangle (-1.76,{y + 0.06:.2f});",
                 rf"\node[anchor=east,align=right,text width=0.40\linewidth,font=\sffamily\scriptsize] at (-1.98,{y:.2f}) {{{segment['label']}}};",
             ])
+    if donut:
+        slices.append(r"\fill[white] (0,0) circle (0.75);")
     slices.append(r"\end{tikzpicture}")
+    if donut:
+        slices = [r"\noindent\resizebox{\linewidth}{!}{", *slices, r"}\par"]
     if keyed_legend:
         slices.append(r"\noindent\textit{Legend}\par")
         slices.extend(rf"\noindent\#{segment['index'] + 1} -- {_tex(segment['category']['value'])}\par" for segment in segments)
@@ -2224,7 +2369,7 @@ _COUNTRY_CODES = {
     "germany": "DE", "hungary": "HU", "italia": "IT", "italy": "IT", "latvia": "LV",
     "lithuania": "LT", "malta": "MT", "netherlands": "NL", "the netherlands": "NL",
     "norway": "NO", "poland": "PL", "qatar": "QA", "slovakia": "SK", "spain": "ES",
-    "sweden": "SE", "switzerland": "CH",
+    "sweden": "SE", "switzerland": "CH", "espana": "ES", "swiss": "CH",
 }
 
 
@@ -2238,11 +2383,37 @@ def _country_code(value: Any) -> str:
         A two-letter code after whitespace, case, and accent normalisation.
     """
     normalized = normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii")
-    return _COUNTRY_CODES.get(normalized.strip().casefold(), "??")
+    key = normalized.strip().casefold()
+    if key.upper() in _COUNTRY_CODES.values():
+        return key.upper()
+    return _COUNTRY_CODES.get(key, "??")
+
+
+def _compact_report_context(value: Any) -> str:
+    """Remove established leading serialization prefixes from source context.
+
+    Args:
+        value: Reader-facing text copied from a response or source-context field.
+
+    Returns:
+        Text with a leading chain of technical prefixes removed, retaining an
+        optional leading SO2/MuCP source tag. Identical tokens inside literal
+        prose or quotations are preserved.
+    """
+    prefix = (
+        r"(?:RESP[-_][A-Z0-9._-]+\s*:\s*|"
+        r"collection_or_submission_as_reported\s*:\s*|"
+        r"submission(?:[-_ ](?:id|record))?\s*[:;]\s*|"
+        r"source_record_id\s*:\s*)"
+    )
+    return re.sub(r"\A\s*(?P<survey>\[(?:SO2|MuCP)\]\s*)?(?:" + prefix + r")+",
+                  r"\g<survey>", str(value), flags=re.IGNORECASE).strip()
 
 
 def _question_tables(
     question: Mapping[str, Any], *, include_parent_context: bool = False,
+    compact_source_context: bool = False,
+    table_biobank_repeated_entries: str | None = None,
 ) -> str:
     """Render an optional evidence table for one validated question payload.
 
@@ -2250,6 +2421,10 @@ def _question_tables(
         question: Validated question payload with either free-text rows or structured contributions.
         include_parent_context: Whether free-text tables include complete raw parent
             answers; the default omits parent context entirely.
+        compact_source_context: Whether machine prefixes and response IDs are hidden
+            from combined-report evidence tables.
+        table_biobank_repeated_entries: Optional combined-report-only biobank-cell
+            policy. None preserves standalone describe/report output unchanged.
 
     Returns:
         TeX for the table, or an empty string if no free-text evidence exists.
@@ -2281,22 +2456,50 @@ def _question_tables(
             parent_values = r"{\raggedright " + r"\par ".join(
                 _tex(parent["value"]) for parent in item.get(parent_key, [])
             ) + r"\par}"
-            row = [_tex(_country_code(item["country"])), _tex(item["institution"])]
+            row = [_tex(item.get("country_code", _country_code(item["country"]))), _tex(item["institution"])]
             if show_parent:
                 row.append(parent_values)
-            row.append(_tex_with_links(item["text"]))
+            text = _compact_report_context(item["text"]) if compact_source_context else item["text"]
+            row.append(_tex_with_links(text))
             rows.append(row)
         columns = (
             r"p{0.04\linewidth}p{0.27\linewidth}p{0.61\linewidth}"
             if not show_parent else r"p{0.04\linewidth}p{0.21\linewidth}p{0.20\linewidth}p{0.47\linewidth}"
         )
+        if table_biobank_repeated_entries is not None:
+            from survey_combined_tables import render_biobank_table
+
+            grouped_rows = []
+            for row_index, (row, item) in enumerate(zip(rows[1:], evidence), start=1):
+                bank_id = item.get("observation_id")
+                if not isinstance(bank_id, str) or not bank_id:
+                    # Legacy hand-built renderer payloads lack canonical identity.
+                    # Keep those rows separate instead of grouping by display name.
+                    bank_id = f"unidentified-render-row-{row_index}"
+                grouped_rows.append({
+                    "biobank_id": bank_id,
+                    "country": str(item.get("country") or "Unknown"),
+                    "biobank_sort_label": str(item.get("institution") or ""),
+                    "biobank_label": row[1],
+                    "cells": [row[0], *row[2:]],
+                })
+            return "\n".join([
+                r"\smaller[1]",
+                render_biobank_table(
+                    grouped_rows, columns, headers,
+                    repeated_entries=table_biobank_repeated_entries,
+                    biobank_column_index=1,
+                ),
+                r"\normalsize",
+            ])
         return "\n".join([r"\smaller[1]", _table(rows, columns), r"\normalsize"])
     grouped: dict[tuple[str, str], list[str]] = {}
     for item in question["contributions"]:
+        value = _compact_report_context(item["value"]) if compact_source_context else item["value"]
         entry = _tex(item["institution"])
         if item["repeated_response"]:
             entry += " [suspected repeated response]"
-        grouped.setdefault((str(item["value"]), str(item["country"])), []).append(entry)
+        grouped.setdefault((str(value), str(item["country"])), []).append(entry)
     rows = [[r"Value", r"Country", r"Institutions"]]
     for (value, country), institutions in grouped.items():
         rows.append([
@@ -2319,10 +2522,12 @@ def _preamble() -> str:
 \setlength{\parindent}{0pt}
 \usepackage{fontspec}
 \usepackage{libertine}
+\usepackage[scaled=0.85]{inconsolata}
+\setmonofont[Scale=0.85,BoldFont=Inconsolatazi4-Bold.otf]{Inconsolatazi4-Regular.otf}
 \usepackage{relsize}
 \usepackage{longtable}
 \usepackage{booktabs}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{hyperref}
 \usepackage{xurl}
 \usepackage{tikz}
@@ -2338,6 +2543,241 @@ def _preamble() -> str:
 \definecolor{bbmriGreen}{HTML}{3F7F4C}
 \definecolor{bbmriOrange}{HTML}{C76D1E}
 """
+
+
+def render_statistics_sections(
+    sections: Sequence[Mapping[str, Any]], options: Mapping[str, Any],
+) -> RenderedStatisticsBody:
+    """Compose generic statistics sections using the existing SO2 chart primitives.
+
+    Args:
+        sections: Ordered section mappings with survey, label and renderer questions.
+        options: Rendering options including optional chart_dir, report_path,
+            include_contribution_tables, include_parent_context, minimum_n and
+            max_piechart_ratio. ``defer_evidence_tables`` returns source tables
+            separately with clickable links in the body; default false preserves
+            standalone describe output. ``include_scope_state_tables`` defaults to true
+            for legacy standalone callers and can suppress diagnostic coverage
+            tables for combined reports. ``compact_source_context`` removes
+            technical response prefixes only when explicitly enabled. Missing
+            options use safe defaults.
+
+    Returns:
+        TeX body, shared fragments/documents/paths and explicit omission diagnostics.
+
+    Raises:
+        InputError: If a section or question cannot be rendered safely.
+    """
+    from copy import deepcopy
+    from survey_descriptive import select_chart_kind, text_chunks, STATE_LABELS
+
+    if not isinstance(options, Mapping):
+        raise InputError("Statistics rendering options must be a mapping.")
+    ratio = float(options.get("max_piechart_ratio", 4 / 3))
+    if ratio <= 0:
+        raise InputError("max_piechart_ratio must be positive")
+    chart_dir = options.get("chart_dir")
+    report_path = options.get("report_path")
+    policy = {"minimum_n": int(options.get("minimum_n", 0))}
+    include_contact_details = bool(options.get("include_contact_details", False))
+    fragments: dict[str, str] = {}
+    documents: dict[str, str] = {}
+    paths: dict[str, str] = {}
+    diagnostics: list[str] = []
+    body: list[str] = []
+    evidence_fragments: dict[str, str] = {}
+    email_pattern = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
+
+    def safe_value(value: Any) -> str:
+        """Mask email-shaped contact details before any report escaping.
+
+        Args:
+            value: Source value rendered as ordinary report text.
+
+        Returns:
+            String with email-shaped substrings replaced by a privacy marker.
+        """
+        text = str(value)
+        return text if include_contact_details else email_pattern.sub("[contact redacted]", text)
+
+    def append_evidence(question: Mapping[str, Any], table: str) -> None:
+        """Append a table inline or return it as linked evidence at caller request.
+
+        Args:
+            question: Current question supplying the stable ID and human heading.
+            table: Fully rendered source table; empty text denotes absent responses.
+
+        Returns:
+            None. Updates the main body and optional deferred evidence mapping.
+        """
+        if not options.get("defer_evidence_tables", False) or not table:
+            body.append(table or r"\emph{No text responses.}")
+            return
+        identity = f"{survey}:{question['question_id']}"
+        anchor = "evidence-" + sha256(identity.encode("utf-8")).hexdigest()[:16]
+        evidence_fragments[anchor] = (rf"\subsection{{[{_tex(survey)}] {_tex(question['label'])}}}"
+                                      + rf"\label{{{anchor}}}" + "\n" + table)
+        body.append(rf"\par\noindent\hyperref[{anchor}]{{Detailed responses and qualifications}}.\par")
+
+    for section_index, section in enumerate(sections, start=1):
+        if not isinstance(section, Mapping):
+            raise InputError(f"Statistics section {section_index} must be a mapping.")
+        survey = safe_value(section.get("survey", "Survey"))
+        label = safe_value(section.get("label", survey))
+        if options.get("include_section_heading", True):
+            body.append(r"\clearpage")
+            body.append(rf"\section{{[{_tex(survey)}] {_tex(label)}}}")
+        questions = section.get("questions", [])
+        if not isinstance(questions, Sequence) or isinstance(questions, (str, bytes)):
+            raise InputError(f"Statistics section {section_index}.questions must be a sequence.")
+        for question_index, source_question in enumerate(questions, start=1):
+            if not isinstance(source_question, Mapping):
+                raise InputError(f"Statistics question {section_index}.{question_index} must be a mapping.")
+            question = deepcopy(dict(source_question))
+            for field_name in ("question_id", "label", "question_type", "population",
+                               "categories", "contributions", "free_text_rows"):
+                if field_name not in question:
+                    raise InputError(f"Statistics question lacks {field_name}: {source_question!r}.")
+            qid = safe_value(question["question_id"])
+            qlabel = safe_value(question["label"])
+            question["question_id"] = qid
+            question["label"] = qlabel
+            for category_list in ("categories", "pie_categories"):
+                for category in question.get(category_list, []):
+                    category["value"] = STATE_LABELS.get(category["value"], category["value"])
+            text_rows = []
+            for row in question.get("free_text_rows", []):
+                context_fields = ("scope_label",) if options.get("compact_source_context", False) else ("source_record_id", "scope_label")
+                context_values = []
+                for key in context_fields:
+                    if not row.get(key):
+                        continue
+                    context_value = safe_value(row[key])
+                    if options.get("compact_source_context", False):
+                        context_value = _compact_report_context(context_value)
+                        if context_value.casefold() in {"submission", "biobank-wide", "biobank wide"}:
+                            continue
+                    context_values.append(context_value)
+                context = "; ".join(context_values)
+                response_text = safe_value(row.get("text", ""))
+                if options.get("compact_source_context", False):
+                    response_text = _compact_report_context(response_text)
+                for index, chunk in enumerate(text_chunks(response_text)):
+                    copied = dict(row)
+                    copied["text"] = f"[{survey}] " + (context + ": " if context else "") + ("(continued) " if index else "") + chunk
+                    for field_name in ("institution", "country"):
+                        if field_name in copied:
+                            copied[field_name] = safe_value(copied[field_name])
+                    text_rows.append(copied)
+            question["free_text_rows"] = text_rows
+            for item in question.get("contributions", []):
+                value = safe_value(item.get("value", ""))
+                if options.get("compact_source_context", False):
+                    value = _compact_report_context(value)
+                item["value"] = f"[{survey}] {value}"
+                for field_name in ("institution", "country"):
+                    if field_name in item:
+                        item[field_name] = safe_value(item[field_name])
+            population = question["population"]
+            if not isinstance(population, Mapping):
+                raise InputError(f"Statistics question {qid!r} has invalid population metadata.")
+            population_labels = question.get("population_labels", (
+                _chart_unit(question), "with an answer", "missing"))
+            if (not isinstance(population_labels, (list, tuple)) or len(population_labels) != 3
+                    or not all(isinstance(value, str) for value in population_labels)):
+                raise InputError(f"Statistics question {qid!r} requires three population labels.")
+            body.append(rf"\subsection{{{_tex(qlabel)}}}")
+            if not question.get("hide_question_identifier", False):
+                body.append(rf"{{\smaller[3] Question identifier: {_question_identifier(qid)}\par}}\vspace{{0.3em}}")
+            body.append(
+                rf"\noindent N/A/M ({' / '.join(_tex(value) for value in population_labels)}): "
+                rf"{population.get('N', 0)} / {population.get('A', 0)} / {population.get('M', 0)}\par"
+            )
+            if question.get("form"):
+                body.append(_tex(_response_structure_text(question)) + r"\par")
+            else:
+                source_type = question.get("type", question["question_type"])
+                body.append(_tex("Source response type: " + str(source_type).replace("_", " ")) + r"\par")
+                if question.get("scope_states"):
+                    body.append(r"\noindent Chart categories are derived scope-aware evidence states, not universal biobank availability.\par")
+            kind = question["question_type"]
+            if kind == "free_text":
+                append_evidence(question, _question_tables(
+                    question,
+                    include_parent_context=bool(options.get("include_parent_context", False)),
+                    compact_source_context=bool(options.get("compact_source_context", False)),
+                    table_biobank_repeated_entries=options.get("table_biobank_repeated_entries"),
+                ))
+                continue
+            if int(population.get("N", 0)) == 0:
+                diagnostics.append(f"{survey} {qid}: chart omitted for an empty cohort.")
+                body.append(r"\emph{Chart omitted: no participating biobanks.}")
+                continue
+            selection = select_chart_kind(question, policy)
+            if selection == "omitted":
+                diagnostics.append(f"{survey} {qid}: chart omitted by minimum-N policy.")
+                body.append(r"\emph{Chart omitted by the configured minimum-N policy.}")
+                continue
+            if selection == "table":
+                append_evidence(question, _question_tables(
+                    question, compact_source_context=bool(options.get("compact_source_context", False)),
+                    table_biobank_repeated_entries=options.get("table_biobank_repeated_entries"),
+                ))
+                continue
+            if selection not in {"pie", "bar"}:
+                diagnostics.append(f"{survey} {qid}: unsupported chart kind {selection!r}.")
+                continue
+            if selection == "pie":
+                category_basis = {
+                    str(category.get("value")): category
+                    for category in question["categories"]
+                }
+                pie_categories = question.get("pie_categories", question["categories"])
+                question["pie_categories"] = []
+                for category in pie_categories:
+                    summary_category = category_basis.get(str(category.get("value")), {})
+                    question["pie_categories"].append({
+                        **category,
+                        "percent_basis": category.get("percent_basis", summary_category.get("percent_basis")),
+                        "excluded_from_chart": category.get("value") == "Missing" or category.get("excluded_from_chart", False),
+                    })
+            chart_slug = _slug(f"{survey}-{qid}-{qlabel}")[:96].rstrip("-") or "question"
+            key = f"{chart_slug}-{sha256(f'{survey}:{qid}'.encode('utf-8')).hexdigest()[:10]}"
+            variants = (False, True) if selection == "pie" and int(population.get("M", 0)) else (False,)
+            if options.get("pie_variants", "default") == "all_only":
+                variants = (False,)
+            for answered_only in variants:
+                chart_key = f"{key}-answered-only" if answered_only else key
+                if chart_key in fragments:
+                    raise InputError(f"Statistics chart filename collision for {chart_key!r}.")
+                fragment = (
+                    _pie_fragment(question, answered_only, ratio)
+                    if selection == "pie" else _bar_fragment(question)
+                )
+                fragments[chart_key] = fragment
+                documents[chart_key] = _standalone_tex(question, fragment, answered_only)
+                body.append(fragment)
+                if chart_dir is not None:
+                    chart_pdf = Path(chart_dir) / f"{chart_key}.pdf"
+                    base = Path(report_path).parent if report_path is not None else Path.cwd()
+                    paths[chart_key] = Path(os.path.relpath(chart_pdf, start=base)).as_posix()
+                    body.append(r"{\raggedright\smaller[3] Chart file: " + _tex(paths[chart_key]) + r"\par}")
+            if question.get("contributions") and options.get("include_contribution_tables", False):
+                append_evidence(question, _question_tables(
+                    question, compact_source_context=bool(options.get("compact_source_context", False)),
+                ))
+            if question.get("option_coverage") and options.get("include_scope_state_tables", True):
+                body.append(r"\par\noindent Scope-state coverage: biobank counts; columns overlap and must not be summed.\par")
+                rows = [["Option", "Unknown / partial", "Qualified positive", "Varying positive"]]
+                rows.extend([_tex(item["label"]), str(item["unknown_or_partial_count"]),
+                    str(item["qualified_positive_count"]), str(item["varying_positive_count"])] for item in question["option_coverage"])
+                body.extend([r"\smaller[1]", _table(rows, r"p{0.46\linewidth}p{0.14\linewidth}p{0.14\linewidth}p{0.14\linewidth}"), r"\normalsize"])
+    return RenderedStatisticsBody(
+        tex="\n".join(body), chart_fragments=MappingProxyType(fragments),
+        chart_documents=MappingProxyType(documents), chart_paths=MappingProxyType(paths),
+        diagnostics=tuple(diagnostics),
+        evidence_fragments=MappingProxyType(evidence_fragments),
+    )
 
 
 def _response_structure_text(question: Mapping[str, Any]) -> str:
@@ -2375,9 +2815,19 @@ def _chart_unit(question: Mapping[str, Any]) -> str:
         question: Renderable question payload containing its declared response type.
 
     Returns:
-        A human-readable unit. Multi-choice marks count rows selecting each
-        value; all other chart marks count submitted response rows.
+        A human-readable unit: survey-participating biobanks for selected
+        combined cohorts, overlapping biobanks for legacy combined analyses;
+        otherwise submitted rows, or rows selecting each
+        value for a legacy multi-choice chart.
     """
+    if question.get("analytical_unit") == "source_reporting_unit":
+        return "survey reporting units"
+    if question.get("analytical_unit") == "unique_selected_biobank":
+        return "survey-participating biobanks"
+    if question.get("analytical_unit") == "unique_overlapping_biobank":
+        return "unique overlapping biobanks"
+    if question.get("analytical_unit") == "reviewed_biobank_or_unresolved_submission":
+        return "trusted biobanks; unresolved submissions counted separately"
     if question["question_type"] == "multi_choice":
         return "submitted response rows selecting each value"
     return "submitted response rows"
@@ -2397,9 +2847,10 @@ def _standalone_tex(
     Returns:
         Standalone XeLaTeX document including interpretation metadata and the chart."""
     population = question["population"]
-    variant = " (answered rows only)" if answered_only else ""
+    unit_name = "observations" if question.get("analytical_unit") == "reviewed_biobank_or_unresolved_submission" else "rows"
+    variant = f" (answered {unit_name} only)" if answered_only else ""
     note = (
-        f"Missing: {population['M']} of {population['N']} included rows. "
+        f"Missing: {population['M']} of {population['N']} included {unit_name}. "
         "Blank means blank; mandatory/optional status is reported from the form definition."
     )
     return "\n".join([
@@ -2407,8 +2858,8 @@ def _standalone_tex(
         r"\begin{document}",
         rf"\section*{{{_tex(question['label'])}{_tex(variant)}}}",
         rf"\noindent\smaller[3] Question identifier: {_question_identifier(question['question_id'])}\normalsize\par\vspace{{0.35\baselineskip}}",
-        rf"Denominator: {population['A']} answering rows; Missing uses "
-        rf"{population['N']} included rows\par",
+        rf"Denominator: {population['A']} answering {unit_name}; Missing uses "
+        rf"{population['N']} included {unit_name}\par",
         rf"Unit: {_tex(_chart_unit(question))}\par",
         rf"\emph{{{_tex(note)}}}",
         fragment,
@@ -2441,20 +2892,31 @@ def _association_heatmap_fragment(
     definition: AssociationHeatmapDefinition | Mapping[str, Any],
     pair: Mapping[str, Any],
     question_labels: Mapping[str, str] | None = None,
+    unit: str | None = None,
 ) -> str:
     """Render one zero-inclusive annotated association contingency heatmap.
 
     Args:
-        definition: Validated association definition controlling title and axes.
+        definition: Validated association definition controlling title and axes;
+            optional presentation supplies reviewed display labels without changing
+            canonical categories. Mapping-based combined panels retain their layout.
         pair: Validated aggregate pair payload with declared cells and denominator.
         question_labels: Optional human-readable labels indexed by question ID.
-            Exact yes/no axes use these labels as their wrapped semantic titles.
+            Axes use these semantic titles unless curated title lines are supplied.
+        unit: Optional explicit analytical unit replacing the legacy row wording.
 
     Returns:
         PGFPlots/TikZ markup for the association heatmap and interpretation note.
     """
     row_categories = tuple(_association_value(definition, "row_categories"))
     column_categories = tuple(_association_value(definition, "column_categories"))
+    presentation = definition.get("presentation") if isinstance(definition, Mapping) else definition.presentation
+    standalone_presentation = isinstance(definition, AssociationHeatmapDefinition) and presentation is not None
+    if presentation:
+        for axis, categories in (("row", row_categories), ("column", column_categories)):
+            unknown = set(categories) - set(presentation[f"{axis}_tick_labels"])
+            if unknown:
+                raise ValueError(f"Heatmap requires curated {axis} category label: {sorted(unknown)!r}")
     question_labels = question_labels or {}
     row_is_yes_no = frozenset(row_categories) == {"No", "Yes"}
     column_is_yes_no = frozenset(column_categories) == {"No", "Yes"}
@@ -2466,16 +2928,20 @@ def _association_heatmap_fragment(
             count = int(cells[f"{row_category}|{column_category}"])
             cell_rows.append(f"{column_index} {row_index} {count}")
             labels.append(rf"\node at (axis cs:{column_index},{row_index}) {{\sffamily\scriptsize {count}}};")
-    x_labels = ",".join(
-        _tex(category) for category in column_categories
-    ) if column_is_yes_no else ",".join(
-        str(index) for index in range(1, len(column_categories) + 1)
-    )
-    y_labels = ",".join(
-        _tex(category) for category in row_categories
-    ) if row_is_yes_no else ",".join(
-        str(index) for index in range(1, len(row_categories) + 1)
-    )
+    x_labels = ",".join(_tex(category) for category in column_categories)
+    y_labels = ",".join(_tex(category) for category in row_categories)
+    # PGFPlots' default padded range adds one cell pitch beyond the categories.
+    x_tick_width = f"{min(0.14, 0.44 / (len(column_categories) + 1)):.3f}"
+    if not column_is_yes_no:
+        x_labels = ",".join(r"{\parbox[t]{" + x_tick_width + r"\linewidth}{\centering " + _tex(category) + "}}" for category in column_categories)
+    if not row_is_yes_no:
+        y_labels = ",".join(r"{\parbox[c]{0.20\linewidth}{\raggedleft " + _tex(category) + "}}" for category in row_categories)
+    if presentation:
+        x_labels = ",".join("{" + _tex(presentation["column_tick_labels"][category]) + "}" for category in column_categories)
+        y_labels = ",".join("{" + _tex(presentation["row_tick_labels"][category]) + "}" for category in row_categories)
+        if standalone_presentation:
+            x_labels = ",".join(r"{\parbox[t]{" + x_tick_width + r"\linewidth}{\centering " + _tex(presentation["column_tick_labels"][category]) + "}}" for category in column_categories)
+            y_labels = ",".join(r"{\parbox[c]{0.20\linewidth}{\raggedleft " + _tex(presentation["row_tick_labels"][category]) + "}}" for category in row_categories)
     row_axis_label = _tex(question_labels.get(
         _association_value(definition, "row_question_id"), "Row response",
     ))
@@ -2485,26 +2951,28 @@ def _association_heatmap_fragment(
     title = _tex(_association_value(definition, "title"))
     interpretation = _tex(_association_value(definition, "interpretation"))
     denominator = int(pair["paired_denominator"])
-    legend_rows = ([] if row_is_yes_no else [
-        rf"R{index} & {_tex(category)} \\\\"
-        for index, category in enumerate(row_categories, start=1)
-    ]) + ([] if column_is_yes_no else [
-        rf"C{index} & {_tex(category)} \\\\"
-        for index, category in enumerate(column_categories, start=1)
-    ])
     axis_options = (
         r"xlabel={\parbox[c]{0.72\linewidth}{\centering " + column_axis_label + r"}}, "
         r"ylabel={\parbox[c]{0.36\textheight}{\raggedleft " + row_axis_label + r"}},"
-    ) if row_is_yes_no or column_is_yes_no else (
-        r"xlabel={Column response}, ylabel={Row response},"
     )
+    if presentation:
+        row_axis_label = r"\\".join(_tex(line) for line in presentation["row_axis_lines"])
+        column_axis_label = r"\\".join(_tex(line) for line in presentation["column_axis_lines"])
+        axis_options = (
+            r"xlabel={\parbox[c]{0.72\linewidth}{\raggedright " + column_axis_label + r"}}, "
+            r"ylabel={\parbox[c]{0.36\textheight}{\raggedleft " + row_axis_label + r"}},"
+        )
     return "\n".join([
-        rf"\subsection*{{{title}}}",
-        rf"\noindent Paired answering rows: {denominator}\par",
+        *([] if presentation and not standalone_presentation else [rf"\subsection*{{{title}}}"]),
+        rf"\noindent Paired {_tex(unit) if unit else 'answering rows'}: {denominator}\par",
         r"\begin{center}",
         r"\begin{tikzpicture}",
         r"\begin{axis}[",
-        r"width=0.82\linewidth, height=0.44\textheight,",
+        (r"width=0.55\linewidth, height=0.34\textheight,"
+         if presentation else r"width=0.82\linewidth, height=0.44\textheight,"),
+        *([r"xticklabel style={rotate=90, anchor=east, font=\scriptsize},",
+           r"yticklabel style={font=\scriptsize},"] if presentation and not standalone_presentation else
+          [r"tick label style={font=\sffamily\scriptsize},"]),
         axis_options,
         rf"xtick={{1,...,{len(column_categories)}}}, ytick={{1,...,{len(row_categories)}}},",
         rf"xticklabels={{{x_labels}}}, yticklabels={{{y_labels}}},",
@@ -2518,15 +2986,7 @@ def _association_heatmap_fragment(
         r"\end{axis}",
         r"\end{tikzpicture}",
         r"\end{center}",
-        *([] if not legend_rows else [
-            r"\begin{flushleft}\smaller[3]",
-            r"\begin{tabular}{@{}r p{0.86\linewidth}@{}}",
-            r"\multicolumn{2}{@{}l}{\textbf{Key:} R = row response; C = column response.} \\",
-            *legend_rows,
-            r"\end{tabular}",
-            r"\end{flushleft}\normalsize",
-        ]),
-        rf"\noindent\emph{{{interpretation} This panel describes submitted response rows, not causal association.}}\par",
+        rf"\noindent\emph{{{interpretation} This panel describes {_tex(unit or 'submitted response rows')}, not causal association.}}\par",
     ])
 
 
@@ -2566,6 +3026,7 @@ def _association_standalone_tex(
     definition: AssociationHeatmapDefinition,
     pair: Mapping[str, Any],
     question_labels: Mapping[str, str],
+    unit: str | None = None,
 ) -> str:
     """Build a self-contained association panel chart document.
 
@@ -2573,6 +3034,8 @@ def _association_standalone_tex(
         definition: Validated association definition represented by this chart.
         pair: Validated aggregate pair payload.
         question_labels: Human-readable labels indexed by association question ID.
+        unit: Optional observation-unit wording for merged standalone SO2 reports;
+            absence preserves the submitted-row interpretation.
 
     Returns:
         Standalone XeLaTeX document containing the panel and any conditional summary.
@@ -2580,7 +3043,7 @@ def _association_standalone_tex(
     return "\n".join([
         _preamble(),
         r"\begin{document}",
-        _association_heatmap_fragment(definition, pair, question_labels),
+        _association_heatmap_fragment(definition, pair, question_labels, unit=unit),
         _association_conditional_summary_fragment(definition, pair),
         r"\end{document}",
         "",
@@ -2676,7 +3139,7 @@ def _association_definition_from_payload(value: Any, path: str) -> AssociationHe
         "column_form_uid", "row_categories", "column_categories", "mode", "title",
         "interpretation", "conditional_summary",
     }
-    if set(definition) != expected_fields:
+    if set(definition) - {"presentation"} != expected_fields:
         raise InputError(
             f"Descriptive statistics payload {path} has missing or unknown fields."
         )
@@ -2730,6 +3193,9 @@ def _association_definition_from_payload(value: Any, path: str) -> AssociationHe
             definition.get("interpretation"), f"{path}.interpretation"
         ),
         conditional_summary=conditional_summary,
+        presentation=_validate_association_presentation(
+            definition.get("presentation"), categories("row_categories"), categories("column_categories"),
+        ),
     )
 
 
@@ -3110,6 +3576,33 @@ def render_descriptive_tex(
     if max_piechart_ratio <= 0:
         raise InputError("max_piechart_ratio must be positive")
     questions = _validate_render_payload(payload)
+    if "readiness_scores" in payload:
+        from so2_readiness_scores import validate_readiness_model
+        try:
+            summary_context = _payload_mapping(payload["responses_summary"], "readiness.responses_summary")
+            form_context = _payload_mapping(payload["form_structure"], "readiness.form_structure")
+            validate_readiness_model(
+                payload["readiness_scores"],
+                source_sha256=_payload_text(payload["provenance"]["source_sha256"], "readiness.source_sha256"),
+                observation_sources=_payload_array(summary_context["observation_sources"], "readiness.observation_sources"),
+                source_records=_payload_array(summary_context["source_records"], "readiness.source_records"),
+                questions=questions,
+                form_sha256=_payload_text(form_context["source_sha256"], "readiness.form_sha256"),
+                authoritative_form_structure={
+                    "source_sha256": form_context["source_sha256"],
+                    "field_bindings": _payload_mapping(form_context["field_bindings"], "readiness.field_bindings"),
+                },
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            raise InputError(f"Invalid readiness report context: {exc}") from exc
+    from so2_response_profiles import build_profile_groups, profile_fragment
+    try:
+        profile_groups = build_profile_groups(questions)
+    except ValueError as exc:
+        raise InputError(str(exc)) from exc
+    profile_after_question = {group["question_ids"][-1]: group for group in profile_groups}
+    if profile_groups and isinstance(payload, dict):
+        payload["response_profiles"] = profile_groups
     association_definitions: tuple[AssociationHeatmapDefinition, ...] = ()
     association_pairs: Mapping[str, Any] = {}
     if "association_heatmap_definitions" in payload:
@@ -3176,6 +3669,18 @@ def render_descriptive_tex(
         r"\noindent oAR: percentage of answering rows; oIR: percentage of included response rows.\par",
         r"\clearpage",
     ])
+    summary = payload.get("responses_summary")
+    association_unit = "analytical observations" if summary is not None else None
+    if summary is not None:
+        report.extend([
+            r"\addsec{Responses Summary}",
+            rf"Submissions received: {summary['received_submissions']}; merged duplicate submissions: {summary['merged_submissions']}; analytical observations: {summary['analytical_observations']}.\par",
+            r"Repeated submissions are merged only when a trusted biobank identity is shared. Similar institution names alone are not merged. Unresolved identities remain separate observations. Agreeing answers count once; blank answers are filled from another submission. Different single-choice answers are shown as Conflicting answers; multi-choice selections are combined and differences flagged. All source answers and row numbers are preserved in JSON.\par",
+        ])
+        for group in sorted(summary["duplicate_groups"], key=lambda item: (item["country"], item["institutions"][0])):
+            report.append(rf"\noindent {_tex(group['country'])}: {_tex('; '.join(group['institutions']))}; source rows {_tex(', '.join(map(str, group['source_rows'])))}.\par")
+        report.append(rf"Question-level differences flagged: {len(summary['conflicts'])}. Unresolved identity submissions retained separately: {len(summary['unresolved_identity_rows'])}.\par")
+        report.append(r"\clearpage")
     active_matrix_parent: str | None = None
 
     def append_upset_pair(
@@ -3212,10 +3717,14 @@ def render_descriptive_tex(
             report.append("UpSet charts omitted: no rendered assets.")
             return
         figure = upset_assets.figures[definition_id]
-        report.extend([
-            rf"\includegraphics[width=\linewidth]{{\detokenize{{{figure.upset_pdf}}}}}",
-            rf"\includegraphics[width=\linewidth]{{\detokenize{{{figure.deviation_pdf}}}}}",
-        ])
+        if definition_id == "q_018":
+            report.extend([
+                r"\clearpage",
+                rf"\includegraphics[angle=90,width=\linewidth,height=0.92\textheight,keepaspectratio]{{\detokenize{{{figure.upset_pdf}}}}}",
+                r"\clearpage",
+            ])
+        else:
+            report.append(rf"\includegraphics[width=\linewidth]{{\detokenize{{{figure.upset_pdf}}}}}")
 
     for question in questions:
         for field in ("question_id", "label", "question_type", "categories", "population",
@@ -3236,6 +3745,11 @@ def render_descriptive_tex(
         population = question["population"]
         report.append(rf"\noindent\smaller[3] Question identifier: {_question_identifier(question['question_id'])}\normalsize\par\vspace{{0.35\baselineskip}}")
         report.append(rf"N/A/M (included/answered/missing): {population['N']} / {population['A']} / {population['M']}\par")
+        if summary is not None:
+            differences = [item for item in summary["conflicts"] if item["question_id"] == question["question_id"]]
+            if differences:
+                difference_rows = "; ".join(", ".join(map(str, item["source_rows"])) for item in differences)
+                report.append(rf"\noindent\textit{{Differences between submissions from {len(differences)} biobank(s), source rows {_tex(difference_rows)}; see Responses Summary.}}\par")
         if not matrix_parent:
             report.append(rf"{_tex(_response_structure_text(question))}\par")
         if question["question_type"] == "free_text":
@@ -3244,14 +3758,16 @@ def render_descriptive_tex(
                 or r"\emph{No text responses.}"
             )
             continue
-        use_pie = question["question_type"] == "single_choice"
+        from survey_descriptive import select_chart_kind
+        use_pie = select_chart_kind(question) == "pie"
         variants = (False, True) if use_pie and population["M"] else ((True,) if use_pie else (False,))
         question_paths: list[str] = []
         for answered_only in variants:
             key = _chart_key(question, answered_only)
-            fragment = _pie_fragment(question, answered_only, max_piechart_ratio) if use_pie else _bar_fragment(question)
+            fragment = (_pie_fragment(question, answered_only, max_piechart_ratio, donut=True)
+                        if use_pie else _bar_fragment(question, descending=True))
             fragments[key] = fragment
-            chart_documents[key] = _standalone_tex(question, fragment, answered_only)
+            chart_documents[key] = _standalone_tex(question, "\\par\n" + fragment, answered_only)
             report.append(fragment)
             if chart_dir is not None:
                 chart_pdf = Path(chart_dir) / f"{key}.pdf"
@@ -3288,12 +3804,12 @@ def render_descriptive_tex(
             )
             key = f"association-{definition.definition_id}"
             fragment = "\n".join(filter(None, [
-                _association_heatmap_fragment(definition, pair, association_question_labels),
+                _association_heatmap_fragment(definition, pair, association_question_labels, unit=association_unit),
                 _association_conditional_summary_fragment(definition, pair),
             ]))
             fragments[key] = fragment
             chart_documents[key] = _association_standalone_tex(
-                definition, pair, association_question_labels,
+                definition, pair, association_question_labels, unit=association_unit,
             )
             report.append(fragment)
             if chart_dir is not None:
@@ -3306,6 +3822,22 @@ def render_descriptive_tex(
                     rf"\url{{{_tex(chart_paths[key])}}}\par",
                     r"\endgroup",
                 ])
+        if question_id in profile_after_question:
+            group = profile_after_question[question_id]
+            for complete in (False, True):
+                variant = "complete" if complete else "top12"
+                key = f"profiles-{group['id']}-{variant}"
+                fragment = profile_fragment(group, complete, _tex)
+                heading = "Complete joint-response profiles" if complete else "Most frequent joint-response profiles"
+                report.extend([r"\clearpage", rf"\subsection{{{heading}}}", fragment])
+                fragments[key] = fragment
+                chart_documents[key] = "\n".join([_preamble(), r"\begin{document}", fragment, r"\end{document}"])
+                if chart_dir is not None:
+                    chart_pdf = Path(chart_dir) / f"{key}.pdf"
+                    base = Path(report_path).parent if report_path is not None else Path.cwd()
+                    chart_paths[key] = Path(os.path.relpath(chart_pdf, start=base)).as_posix()
+                    report.extend([r"\noindent\begingroup\raggedright\smaller[3]",
+                                   rf"\url{{{_tex(chart_paths[key])}}}\par", r"\endgroup"])
     if upset_assets is not None:
         report.extend([r"\clearpage", r"\section{Shared UpSet charts}"])
         for definition_id, source_selectors in _UPSET_SHARED_DEFINITIONS.items():
@@ -3313,11 +3845,33 @@ def render_descriptive_tex(
                 definition_id, definition_id, anchor=True,
                 source_selectors=source_selectors,
             )
+    if "readiness_scores" in payload:
+        from so2_readiness_scores import readiness_section
+        try:
+            section, readiness_fragments = readiness_section(payload["readiness_scores"], _tex)
+        except ValueError as exc:
+            raise InputError(str(exc)) from exc
+        for key, fragment in readiness_fragments.items():
+            fragments[key] = fragment
+            chart_documents[key] = "\n".join([_preamble(), r"\begin{document}", fragment, r"\end{document}"])
+            display = fragment
+            if chart_dir is not None:
+                chart_pdf = Path(chart_dir) / f"{key}.pdf"
+                base = Path(report_path).parent if report_path is not None else Path.cwd()
+                chart_paths[key] = Path(os.path.relpath(chart_pdf, start=base)).as_posix()
+                display += "\n" + r"\noindent\begingroup\raggedright\smaller[3]" + "\n" + rf"\url{{{_tex(chart_paths[key])}}}\par\endgroup"
+            section = section.replace(f"%% {key}", display)
+        report.append(section)
     report.extend([r"\end{document}", ""])
     if chart_dir is not None and isinstance(payload, dict):
         payload["chart_paths"] = dict(chart_paths)
+    report_tex = "\n".join(report)
+    if summary is not None:
+        report_tex = report_tex.replace("N: included response rows; A: rows with a nonblank answer", "N: analytical observations; A: observations with a nonblank answer")
+        report_tex = report_tex.replace("percentage of answering rows", "percentage of answering observations").replace("percentage of included response rows", "percentage of included observations")
+        report_tex = report_tex.replace("Included response rows:", "Analytical observations:")
     return RenderedDescriptiveReport(
-        tex="\n".join(report),
+        tex=report_tex,
         chart_fragments=MappingProxyType(fragments),
         chart_documents=MappingProxyType(chart_documents),
         chart_paths=MappingProxyType(chart_paths),

@@ -15,3 +15,4 @@ roman~=5.0
 validate_email
 javaobj-py3==0.6.1
 defusedxml~=0.7.1
+jsonschema>=4.17.3,<5

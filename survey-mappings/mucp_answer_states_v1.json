@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0.0",
+  "states": {
+    "ambiguous_formatting": {
+      "normalized_state": "ambiguous_or_source_conflict",
+      "allowed_values": [null]
+    },
+    "conditional": {
+      "normalized_state": "conditional",
+      "allowed_values": [null]
+    },
+    "conditional_text": {
+      "normalized_state": "conditional",
+      "allowed_values": [null]
+    },
+    "explicit_no": {
+      "normalized_state": "explicit_negative",
+      "allowed_values": [false]
+    },
+    "listed": {
+      "normalized_state": "affirmed",
+      "allowed_values": [true]
+    },
+    "multiple_scopes_or_conflict": {
+      "normalized_state": "ambiguous_or_source_conflict",
+      "allowed_values": [null]
+    },
+    "not_asked": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    },
+    "not_asked_or_not_recognized": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    },
+    "not_confirmed": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    },
+    "not_listed": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    },
+    "not_reported": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    },
+    "not_reported_in_country_summary": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    },
+    "selected": {
+      "normalized_state": "affirmed",
+      "allowed_values": [true]
+    },
+    "stated_yes": {
+      "normalized_state": "affirmed",
+      "allowed_values": [true]
+    },
+    "text_reported": {
+      "normalized_state": "unknown",
+      "allowed_values": [true, null]
+    },
+    "unmarked": {
+      "normalized_state": "unknown",
+      "allowed_values": [null]
+    }
+  }
+}

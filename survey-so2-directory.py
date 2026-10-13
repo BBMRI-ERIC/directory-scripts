@@ -336,6 +336,7 @@ def build_cli() -> argparse.ArgumentParser:
     describe.add_argument("-i", "--survey-file", required=True, help="Path to the SO2 survey XLSX export.")
     describe.add_argument("--descriptive-schema", required=True, help="Path to the descriptive-workbook schema JSON.")
     describe.add_argument("--form-json", required=True, help="Path to the generated authoritative SO2 form manifest JSON.")
+    describe.add_argument("--response-identities", help="Reviewed offline identities and country corrections; defaults to the local private mapping when present, otherwise the empty example template.")
     describe.add_argument(
         "--association-heatmap-registry",
         default=str(DEFAULT_ASSOCIATION_HEATMAP_REGISTRY),
@@ -401,6 +402,43 @@ def build_cli() -> argparse.ArgumentParser:
         choices=["uncertain", "almost_certain", "certain"],
         help="Minimum confidence to export into the update plan.",
     )
+    merge = subparsers.add_parser("merge-mucp", help="Enrich MuCP with SO2 evidence for an explicit unique-biobank cohort.")
+    _add_common_cli(merge)
+    from cli_common import add_withdrawn_scope_arguments, add_purge_cache_arguments
+    add_withdrawn_scope_arguments(merge)
+    add_purge_cache_arguments(merge, ["directory"])
+    merge.add_argument("-i", "--survey-file", required=True, help="SO2 survey XLSX export.")
+    merge.add_argument("--descriptive-schema", required=True, help="SO2 descriptive question schema.")
+    merge.add_argument("--form-json", required=True, help="Authoritative generated SO2 form manifest.")
+    merge.add_argument("--so2-findings", help="Optional source-bound reviewed SO2 resolution findings.")
+    merge.add_argument("--mucp-json", required=True, help="Source-complete MuCP response JSON.")
+    merge.add_argument("--mucp-schema", required=True, help="Local MuCP Draft 2020-12 schema.")
+    merge.add_argument("--join", choices=["inner", "all-MuCP", "all-SO2", "outer"], default="all-MuCP",
+                       help="Select both surveys, all MuCP (default), all SO2, or either survey.")
+    mappings = Path(__file__).resolve().parent / "survey-mappings"
+    merge.add_argument("--match-overrides", default=str(mappings / "so2_mucp_biobank_overrides.json"), help="Reviewed fingerprint-bound identity decisions.")
+    merge.add_argument("--crosswalk", default=str(mappings / "so2_mucp_crosswalk.json"), help="Complementary thematic question links.")
+    merge.add_argument("--visualization-registry", default=str(mappings / "so2_mucp_visualizations.json"), help="Approved heatmap and UpSet definitions.")
+    merge.add_argument("-o", "--output-json", required=True, help="Canonical combined-evidence JSON output.")
+    for option, description in (
+        ("--output-tex", "Combined report TeX"), ("--output-pdf", "Combined report PDF"),
+        ("--output-chart-dir", "Standalone vector chart PDF directory"),
+        ("--output-biobank-pdf-dir", "Individual provenance-labelled biobank dossier PDFs"),
+        ("--output-match-review", "Incremental identity review Markdown"),
+        ("--output-upset-r-dir", "External ComplexUpset CSV/R bundle output"),
+        ("--upset-assets-dir", "Read-only previously rendered combined UpSet assets"),
+    ):
+        merge.add_argument(option, help=description)
+    merge.add_argument("--include-contact-details", action="store_true", help="Include professional contacts in sensitive PDF output.")
+    merge.add_argument("--extended-evidence", action="store_true", help="Include technical answer identifiers, source records, locators and evidence references in dossiers.")
+    merge.add_argument("--include-dossiers", action="store_true", help="Append individual biobank evidence dossiers to the combined PDF (default: omitted).")
+    merge.add_argument("--long-report", action="store_true", help="Include structured-response contribution tables.")
+    merge.add_argument("--include-parent-context", action="store_true", help="Include complete raw SO2 parent answers in text tables.")
+    merge.add_argument("--include-upset-deviations", action="store_true", help="Include exploratory independence-model UpSet deviation pages; no significance claims.")
+    merge.add_argument("--table-biobank-repeated-entries", choices=["empty", "dtto"], default="empty",
+                       help="In combined-report tables, leave repeated biobank cells empty (default) or show dtto.")
+    merge.add_argument("--max-piechart-ratio", default="4:3", help="Maximum piechart width:height ratio.")
+    merge.add_argument("--overwrite", action="store_true", help="Replace outputs only after successful regeneration.")
     return parser
 
 
@@ -496,6 +534,9 @@ def build_directory(args: argparse.Namespace) -> Any:
         "directory_url": args.directory_target,
         "include_withdrawn_entities": False,
     }
+    if getattr(args, "command", None) == "merge-mucp":
+        from cli_common import build_directory_kwargs
+        kwargs.update(build_directory_kwargs(args))
     if args.token:
         kwargs["token"] = args.token
     elif args.schema != "ERIC":
@@ -4027,12 +4068,16 @@ def run_describe(args: argparse.Namespace) -> int:
             publication, or cleanup fails.
     """
     render_requested = bool(args.output_tex or args.output_pdf or args.output_chart_dir)
+    from so2_readiness_scores import DEFAULT_MAPPING, DEFAULT_REFERENCE, load_scoring_mapping, score_sources, build_readiness_model, bind_form_fields
+    from so2_response_merging import default_response_identity_path
+    configured_identities = getattr(args, "response_identities", None)
+    identity_path = Path(configured_identities) if configured_identities else default_response_identity_path(Path(__file__).resolve().parent / "survey-mappings")
     derived_tex_path = (
         args.output_tex or str(Path(args.output_json).with_suffix(".tex"))
         if render_requested else None
     )
     _require_distinct_descriptive_outputs(
-        [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry],
+        [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry, str(identity_path), str(DEFAULT_MAPPING), str(DEFAULT_REFERENCE)],
         [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
     )
     _require_new_or_empty_chart_dir(args.output_chart_dir, args.overwrite)
@@ -4050,6 +4095,21 @@ def run_describe(args: argparse.Namespace) -> int:
             schema,
             [column for column in workbook.responses.columns if column != source_row_column],
         )
+        readiness_mapping = None
+        readiness_sources = None
+        scoring_ids = ("q_053_", "q_055_", "q_056_", "q_057_", "q_058_", "q_060_", "q_061_")
+        if any(question.question_id.startswith(scoring_ids) for question in questions):
+            readiness_mapping = load_scoring_mapping(schema["questions"])
+            readiness_form_bindings = bind_form_fields(readiness_mapping, form_structure)
+            scoring_columns = {key: next(q.column for q in questions if q.question_id == component["question_id"])
+                               for key, component in readiness_mapping["components"].items()}
+            original_scoring_records = [
+                {"source_row": int(record[source_row_column]),
+                 "answers": {key: "" if descriptive._is_blank(record[column]) else str(record[column])
+                             for key, column in scoring_columns.items()}}
+                for record in workbook.responses.to_dict("records")
+            ]
+            readiness_sources = score_sources(original_scoring_records, readiness_mapping)
         descriptive.validate_association_definitions(
             association_definitions,
             {question.question_id: question for question in questions},
@@ -4058,12 +4118,39 @@ def run_describe(args: argparse.Namespace) -> int:
             definition for definition in association_definitions
             if definition.mode == "default" or args.include_exploratory_association_heatmaps
         )
+        from so2_response_merging import merge_descriptive_responses
+        try:
+            identity_mapping = json.loads(identity_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise InputError(f"Cannot load SO2 response identities: {exc}") from exc
+        workbook, responses_summary = merge_descriptive_responses(workbook, schema, questions, identity_mapping)
         payload = descriptive.build_descriptive_payload(
             workbook, schema, form_structure,
             association_definitions=selected_association_definitions,
             association_registry_sha256=association_registry_sha256,
         )
-    except descriptive.InputError as exc:
+        payload["responses_summary"] = responses_summary
+        if readiness_mapping is not None:
+            payload["form_structure"]["field_bindings"] = {
+                component["form_uid"]: form_structure["field_bindings"][component["form_uid"]]
+                for component in readiness_mapping["components"].values()
+            }
+            merged_records = {int(record[source_row_column]): record for record in workbook.responses.to_dict("records")}
+            readiness_groups = [
+                {"source_rows": group["source_rows"], "biobank_id": group["biobank_id"],
+                 "institution": str(merged_records[group["representative_source_row"]][schema["columns"]["institution_column"]]),
+                 "country": descriptive._country_code(merged_records[group["representative_source_row"]][schema["columns"]["country_column"]])}
+                for group in responses_summary["observation_sources"]
+            ]
+            payload["readiness_scores"] = build_readiness_model(readiness_sources, readiness_groups, readiness_mapping, workbook.source_sha256, readiness_form_bindings)
+        for question in payload["questions"]:
+            question["analytical_unit"] = "reviewed_biobank_or_unresolved_submission"
+            for category in (*question["categories"], *question["pie_categories"]):
+                category["percent_basis_label"] = "included observations" if category["value"] == "Missing" else "answering observations"
+        payload["provenance"]["received_response_rows"] = responses_summary["received_submissions"]
+        payload["provenance"]["response_identities_path"] = str(identity_path)
+        payload["provenance"]["response_identities_sha256"] = sha256(identity_path.read_bytes()).hexdigest()
+    except (descriptive.InputError, ValueError) as exc:
         raise InputError(str(exc)) from exc
     if render_requested:
         render_args = argparse.Namespace(
@@ -4083,7 +4170,7 @@ def run_describe(args: argparse.Namespace) -> int:
         _render_descriptive_payload(
             payload,
             render_args,
-            [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry],
+            [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry, str(identity_path), str(DEFAULT_MAPPING), str(DEFAULT_REFERENCE)],
             Path(args.output_json),
         )
     else:
@@ -4192,6 +4279,40 @@ def run_export_update_plan(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def run_merge_mucp(args: argparse.Namespace) -> int:
+    """Generate combined evidence and statistics for the requested reporting cohort.
+
+    Args:
+        args: Parsed peer-command input, matching, Directory and report output options.
+
+    Returns:
+        Successful process status after all requested artifacts have been published.
+
+    Raises:
+        InputError: If sources, matching, rendering or transactional publication fail.
+    """
+    try:
+        from survey_combined import execute_merge
+        from so2_descriptive_report import InputError as DescriptiveInputError
+        payload = execute_merge(args, build_directory)
+    except (ValueError, OSError, ImportError, DescriptiveInputError) as exc:
+        raise InputError(str(exc)) from exc
+    print(f"Selected reporting units ({payload['metadata']['cohort']['join']}): {len(payload['biobanks'])}")
+    coverage = payload["metadata"].get("mucp_source_coverage", {})
+    if coverage:
+        print(f"MuCP responses included: {coverage['included_records']} / {coverage['input_records']}")
+    print(f"Biobanks represented in both surveys: {payload['matching_summary']['overlapping_biobanks']}")
+    for bb in payload["biobanks"]:
+        print(f"{bb['country']:2s}  {bb['biobank_id']}  {bb['name']}  SO2={len(bb['so2_source_records'])} MuCP={len(bb['mucp_source_records'])}")
+    print(f"Manual review: {len(payload['manual_review_matches'])}; unmatched SO2: {len(payload['unmatched_so2'])}; unmatched MuCP: {len(payload['unmatched_mucp'])}; excluded: {len(payload['excluded_source_records'])}")
+    print(f"Accepted biobanks: SO2={payload['matching_summary']['so2_matched_biobanks']}; MuCP={payload['matching_summary']['mucp_matched_biobanks']}")
+    print(f"Combined JSON: {args.output_json}")
+    for name in ("output_tex", "output_pdf", "output_chart_dir", "output_biobank_pdf_dir", "output_match_review", "output_upset_r_dir"):
+        if getattr(args, name, None):
+            print(f"{name}: {getattr(args, name)}")
+    return EXIT_OK
+
+
 def main() -> int:
     """Dispatch the selected SO2 command-line subcommand.
 
@@ -4215,10 +4336,15 @@ def main() -> int:
             return run_render_descriptive_report(args)
         if args.command == "export-descriptive-upset-r":
             return run_export_descriptive_upset_r(args)
+        if args.command == "merge-mucp":
+            return run_merge_mucp(args)
         raise InputError(f"Unsupported command {args.command!r}.")
     except InputError as exc:
         logging.error("%s", exc)
         return EXIT_INPUT_ERROR
+    except KeyboardInterrupt:
+        logging.error("Interrupted by Ctrl+C; no incomplete report is published.")
+        return EXIT_RUNTIME_ERROR
     except subprocess.CalledProcessError as exc:
         logging.error("XeLaTeX failed: %s", exc.stdout or exc)
         return EXIT_RUNTIME_ERROR

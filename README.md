@@ -31,6 +31,9 @@ line options, see [Setup and common operation](docs/setup.md).
 | Auxiliary analyses and utilities | `survey-so2-directory.py`, `eosc-organisation-matcher.py`, search and statistics | [Auxiliary tools](docs/auxiliary-tools.md) |
 | Reusable Python modules | `directory.py` and focused helper modules | [Libraries](docs/libraries.md) |
 
+Survey analysis includes separate SO2 descriptive, Directory-consistency, and
+[combined SO2/MuCP biobank reports](docs/auxiliary-tools.md#combined-so2-and-multi-country-project-evidence).
+
 ## Common Examples
 
 Run the default quality checks and write an XLSX report:
