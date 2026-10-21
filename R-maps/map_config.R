@@ -140,12 +140,12 @@ bbmri_map_config <- function() {
     ),
     standard_country_labels = c(
       "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES",
-      "FI", "GR", "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL",
-      "QA",
-      "SE", "SI", "SK", "TR"
+      "FI", "GR", "HU", "IT", "LT", "LV", "ME", "MT", "NL", "NO", "PL",
+      "PT", "QA", "SE", "SI", "SK", "TR", "UA"
     ),
     fedplat_country_labels = c(
-      "AT", "CH", "CZ", "DE", "FI", "GB", "IT", "LV", "MT", "QA", "SE"
+      "AT", "CH", "CY", "CZ", "DE", "DK", "FI", "GB", "IT", "LV",
+      "ME", "MT", "PT", "QA", "SE", "TR", "UA"
     ),
     standard_label_offsets = data.frame(
       iso_a2 = c("BE", "CH", "CY", "CZ", "DE", "GB", "MT", "NL", "NO"),
@@ -227,27 +227,27 @@ bbmri_map_config <- function() {
     ),
     standard_country_groups = list(
       member = c(
-        "AT", "BE", "BG", "CH", "CZ", "DE", "EE", "ES", "FI", "GR",
-        "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL", "SE", "SI",
+        "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "EE", "ES", "FI", "GR",
+        "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL", "PT", "SE", "SI",
         "SK"
       ),
-      observer = c("CY", "DK", "QA", "TR")
+      observer = c("DK", "ME", "QA", "TR", "UA")
     ),
     fedplat_country_groups = list(
-      member = c("BE", "CH", "FI", "GR", "LT", "NL", "NO", "PL", "BG", "HU", "SI"),
-      observer = c("DK", "TR", "QA"),
+      member = c("BE", "CH", "CY", "FI", "GR", "LT", "NL", "NO", "PL", "PT", "BG", "HU", "SI"),
+      observer = c("DK", "ME", "TR", "QA", "UA"),
       fedplat = c("AT", "CZ", "DE", "EE", "IT", "MT", "CY", "LV", "SE")
     ),
     oec_country_groups = list(
       member = c(
-        "AT", "BE", "BG", "CH", "CZ", "DE", "EE", "ES", "FI", "GR",
-        "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL", "SE", "SI",
+        "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "EE", "ES", "FI", "GR",
+        "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL", "PT", "SE", "SI",
         "SK"
       ),
-      observer = c("CY", "DK", "QA", "TR"),
+      observer = c("DK", "ME", "QA", "TR", "UA"),
       gray = c(
         "AL", "BA", "BY", "FR", "GB", "HR", "IE", "IL", "IS", "LU",
-        "MD", "ME", "MK", "PT", "RO", "RS", "UA"
+        "MD", "MK", "RO", "RS"
       )
     ),
     standard_colors = list(

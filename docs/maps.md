@@ -29,5 +29,24 @@ The maintained rendering workflow lives in `R-maps/`:
 - [Migration and handover notes](../R-maps/TRANSFER.md)
 
 Use the R-maps documentation as the canonical source for dependencies, layers,
-rendering commands, and output publishing. This page only describes how the
-top-level Python tools supply geospatial data.
+rendering commands, and output publishing. This page covers geospatial inputs
+and the membership configuration used by the maps.
+
+## Member And Observer Countries
+
+Edit `R-maps/map_config.R`: `standard_country_groups` controls standard maps
+and OEC point selection; `oec_country_groups` controls OEC country colours.
+Keep their member/observer lists aligned and remove newly admitted countries
+from the OEC `gray` list. Country labels are configured separately in
+`standard_country_labels` and `fedplat_country_labels`.
+
+The requested map classification as of 2026-10-21 includes Portugal (`PT`) and
+Cyprus (`CY`) as members; Ukraine (`UA`), Montenegro (`ME`), Denmark (`DK`) and
+Turkey (`TR`) as observers. Montenegro's three-letter code `MNE` is represented
+by the basemap's two-letter code `ME`. Other country classifications are retained.
+
+`fedplat_country_groups` uses a separate `fedplat` participation overlay: Cyprus
+remains in that overlay even though its underlying membership is now member.
+Changing status does not add Directory biobanks or create node-marker coordinates;
+the OEC node overlays remain explicit GeoJSON inputs. These R settings do not
+automatically update Python's `nncontacts.py`.

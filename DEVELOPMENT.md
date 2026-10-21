@@ -128,6 +128,13 @@ operation.
   - keep shared palettes, projections, Natural Earth layer loading, and output
     size presets in common R helpers there rather than duplicating them between
     map scripts
+  - map membership classifications live in `R-maps/map_config.R`: standard
+    and OEC member/observer lists must agree, and OEC gray overrides must not
+    include those countries. Use ISO alpha-2 `ME` for Montenegro (`MNE`).
+    The 2026-10-21 requested changes classify PT/CY as members and UA/ME/DK/TR
+    as observers; retain other classifications. Federated Platform participation
+    remains a separate colour overlay, including CY. Keep country-label lists
+    current without inventing Directory records or node-marker locations.
 - `checks/CollectionContent.py` now owns conservative ORPHA/ICD diagnosis crosswalk completion too when an `OrphaCodes` mapper is loaded: keep exact mappings highest-confidence, allow narrower-to-broader crosswalk fixes only in the accepted direction, and suppress duplicate legacy informational warnings when a newer concrete append fix already covers the same source diagnosis.
 - `warningscontainer.py` should write XLSX cells by actual value type; withdrawn flags may be real booleans in warning/entity listings and must not be forced through string-only worksheet APIs.
   - own reusable logic that can be consumed by multiple scripts or plugins
