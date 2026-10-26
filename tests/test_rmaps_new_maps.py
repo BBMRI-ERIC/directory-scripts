@@ -62,6 +62,11 @@ def test_rare_disease_prep_script_compiles():
 
 
 def test_rmaps_export_help_mentions_directory_cache_purge_option():
+    """Expose the cache-refresh switch in the public map export help.
+
+    Returns:
+        None. The shell entrypoint advertises the Directory cache purge option.
+    """
     shell = shutil.which("sh")
     if shell is None:
         pytest.skip("sh not available")
@@ -76,6 +81,11 @@ def test_rmaps_export_help_mentions_directory_cache_purge_option():
 
 
 def test_rmaps_geocoding_export_adds_directory_cache_purge_flag():
+    """Forward the requested Directory cache purge to the GeoJSON producer.
+
+    Returns:
+        None. The intercepted geocoding invocation includes the cache selector.
+    """
     rscript = shutil.which("Rscript")
     if rscript is None:
         pytest.skip("Rscript not available")

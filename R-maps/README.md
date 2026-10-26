@@ -11,6 +11,7 @@ For a narrative, RStudio-friendly walkthrough, open
 Core maps:
 
 - `bbmri-members-nolabels`
+- `bbmri-members-nolabelcountry`
 - `bbmri-members-labels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
@@ -18,6 +19,7 @@ Core maps:
 Extra maps:
 
 - `global-nolabels`
+- `global-nolabelcountry`
 - `global-labels`
 - `global-sized`
 - `covid-nolabels`
@@ -32,7 +34,12 @@ Extra maps:
 - `strategic-objectives`
 
 Notes:
+- `*-nolabelcountry` variants remove country names as well as biobank names;
+  the existing `*-nolabels` variants continue to show country names.
 - `rare-diseases-nolabels` and `rare-diseases-labels` use fixed-size circles; only `rare-diseases-sized` scales circles by biobank size.
+- Rare-disease circles are magenta for biobanks in member/observer countries,
+  except that `EXT_` biobanks are always green. Biobanks outside member/observer
+  countries are green too. Both colors use the same size mapping.
 - global/covid country labels use a wider placement search on small/med variants to reduce overlap.
 
 ## Quick Start
@@ -66,6 +73,7 @@ Render only specific maps:
 
 ```bash
 sh R-maps/export.sh bbmri-members-OEC-all global-nolabels
+sh R-maps/export.sh bbmri-members-nolabelcountry global-nolabelcountry
 ```
 
 Render a named set directly through the R runner:

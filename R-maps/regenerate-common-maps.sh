@@ -38,10 +38,12 @@ fi
 
 exec "$script_dir/export.sh" "$@" \
   bbmri-members-nolabels \
+  bbmri-members-nolabelcountry \
   bbmri-members-labels \
   bbmri-members-sized \
   bbmri-members-OEC-all \
   global-nolabels \
+  global-nolabelcountry \
   global-labels \
   global-sized \
   covid-nolabels \

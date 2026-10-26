@@ -49,4 +49,15 @@ by the basemap's two-letter code `ME`. Other country classifications are retaine
 remains in that overlay even though its underlying membership is now member.
 Changing status does not add Directory biobanks or create node-marker coordinates;
 the OEC node overlays remain explicit GeoJSON inputs. These R settings do not
-automatically update Python's `nncontacts.py`.
+automatically update Python's `nncontacts.py`; keep its member/observer country
+set aligned with the R lists. Rare-disease GeoJSON preparation reuses that
+Python registry: member/observer-country biobanks are magenta unless managed in
+the `EXT` staging area. EXT biobanks and biobanks outside member/observer
+countries are green. Both colors share the same circle-size rules.
+
+The `bbmri-members-nolabelcountry` and `global-nolabelcountry` variants omit
+country names as well as biobank names. Generate them with:
+
+```bash
+sh R-maps/export.sh bbmri-members-nolabelcountry global-nolabelcountry
+```

@@ -25,30 +25,7 @@ from cli_common import (
     configure_logging,
 )
 from directory import Directory
-
-MEMBER_COUNTRIES = {
-    "AT",
-    "BE",
-    "BG",
-    "CH",
-    "CZ",
-    "DE",
-    "EE",
-    "ES",
-    "FI",
-    "GR",
-    "HU",
-    "IT",
-    "LT",
-    "LV",
-    "MT",
-    "NL",
-    "NO",
-    "PL",
-    "SE",
-    "SI",
-    "SK",
-}
+from nncontacts import NNContacts
 
 RD_NETWORK_SUBSTRINGS = (
     "rd-biobanks",
@@ -214,16 +191,18 @@ def biobank_is_rd(biobank: dict[str, Any], collection_type_by_id: dict[str, list
 
 
 def biobank_membership_role(biobank: dict[str, Any]) -> str:
-    """Classify a biobank country as member or non-member map role.
+    """Classify Node-managed member/observer biobanks for rare-disease coloring.
 
     Args:
-        biobank: Directory biobank mapping with optional country value.
+        biobank: Directory biobank mapping with ID and optional country value.
 
     Returns:
-        ``member`` for configured member countries, otherwise ``non_member``.
+        ``member`` for member/observer countries unless the ID belongs to EXT;
+        otherwise ``non_member``. The role names retain the GeoJSON contract.
     """
+    staging_area = NNContacts.extract_staging_area(biobank.get("id"))
     country = normalize_country_code(biobank.get("country"))
-    if country not in MEMBER_COUNTRIES:
+    if staging_area == "EXT" or not NNContacts.is_member_node(country):
         return "non_member"
     return "member"
 

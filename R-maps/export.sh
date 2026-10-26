@@ -36,9 +36,11 @@ Export one or more R maps. If no MAP_ID is given, all maps are exported.
 
 Map ids:
   bbmri-members-nolabels
+  bbmri-members-nolabelcountry
   bbmri-members-sized
   bbmri-members-OEC-all
   global-nolabels
+  global-nolabelcountry
   covid-nolabels
   quality_maps-nolabels
   federated-platform

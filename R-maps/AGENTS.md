@@ -10,10 +10,12 @@ This folder contains the in-progress R replacement for the legacy Tilemill map
 pipeline. The current target maps are:
 
 - `bbmri-members-nolabels`
+- `bbmri-members-nolabelcountry`
 - `bbmri-members-labels`
 - `bbmri-members-sized`
 - `bbmri-members-OEC-all`
 - `global-nolabels`
+- `global-nolabelcountry`
 - `global-labels`
 - `global-sized`
 - `covid-nolabels`
@@ -41,6 +43,9 @@ are still the parity baseline and should remain documented here:
   - fixed-size biobank dots
   - no biobank labels
   - country labels still exist
+- `bbmri-members-nolabelcountry` / `global-nolabelcountry`
+  - use the corresponding `-nolabels` geography, palette, and fixed-size dots
+  - omit country-name labels as well as biobank labels
 - `bbmri-members-labels`
   - same standard Europe map and country palette as `nolabels`
   - no rivers or lakes
@@ -92,8 +97,9 @@ are still the parity baseline and should remain documented here:
   - derived from Directory collections plus RD network membership
   - `rare-diseases-nolabels` and `rare-diseases-labels` use fixed-size circles
   - only `rare-diseases-sized` should size circles by biobank size
-  - non-member biobanks are green
-  - member rare-disease biobanks keep the shared RD member color
+  - member/observer-country biobanks are magenta unless their staging area is EXT
+  - EXT biobanks and those outside member/observer countries are green
+  - circle sizing is independent of the membership color
 - `strategic-objectives`
   - TOML-driven SO/SG framework with a shared reusable R helper layer
   - per-SG maps are recolor-only
@@ -253,8 +259,9 @@ document.
 - `rare-diseases-*` is derived from current Directory collections and network
   membership plus the full pilot GeoJSON. The inclusion rule is OR-combined:
   keep biobanks with at least one RD collection or with RD network membership.
-  Biobanks in non-member countries or in the non-member RD network should be
-  colored green.
+  Use `NNContacts` for member/observer classification and staging-area parsing.
+  Member/observer-country biobanks are magenta, except EXT biobanks are always
+  green. All other countries are green. RD networks affect inclusion only.
 - `quality_maps-nolabels` must use the standard BBMRI country fill path for
   countries and add its quality-specific colors only for points/legend.
   Quality rendering must not override the shared country fill scale.
