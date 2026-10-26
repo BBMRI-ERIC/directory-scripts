@@ -413,6 +413,10 @@ drift.
 - The current local overlay data now place the Slovakia node in Martin rather
   than Bratislava. If the Slovakia node moves again, update both
   `HQlineNN.geojson` and the matching endpoint in `onlyLinesHQlineNN.geojson`.
+- Portugal, Montenegro, and Ukraine Node positions were supplied by the user
+  on 2026-10-26 as latitude/longitude: PT (38.74639, -9.16111),
+  ME/MNE (42.43659, 19.24457), UA (50.45856, 30.42380). Both overlay files
+  store these in GeoJSON longitude/latitude order and connect them to Graz HQ.
 
 ## Extra-Map Data Contracts
 

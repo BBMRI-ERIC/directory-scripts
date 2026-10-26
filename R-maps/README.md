@@ -194,6 +194,11 @@ OEC overlays:
 - `R-maps/data/HQlineNN.geojson`
 - `R-maps/data/onlyLinesHQlineNN.geojson`
 
+Node locations are curated in `HQlineNN.geojson` as `[longitude, latitude]`.
+Update the matching HQ connector endpoint in `onlyLinesHQlineNN.geojson`
+whenever a Node moves. PT, ME (MNE), and UA use the locations supplied on
+2026-10-26; these overlays are maintained locally rather than fetched from the Directory.
+
 ## Direct Commands
 
 Render one map directly:
