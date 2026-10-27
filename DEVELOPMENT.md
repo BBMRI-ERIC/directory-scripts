@@ -728,6 +728,12 @@ human sign-off.
 
 ## Testing
 
+Exporter tests must direct every generated artifact to `tmp_path` and run
+default-output paths in an isolated working directory. Never let an in-process
+CLI test overwrite an existing report in the developer's checkout. Use a
+pre-existing sentinel file when testing output isolation; a successful export
+alone does not prove that local artifacts were preserved.
+
 ### Fast checks
 
 ```bash
