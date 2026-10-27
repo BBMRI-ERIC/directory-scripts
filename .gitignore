@@ -30,6 +30,8 @@ __pycache__/
 /DraftSO2Analysis_*.pdf
 /survey_results.json
 /survey_results.schema.json
+/BBMRI_survey_data_and_audit*.zip
+/BBMRI_survey_data_and_audit*/
 /institutions_responded_to_both_surveys.xlsx
 /multi-country-proj/
 # local Josephine scoring inputs and response-derived reference vectors

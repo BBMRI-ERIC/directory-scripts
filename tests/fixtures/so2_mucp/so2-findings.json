@@ -1,7 +1,0 @@
-{
-  "survey_metadata": {"synthetic": true},
-  "row_resolutions": [
-    {"survey_row": 5, "institution_name": "Synthetic institute", "resolution_status": "resolved_by_biobank_id", "matched_biobank_ids": ["bbmri-eric:ID:AT_SYNTHETIC"], "resolution_reliability": "certain", "resolution_explanation": "Synthetic exact ID"},
-    {"survey_row": 6, "institution_name": "Synthetic institute", "resolution_status": "resolved_by_biobank_id", "matched_biobank_ids": ["bbmri-eric:ID:AT_SYNTHETIC"], "resolution_reliability": "certain", "resolution_explanation": "Synthetic repeated submission"}
-  ]
-}

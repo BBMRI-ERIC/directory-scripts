@@ -1,5 +1,0 @@
-{
-  "policy_version": "1",
-  "rule": "present_applicable_unmarked_is_no",
-  "question_types": ["checkbox", "checkbox_with_optional_qualifier"]
-}

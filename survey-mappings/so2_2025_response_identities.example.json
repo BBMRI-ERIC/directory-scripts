@@ -1,6 +1,0 @@
-{
-  "schema_version": 1,
-  "description": "Empty portable template. Keep source-specific reviewed identities in the ignored local so2_2025_response_identities.json or pass --response-identities.",
-  "country_overrides": {},
-  "reviewed_sources": {}
-}

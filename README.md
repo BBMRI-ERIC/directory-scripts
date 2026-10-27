@@ -28,11 +28,11 @@ line options, see [Setup and common operation](docs/setup.md).
 | Exports and reports | `exporter-*.py` | [Exporters](docs/exporters.md) |
 | Maps and geospatial output | `geocoding_2022.py`, `R-maps/` | [Maps](docs/maps.md) |
 | Data maintenance and synchronization | `directory-tables-modifier.py`, updater/importer/sync tools | [Maintenance tools](docs/maintenance-tools.md) |
-| Auxiliary analyses and utilities | `survey-so2-directory.py`, `eosc-organisation-matcher.py`, search and statistics | [Auxiliary tools](docs/auxiliary-tools.md) |
+| Auxiliary analyses and utilities | `eosc-organisation-matcher.py`, search and statistics | [Auxiliary tools](docs/auxiliary-tools.md) |
 | Reusable Python modules | `directory.py` and focused helper modules | [Libraries](docs/libraries.md) |
 
-Survey analysis includes separate SO2 descriptive, Directory-consistency, and
-[combined SO2/MuCP biobank reports](docs/auxiliary-tools.md#combined-so2-and-multi-country-project-evidence).
+SO2 and MuCP survey tools are maintained on the separate
+[survey-analysis branch](https://github.com/BBMRI-ERIC/directory-scripts/tree/survey-analysis/docs/surveys).
 
 ## Common Examples
 
