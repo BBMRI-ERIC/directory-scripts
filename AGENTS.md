@@ -173,6 +173,7 @@
 - For fact-sheet material alignment, NAV-only fact output is ambiguous because k-anonymity suppression can hide richer material-specific rows; document that ambiguity instead of treating NAV-only facts as definitive evidence that richer collection metadata is wrong.
 
 ## Testing Guidelines
+- Exporter tests must write only into pytest temporary directories; never rely on default output paths in the developer's checkout. Protect pre-existing reports with a sentinel regression when testing output isolation.
 - A pytest-based unit test suite is present in `tests/` (currently focused on reusable modules such as `directory.py`).
 - Run unit tests with `pytest -q` (or targeted subsets with `pytest -q tests/test_directory.py`).
 - For live cache behavior in `directory.py`, run `pytest -q tests/test_directory_live_cache_modes.py --live-directory --live-directory-mode both` (or `cached` / `fresh`).

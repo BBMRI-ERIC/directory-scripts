@@ -1106,20 +1106,26 @@ def test_exporter_cohorts_no_star_fallback_is_warned_and_separate(
     assert authoritative.empty
 
 
-def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch):
+def test_exporter_cmdr_lists_biobanks_collections_and_studies(monkeypatch, tmp_path):
     """Verify exporter cmdr lists biobanks collections and studies.
 
     Args:
         monkeypatch: Pytest monkeypatch fixture; temporary dependency and environment overrides are undone after the test.
+        tmp_path: Isolated exporter working directory protecting existing local reports.
 
     Returns:
         None. Verifies exporter cmdr lists biobanks collections and studies.
     """
+    monkeypatch.chdir(tmp_path)
+    existing_report = tmp_path / "cMDR.xlsx"
+    existing_report.write_bytes(b"existing report must not be overwritten by tests")
     exporter_globals, stdout, _ = _run_script(
         monkeypatch,
         "exporter-cMDR.py",
-        [],
+        ["-X", str(tmp_path / "test-export.xlsx")],
     )
+
+    assert existing_report.read_bytes() == b"existing report must not be overwritten by tests"
 
     assert [biobank["id"] for biobank in exporter_globals["cmdrBiobanks"]] == [
         "bbmri-eric:ID:CZ_BB1",
