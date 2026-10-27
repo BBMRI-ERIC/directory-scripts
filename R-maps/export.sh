@@ -26,6 +26,7 @@ crc_imaging_geojson="$script_dir/data/CRC-Cohort-imaging.geojson"
 output_dir="$script_dir/pilot-output"
 map_set="all"
 maps=""
+purge_directory_cache=0
 
 usage() {
   cat <<EOF
@@ -35,9 +36,11 @@ Export one or more R maps. If no MAP_ID is given, all maps are exported.
 
 Map ids:
   bbmri-members-nolabels
+  bbmri-members-nolabelcountry
   bbmri-members-sized
   bbmri-members-OEC-all
   global-nolabels
+  global-nolabelcountry
   covid-nolabels
   quality_maps-nolabels
   federated-platform
@@ -59,6 +62,7 @@ Options:
   --crc-geojson PATH          CRC cohort snapshot GeoJSON
   --crc-imaging-geojson PATH  CRC cohort imaging snapshot GeoJSON
   --output-dir PATH           render output directory
+  --purge-directory-cache     purge the Directory cache before exporting GeoJSON
 
 Compatibility:
   --map-set VALUE             legacy core|extras|all selector
@@ -137,6 +141,10 @@ while [ "$#" -gt 0 ]; do
       output_dir=$2
       shift 2
       ;;
+    --purge-directory-cache)
+      purge_directory_cache=1
+      shift
+      ;;
     --map-set)
       map_set=$2
       shift 2
@@ -178,6 +186,7 @@ printf 'Output directory: %s\n' "$output_dir"
 exec "$rscript_bin" "$script_dir/render_pilot_maps.R" \
   --map-set="$map_set" \
   --maps="$maps" \
+  --purge-directory-cache="$purge_directory_cache" \
   --python="$python_bin" \
   --geocoding-script="$geocoding_script" \
   --geocoding-config="$geocoding_config" \

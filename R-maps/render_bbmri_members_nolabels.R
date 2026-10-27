@@ -20,7 +20,12 @@ script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
-build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, output_variant = "med") {
+build_members_nolabels_map <- function(
+  points_path,
+  iarc_path = NA_character_,
+  output_variant = "med",
+  include_country_labels = TRUE
+) {
   bbmri_require_packages(c("ggplot2", "sf"))
 
   cfg <- bbmri_map_config()
@@ -36,12 +41,15 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
   points <- bbmri_read_sf(points_path, "Biobank GeoJSON")
   iarc <- bbmri_read_optional_sf(iarc_path)
 
-  country_labels <- bbmri_country_label_df(countries, cfg, cfg$standard_crs)
+  country_labels <- NULL
+  if (isTRUE(include_country_labels)) {
+    country_labels <- bbmri_country_label_df(countries, cfg, cfg$standard_crs)
+  }
   point_df <- bbmri_biobank_points_df(points, cfg$standard_crs, label = "biobank points")
   symbol_scale <- bbmri_symbol_scale_for_output(cfg, output_variant)
   line_scale <- bbmri_line_scale_for_output(cfg, output_variant)
   obstacle_df <- point_df[, c("x", "y")]
-  if (identical(output_variant, "small")) {
+  if (isTRUE(include_country_labels) && identical(output_variant, "small")) {
     country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
   }
   if (!is.null(iarc)) {
@@ -50,15 +58,17 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
   } else {
     iarc_df <- NULL
   }
-  country_labels <- bbmri_place_country_labels(
-    country_labels,
-    obstacle_df,
-    bbox = cfg$standard_bbox,
-    crs = cfg$standard_crs,
-    output_width_px = output_width_px,
-    label_size_scale = label_style$size / cfg$standard_label_style$size,
-    layout_variant = if (identical(output_variant, "small")) "small" else "default"
-  )
+  if (isTRUE(include_country_labels)) {
+    country_labels <- bbmri_place_country_labels(
+      country_labels,
+      obstacle_df,
+      bbox = cfg$standard_bbox,
+      crs = cfg$standard_crs,
+      output_width_px = output_width_px,
+      label_size_scale = label_style$size / cfg$standard_label_style$size,
+      layout_variant = if (identical(output_variant, "small")) "small" else "default"
+    )
+  }
   point_df$fill_color <- ifelse(
     point_df$biobankType == "standaloneCollection",
     cfg$standard_colors$standalone,
@@ -81,18 +91,20 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
     bbmri_coord_sf(cfg$standard_bbox, cfg$standard_crs) +
     bbmri_void_theme(cfg$standard_colors$water)
 
-  plot <- plot + bbmri_geom_text_halo(
-    data = country_labels,
-    mapping = ggplot2::aes(x = x, y = y, label = label),
-    size = label_style$size,
-    bbox = cfg$standard_bbox,
-    crs = cfg$standard_crs,
-    output_width_px = output_width_px,
-    family = bbmri_font_family(),
-    inner_halo_px = label_style$inner_halo_px,
-    outer_halo_px = label_style$outer_halo_px,
-    alpha = label_style$alpha
-  )
+  if (isTRUE(include_country_labels)) {
+    plot <- plot + bbmri_geom_text_halo(
+      data = country_labels,
+      mapping = ggplot2::aes(x = x, y = y, label = label),
+      size = label_style$size,
+      bbox = cfg$standard_bbox,
+      crs = cfg$standard_crs,
+      output_width_px = output_width_px,
+      family = bbmri_font_family(),
+      inner_halo_px = label_style$inner_halo_px,
+      outer_halo_px = label_style$outer_halo_px,
+      alpha = label_style$alpha
+    )
+  }
 
   if (!is.null(iarc_df)) {
     plot <- plot +
@@ -146,11 +158,22 @@ build_members_nolabels_map <- function(points_path, iarc_path = NA_character_, o
   plot
 }
 
-save_members_nolabels_formats <- function(points_path, iarc_path, output_dir, prefix) {
+save_members_nolabels_formats <- function(
+  points_path,
+  iarc_path,
+  output_dir,
+  prefix,
+  include_country_labels = TRUE
+) {
   cfg <- bbmri_map_config()
   bbmri_save_plot_formats_from_builder(
     build_plot = function(output_variant) {
-      build_members_nolabels_map(points_path, iarc_path, output_variant = output_variant)
+      build_members_nolabels_map(
+        points_path,
+        iarc_path,
+        output_variant = output_variant,
+        include_country_labels = include_country_labels
+      )
     },
     output_dir = output_dir,
     prefix = prefix,

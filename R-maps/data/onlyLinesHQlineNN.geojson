@@ -500,6 +500,48 @@
                 ],
 		"type": "LineString"
             }
-	}
+	},
+        {
+            "properties": {
+                "name": "PortugalConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [-9.16111, 38.74639],
+                    [15.4685848, 47.081898]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "MontenegroConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [19.24457, 42.43659],
+                    [15.4685848, 47.081898]
+                ],
+                "type": "LineString"
+            }
+        },
+        {
+            "properties": {
+                "name": "UkraineConnecting LineString",
+                "stringType": "normalString"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [
+                    [30.42380, 50.45856],
+                    [15.4685848, 47.081898]
+                ],
+                "type": "LineString"
+            }
+        }
     ]
 }

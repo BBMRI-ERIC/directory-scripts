@@ -140,6 +140,14 @@ operation.
     as observers; retain other classifications. Federated Platform participation
     remains a separate colour overlay, including CY. Keep country-label lists
     current without inventing Directory records or node-marker locations.
+  - Python rare-disease preparation uses `nncontacts.py` member/observer Node
+    classification and staging-area parsing. Keep its country set equal to the
+    union of the R member and observer lists. EXT-managed biobanks are green
+    regardless of country; other member/observer-country biobanks are magenta.
+    Circle sizing must be independent of this color classification.
+  - `bbmri-members-nolabelcountry` and `global-nolabelcountry` reuse their
+    `-nolabels` builders with `include_country_labels = FALSE`; keep the default
+    enabled for existing callers and include both variants in common exports.
 - `checks/CollectionContent.py` now owns conservative ORPHA/ICD diagnosis crosswalk completion too when an `OrphaCodes` mapper is loaded: keep exact mappings highest-confidence, allow narrower-to-broader crosswalk fixes only in the accepted direction, and suppress duplicate legacy informational warnings when a newer concrete append fix already covers the same source diagnosis.
 - `warningscontainer.py` should write XLSX cells by actual value type; withdrawn flags may be real booleans in warning/entity listings and must not be forced through string-only worksheet APIs.
   - own reusable logic that can be consumed by multiple scripts or plugins

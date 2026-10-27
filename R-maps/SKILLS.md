@@ -16,6 +16,10 @@ Rscript R-maps/render_bbmri_members_nolabels.R \
   --output-dir=R-maps/pilot-output
 ```
 
+The `bbmri-members-nolabelcountry` and `global-nolabelcountry` export IDs use
+the same point and country styling as their `-nolabels` counterparts but omit
+country-name labels too.
+
 ### `sized`
 
 ```bash

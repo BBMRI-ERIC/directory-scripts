@@ -364,6 +364,39 @@
             ],
 		"type": "Point"
             }
-	}
+	},
+        {
+            "properties": {
+                "name": "Portugal",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [-9.16111, 38.74639],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Montenegro",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [19.24457, 42.43659],
+                "type": "Point"
+            }
+        },
+        {
+            "properties": {
+                "name": "Ukraine",
+                "nodeType": "NN"
+            },
+            "type": "Feature",
+            "geometry": {
+                "coordinates": [30.42380, 50.45856],
+                "type": "Point"
+            }
+        }
     ]
 }

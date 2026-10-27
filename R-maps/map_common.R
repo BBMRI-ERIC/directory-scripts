@@ -1863,7 +1863,8 @@ bbmri_build_classic_standard_points_map <- function(
   biobank_label_layout_variant = "default",
   biobank_label_style = NULL,
   biobank_label_colour = "#4a4a4a",
-  biobank_label_alpha = 0.95
+  biobank_label_alpha = 0.95,
+  include_country_labels = TRUE
 ) {
   layers <- bbmri_prepare_classic_layers(bbox, cfg, fill_fn = bbmri_assign_standard_country_fill, include_rivers = include_rivers)
   points <- bbmri_read_sf(points_path, "Biobank GeoJSON")
@@ -1871,7 +1872,10 @@ bbmri_build_classic_standard_points_map <- function(
   country_label_style <- bbmri_country_label_style_for_output(cfg, output_variant)
   output_width_px <- bbmri_output_width_px(export_sizes, output_variant)
 
-  country_labels <- bbmri_country_label_df(layers$countries, cfg, cfg$standard_crs)
+  country_labels <- NULL
+  if (isTRUE(include_country_labels)) {
+    country_labels <- bbmri_country_label_df(layers$countries, cfg, cfg$standard_crs)
+  }
   point_df <- bbmri_biobank_points_df(points, cfg$standard_crs, label = "biobank points")
   point_df$fill_color <- ifelse(
     point_df$biobankType == "standaloneCollection",
@@ -1898,7 +1902,7 @@ bbmri_build_classic_standard_points_map <- function(
     )
   }
   obstacle_df <- point_df[, c("x", "y")]
-  if (identical(output_variant, "small")) {
+  if (isTRUE(include_country_labels) && identical(output_variant, "small")) {
     country_labels <- bbmri_apply_label_offsets(country_labels, cfg$standard_small_label_offsets)
   }
   if (!is.null(iarc)) {
@@ -1911,15 +1915,17 @@ bbmri_build_classic_standard_points_map <- function(
     country_layout_variant <- if (identical(output_variant, "small")) "small" else "default"
   }
 
-  country_labels <- bbmri_place_country_labels(
-    country_labels,
-    obstacle_df,
-    bbox = bbox,
-    crs = cfg$standard_crs,
-    output_width_px = output_width_px,
-    label_size_scale = country_label_style$size / cfg$standard_label_style$size,
-    layout_variant = country_layout_variant
-  )
+  if (isTRUE(include_country_labels)) {
+    country_labels <- bbmri_place_country_labels(
+      country_labels,
+      obstacle_df,
+      bbox = bbox,
+      crs = cfg$standard_crs,
+      output_width_px = output_width_px,
+      label_size_scale = country_label_style$size / cfg$standard_label_style$size,
+      layout_variant = country_layout_variant
+    )
+  }
 
   plot <- bbmri_add_classic_base(
     ggplot2::ggplot(),
@@ -1958,18 +1964,20 @@ bbmri_build_classic_standard_points_map <- function(
       alpha = 0.8
     )
 
-  plot <- plot + bbmri_geom_text_halo(
-    data = country_labels,
-    mapping = ggplot2::aes(x = x, y = y, label = label),
-    size = country_label_style$size,
-    bbox = bbox,
-    crs = cfg$standard_crs,
-    output_width_px = output_width_px,
-    family = bbmri_font_family(),
-    inner_halo_px = country_label_style$inner_halo_px,
-    outer_halo_px = country_label_style$outer_halo_px,
-    alpha = country_label_style$alpha
-  )
+  if (isTRUE(include_country_labels)) {
+    plot <- plot + bbmri_geom_text_halo(
+      data = country_labels,
+      mapping = ggplot2::aes(x = x, y = y, label = label),
+      size = country_label_style$size,
+      bbox = bbox,
+      crs = cfg$standard_crs,
+      output_width_px = output_width_px,
+      family = bbmri_font_family(),
+      inner_halo_px = country_label_style$inner_halo_px,
+      outer_halo_px = country_label_style$outer_halo_px,
+      alpha = country_label_style$alpha
+    )
+  }
 
   if (!is.null(iarc_df)) {
     plot <- bbmri_add_standard_iarc(

@@ -20,7 +20,12 @@ script_dir <- bbmri_detect_rmaps_dir()
 source(file.path(script_dir, "map_config.R"))
 source(file.path(script_dir, "map_common.R"))
 
-build_global_nolabels_map <- function(points_path, iarc_path = NA_character_, output_variant = "med") {
+build_global_nolabels_map <- function(
+  points_path,
+  iarc_path = NA_character_,
+  output_variant = "med",
+  include_country_labels = TRUE
+) {
   bbmri_require_packages(c("ggplot2", "sf"))
   cfg <- bbmri_map_config()
   bbmri_build_classic_standard_points_map(
@@ -31,15 +36,27 @@ build_global_nolabels_map <- function(points_path, iarc_path = NA_character_, ou
     iarc_path = iarc_path,
     output_variant = output_variant,
     include_rivers = FALSE,
-    country_layout_variant = if (identical(output_variant, "big")) "global" else "globalwide"
+    country_layout_variant = if (identical(output_variant, "big")) "global" else "globalwide",
+    include_country_labels = include_country_labels
   )
 }
 
-save_global_nolabels_formats <- function(points_path, iarc_path, output_dir, prefix) {
+save_global_nolabels_formats <- function(
+  points_path,
+  iarc_path,
+  output_dir,
+  prefix,
+  include_country_labels = TRUE
+) {
   cfg <- bbmri_map_config()
   bbmri_save_plot_formats_from_builder(
     build_plot = function(output_variant) {
-      build_global_nolabels_map(points_path, iarc_path, output_variant = output_variant)
+      build_global_nolabels_map(
+        points_path,
+        iarc_path,
+        output_variant = output_variant,
+        include_country_labels = include_country_labels
+      )
     },
     output_dir = output_dir,
     prefix = prefix,

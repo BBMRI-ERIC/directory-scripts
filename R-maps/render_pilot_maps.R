@@ -43,13 +43,16 @@ source(file.path(script_dir, "render_rare_diseases_labels.R"))
 source(file.path(script_dir, "render_rare_diseases_sized.R"))
 source(file.path(script_dir, "strategic_objectives_common.R"))
 
-bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_config, out_path) {
+bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_config, out_path, purge_directory_cache = FALSE) {
   out_base <- tools::file_path_sans_ext(out_path)
   args <- c(
     geocoding_script,
     "--out-name", out_base,
     geocoding_config
   )
+  if (isTRUE(purge_directory_cache)) {
+    args <- c(args, "--purge-cache", "directory")
+  }
   status <- system2(python_bin, args = args)
   if (!identical(status, 0L)) {
     stop("geocoding_2022.py failed with exit status ", status, call. = FALSE)
@@ -67,6 +70,17 @@ bbmri_run_python_helper <- function(python_bin, script_path, helper_args) {
   }
 }
 
+bbmri_parse_bool_flag <- function(value) {
+  if (is.null(value) || identical(value, FALSE) || identical(value, 0L)) {
+    return(FALSE)
+  }
+  if (is.logical(value)) {
+    return(isTRUE(value))
+  }
+  value <- tolower(trimws(as.character(value)[[1]]))
+  value %in% c("1", "true", "t", "yes", "y")
+}
+
 bbmri_validate_map_set <- function(value) {
   allowed <- c("core", "extras", "all")
   if (!value %in% allowed) {
@@ -78,10 +92,12 @@ bbmri_validate_map_set <- function(value) {
 bbmri_all_map_ids <- function() {
   c(
     "bbmri-members-nolabels",
+    "bbmri-members-nolabelcountry",
     "bbmri-members-labels",
     "bbmri-members-sized",
     "bbmri-members-OEC-all",
     "global-nolabels",
+    "global-nolabelcountry",
     "global-labels",
     "global-sized",
     "covid-nolabels",
@@ -101,8 +117,8 @@ bbmri_map_ids_for_set <- function(map_set) {
   map_set <- bbmri_validate_map_set(map_set)
   switch(
     map_set,
-    core = c("bbmri-members-nolabels", "bbmri-members-labels", "bbmri-members-sized", "bbmri-members-OEC-all"),
-    extras = c("global-nolabels", "global-labels", "global-sized", "covid-nolabels", "covid-labels", "covid-sized", "quality_maps-nolabels", "federated-platform", "CRC-cohort-sized", "rare-diseases-nolabels", "rare-diseases-labels", "rare-diseases-sized", "strategic-objectives"),
+    core = c("bbmri-members-nolabels", "bbmri-members-nolabelcountry", "bbmri-members-labels", "bbmri-members-sized", "bbmri-members-OEC-all"),
+    extras = c("global-nolabels", "global-nolabelcountry", "global-labels", "global-sized", "covid-nolabels", "covid-labels", "covid-sized", "quality_maps-nolabels", "federated-platform", "CRC-cohort-sized", "rare-diseases-nolabels", "rare-diseases-labels", "rare-diseases-sized", "strategic-objectives"),
     all = bbmri_all_map_ids()
   )
 }
@@ -158,6 +174,7 @@ main <- function() {
     crc_geojson = normalizePath(file.path(script_dir, "data", "CRC-Cohort.geojson"), winslash = "/", mustWork = FALSE),
     crc_imaging_geojson = normalizePath(file.path(script_dir, "data", "CRC-Cohort-imaging.geojson"), winslash = "/", mustWork = FALSE),
     strategic_objectives_spec = normalizePath(file.path(script_dir, "data", "strategic-objectives-template.toml"), winslash = "/", mustWork = FALSE),
+    purge_directory_cache = FALSE,
     output_dir = file.path(script_dir, "pilot-output")
   ))
   args$map_set <- bbmri_validate_map_set(args$map_set)
@@ -167,10 +184,12 @@ main <- function() {
 
   needs_full_geojson <- any(selected_maps %in% c(
     "bbmri-members-nolabels",
+    "bbmri-members-nolabelcountry",
     "bbmri-members-labels",
     "bbmri-members-sized",
     "bbmri-members-OEC-all",
     "global-nolabels",
+    "global-nolabelcountry",
     "global-labels",
     "global-sized",
     "covid-nolabels",
@@ -194,7 +213,8 @@ main <- function() {
       python_bin = args$python,
       geocoding_script = args$geocoding_script,
       geocoding_config = args$geocoding_config,
-      out_path = args$full_geojson
+      out_path = args$full_geojson,
+      purge_directory_cache = bbmri_parse_bool_flag(args$purge_directory_cache)
     )
   }
 
@@ -208,6 +228,17 @@ main <- function() {
   if ("bbmri-members-nolabels" %in% selected_maps) {
     message("Rendering bbmri-members-nolabels...")
     save_members_nolabels_formats(args$full_geojson, args$iarc, args$output_dir, "bbmri-members-nolabels")
+  }
+
+  if ("bbmri-members-nolabelcountry" %in% selected_maps) {
+    message("Rendering bbmri-members-nolabelcountry...")
+    save_members_nolabels_formats(
+      args$full_geojson,
+      args$iarc,
+      args$output_dir,
+      "bbmri-members-nolabelcountry",
+      include_country_labels = FALSE
+    )
   }
 
   if ("bbmri-members-labels" %in% selected_maps) {
@@ -256,6 +287,17 @@ main <- function() {
   if ("global-nolabels" %in% selected_maps) {
     message("Rendering global-nolabels...")
     save_global_nolabels_formats(args$full_geojson, args$iarc, args$output_dir, "global-nolabels")
+  }
+
+  if ("global-nolabelcountry" %in% selected_maps) {
+    message("Rendering global-nolabelcountry...")
+    save_global_nolabels_formats(
+      args$full_geojson,
+      args$iarc,
+      args$output_dir,
+      "global-nolabelcountry",
+      include_country_labels = FALSE
+    )
   }
 
   if ("covid-nolabels" %in% selected_maps) {
@@ -331,7 +373,13 @@ main <- function() {
 
   if ("rare-diseases-sized" %in% selected_maps) {
     message("Rendering rare-diseases-sized...")
-    save_rare_diseases_formats(args$rare_diseases_geojson, args$iarc, args$output_dir, "rare-diseases-sized", include_biobank_labels = TRUE, biobank_label_layout_variant = "spread")
+    save_rare_diseases_formats(
+      args$rare_diseases_geojson, args$iarc, args$output_dir, "rare-diseases-sized",
+      include_biobank_labels = TRUE,
+      omit_biobank_labels_on_small = TRUE,
+      biobank_label_layout_variant = "spread",
+      point_size_value = NULL
+    )
   }
 
   message("Pilot renders written to: ", args$output_dir)

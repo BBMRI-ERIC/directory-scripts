@@ -51,11 +51,11 @@ class NNContacts:
     NNtoEmails = NODE_TO_EMAILS
 
     # Member/observer countries are independent of which contact emails we have.
-    # https://www.bbmri-eric.eu/national-nodes/ (verified 2026-10-09)
+    # https://www.bbmri-eric.eu/national-nodes/ (verified 2026-10-26)
     MEMBER_NODE_CODES = frozenset({
         "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI",
-        "GR", "HU", "IT", "LT", "LV", "MT", "NL", "NO", "PL", "QA", "SE",
-        "SI", "SK", "TR",
+        "GR", "HU", "IT", "LT", "LV", "ME", "MT", "NL", "NO", "PL", "PT",
+        "QA", "SE", "SI", "SK", "TR", "UA",
     })
     GLOBAL_STAGING_AREA_CODES = frozenset({"EU", "IARC"})
     NON_MEMBER_STAGING_AREA_CODES = frozenset({"EXT"}) | GLOBAL_STAGING_AREA_CODES
@@ -154,7 +154,7 @@ class NNContacts:
 
     @classmethod
     def is_member_node(cls, code: str | None) -> bool:
-        """Return whether the code is a BBMRI member-node country code.
+        """Return whether the code is a BBMRI member or observer Node country.
 
         Args:
             code: Candidate node code normalized before lookup.
