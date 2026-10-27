@@ -516,7 +516,7 @@ The main heatmap counts agreeing score vectors once per reviewed observation.
 Conflicting vectors remain separate alternatives in the table and are excluded
 from that heatmap; missing/unrecognised answers are unscorable, never zero.
 The report states complete-pair, conflict and incomplete-observation counts.
-Josephine replay is enabled only when the ignored local policy
+Reference replay is enabled only when the ignored local policy
 `survey-mappings/so2_2025_readiness_reference.json` exists and its reviewed input
 hash matches the workbook. That private policy contains the reference matrix,
 source-row binding and documented blank override; none is distributed in Git.
@@ -529,7 +529,7 @@ scores are flagged. QMS manual-digital/paper values remain literal 0.66/0.33.
 the normal chart publication pipeline. The JSON stores the versioned rules, their
 semantic SHA-256, original answers, scores, alternatives, diagnostics and both
 matrices under `readiness_scores`. `render-descriptive-report` validates and
-recomputes that saved model without opening Josephine's workbook or ZIP. Scoring
+recomputes that saved model without opening the private reference workbook or archive. Scoring
 models are cross-checked against the report's preserved raw responses, observation
 membership and workbook/form hashes; those evidence fields cannot be removed to
 bypass validation or set to null. Scoring field UIDs, types and all choices are validated against
@@ -538,12 +538,12 @@ alternatives stay together on a table page.
 Legacy payloads without the model remain renderable but do not gain this section until
 `describe` is rerun. These changes do not affect MuCP reports.
 
-Raw SO2 XLSX/XML exports and EUS archives, Josephine's ZIP/workbook/reference
+Raw SO2 XLSX/XML exports and EUS archives, private scoring archives, workbooks, reference
 vectors and replay policy, local identity decisions, source-specific MuCP quantity reviews, and
 generated reports are excluded from Git. The generated SO2 form manifest,
 question/scoring definitions and invented test fixtures are shared. Obtain
 response exports and optional raw form/reference files separately; do not add
-them to commits. The full 1,332-value Josephine replay is an optional local
+them to commits. The complete reference-vector replay is an optional local
 test when both the ignored reference vectors and replay policy exist. Portable numerical,
 missingness, conflict, provenance and layout tests use invented responses.
 

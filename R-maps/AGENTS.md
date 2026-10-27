@@ -1,7 +1,7 @@
 # R-Maps Agent Notes
 
 This file is intentionally local to `R-maps/`. It supplements the root
-repository guidance in `/home/hopet/codex/directory-scripts/AGENTS.md` and
+repository guidance in `../AGENTS.md` and
 should not repeat the general Directory/QC/exporter rules from there.
 
 ## Scope
@@ -576,9 +576,9 @@ blocked on the answer; that part was faster locally.
 
 The current OEC renderer expects these explicit external inputs:
 
-- `/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/HQlineNN.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/onlyLinesHQlineNN.geojson`
+- `R-maps/data/IARC.geojson`
+- `R-maps/data/HQlineNN.geojson`
+- `R-maps/data/onlyLinesHQlineNN.geojson`
 
 These are repo-local working copies of the legacy Tilemill overlay files. Do
 not move these assumptions into root-level repo guidance. They are specific to
@@ -586,9 +586,9 @@ the current map migration work.
 
 Current extra-map local inputs:
 
-- `/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort-imaging.geojson`
+- `R-maps/data/federated-platform.geojson`
+- `R-maps/data/CRC-Cohort.geojson`
+- `R-maps/data/CRC-Cohort-imaging.geojson`
 
 Keep these defaults repo-local. They replace direct reads from the legacy
 Tilemill tree.

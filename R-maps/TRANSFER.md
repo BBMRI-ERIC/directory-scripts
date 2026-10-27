@@ -1,7 +1,7 @@
-# R-Maps Transfer Note
+# R Maps Migration Status
 
-This is the current handoff state for the Tilemill-to-R migration work in
-`R-maps/`.
+This document records the Tilemill-to-R migration status and technical
+constraints in `R-maps/`. Paths below are relative to the repository root.
 
 ## Goal
 
@@ -39,15 +39,15 @@ Implemented outputs:
 
 Current wrapper:
 
-- `/home/hopet/codex/directory-scripts/R-maps/export.sh`
+- `R-maps/export.sh`
   Main POSIX-shell entry point that exports all maps by default or only the
   explicitly named map ids.
 
 Human-facing docs now live in:
 
-- `/home/hopet/codex/directory-scripts/R-maps/README.md`
-- `/home/hopet/codex/directory-scripts/R-maps/README.Rmd`
-- `/home/hopet/codex/directory-scripts/R-maps/examples/`
+- `R-maps/README.md`
+- `R-maps/README.Rmd`
+- `R-maps/examples/`
 
 The map framework now has a shared sized-map helper for all biobank-point
 families, plus a rare-disease prep path driven from Directory collections and
@@ -60,29 +60,29 @@ framework walkthroughs.
 
 Current pilot outputs live in:
 
-- `/home/hopet/codex/directory-scripts/R-maps/pilot-output`
+- `R-maps/pilot-output`
 
 ## Current Data Inputs
 
 Pilot GeoJSON inputs:
 
-- `/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson`
-- `/home/hopet/codex/directory-scripts/bbmri-directory-members-pilot.geojson`
-- `/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson`
-- `/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson`
-- `/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson`
+- `bbmri-directory-pilot.geojson`
+- `bbmri-directory-members-pilot.geojson`
+- `bbmri-directory-covid-pilot.geojson`
+- `bbmri-directory-quality-pilot.geojson`
+- `bbmri-directory-rare-diseases-pilot.geojson`
 
 Current OEC overlay inputs:
 
-- `/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/HQlineNN.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/onlyLinesHQlineNN.geojson`
+- `R-maps/data/IARC.geojson`
+- `R-maps/data/HQlineNN.geojson`
+- `R-maps/data/onlyLinesHQlineNN.geojson`
 
 Current snapshot-backed extra-map inputs:
 
-- `/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort.geojson`
-- `/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort-imaging.geojson`
+- `R-maps/data/federated-platform.geojson`
+- `R-maps/data/CRC-Cohort.geojson`
+- `R-maps/data/CRC-Cohort-imaging.geojson`
 
 Local visual-review snapshots should be stored under
 `R-maps/compare-temp/history/` via `archive-visual-history.sh`. This is a
@@ -106,8 +106,8 @@ review should prefer tighter and better-balanced whitespace.
   runs on the same Directory snapshot should therefore reuse cached geocoding
   results instead of touching the live geocoder again for already-seen
   unresolved contacts.
-- The bad cached coordinates for `ES_BV` and `ES_IMIB` were explicitly handled
-  during this work and should not silently reappear.
+- Previously invalid cached coordinates for `ES_BV` and `ES_IMIB` must not
+  silently reappear.
 - `prepare_covid_geojson.py` derives the COVID subset from the full pilot
   GeoJSON plus live Directory metadata. It does not depend on `biobankCOVID`
   being present in the full pilot GeoJSON.
@@ -361,18 +361,18 @@ rendering.
 
 ## Files That Matter Most For Future Work
 
-- `/home/hopet/codex/directory-scripts/R-maps/map_config.R`
-- `/home/hopet/codex/directory-scripts/R-maps/map_common.R`
-- `/home/hopet/codex/directory-scripts/R-maps/prepare_covid_geojson.py`
-- `/home/hopet/codex/directory-scripts/R-maps/prepare_quality_geojson.py`
-- `/home/hopet/codex/directory-scripts/R-maps/render_bbmri_members_nolabels.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_bbmri_members_sized.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_bbmri_members_oec_all.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_global_nolabels.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_covid_nolabels.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_quality_maps_nolabels.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_federated_platform.R`
-- `/home/hopet/codex/directory-scripts/R-maps/render_crc_cohort_sized.R`
+- `R-maps/map_config.R`
+- `R-maps/map_common.R`
+- `R-maps/prepare_covid_geojson.py`
+- `R-maps/prepare_quality_geojson.py`
+- `R-maps/render_bbmri_members_nolabels.R`
+- `R-maps/render_bbmri_members_sized.R`
+- `R-maps/render_bbmri_members_oec_all.R`
+- `R-maps/render_global_nolabels.R`
+- `R-maps/render_covid_nolabels.R`
+- `R-maps/render_quality_maps_nolabels.R`
+- `R-maps/render_federated_platform.R`
+- `R-maps/render_crc_cohort_sized.R`
 
 ## Recommended Next Steps
 
@@ -381,5 +381,5 @@ rendering.
    reimplemented with a better blur-like text effect.
 3. Keep the root repository docs unchanged unless the change is truly global.
    R-map-specific operational knowledge belongs in this folder.
-4. Do a visual-tuning pass for the five extra maps once the user starts
-   reviewing them side-by-side against the legacy Tilemill outputs.
+4. Compare the extra maps side-by-side with the legacy Tilemill outputs and
+   tune any remaining visual differences.

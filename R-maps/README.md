@@ -181,13 +181,15 @@ OEC overlays:
 
 ## Direct Commands
 
+Run these commands from the repository root.
+
 Render one map directly:
 
 ```bash
 Rscript R-maps/render_global_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 The standalone renderer defaults now point to the current pilot GeoJSON files:
@@ -201,41 +203,41 @@ fixups.
 
 ```bash
 Rscript R-maps/render_quality_maps_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-quality-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ```bash
 Rscript R-maps/render_federated_platform.R \
-  --input=/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=R-maps/data/federated-platform.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ```bash
 Rscript R-maps/render_strategic_objectives.R \
-  --input=/home/hopet/codex/directory-scripts/R-maps/data/strategic-objectives-template.toml \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=R-maps/data/strategic-objectives-template.toml \
+  --output-dir=R-maps/pilot-output
 ```
 
 Prep helpers can also be run directly:
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_covid_geojson.py \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson
+  --input=bbmri-directory-pilot.geojson \
+  --output=bbmri-directory-covid-pilot.geojson
 ```
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_quality_geojson.py \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson
+  --output=bbmri-directory-quality-pilot.geojson
 ```
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_rare_diseases_geojson.py \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson
+  --input=bbmri-directory-pilot.geojson \
+  --output=bbmri-directory-rare-diseases-pilot.geojson
 ```
 
 ## Important Files
@@ -318,6 +320,6 @@ Rscript -e '.libPaths(c(normalizePath("R-maps/r-lib", mustWork = TRUE), .libPath
 
 Use these folder-local files for deeper maintenance guidance:
 
-- [AGENTS.md](/home/hopet/codex/directory-scripts/R-maps/AGENTS.md)
-- [SKILLS.md](/home/hopet/codex/directory-scripts/R-maps/SKILLS.md)
-- [TRANSFER.md](/home/hopet/codex/directory-scripts/R-maps/TRANSFER.md)
+- [AGENTS.md](AGENTS.md)
+- [SKILLS.md](SKILLS.md)
+- [TRANSFER.md](TRANSFER.md)

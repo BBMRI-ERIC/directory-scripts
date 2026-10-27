@@ -79,7 +79,7 @@ Run this workflow before creating a commit in this repository.
   - verify user-facing errors for missing credentials/configuration
 - skills changed:
   - sync any installed local copy if the workflow depends on it
-  - run `python3 /data/data/com.termux/files/home/.codex/skills/.system/skill-creator/scripts/quick_validate.py <skill-path>`
+  - run `python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" <skill-path>`
 
 ## Output expectation
 

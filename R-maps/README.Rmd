@@ -14,7 +14,7 @@ helpers in `map_config.R` and `map_common.R`.
 
 ## Open In RStudio
 
-1. Open `/home/hopet/codex/directory-scripts` as an RStudio project or set the
+1. Open the cloned repository as an RStudio project or set the
    working directory to the repository root.
 2. Open `R-maps/README.Rmd` for the narrative guide.
 3. Open one of the scripts in `R-maps/examples/` to run a concrete recipe.
@@ -22,7 +22,7 @@ helpers in `map_config.R` and `map_common.R`.
    helper objects.
 
 ```r
-setwd("/home/hopet/codex/directory-scripts")
+# Start with the repository root as the working directory.
 source("R-maps/examples/00_setup.R")
 ```
 

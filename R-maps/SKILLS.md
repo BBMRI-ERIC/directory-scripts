@@ -5,24 +5,24 @@ It is not a duplicate of the root repository skills/guidance.
 
 ## 1. Render One Map
 
-Run from `/home/hopet/codex/directory-scripts`.
+Run commands from the repository root.
 
 ### `nolabels`
 
 ```bash
 Rscript R-maps/render_bbmri_members_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `sized`
 
 ```bash
 Rscript R-maps/render_bbmri_members_sized.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 For temporary overlap tuning in the sized map, add
@@ -32,78 +32,78 @@ For temporary overlap tuning in the sized map, add
 
 ```bash
 Rscript R-maps/render_bbmri_members_oec_all.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-members-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --node-points=/home/hopet/codex/directory-scripts/R-maps/data/HQlineNN.geojson \
-  --node-lines=/home/hopet/codex/directory-scripts/R-maps/data/onlyLinesHQlineNN.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-members-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --node-points=R-maps/data/HQlineNN.geojson \
+  --node-lines=R-maps/data/onlyLinesHQlineNN.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `global-nolabels`
 
 ```bash
 Rscript R-maps/render_global_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `covid-nolabels`
 
 ```bash
 Rscript R-maps/render_covid_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-covid-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `global-labels` / `global-sized`
 
 ```bash
 Rscript R-maps/render_global_labels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ```bash
 Rscript R-maps/render_global_sized.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `covid-labels` / `covid-sized`
 
 ```bash
 Rscript R-maps/render_covid_labels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-covid-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ```bash
 Rscript R-maps/render_covid_sized.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-covid-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `quality_maps-nolabels`
 
 ```bash
 Rscript R-maps/render_quality_maps_nolabels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-quality-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `strategic-objectives`
 
 ```bash
 Rscript R-maps/render_strategic_objectives.R \
-  --input=/home/hopet/codex/directory-scripts/R-maps/data/strategic-objectives-template.toml \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=R-maps/data/strategic-objectives-template.toml \
+  --output-dir=R-maps/pilot-output
 ```
 
 For interactive work in RStudio, source `R-maps/strategic_objectives_common.R`
@@ -114,41 +114,41 @@ finds the folder in both cases.
 
 ```bash
 Rscript R-maps/render_federated_platform.R \
-  --input=/home/hopet/codex/directory-scripts/R-maps/data/federated-platform.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=R-maps/data/federated-platform.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `CRC-cohort-sized`
 
 ```bash
 Rscript R-maps/render_crc_cohort_sized.R \
-  --input=/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort.geojson \
-  --imaging=/home/hopet/codex/directory-scripts/R-maps/data/CRC-Cohort-imaging.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=R-maps/data/CRC-Cohort.geojson \
+  --imaging=R-maps/data/CRC-Cohort-imaging.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ### `rare-diseases-*`
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_rare_diseases_geojson.py \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson
+  --input=bbmri-directory-pilot.geojson \
+  --output=bbmri-directory-rare-diseases-pilot.geojson
 ```
 
 ```bash
 Rscript R-maps/render_rare_diseases_labels.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-rare-diseases-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 ```bash
 Rscript R-maps/render_rare_diseases_sized.R \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson \
-  --iarc=/home/hopet/codex/directory-scripts/R-maps/data/IARC.geojson \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --input=bbmri-directory-rare-diseases-pilot.geojson \
+  --iarc=R-maps/data/IARC.geojson \
+  --output-dir=R-maps/pilot-output
 ```
 
 `rare-diseases-nolabels` and `rare-diseases-labels` keep fixed-size circles; `rare-diseases-sized` is the only rare-disease variant that scales circles by biobank size.
@@ -173,7 +173,7 @@ sh R-maps/export.sh
 
 ```bash
 Rscript R-maps/render_pilot_maps.R \
-  --output-dir=/home/hopet/codex/directory-scripts/R-maps/pilot-output
+  --output-dir=R-maps/pilot-output
 ```
 
 What it does:
@@ -216,19 +216,19 @@ Rscript R-maps/render_pilot_maps.R --map-set=all
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_covid_geojson.py \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-covid-pilot.geojson
+  --input=bbmri-directory-pilot.geojson \
+  --output=bbmri-directory-covid-pilot.geojson
 ```
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_quality_geojson.py \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-quality-pilot.geojson
+  --output=bbmri-directory-quality-pilot.geojson
 ```
 
 ```bash
 ./.venv-maps/bin/python R-maps/prepare_rare_diseases_geojson.py \
-  --input=/home/hopet/codex/directory-scripts/bbmri-directory-pilot.geojson \
-  --output=/home/hopet/codex/directory-scripts/bbmri-directory-rare-diseases-pilot.geojson
+  --input=bbmri-directory-pilot.geojson \
+  --output=bbmri-directory-rare-diseases-pilot.geojson
 ```
 
 ## 4. Fast Parse Check

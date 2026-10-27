@@ -7,6 +7,11 @@ dedicated specification system replaces it.
 
 ## Documentation ownership
 
+Tracked Markdown is shared project documentation, not a personal notebook. Use
+neutral descriptions for private reference datasets and repository-relative or
+environment-based paths. Omit person-specific labels and session-only notes while
+retaining substantive specifications, public attribution and source citations.
+
 - [`README.md`](README.md) is a concise landing page for discovery and first
   steps. It must link outward rather than accumulate per-script manuals.
 - `docs/` contains user/operator documentation: installation, commands, inputs,
@@ -303,7 +308,7 @@ python3 ../BBMRI-ERIC-Directory-Data-Manager-Manual/scripts/generate_checks_docs
 
 Status: Normative project specification
 
-Provenance: user request, 2026-08-31
+Specification baseline: 2026-08-31
 
 ### Row classification
 
@@ -1367,12 +1372,12 @@ See `docs/auxiliary-tools.md` for commands and operational safety.
   the enclosing `form_structure.field_bindings` and compare them to the model's
   copied bindings; changing mapping and embedded UIDs together must not bypass
   authoritative verification.
-  No Josephine inputs are read. Keep conflicting alternatives on one table page.
+  Rerendering does not read private reference inputs. Keep conflicting alternatives on one table page.
   Legacy payloads without the field
   render unchanged. The
   local ignored fixture `tests/fixtures/so2_readiness_reference.json` retains
   seven answers and nine cached spreadsheet values per source; optionally replay
-  all 1,332 scores and 25 reference cells when that private dataset is available.
+  all cached scores and 25 reference cells when that private dataset is available.
   Portable tests construct invented source vectors and independently check
   numerical formulas, boundaries, missingness, precedence,
   deduplication/conflicts, escaped multipage tables and transactional publication.
