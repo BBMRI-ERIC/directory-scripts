@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {"survey": "MuCP", "synthetic": true},
+  "questionnaire": {
+    "title": "Synthetic scope test",
+    "checkbox_questions": [
+      {"id": "C.serum", "part": "C", "group": "biospecimens", "key": "serum", "label": "Serum", "type": "checkbox", "aliases": []},
+      {"id": "C.plasma", "part": "C", "group": "biospecimens", "key": "plasma", "label": "Plasma", "type": "checkbox", "aliases": []}
+    ],
+    "text_fields": [{"id": "B.description", "label": "Description", "type": "text"}]
+  },
+  "sources": [{"source_id": "SYNTHETIC", "path": "invented-source.txt", "filename": "invented-source.txt", "role": "submission", "file_type": "txt"}],
+  "responses": [{
+    "response_id": "SYNTHETIC-001", "country": "AT", "record_type": "submission", "scope": "submission",
+    "identity": {"institution_name": "Synthetic institute", "explicit_biobank_id": "bbmri-eric:ID:AT_SYNTHETIC"},
+    "source_ids": ["SYNTHETIC"],
+    "answers": {}, "fields": {"B.description": "Synthetic source wording, not a real response."},
+    "collections": [
+      {"collection_id": "LOCAL-1", "name": "Collection one", "scope": "collection", "answers": {
+        "C.serum": {"value": true, "answer_state": "selected", "raw_text": "Selected", "qualifier_text": "Consent limitation", "evidence": [{"source_id": "SYNTHETIC", "locator": "invented row 1"}]}
+      }},
+      {"collection_id": "LOCAL-2", "name": "Collection two", "scope": "collection", "answers": {
+        "C.serum": {"value": null, "answer_state": "unmarked", "raw_text": null, "qualifier_text": null, "evidence": []},
+        "C.plasma": {"value": false, "answer_state": "explicit_no", "raw_text": "No", "qualifier_text": null, "evidence": []}
+      }}
+    ]
+  }],
+  "reconciliation": {}, "validation": {}
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "minimum_n": 5,
+  "heatmaps": [
+    {"id":"mucp-consent-sharing","title":"Broad consent and permission to share samples within Europe","questions":["MuCP:B.consent_and_policy.broad_consent","MuCP:B.consent_and_policy.share_samples_europe"],"minimum_n":5,"interpretation":"Reported consent and sharing states; project criteria do not independently establish legal permission."},
+    {"id":"qms-sops","title":"SO2 QMS readiness and MuCP SOP evidence","questions":["SO2:q_061_how_would_you_rate_your_biobank_s_quality_management_system_qms_readines","MuCP:B.collection_infrastructure.sops_work_instructions"],"minimum_n":5,"interpretation":"Complementary readiness and scoped SOP evidence, not interchangeable quality certifications."}
+  ],
+  "upsets": [
+    {"id":"mucp-biospecimens","title":"[MuCP] Part C: Reported biospecimens","projection":"reported_checkbox_pattern","questions":["MuCP:C.biospecimens.serum","MuCP:C.biospecimens.plasma","MuCP:C.biospecimens.pbmcs","MuCP:C.biospecimens.urine","MuCP:C.biospecimens.tissue","MuCP:C.biospecimens.rna","MuCP:C.biospecimens.proteins","MuCP:C.biospecimens.exosomes","MuCP:C.biospecimens.microbiome","MuCP:C.biospecimens.other"],"minimum_n":5},
+    {"id":"mucp-omics","title":"[MuCP] Part C: Reported OMICs data","projection":"reported_checkbox_pattern","questions":["MuCP:C.omics_data.gwas","MuCP:C.omics_data.wgs","MuCP:C.omics_data.wes","MuCP:C.omics_data.rna_seq","MuCP:C.omics_data.proteomics","MuCP:C.omics_data.metabolomics","MuCP:C.omics_data.exposomics","MuCP:C.omics_data.other"],"minimum_n":5},
+    {"id":"mucp-available-data","title":"[MuCP] Part C: Reported data types","projection":"reported_checkbox_pattern","questions":["MuCP:C.available_data.medication_treatment","MuCP:C.available_data.clinical_laboratory","MuCP:C.available_data.longitudinal_outcomes","MuCP:C.available_data.lifestyle","MuCP:C.available_data.environmental_exposure","MuCP:C.available_data.real_world_data","MuCP:C.available_data.proms","MuCP:C.available_data.digital_wearables","MuCP:C.available_data.imaging","MuCP:C.available_data.functional_assays"],"minimum_n":5},
+    {"id":"so2-modalities","title":"[SO2] Reported direct technology access","projection":"reported_checkbox_pattern","questions":["SO2:q_035_does_the_repository_have_a_direct_access_to_data_from_any_of_the_followi"],"minimum_n":5},
+    {"id":"mucp-data-so2-omics-technologies","title":"[MuCP] Part C: Reported OMICs data and [SO2] technology access","projection":"reported_checkbox_pattern","questions":["MuCP:C.omics_data.gwas","MuCP:C.omics_data.wgs","MuCP:C.omics_data.wes","MuCP:C.omics_data.rna_seq","MuCP:C.omics_data.proteomics","MuCP:C.omics_data.metabolomics","MuCP:C.omics_data.exposomics","SO2:q_035_does_the_repository_have_a_direct_access_to_data_from_any_of_the_followi"],"minimum_n":5},
+    {"id":"mucp-data-so2-clinical-imaging-technologies","title":"[MuCP] Reported clinical and imaging data and [SO2] technology access","projection":"reported_checkbox_pattern","questions":["MuCP:B.available_data.clinical_phenotype","MuCP:C.available_data.clinical_laboratory","MuCP:C.available_data.longitudinal_outcomes","MuCP:C.available_data.imaging","MuCP:C.available_data.real_world_data","SO2:q_035_does_the_repository_have_a_direct_access_to_data_from_any_of_the_followi"],"minimum_n":5}
+  ]
+}

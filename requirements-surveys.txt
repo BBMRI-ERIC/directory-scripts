@@ -1,0 +1,5 @@
+# Survey branch extras; keep the core dependency contract inherited from master.
+-r requirements.txt
+javaobj-py3==0.6.1
+defusedxml~=0.7.1
+jsonschema>=4.17.3,<5
