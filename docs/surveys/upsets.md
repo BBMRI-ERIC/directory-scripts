@@ -144,3 +144,82 @@ category prefixing, manifest hashes, empty-directory omission notes, complete
 asset embedding, and every rejection path for stale or incomplete assets.
 R execution tests are conditional on an available `Rscript`; static tests must
 verify generated R syntax and required-package checks.
+
+## Descriptive Bundle Integration
+
+### Optional ComplexUpset figures
+
+The descriptive report can embed the approved eight multi-choice UpSet and
+observed-minus-expected deviation figures without making R a Termux runtime
+dependency. First generate the JSON payload, then create the external bundle:
+
+```bash
+python3 survey-so2-directory.py export-descriptive-upset-r \
+  -i so2-descriptive.json --output-dir so2-upsets
+```
+
+Run `so2-upsets/render-descriptive-upsets.R` in an R environment containing
+`ComplexUpset`, `ggplot2`, and `jsonlite`. See
+[SO2 Descriptive UpSet Assets](upsets.md) for native-R and
+Termux Debian-proot installation and execution commands. Finally rerun the
+normal `describe` command with `--upset-assets-dir so2-upsets`. An explicitly
+empty existing assets directory
+adds omission notes; a nonempty directory must contain a current completed
+bundle whose canonical hash matches the newly generated payload. The final PDF
+embeds the figures, while TeX references the sidecar PDFs and therefore needs
+the validated bundle retained for later recompilation.
+
+
+## Combined Report Assets
+
+Every shared UpSet bar is labelled `I1`, `I2`, etc. Its immediately following table
+lists the exact intersection's biobanks grouped by country. Bar heights are exclusive
+intersection counts, not left-hand set totals. Bundle validation checks actual built
+bar/matrix order and counts, including ties and empty patterns. New cohort or renderer
+changes invalidate old bundles; regenerate both R and PDFs, never edit hashes.
+
+For the current local workflow use `--join all-MuCP`, generate the new bundle with
+`--output-upset-r-dir so2-mucp-all-MuCP-upsets`, run its generated R script, and rerun
+the identical inputs with `--upset-assets-dir so2-mucp-all-MuCP-upsets --overwrite`.
+Do not supply old overlap-only assets. Final outputs can continue to use
+`so2-mucp-readable.json`, `.tex` and `.pdf`.
+
+Default definitions include MuCP biospecimens, OMICs and available data, SO2
+technology access, and two source-labelled cross-survey intersections pairing
+MuCP OMICs or clinical/imaging data with SO2 technology access. These show
+co-reported evidence at the biobank level, not that a technology generates the
+reported data or that the same collection has both. Regenerate existing bundles
+after changing these definitions or the reviewed overlap cohort.
+The required SO2 `Other` and `I don't know` checkboxes are not concrete technology
+access sets; their original answers remain in the descriptive statistics and
+evidence dossiers. These figures cover the named technologies, not an inferred
+availability of unspecified technologies.
+Unknown technology answers and Other-only selections are excluded from these
+matrices with a recorded reason, not converted into all-zero technology vectors.
+
+Add `--output-upset-r-dir so2-mucp-upsets` to the initial merge command. Run:
+
+```bash
+Rscript so2-mucp-upsets/render-descriptive-upsets.R
+```
+
+Then rerun the same `merge-mucp` inputs with
+`--upset-assets-dir so2-mucp-upsets --overwrite` and the desired PDF targets;
+omit `--output-upset-r-dir` on that rerun. The folder is read-only input during
+embedding. Empty/missing optional figures are clearly marked omitted; a supplied
+nonempty stale or incomplete bundle blocks publication. For Termux, use the
+Debian proot installation/bind workflow documented in the SO2 UpSet section below.
+The validator checks the actual CSV vectors, renderer script and PDF hashes;
+regenerate the bundle after analytical or renderer changes rather than editing
+its integrity markers manually.
+
+The default classified MuCP UpSet includes answered all-unticked groups as
+all-zero rows. An absent dot means No reported in the represented applicable
+scopes, not universal biological absence. Unknown, conditional, conflicting and
+incomplete-scope patterns are excluded with reasons; cross-survey SO2 unknowns
+remain unknown. Distinct collection reports may refer to different collections.
+The external bundle still generates both UpSet and exploratory deviation PDFs,
+but the combined report embeds only UpSets by default. Pass
+`--include-upset-deviations` to include the exploratory independence-model
+pages; they are not significance tests. Refresh the R bundle after changes to
+source data, policy, cohort or curated presentation rather than editing hashes.

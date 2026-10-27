@@ -1,5 +1,8 @@
 # Repository Guidelines
 
+For survey CLI, helpers, mappings and tests on this branch, also read
+[survey-specific instructions](docs/surveys/AGENTS.md) and their dedicated specifications.
+
 ## Documentation Ownership
 - Keep tracked Markdown team-facing: omit personal notes, person-specific reference labels and local account paths. Use neutral technical descriptions and portable paths; retain relevant public authorship and citations.
 - Keep [`README.md`](README.md) as a concise repository landing page: identify the tool families, show only a few first-run commands, and link to detailed documentation. Do not turn it back into a per-script manual.
