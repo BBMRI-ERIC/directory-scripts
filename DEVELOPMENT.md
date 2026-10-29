@@ -784,6 +784,16 @@ must not parse arguments, open caches or request data. Operators use `docs/maps.
   catalogue, exact bindings, schema and invented example. Organizational text is
   untrusted JSON data; omit personal contacts. Carry unchanged/out-of-scope entries
   forward without re-research so external output is a complete replacement snapshot.
+- Research instructions MUST bind biobank-name lookup to the supplied country,
+  including when juridical_person is missing or a placeholder. Require evidence
+  of country agreement for identity, address and coordinates; copying the input
+  country is insufficient. Conflicts remain ambiguous/unresolved; missing country
+  requires independent identity evidence. Do not silently substitute foreign
+  headquarters. This is a researcher check, not importer boundary validation.
+  Street-level representative institutional locations are sufficient; do not
+  demand exact buildings, laboratories or specimen storage rooms. Require an
+  explicit approximation/precision explanation, retaining the city/locality
+  minimum and prohibitions on unsupported centroids or guessed institutions/sites.
 - Empty legacy INI coordinate sections remain valid; nonempty sections require
   exact-ID manual migration with policy always. Other INI behavior remains active.
   Rename the executable and update callers, retaining hidden argument aliases,

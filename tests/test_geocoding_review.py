@@ -9,6 +9,27 @@ from geocoding_utils import (CoordinateResult, collect_institution_requests,
 from test_geocoding_locations import catalogue, context, research_entry
 
 
+def test_review_requires_country_consistency_and_allows_street_precision():
+    """Require country-bound identity research without demanding a storage location.
+
+    Returns:
+        None. Instructions require evidence for country agreement and permit street points.
+    """
+    empty = load_location_catalogue(None, "institution_resolutions")
+    requests = collect_institution_requests([(context(), CoordinateResult(None, "unresolved"))], empty)
+    rendered = render_institution_review(requests, empty, {})
+    instructions = rendered.split("## New research targets", 1)[0]
+    assert "Use biobank_name and country together" in instructions
+    assert "homonymous biobank in another country" in instructions
+    assert "Verify country consistency" in instructions
+    assert "country is missing" in instructions
+    assert "Do not silently change the supplied country" in instructions
+    assert "biobank name alone" in instructions
+    assert "Street-level positioning is sufficient" in instructions
+    assert "exact building, laboratory or sample storage room" in instructions
+    assert "Record the achieved precision" in instructions
+
+
 def test_second_packet_carries_complete_prior_catalogue_without_researching_accepted_entries(tmp_path):
     """Preserve accepted and out-of-scope entries while researching only new targets.
 

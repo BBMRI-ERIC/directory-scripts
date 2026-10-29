@@ -149,6 +149,21 @@ research are not re-researched. Give the packet to Codex, ChatGPT or another
 interface and save its **complete JSON catalogue** as
 `geocoding-institutions.local.json`. The geocoder never calls an AI model itself.
 
+The research instructions require using **biobank name and country together**,
+including when no usable institution name is available. The researcher must
+verify that the evidenced institution/address and coordinate location agree with
+the requested country, document the check, and leave conflicting or ambiguous
+identities unresolved rather than select a namesake abroad. A missing country
+requires independent identity evidence, not a guess.
+
+These are institutional map locations, not specimen storage locations.
+Street-level points are sufficient; an exact building, laboratory or storage
+room is not required. The researcher must explain approximate precision and
+support the institutional association; a city name alone does not justify
+selecting its centre. This is an AI research requirement, not an automated
+coordinate-versus-country boundary check by the JSON importer. Regenerate the
+Markdown packet to obtain updated instructions; existing packets are unchanged.
+
 #### Import Results
 
 After reviewing the AI-generated JSON, rerun the geocoder with that file. No
