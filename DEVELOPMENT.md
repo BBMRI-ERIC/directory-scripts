@@ -764,6 +764,17 @@ must not parse arguments, open caches or request data. Operators use `docs/maps.
   Persist stable negatives, not service outages. No startup probe, AI API, cache purge
   or request solely to enrich statistics. Retain effective retry/rate limits;
   do not activate the previously unreachable TLS-verification bypass.
+- Address-geocoding acceptance requires returned city/locality-or-better
+  evidence, not just detailed query fields. Never issue country-only queries
+  or accept country/state/county/unverified matches as positions. Explicit coarse
+  provider types override misleading child address fields. Search rank alone
+  does not qualify postcodes/natural features; a city-rank administrative feature,
+  explicit local place type, or returned locality context must support acceptance.
+  Request provider address details. V3 address records retain result metadata and
+  are revalidated on reuse. Old records without precision evidence cannot bypass
+  necessary validation; leave them on disk and perform real needed lookups.
+  This is a locality threshold, not a metric accuracy guarantee. Directory,
+  manual and accepted institution coordinates retain their explicit authority.
 - Structured results retain one winning source, successful channel, query fields,
   reason and evidence. Count selected biobanks once; address cache/API counts
   describe successes, not attempts. Query specificity is not positional accuracy.

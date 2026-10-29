@@ -278,11 +278,12 @@ def test_unavailable_service_preserves_existing_verified_tls_retry_path(monkeypa
     class Unavailable:
         """Simulate the installed geopy unavailable-service exception hierarchy."""
 
-        def geocode(self, query):
+        def geocode(self, query, **kwargs):
             """Reject each invented address query as unavailable.
 
             Args:
                 query: Address never sent externally.
+                **kwargs: Provider flags requesting geographic response details.
 
             Returns:
                 None. The failure prevents a successful location.
@@ -438,3 +439,40 @@ def test_path_aliases_include_symlinks_hardlinks_and_output_pairs(tmp_path, monk
             geocoding.validate_targets([source], [output])
     with pytest.raises(ValueError, match="aliases"):
         geocoding.validate_targets([], [symlink, source])
+
+
+@pytest.mark.parametrize("flags,include,only", [([], False, False), (["-w"], True, False),
+    (["--include-withdrawn"], True, False), (["--only-withdrawn"], True, True)])
+def test_withdrawn_scope_is_forwarded_to_directory(tmp_path, monkeypatch, flags, include, only):
+    """Verify shared scope switches change the Directory selection configuration.
+
+    Args:
+        tmp_path: Temporary INI/cache/output directory.
+        monkeypatch: Replace Directory access and all external geocoding.
+        flags: Public withdrawn-scope arguments being exercised.
+        include: Expected include-withdrawn Directory construction setting.
+        only: Expected withdrawn-only Directory construction setting.
+
+    Returns:
+        None. Default, included and withdrawn-only scopes use the shared Directory API.
+    """
+    seen = []
+
+    def directory(**kwargs):
+        """Capture shared Directory options without connecting externally.
+
+        Args:
+            **kwargs: Actual Directory construction parameters from the CLI helper.
+
+        Returns:
+            Offline invented Directory fixture.
+        """
+        seen.append(kwargs)
+        return FakeDirectory()
+
+    monkeypatch.setattr(geocoding, "Directory", directory)
+    monkeypatch.setattr(geocoding, "safe_geocode", lambda query: ("not_found", None))
+    monkeypatch.setenv("DIRECTORY_CACHE_ROOT", str(tmp_path))
+    assert geocoding.main([*flags, str(config_file(tmp_path)), "-o", str(tmp_path / "points")]) == 0
+    assert seen[0]["include_withdrawn_entities"] is include
+    assert seen[0]["only_withdrawn_entities"] is only

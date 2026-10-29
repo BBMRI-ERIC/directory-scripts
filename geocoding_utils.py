@@ -403,53 +403,126 @@ def _institution_entry(context: LocationContext, catalogue: LocationCatalogue) -
     return entry
 
 
+def match_precision(metadata: Mapping | None) -> str:
+    """Classify returned Nominatim geography, never precision inferred from query text.
+
+    Args:
+        metadata: Provider type/addresstype, optional place_rank and address details.
+
+    Returns:
+        city_or_better, below_city or unknown. This is geographic granularity,
+        not proof of coordinate accuracy or a distance-error bound.
+    """
+    if not isinstance(metadata, Mapping):
+        return "unknown"
+    coarse = {"country", "continent", "state", "region", "province", "county",
+              "state_district", "island", "archipelago", "sea", "ocean"}
+    local = {"city", "town", "village", "hamlet", "municipality", "suburb", "borough",
+             "neighbourhood", "neighborhood", "quarter", "city_district", "city_block",
+             "locality", "road", "street", "house", "house_number", "building"}
+    labels = {_text(metadata.get(key)).casefold() for key in ("type", "addresstype")}
+    if labels & coarse:
+        return "below_city"
+    rank = metadata.get("place_rank")
+    if isinstance(rank, str) and rank.isdecimal():
+        rank = int(rank)
+    if isinstance(rank, int) and not isinstance(rank, bool):
+        if 0 < rank < 13:
+            return "below_city"
+        if 13 <= rank <= 30 and "administrative" in labels:
+            return "city_or_better"
+    if labels & local:
+        return "city_or_better"
+    address = metadata.get("address")
+    if isinstance(address, Mapping) and any(_text(address.get(key)) for key in local - {"road", "street", "house", "house_number", "building"}):
+        return "city_or_better"
+    return "unknown"
+
+
+def _match_metadata(location: Any) -> dict:
+    """Copy only geographic response metadata needed for acceptance and cache revalidation.
+
+    Args:
+        location: Provider location object with optional raw JSON response.
+
+    Returns:
+        Owned geographic type/rank/address details; empty when precision is unverified.
+    """
+    raw = getattr(location, "raw", None)
+    if not isinstance(raw, Mapping):
+        return {}
+    result = {key: raw[key] for key in ("class", "category", "type", "addresstype", "place_rank")
+              if key in raw and isinstance(raw[key], (str, int, float)) and not isinstance(raw[key], bool)}
+    if isinstance(raw.get("address"), Mapping):
+        result["address"] = {key: value for key, value in raw["address"].items()
+                             if isinstance(key, str) and isinstance(value, str)}
+    return result
+
+
 def resolve_address(context: LocationContext, cache: Any, geocode: Any) -> CoordinateResult:
-    """Resolve current address suffixes cache-first, retaining the successful fields.
+    """Resolve current address suffixes, accepting only verified locality-or-better matches.
 
     Args:
         context: Current street/postcode/city/country fields after source precedence.
-        cache: Mutable cache; v2 records include queries and full freshness signatures.
+        cache: Mutable cache; v3 address records retain returned geographic metadata.
         geocode: Injected address-only callable returning status and a geopy-like location.
 
     Returns:
-        Address-source success with cache/API channel, or an explained unresolved result.
+        City-or-better address success with cache/API channel, or explained unresolved result.
     """
     values_by_field = {key: getattr(context, key) for key in ("address", "zip", "city")}
     values_by_field["country"] = context.address_country
     parts = [(key, value) for key, value in values_by_field.items() if value]
-    if not parts:
-        return CoordinateResult(None, "unresolved", reason="missing_address_context")
+    if not any(key in {"address", "zip", "city"} for key, value in parts):
+        return CoordinateResult(None, "unresolved", reason="insufficient_address_context")
     signature = _digest([context.biobank_id, parts])
-    bank_key = f"address-biobank:v2:{signature}"
+    bank_key = f"address-biobank:v3:{signature}"
     bank_entry = cache.get(bank_key)
+    if bank_entry is None:
+        bank_entry = cache.get(f"address-biobank:v2:{signature}")
     best = None
+    seen_unusable = False
     if isinstance(bank_entry, dict) and bank_entry.get("signature") == signature:
         fields = bank_entry.get("query_fields")
-        candidates = [tuple(key for key, value in parts[index:]) for index in range(len(parts))]
+        candidates = [tuple(key for key, value in parts[index:]) for index in range(len(parts))
+                      if any(key in {"address", "zip", "city"} for key, value in parts[index:])]
         pair = _cache_coordinates(bank_entry)
-        if pair and isinstance(fields, (tuple, list)) and tuple(fields) in candidates:
-            best = CoordinateResult(pair, "address", "cache", tuple(fields), "cached_biobank_address")
+        metadata = bank_entry.get("result_metadata")
+        if pair and isinstance(fields, (tuple, list)) and tuple(fields) in candidates and match_precision(metadata) == "city_or_better":
+            best = CoordinateResult(pair, "address", "cache", tuple(fields), "cached_biobank_address",
+                                    {"result_metadata": metadata, "match_precision": "city_or_better"})
     variants = []
     for start in range(len(parts)):
         variant = parts[start:]
         fields = tuple(key for key, value in variant)
+        if not set(fields) & {"address", "zip", "city"}:
+            continue
         values = [value for key, value in variant]
-        key = f"address:v2:{_digest(variant)}"
+        key = f"address:v3:{_digest(variant)}"
         entry = cache.get(key)
         legacy = False
+        if entry is None:
+            entry = cache.get(f"address:v2:{_digest(variant)}")
         if entry is None:
             old = cache.get(geocoding_cache_key(context.contact_id, values))
             if isinstance(old, dict) and old.get("query") == values:
                 entry, legacy = old, True
         pair = _cache_coordinates(entry)
-        if pair and (legacy or isinstance(entry, dict) and entry.get("query") == values and entry.get("query_fields") == list(fields)):
+        metadata = entry.get("result_metadata") if isinstance(entry, dict) else None
+        precision = match_precision(metadata)
+        if pair and precision == "city_or_better" and (legacy or isinstance(entry, dict) and entry.get("query") == values and entry.get("query_fields") == list(fields)):
             if best is None or len(fields) >= len(best.query_fields):
-                best = CoordinateResult(pair, "address", "cache", fields, "cached_address_query")
-        negative = isinstance(entry, dict) and entry.get("status") == "not_found" and entry.get("query") == values
+                best = CoordinateResult(pair, "address", "cache", fields, "cached_address_query",
+                                        {"result_metadata": metadata, "match_precision": "city_or_better"})
+        if pair and precision != "city_or_better":
+            seen_unusable = True
+        rejected = isinstance(entry, dict) and entry.get("status") == "below_city_precision" and entry.get("query") == values
+        seen_unusable = seen_unusable or rejected
+        negative = isinstance(entry, dict) and entry.get("status") in {"not_found", "below_city_precision"} and entry.get("query") == values
         variants.append((key, fields, values, negative))
     if best:
         cache[bank_key] = {"status": "resolved", "coordinates": list(best.coordinates), "signature": signature,
-                           "query_fields": list(best.query_fields)}
+                           "query_fields": list(best.query_fields), "result_metadata": best.evidence["result_metadata"]}
         return best
     for key, fields, values, negative in variants:
         if negative:
@@ -461,16 +534,25 @@ def resolve_address(context: LocationContext, cache: Any, geocode: Any) -> Coord
             except (ValueError, TypeError, AttributeError):
                 logging.warning("%s: geocoder returned invalid coordinates", context.biobank_id)
                 continue
+            metadata = _match_metadata(location)
+            if match_precision(metadata) != "city_or_better":
+                seen_unusable = True
+                cache[key] = {"status": "below_city_precision", "query": values,
+                              "query_fields": list(fields), "result_metadata": metadata}
+                logging.warning("%s: rejecting below-city or unverified geocoder match for %r",
+                                context.biobank_id, ", ".join(values))
+                continue
             cache[key] = {"status": "resolved", "coordinates": list(pair), "query": values,
-                          "query_fields": list(fields)}
+                          "query_fields": list(fields), "result_metadata": metadata}
             cache[bank_key] = {"status": "resolved", "coordinates": list(pair), "signature": signature,
-                               "query_fields": list(fields)}
-            return CoordinateResult(pair, "address", "api", fields, "live_address_query")
+                               "query_fields": list(fields), "result_metadata": metadata}
+            return CoordinateResult(pair, "address", "api", fields, "live_address_query",
+                                    {"result_metadata": metadata, "match_precision": "city_or_better"})
         if status == "disabled":
             return CoordinateResult(None, "unresolved", reason="service_disabled")
         if status == "not_found":
             cache[key] = {"status": "not_found", "query": values, "query_fields": list(fields)}
-    return CoordinateResult(None, "unresolved", reason="address_not_found")
+    return CoordinateResult(None, "unresolved", reason="below_city_precision" if seen_unusable else "address_not_found")
 
 
 def resolve_coordinates(context: LocationContext, manual: LocationCatalogue,
@@ -653,6 +735,7 @@ def format_statistics(summary: Mapping) -> str:
     cached = sum(row["cache"] for row in strata.values())
     live = sum(row["api"] for row in strata.values())
     lines = [f"Biobanks considered: {summary['considered']}",
+        "Minimum accepted geocoder match: city/locality",
         f"Directory-provided coordinates: {summary['directory']}",
         f"Manual overrides: {summary['manual']}"]
     for policy, count in sorted(summary["manual_by_policy"].items()):
@@ -661,9 +744,15 @@ def format_statistics(summary: Mapping) -> str:
         f"  Institutions represented: {summary['institutions_represented']}",
         f"Address geocoding succeeded: {summary['address_total']} (cache: {cached}; API: {live})"]
     for key, label in (("street", "Street/address included"), ("postcode", "Postcode, without street"),
-                       ("city", "City, without street/postcode"), ("country", "Country only"),
+                       ("city", "City, without street/postcode"),
                        ("unknown", "Query specificity unknown")):
         row = strata[key]
         lines.append(f"  {label}: {row['cache'] + row['api']} (cache: {row['cache']}; API: {row['api']})")
     lines.append(f"Unresolved: {summary['unresolved']}")
+    labels = {"below_city_precision": "Below city-level or unverified match",
+              "insufficient_address_context": "Insufficient sub-country address context",
+              "missing_address_context": "Missing address context",
+              "address_not_found": "Address not found", "service_disabled": "Geocoding service unavailable"}
+    for reason, count in sorted(summary["unresolved_by_reason"].items()):
+        lines.append(f"  {labels.get(reason, reason)}: {count}")
     return "\n".join(lines)

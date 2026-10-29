@@ -86,7 +86,7 @@ def safe_geocode(query: str):
             time.sleep(wait)
         geocodingNextRequestMonotonic = time.monotonic() + 1.1
         try:
-            location = geolocator.geocode(query)
+            location = geolocator.geocode(query, addressdetails=True)
         except (geopy.exc.GeocoderRateLimited, geopy.exc.GeocoderServiceError) as exc:
             if attempt < 3:
                 log.warning("Geocoding attempt %d for %r failed: %s; retrying after %.1fs", attempt, query, exc, backoff)

@@ -12,6 +12,27 @@ python3 geocoding.py geocoding.config -o bbmri-directory-geojson
 Use `python3 geocoding.py --help` for output, cache, schema, and withdrawn
 scope options. The geocoding cache is separate from the Directory cache.
 
+Withdrawn biobanks are excluded by default. Use `-w`/`--include-withdrawn` to
+include them, or `--only-withdrawn` for withdrawn biobanks only. Shared Directory
+scope is applied first; INI exclusions still apply in every mode.
+
+```sh
+python3 geocoding.py -v -w geocoding.config -o biobank-points-including-withdrawn
+python3 geocoding.py -v --only-withdrawn geocoding.config -o biobank-points-withdrawn-only
+```
+
+Caches default to the **working directory**, not the script directory. Running
+after `cd .worktrees/geocoding-cleanup` uses a separate cache unless
+`DIRECTORY_CACHE_ROOT` is set. To share Directory and geocoding caches with the
+main checkout, set their common root before running:
+
+```sh
+export DIRECTORY_CACHE_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+python3 geocoding.py -v geocoding.config -o biobank-points
+```
+
+Do not point unit-test caches at a real shared production cache.
+
 ### Location Sources And Overrides
 
 The old `geocoding_2022.py` executable is now `geocoding.py`, without a wrapper;
@@ -104,13 +125,29 @@ Winning categories sum to the considered total. Supplementary
 not separate addresses or positions, and is never added to biobank totals.
 
 Address successes show cache/API counts and query specificity: street included,
-postcode without street, city without street/postcode, country only, or unknown.
+postcode without street, city without street/postcode, or unknown.
 These describe **query contents**, not guaranteed positional accuracy. Failed
 requests/retries are not successful biobank resolutions. Warm-cache institution
 results remain AI-derived, without a redundant public file/cache distinction.
 Address queries use the contact address's country; institution grouping uses
 the biobank's reported country. A contact-country edit also invalidates the
 relevant cache/research context rather than silently reusing the previous position.
+
+**A geocoder match must be city/locality-level or better.** Country/state/county
+points and unverified result granularity remain unresolved and are excluded
+from GeoJSON, even if the query included a street. Country-only queries are not
+sent, without an automatic micro-country exception. An old country-cache hit
+cannot suppress more-specific lookups. Supplied Directory, manual and accepted
+institution coordinates retain their existing authority; this check does not
+independently certify those positions.
+
+The summary states the acceptance floor and explains unresolved outcomes.
+Query text alone is not precision evidence: new address records retain provider
+feature metadata. Old entries without it may require actual live revalidation,
+not cache purging. Geographic level is not a guaranteed distance-error bound.
+The classification uses Nominatim's [returned feature fields](https://nominatim.org/release-docs/latest/api/Output/)
+and [place ranking](https://nominatim.org/release-docs/latest/customize/Ranking/),
+conservatively rejecting coarse and unsupported features.
 
 The existing shared `data-check-cache/geocoding` cache and `DIRECTORY_CACHE_ROOT`
 remain supported. Current address values and research fingerprints govern

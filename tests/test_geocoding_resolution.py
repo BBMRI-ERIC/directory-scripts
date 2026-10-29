@@ -95,7 +95,7 @@ def test_changed_address_does_not_reuse_biobank_fallback(tmp_path):
             Positive geocoder protocol value with invented numeric coordinates.
         """
         calls.append(query)
-        return "resolved", SimpleNamespace(longitude=13, latitude=49)
+        return "resolved", SimpleNamespace(longitude=13, latitude=49, raw={"type": "city"})
 
     current = context(address="Old road")
     result = resolve_coordinates(current, manual, research, cache, geocode)
@@ -124,7 +124,8 @@ def test_city_only_caching_service_disable_and_legacy_freshness():
     result = resolve_coordinates(current, manual, research, cache, unavailable)
     assert result.coordinates is None
     proven_cache = {geocoding_cache_key("old-contact", ["Example City", "ZZ"]): {
-        "status": "resolved", "query": ["Example City", "ZZ"], "coordinates": [12, 48]}}
+        "status": "resolved", "query": ["Example City", "ZZ"], "coordinates": [12, 48],
+        "result_metadata": {"type": "city"}}}
     proven = resolve_coordinates(replace(current, contact_id="old-contact"), manual, research, proven_cache, unavailable)
     assert proven.channel == "cache" and proven.query_fields == ("city", "country")
 
@@ -163,13 +164,14 @@ def test_specific_query_cache_beats_coarse_biobank_cache():
             Resolved city position or no match for more specific address variants.
         """
         if query == "Example City, ZZ":
-            return "resolved", SimpleNamespace(longitude=12, latitude=48)
+            return "resolved", SimpleNamespace(longitude=12, latitude=48, raw={"type": "city"})
         return "not_found", None
 
     assert resolve_coordinates(current, manual, research, cache, city_only).query_fields == ("city", "country")
     for key, record in list(cache.items()):
         if record.get("query", [""])[0] == "Specific Road":
-            cache[key] = {**record, "status": "resolved", "coordinates": [13, 49]}
+            cache[key] = {**record, "status": "resolved", "coordinates": [13, 49],
+                          "result_metadata": {"type": "city"}}
     result = resolve_coordinates(current, manual, research, cache, unavailable)
     assert result.coordinates == (13, 49)
     assert result.channel == "cache" and result.query_fields[0] == "address"
@@ -199,7 +201,7 @@ def test_contact_country_is_separate_from_research_country():
             Successful provider-compatible position.
         """
         calls.append(query)
-        return "resolved", SimpleNamespace(longitude=2, latitude=48)
+        return "resolved", SimpleNamespace(longitude=2, latitude=48, raw={"type": "city"})
 
     resolve_coordinates(current, manual, research, cache, geocode)
     assert current.country == "DE" and calls[-1] == "1 Example Road, Paris, FR"

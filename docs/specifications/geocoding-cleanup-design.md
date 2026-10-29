@@ -1,6 +1,6 @@
 # Geocoding Cleanup And Institution Resolution
 
-Status: Approved after Astra consistency review and user clarification; implementation awaits plan review.
+Status: Approved and implemented; verification and follow-ups are recorded in the plan ledger.
 
 ## Intent And Scope
 
@@ -89,7 +89,7 @@ Evaluate current Directory data and manual policies on every run before caches:
 5. If street/address is missing: a current, accepted institution-resolution entry
    authorized by the explicitly supplied institution-resolution file. A matching
    separately typed cache record may accelerate that entry, but cannot authorize it.
-6. Existing postcode/city/country geocoding fallbacks if available.
+6. Existing postcode/city geocoding fallbacks, with country as context only.
 7. Unresolved, with a reason distinguishing missing context, no match and disabled
    service where possible.
 
@@ -279,6 +279,7 @@ separately so it is never added to the biobank denominator. The minimum layout i
 
 ```text
 Biobanks considered: N
+Minimum accepted geocoder match: city/locality
 Directory-provided coordinates: N
 Manual overrides: N
 AI-assisted institution resolution: N biobanks
@@ -287,14 +288,23 @@ Address geocoding succeeded: N (cache: N; API: N)
   Street/address included: N (cache: N; API: N)
   Postcode, without street: N (cache: N; API: N)
   City, without street/postcode: N (cache: N; API: N)
-  Country only: N (cache: N; API: N)
   Query specificity unknown: N (cache: N)
 Unresolved: N
 ```
 
+Approved follow-up: a usable address-geocoder result must have returned
+city/locality-or-better geographic evidence. Country/state/county or unverified
+matches remain unresolved and are excluded from GeoJSON. Never request a
+country-only point, and never let its cache entry suppress more-specific queries.
+The example's historical country-only success row is removed; print the minimum
+accepted level and unresolved reasons instead. Store and revalidate provider
+match metadata in v3 address caches, not just query fields. Older entries lacking
+such evidence require actual validation before reuse; retain them on disk.
+This threshold is geographic granularity, not guaranteed metric accuracy.
+
 For address-geocoded successes, report total and cache/API columns, stratified by
 successful query fields: street/address included; postcode without street; city
-without street/postcode; country only; unknown specificity. Both cache layers
+without street/postcode; unknown specificity. Both cache layers
 contribute to cache successes. Do not count unsuccessful API calls as successful
 resolutions, or a cached success found later in a lookup as an API success.
 

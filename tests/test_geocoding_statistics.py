@@ -44,3 +44,16 @@ def test_source_and_address_strata_reconcile():
     assert summary["address_by_specificity"]["street"]["api"] == 1
     assert summary["address_by_specificity"]["city"]["cache"] == 1
     assert "Address geocoding succeeded: 2 (cache: 1; API: 1)" in format_statistics(summary)
+
+
+def test_minimum_precision_and_unresolved_reasons_are_explicit():
+    """Prevent unresolved broad matches from being presented as successful geocoding.
+
+    Returns:
+        None. The summary states the acceptance floor and explains excluded coarse outcomes.
+    """
+    summary = summarize_results([(context(), CoordinateResult(None, "unresolved", reason="below_city_precision"))])
+    text = format_statistics(summary)
+    assert "Minimum accepted geocoder match: city/locality" in text
+    assert "Below city-level or unverified match: 1" in text
+    assert "Unresolved: 1" in text and "Address geocoding succeeded: 0" in text
