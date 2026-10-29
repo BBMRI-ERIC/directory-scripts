@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 from typing import Any, Mapping
+import logging
 
 from geojsonutils import get_entity_coordinates
 
@@ -25,6 +26,7 @@ class LocationContext:
         city: Current reported city used for queries and research freshness.
         longitude_raw: Unmodified source coordinate component for parsing/diagnostics.
         latitude_raw: Unmodified source coordinate component for parsing/diagnostics.
+        contact_id: Internal legacy-cache lookup identifier; never exported in research.
     """
 
     biobank_id: str
@@ -37,6 +39,7 @@ class LocationContext:
     city: str = ""
     longitude_raw: Any = None
     latitude_raw: Any = None
+    contact_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -114,7 +117,7 @@ def make_location_context(biobank: Mapping, contact: Mapping | None) -> Location
         "juridical_person" if institution else "biobank_name",
         _text(biobank.get("country")) or _text(contact.get("country")),
         _text(contact.get("address")), _text(contact.get("zip")), _text(contact.get("city")),
-        biobank.get("longitude"), biobank.get("latitude"),
+        biobank.get("longitude"), biobank.get("latitude"), _text(contact.get("id")),
     )
 
 
@@ -319,3 +322,181 @@ def load_location_catalogue(path: Path | None, expected_kind: str) -> LocationCa
     except ValueError as exc:
         raise ValueError(f"Invalid location catalogue {path or '<disabled>'}: {exc}") from exc
     return LocationCatalogue(expected_kind, entries, document)
+
+
+def supplied_coordinates(context: LocationContext) -> tuple[float, float] | None:
+    """Normalize valid Directory coordinates while permitting safe fallback on defects.
+
+    Args:
+        context: Current Directory components, possibly absent, numeric or formatted text.
+
+    Returns:
+        Finite validated coordinate pair, or None when either component is unusable.
+    """
+    try:
+        if isinstance(context.longitude_raw, bool) or isinstance(context.latitude_raw, bool):
+            return None
+        pair = get_entity_coordinates({"longitude": context.longitude_raw, "latitude": context.latitude_raw})
+        return tuple(parse_decimal_coordinates(*pair)) if pair else None
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def geocoding_cache_key(contact_id: str, values: list[str]) -> str:
+    """Reproduce the previous address-query key for provenance-checked cache reuse.
+
+    Args:
+        contact_id: Current contact ID, or empty for the old query-only key.
+        values: Ordered, nonempty address fragments used by the legacy geocoder.
+
+    Returns:
+        Legacy key; use only when its stored query agrees with current fragments.
+    """
+    digest = sha256(" | ".join(value.strip() for value in values).encode()).hexdigest()
+    return f"contact:{contact_id}:{digest}" if contact_id else f"query:{digest}"
+
+
+def _cache_coordinates(entry: object) -> tuple[float, float] | None:
+    """Validate an optional successful cache record before using its position.
+
+    Args:
+        entry: Decoded diskcache record or missing/malformed cached content.
+
+    Returns:
+        Validated pair for a resolved record, otherwise None without raising.
+    """
+    if not isinstance(entry, dict) or entry.get("status") != "resolved":
+        return None
+    pair = entry.get("coordinates")
+    if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+        return None
+    try:
+        return tuple(parse_decimal_coordinates(*pair))
+    except (ValueError, TypeError):
+        return None
+
+
+def _institution_entry(context: LocationContext, catalogue: LocationCatalogue) -> dict | None:
+    """Find current research only when both identity and context binding agree.
+
+    Args:
+        context: Current biobank identity and coarse organizational location.
+        catalogue: Explicit current authoritative research snapshot, possibly empty.
+
+    Returns:
+        Read-only accepted resolved entry, or None for absent/stale/ambiguous research.
+    """
+    entry = catalogue.entries.get(context.biobank_id)
+    if not entry or entry["status"] != "resolved":
+        return None
+    fingerprint = context_fingerprint(context)
+    if (entry["context_fingerprint"] != fingerprint or entry["request_id"] != fingerprint
+            or " ".join(entry["institution"].split()) != " ".join(context.institution.split())
+            or " ".join(entry["country"].split()) != " ".join(context.country.split())):
+        logging.warning("%s: ignoring stale institution-resolution context", context.biobank_id)
+        return None
+    return entry
+
+
+def resolve_address(context: LocationContext, cache: Any, geocode: Any) -> CoordinateResult:
+    """Resolve current address suffixes cache-first, retaining the successful fields.
+
+    Args:
+        context: Current street/postcode/city/country fields after source precedence.
+        cache: Mutable cache; v2 records include queries and full freshness signatures.
+        geocode: Injected address-only callable returning status and a geopy-like location.
+
+    Returns:
+        Address-source success with cache/API channel, or an explained unresolved result.
+    """
+    parts = [(key, getattr(context, key)) for key in ("address", "zip", "city", "country") if getattr(context, key)]
+    if not parts:
+        return CoordinateResult(None, "unresolved", reason="missing_address_context")
+    signature = _digest([context.biobank_id, parts])
+    bank_key = f"address-biobank:v2:{signature}"
+    bank_entry = cache.get(bank_key)
+    if isinstance(bank_entry, dict) and bank_entry.get("signature") == signature:
+        fields = bank_entry.get("query_fields")
+        candidates = [tuple(key for key, value in parts[index:]) for index in range(len(parts))]
+        pair = _cache_coordinates(bank_entry)
+        if pair and isinstance(fields, (tuple, list)) and tuple(fields) in candidates:
+            return CoordinateResult(pair, "address", "cache", tuple(fields), "cached_biobank_address")
+    variants = []
+    for start in range(len(parts)):
+        variant = parts[start:]
+        fields = tuple(key for key, value in variant)
+        values = [value for key, value in variant]
+        key = f"address:v2:{_digest(variant)}"
+        entry = cache.get(key)
+        legacy = False
+        if entry is None:
+            old = cache.get(geocoding_cache_key(context.contact_id, values))
+            if isinstance(old, dict) and old.get("query") == values:
+                entry, legacy = old, True
+        pair = _cache_coordinates(entry)
+        if pair and (legacy or isinstance(entry, dict) and entry.get("query") == values and entry.get("query_fields") == list(fields)):
+            cache[bank_key] = {"status": "resolved", "coordinates": list(pair), "signature": signature,
+                               "query_fields": list(fields)}
+            return CoordinateResult(pair, "address", "cache", fields, "cached_address_query")
+        negative = isinstance(entry, dict) and entry.get("status") == "not_found" and entry.get("query") == values
+        variants.append((key, fields, values, negative))
+    for key, fields, values, negative in variants:
+        if negative:
+            continue
+        status, location = geocode(", ".join(values))
+        if status == "resolved" and location is not None:
+            try:
+                pair = tuple(parse_decimal_coordinates(location.longitude, location.latitude))
+            except (ValueError, TypeError, AttributeError):
+                logging.warning("%s: geocoder returned invalid coordinates", context.biobank_id)
+                continue
+            cache[key] = {"status": "resolved", "coordinates": list(pair), "query": values,
+                          "query_fields": list(fields)}
+            cache[bank_key] = {"status": "resolved", "coordinates": list(pair), "signature": signature,
+                               "query_fields": list(fields)}
+            return CoordinateResult(pair, "address", "api", fields, "live_address_query")
+        if status == "disabled":
+            return CoordinateResult(None, "unresolved", reason="service_disabled")
+        if status == "not_found":
+            cache[key] = {"status": "not_found", "query": values, "query_fields": list(fields)}
+    return CoordinateResult(None, "unresolved", reason="address_not_found")
+
+
+def resolve_coordinates(context: LocationContext, manual: LocationCatalogue,
+                        institutions: LocationCatalogue, cache: Any, geocode: Any) -> CoordinateResult:
+    """Select one authorized source before consulting address or research caches.
+
+    Args:
+        context: Current Directory identity, contact address and raw coordinates.
+        manual: Explicit current manual snapshot; absent entries have no authority.
+        institutions: Explicit current research snapshot; cache alone grants no authority.
+        cache: Mutable typed coordinate cache, never a substitute for current inputs.
+        geocode: Injected rate-limited address geocoder; never an AI interface.
+
+    Returns:
+        Exactly one winning coordinate result or explained unresolved outcome.
+    """
+    coordinates = supplied_coordinates(context)
+    override = manual.entries.get(context.biobank_id)
+    if override and (override["policy"] == "always" or not coordinates and
+                     (override["policy"] == "missing-coordinates" or not context.address)):
+        pair = tuple(parse_decimal_coordinates(override["longitude"], override["latitude"]))
+        return CoordinateResult(pair, "manual", "input", reason=override["explanation"],
+                                evidence={"policy": override["policy"]})
+    if coordinates:
+        return CoordinateResult(coordinates, "directory", "input", reason="supplied_coordinates")
+    if _text(context.longitude_raw) or _text(context.latitude_raw):
+        logging.warning("%s: invalid supplied coordinates longitude=%r latitude=%r; trying fallbacks",
+                        context.biobank_id, context.longitude_raw, context.latitude_raw)
+    if not context.address:
+        entry = _institution_entry(context, institutions)
+        if entry:
+            signature = _digest([context_fingerprint(context), entry])
+            key = f"institution:v2:{signature}"
+            expected = tuple(parse_decimal_coordinates(entry["longitude"], entry["latitude"]))
+            cached = _cache_coordinates(cache.get(key))
+            channel = "cache" if cached == expected else "input"
+            cache[key] = {"status": "resolved", "coordinates": list(expected)}
+            return CoordinateResult(expected, "institution", channel, reason=entry["explanation"],
+                                    evidence=dict(entry))
+    return resolve_address(context, cache, geocode)
