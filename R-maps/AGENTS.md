@@ -30,7 +30,7 @@ pipeline. The current target maps are:
 
 The R code is responsible for rendering plus a small amount of map-specific
 GeoJSON derivation. The base full-Directory point export still starts from
-`geocoding_2022.py`.
+`geocoding.py`.
 
 ## Legacy Baseline That Still Matters
 
@@ -197,9 +197,9 @@ document.
 
 ## Non-Negotiable Design Decisions
 
-- Keep `geocoding_2022.py` as the GeoJSON producer unless there is an explicit
+- Keep `geocoding.py` as the GeoJSON producer unless there is an explicit
   decision to replace it.
-- `geocoding_2022.py` must stay lazy and cache-backed:
+- `geocoding.py` must stay lazy and cache-backed:
   - no unconditional startup probe against the live geocoder
   - only still-unresolved coordinate cases may hit the live geocoder
   - successful and stable negative geocoder results should be persisted in the

@@ -101,7 +101,7 @@ Cache availability differs by tool:
 
 - read-only exporters expose the `directory` cache
 - `full-text-search.py` exposes `directory` and `index`
-- `geocoding_2022.py` exposes `directory` and `geocoding`
+- `geocoding.py` exposes `directory` and `geocoding`
 - `data-check.py` exposes the full QC cache and plugin-control surface
 
 Scoped input validation covers repository-owned configuration and JSON/cache

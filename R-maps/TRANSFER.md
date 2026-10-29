@@ -6,7 +6,7 @@ constraints in `R-maps/`. Paths below are relative to the repository root.
 ## Goal
 
 Replace the current Tilemill rendering of selected BBMRI maps with maintainable
-R scripts built on `ggplot2` and `sf`, while keeping `geocoding_2022.py` as the
+R scripts built on `ggplot2` and `sf`, while keeping `geocoding.py` as the
 GeoJSON source.
 
 ## Current Implemented Scope
@@ -98,7 +98,7 @@ review should prefer tighter and better-balanced whitespace.
 
 ### GeoJSON / Python Boundary
 
-- `geocoding_2022.py` stays in place.
+- `geocoding.py` stays in place.
 - It was already patched so invalid cached decimal coordinates are range-checked
   before export.
 - It now also uses a persistent global geocoding cache and no longer

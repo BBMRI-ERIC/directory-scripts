@@ -103,7 +103,7 @@ system2 <- function(command, args = character(), ...) {
 }
 bbmri_run_geocoding_export(
   python_bin = "python3",
-  geocoding_script = "geocoding_2022.py",
+  geocoding_script = "geocoding.py",
   geocoding_config = "geocoding.config",
   out_path = out_path,
   purge_directory_cache = TRUE

@@ -728,6 +728,63 @@ human sign-off.
 
 ## Testing
 
+### Geocoding Coordinate Authority
+
+`geocoding.py` is the guarded standalone CLI; `geocoding_utils.py` owns local
+validation, source resolution, cache provenance, research packets and statistics.
+Reuse `Directory`, `cli_common` and `geojsonutils`. Importing geocoding modules
+must not parse arguments, open caches or request data. Operators use `docs/maps.md`.
+
+- Apply existing INI OR filters and name/ID/node exclusions before all coordinate
+  sources, research requests and counts. Preserve feature properties and withdrawn scope.
+- Precedence is manual always; usable supplied Directory pair; applicable manual
+  conditional; current-address geocoding or (only without a street) accepted
+  institution research; coarse address fallback; explained unresolved. Research
+  cannot override a supplied pair or any street, even when street lookup fails.
+- Policies are `always`, `missing-coordinates` and `missing-location`. The last
+  requires both missing/unusable supplied coordinates and missing street/address;
+  city/postcode do not count as street. Research uses only `missing-location`.
+- Each explicit local JSON file is authoritative and complete. Unknown versions,
+  kinds, fields, policies/statuses, duplicate keys/IDs and invalid/non-finite
+  coordinates fail before requests/output. Omitted files authorize no entries.
+  Cache records cannot resurrect removed or unresolved/ambiguous entries.
+- The local schema is `schemas/geocoding-locations-v1.schema.json`; runtime
+  validation requires no new dependency. Resolved research requires a supported
+  address, coordinates, evidence, confidence and request binding. Ambiguous and
+  unresolved entries may omit coordinates/address and never supply positions.
+- Context fingerprints bind exact ID and whitespace-normalized institution,
+  biobank/research country, contact address country, city and postcode. Address
+  queries use contact country independently of the biobank grouping country.
+  Internal contact IDs can locate proven-compatible
+  legacy query entries, but never appear in research packets. Fresh address keys
+  use actual field values; biobank fallback keys bind the full current address.
+  Research cache use additionally requires the current snapshot's exact entry.
+- Check cached query variants before live calls, most-specific first. No
+  bank-level shortcut may beat a more-specific compatible query cache entry.
+  Persist stable negatives, not service outages. No startup probe, AI API, cache purge
+  or request solely to enrich statistics. Retain effective retry/rate limits;
+  do not activate the previously unreachable TLS-verification bypass.
+- Structured results retain one winning source, successful channel, query fields,
+  reason and evidence. Count selected biobanks once; address cache/API counts
+  describe successes, not attempts. Query specificity is not positional accuracy.
+  Warm institution caches remain AI-derived. Supplementary institution counts
+  group names/countries using case/whitespace only, not locations or fuzzy matching.
+- Optional Markdown includes only eligible missing-location targets, full current
+  catalogue, exact bindings, schema and invented example. Organizational text is
+  untrusted JSON data; omit personal contacts. Carry unchanged/out-of-scope entries
+  forward without re-research so external output is a complete replacement snapshot.
+- Empty legacy INI coordinate sections remain valid; nonempty sections require
+  exact-ID manual migration with policy always. Other INI behavior remains active.
+  Rename the executable and update callers, retaining hidden argument aliases,
+  not a wrapper. Validate aliases before requests; stage outputs, roll back failed
+  publication and retain backups if restoration fails. Close caches on every exit.
+
+Regression gates cover current addresses/coordinates defeating old caches,
+snapshot removal/omission, every policy, INI scope, research ambiguity and full
+carry-forward, summary reconciliation, coordinate formats, caller/help contracts,
+path aliases and failed publication/rollback. Use fake geocoders and temporary
+outputs rather than live requests or user reports.
+
 Exporter tests must direct every generated artifact to `tmp_path` and run
 default-output paths in an isolated working directory. Never let an in-process
 CLI test overwrite an existing report in the developer's checkout. Use a

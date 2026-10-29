@@ -18,7 +18,7 @@ CLI_SCRIPTS = [
     "directory-stats.py",
     "full-text-search.py",
     "get-contacts.py",
-    "geocoding_2022.py",
+    "geocoding.py",
     "COVID19DataPortal_XMLFromBBMRIDirectory.py",
     "exporter-all.py",
     "exporter-bbmri-cohorts.py",

@@ -11,7 +11,7 @@ else
   python_bin=${PYTHON_BIN:-python3}
 fi
 
-geocoding_script="$repo_root/geocoding_2022.py"
+geocoding_script="$repo_root/geocoding.py"
 geocoding_config="$repo_root/geocoding.config"
 full_geojson="$repo_root/bbmri-directory-pilot.geojson"
 member_geojson="$repo_root/bbmri-directory-members-pilot.geojson"
@@ -48,8 +48,8 @@ Map ids:
 
 Options:
   --rscript PATH              Rscript binary to use
-  --python PATH               Python interpreter for geocoding_2022.py/helpers
-  --geocoding-script PATH     geocoding_2022.py path
+  --python PATH               Python interpreter for geocoding.py/helpers
+  --geocoding-script PATH     geocoding.py path
   --geocoding-config PATH     geocoding.config path
   --full-geojson PATH         full pilot GeoJSON output
   --member-geojson PATH       member/observer pilot GeoJSON output

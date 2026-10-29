@@ -47,7 +47,7 @@ bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_c
   out_base <- tools::file_path_sans_ext(out_path)
   args <- c(
     geocoding_script,
-    "--out-name", out_base,
+    "--output-prefix", out_base,
     geocoding_config
   )
   if (isTRUE(purge_directory_cache)) {
@@ -55,7 +55,7 @@ bbmri_run_geocoding_export <- function(python_bin, geocoding_script, geocoding_c
   }
   status <- system2(python_bin, args = args)
   if (!identical(status, 0L)) {
-    stop("geocoding_2022.py failed with exit status ", status, call. = FALSE)
+    stop("geocoding.py failed with exit status ", status, call. = FALSE)
   }
   if (!file.exists(out_path)) {
     stop("Expected GeoJSON was not created: ", out_path, call. = FALSE)
@@ -157,7 +157,7 @@ main <- function() {
     map_set = "all",
     maps = "",
     python = file.path(repo_root, ".venv-maps", "bin", "python"),
-    geocoding_script = normalizePath(file.path(repo_root, "geocoding_2022.py"), winslash = "/", mustWork = TRUE),
+    geocoding_script = normalizePath(file.path(repo_root, "geocoding.py"), winslash = "/", mustWork = TRUE),
     geocoding_config = normalizePath(file.path(repo_root, "geocoding.config"), winslash = "/", mustWork = TRUE),
     covid_prep_script = normalizePath(file.path(script_dir, "prepare_covid_geojson.py"), winslash = "/", mustWork = TRUE),
     quality_prep_script = normalizePath(file.path(script_dir, "prepare_quality_geojson.py"), winslash = "/", mustWork = TRUE),

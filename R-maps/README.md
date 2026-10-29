@@ -103,7 +103,7 @@ production renderers use, but in smaller recipe-sized pieces.
 
 Shared inputs:
 
-1. `geocoding_2022.py` writes the full pilot GeoJSON
+1. `geocoding.py` writes the full pilot GeoJSON
 2. helper prep scripts derive map-specific GeoJSONs when needed
 3. renderer scripts write `small` / `med` / `big` PNG, PDF, and SVG outputs
 
@@ -112,7 +112,7 @@ landscape exporter sheet. The current target `med` page is approximately
 `20.3 x 11.9 cm` (`2400 x 1400 px` at `300 dpi`, `4800 x 2800 px` at
 `600 dpi` raster), with proportional `small` and `big` variants.
 
-`geocoding_2022.py` is expected to be cache-backed for both Directory data and
+`geocoding.py` is expected to be cache-backed for both Directory data and
 live geocoding. Only entities still missing usable coordinates should trigger a
 live geocoder lookup, and successful or stable negative lookup results should
 be written into the shared global geocoding cache for reuse on later runs.
@@ -120,7 +120,7 @@ be written into the shared global geocoding cache for reuse on later runs.
 Derived GeoJSONs:
 
 - `bbmri-directory-pilot.geojson`
-  Full Directory biobank point export from `geocoding_2022.py`
+  Full Directory biobank point export from `geocoding.py`
 - `bbmri-directory-members-pilot.geojson`
   Member/observer subset for `bbmri-members-OEC-all`
 - `bbmri-directory-covid-pilot.geojson`

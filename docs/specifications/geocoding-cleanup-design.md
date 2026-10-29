@@ -199,7 +199,8 @@ unexplained centroids. If ambiguous or unsupported, return that status and expla
 what is missing. Never edit Directory records or the manual override file.
 
 Requests/results use the same fingerprint definition: canonical biobank ID,
-institution identity, country and nonblank city/postcode context. Preserve raw
+institution identity, biobank country, contact-address country and nonblank
+city/postcode context. Preserve raw
 values while canonicalizing whitespace deterministically for comparison. Missing
 `juridical_person` may use the biobank name with an explicit lower-specificity
 note; do not invent a juridical person. A newly added street always disables the

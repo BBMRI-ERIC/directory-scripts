@@ -26,7 +26,7 @@ line options, see [Setup and common operation](docs/setup.md).
 |---|---|---|
 | Data quality | `data-check.py`, `checks/`, `qcheck-updater.py` | [Data quality](docs/data-quality.md) |
 | Exports and reports | `exporter-*.py` | [Exporters](docs/exporters.md) |
-| Maps and geospatial output | `geocoding_2022.py`, `R-maps/` | [Maps](docs/maps.md) |
+| Maps and geospatial output | `geocoding.py`, `R-maps/` | [Maps](docs/maps.md) |
 | Data maintenance and synchronization | `directory-tables-modifier.py`, updater/importer/sync tools | [Maintenance tools](docs/maintenance-tools.md) |
 | Auxiliary analyses and utilities | `eosc-organisation-matcher.py`, search and statistics | [Auxiliary tools](docs/auxiliary-tools.md) |
 | Reusable Python modules | `directory.py` and focused helper modules | [Libraries](docs/libraries.md) |
@@ -51,7 +51,7 @@ python3 exporter-all.py -X directory.xlsx
 Generate the GeoJSON used by the map framework:
 
 ```bash
-python3 geocoding_2022.py geocoding.config -o bbmri-directory-geojson
+python3 geocoding.py geocoding.config -o bbmri-directory-geojson
 ```
 
 Every CLI provides its authoritative option list through `-h` or `--help`.

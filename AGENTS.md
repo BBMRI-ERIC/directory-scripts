@@ -44,7 +44,7 @@
 - Write-capable maintenance CLIs should import `DirectorySession` from the local `directory_session_compat.py` wrapper around `molgenis_emx2_pyclient.Client`; do not import the removed legacy `molgenis_emx2.directory_client...` package path directly.
 - `nncontacts.py` is the single source of truth for BBMRI node contacts, member-node classification, staging-area parsing, and non-member/global area detection; do not re-encode that logic elsewhere.
 - Keep permitted non-country staging prefixes (currently `EXT`, `EU`, `IARC`) and staging-prefix-to-schema expectations in `nncontacts.py`; checks and tools such as `ValidateIDs` and `collection-factsheet-descriptor-updater.py` must use that shared configuration rather than hardcoding `EXT` rules locally.
-- New map-rendering work in `R-maps/` should treat `geocoding_2022.py` output as
+- New map-rendering work in `R-maps/` should treat `geocoding.py` output as
   the primary GeoJSON input and must not hardcode machine-specific legacy
   Tilemill installation paths; keep external overlays
   explicit/configurable.
@@ -99,6 +99,7 @@
 - Prefer small, composable helpers over copy-pasted query logic; factor common code into modules.
 
 ## Operational Notes
+- Geocoding must evaluate current INI exclusions and current manual/research snapshots before cached positions. Institution results require missing coordinates and street; removed entries, absent research files and newly added streets must never be bypassed by caches. See the geocoding specification in DEVELOPMENT.md.
 - XLSX inputs are typically read with pandas; ensure `openpyxl` is installed for `read_excel` compatibility.
 - Directory API access requires network access; account for this when running in sandboxed environments.
 - When deriving NN from IDs, the common pattern is `ID:XX_...` (XX can be multi-letter like `EXT`).

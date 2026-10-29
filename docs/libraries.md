@@ -7,6 +7,10 @@ repository as a package.
 
 ## Directory access and identity
 
+- `geocoding_utils.py`: importable coordinate precedence, authoritative local
+  location inputs, address-cache provenance, institution-research packets and
+  reconciled statistics; used by `geocoding.py`. See [map workflows](maps.md).
+
 - `directory.py`: cache-first Directory loading, entity graphs, traversal,
   quality metadata, facts, and scope-aware accessors
 - `directory_session_compat.py`: context-managed EMX2 client compatibility for

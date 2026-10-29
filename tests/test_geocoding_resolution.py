@@ -141,3 +141,68 @@ def test_city_only_caching_service_disable_and_legacy_freshness():
 
     result = resolve_coordinates(context(), manual, research, {}, disabled)
     assert result.source == "unresolved" and result.reason == "service_disabled"
+
+
+def test_specific_query_cache_beats_coarse_biobank_cache():
+    """Prefer a compatible cached street result over a prior city-only bank fallback.
+
+    Returns:
+        None. Warm bank-level shortcuts cannot hide more precise current query entries.
+    """
+    current, cache = context(address="Specific Road"), {}
+    manual = load_location_catalogue(None, "manual_overrides")
+    research = load_location_catalogue(None, "institution_resolutions")
+
+    def city_only(query):
+        """Resolve only the city suffix to create a coarse bank fallback.
+
+        Args:
+            query: Invented suffix query being checked.
+
+        Returns:
+            Resolved city position or no match for more specific address variants.
+        """
+        if query == "Example City, ZZ":
+            return "resolved", SimpleNamespace(longitude=12, latitude=48)
+        return "not_found", None
+
+    assert resolve_coordinates(current, manual, research, cache, city_only).query_fields == ("city", "country")
+    for key, record in list(cache.items()):
+        if record.get("query", [""])[0] == "Specific Road":
+            cache[key] = {**record, "status": "resolved", "coordinates": [13, 49]}
+    result = resolve_coordinates(current, manual, research, cache, unavailable)
+    assert result.coordinates == (13, 49)
+    assert result.channel == "cache" and result.query_fields[0] == "address"
+
+
+def test_contact_country_is_separate_from_research_country():
+    """Preserve contact-address query country and invalidate it when that field changes.
+
+    Returns:
+        None. Queries use the contact country while institutional identity keeps biobank country.
+    """
+    from geocoding_utils import make_location_context
+    bank = {"id": "bbmri-eric:ID:DE_EXAMPLE", "name": "Bank", "country": "DE"}
+    contact = {"id": "same-contact", "address": "1 Example Road", "city": "Paris", "country": "FR"}
+    current = make_location_context(bank, contact)
+    manual = load_location_catalogue(None, "manual_overrides")
+    research = load_location_catalogue(None, "institution_resolutions")
+    calls, cache = [], {}
+
+    def geocode(query):
+        """Record actual address queries and return an invented position.
+
+        Args:
+            query: Contact-specific address query to capture.
+
+        Returns:
+            Successful provider-compatible position.
+        """
+        calls.append(query)
+        return "resolved", SimpleNamespace(longitude=2, latitude=48)
+
+    resolve_coordinates(current, manual, research, cache, geocode)
+    assert current.country == "DE" and calls[-1] == "1 Example Road, Paris, FR"
+    changed = make_location_context(bank, {**contact, "country": "CH"})
+    resolve_coordinates(changed, manual, research, cache, geocode)
+    assert len(calls) == 2 and calls[-1].endswith(", CH")

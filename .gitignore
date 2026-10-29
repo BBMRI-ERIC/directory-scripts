@@ -3,6 +3,11 @@
 /data-check-cache/*
 # python bytecode caches
 __pycache__/
+/geocoding-manual.local.json
+/geocoding-institutions.local.json
+/geocoding-institutions-review.md
+.geocoding-stage-*
+.geocoding-backup-*
 # isolated local Git worktrees
 /.worktrees/
 # ignore setup of environment variables

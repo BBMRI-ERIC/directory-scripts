@@ -20,13 +20,14 @@ class LocationContext:
         biobank_name: Original display name used in operator diagnostics.
         institution: Juridical person, or explicitly labelled biobank-name fallback.
         institution_source: Whether institution came from juridical_person or biobank_name.
-        country: Reported country identifier/text, not a staging-area prefix.
+        country: Biobank/research country, with contact fallback if unreported; never a node prefix.
         address: Current street/address; empty means institution fallback is eligible.
         zip: Current postcode, retaining leading zeroes where provided as text.
         city: Current reported city used for queries and research freshness.
         longitude_raw: Unmodified source coordinate component for parsing/diagnostics.
         latitude_raw: Unmodified source coordinate component for parsing/diagnostics.
         contact_id: Internal legacy-cache lookup identifier; never exported in research.
+        address_country: Contact's address country, separate from biobank/research country.
     """
 
     biobank_id: str
@@ -40,6 +41,7 @@ class LocationContext:
     longitude_raw: Any = None
     latitude_raw: Any = None
     contact_id: str = ""
+    address_country: str = ""
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,7 @@ def make_location_context(biobank: Mapping, contact: Mapping | None) -> Location
         _text(biobank.get("country")) or _text(contact.get("country")),
         _text(contact.get("address")), _text(contact.get("zip")), _text(contact.get("city")),
         biobank.get("longitude"), biobank.get("latitude"), _text(contact.get("id")),
+        _text(contact.get("country")),
     )
 
 
@@ -141,10 +144,12 @@ def context_fingerprint(context: LocationContext) -> str:
         context: Current identity, institution and coarse location; never personal fields.
 
     Returns:
-        Deterministic digest of identity/institution/country/city/postcode with whitespace normalized.
+        Deterministic digest of identity, institution, both reported countries, city and postcode,
+        with whitespace normalized; never a fingerprint of personal contact details.
     """
     return _digest([" ".join(value.split()) for value in (
-        context.biobank_id, context.institution, context.country, context.city, context.zip)])
+        context.biobank_id, context.institution, context.country, context.city, context.zip,
+        context.address_country)])
 
 
 def parse_decimal_coordinates(longitude_raw: object, latitude_raw: object) -> list[float]:
@@ -409,18 +414,21 @@ def resolve_address(context: LocationContext, cache: Any, geocode: Any) -> Coord
     Returns:
         Address-source success with cache/API channel, or an explained unresolved result.
     """
-    parts = [(key, getattr(context, key)) for key in ("address", "zip", "city", "country") if getattr(context, key)]
+    values_by_field = {key: getattr(context, key) for key in ("address", "zip", "city")}
+    values_by_field["country"] = context.address_country
+    parts = [(key, value) for key, value in values_by_field.items() if value]
     if not parts:
         return CoordinateResult(None, "unresolved", reason="missing_address_context")
     signature = _digest([context.biobank_id, parts])
     bank_key = f"address-biobank:v2:{signature}"
     bank_entry = cache.get(bank_key)
+    best = None
     if isinstance(bank_entry, dict) and bank_entry.get("signature") == signature:
         fields = bank_entry.get("query_fields")
         candidates = [tuple(key for key, value in parts[index:]) for index in range(len(parts))]
         pair = _cache_coordinates(bank_entry)
         if pair and isinstance(fields, (tuple, list)) and tuple(fields) in candidates:
-            return CoordinateResult(pair, "address", "cache", tuple(fields), "cached_biobank_address")
+            best = CoordinateResult(pair, "address", "cache", tuple(fields), "cached_biobank_address")
     variants = []
     for start in range(len(parts)):
         variant = parts[start:]
@@ -435,11 +443,14 @@ def resolve_address(context: LocationContext, cache: Any, geocode: Any) -> Coord
                 entry, legacy = old, True
         pair = _cache_coordinates(entry)
         if pair and (legacy or isinstance(entry, dict) and entry.get("query") == values and entry.get("query_fields") == list(fields)):
-            cache[bank_key] = {"status": "resolved", "coordinates": list(pair), "signature": signature,
-                               "query_fields": list(fields)}
-            return CoordinateResult(pair, "address", "cache", fields, "cached_address_query")
+            if best is None or len(fields) >= len(best.query_fields):
+                best = CoordinateResult(pair, "address", "cache", fields, "cached_address_query")
         negative = isinstance(entry, dict) and entry.get("status") == "not_found" and entry.get("query") == values
         variants.append((key, fields, values, negative))
+    if best:
+        cache[bank_key] = {"status": "resolved", "coordinates": list(best.coordinates), "signature": signature,
+                           "query_fields": list(best.query_fields)}
+        return best
     for key, fields, values, negative in variants:
         if negative:
             continue
@@ -522,7 +533,8 @@ def collect_institution_requests(observations: Any, institutions: LocationCatalo
         requests.append({"request_id": fingerprint, "context_fingerprint": fingerprint,
             "biobank_id": context.biobank_id, "biobank_name": context.biobank_name,
             "institution": context.institution, "institution_source": context.institution_source,
-            "country": context.country, "city": context.city, "zip": context.zip})
+            "country": context.country, "address_country": context.address_country,
+            "city": context.city, "zip": context.zip})
     return sorted(requests, key=lambda row: (row["country"], row["institution"], row["biobank_id"]))
 
 

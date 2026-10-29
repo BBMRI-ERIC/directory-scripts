@@ -45,7 +45,8 @@ QC_HELPER_PATHS = (
 )
 ANALYTICS_HELPER_PATHS = (
     "geojsonutils.py",
-    "geocoding_2022.py",
+    "geocoding.py",
+    "geocoding_utils.py",
     "pddfutils.py",
     "oomutils.py",
     "orphacodes.py",

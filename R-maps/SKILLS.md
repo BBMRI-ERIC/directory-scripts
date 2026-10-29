@@ -182,7 +182,7 @@ Rscript R-maps/render_pilot_maps.R \
 
 What it does:
 
-- runs `geocoding_2022.py` through the local pilot Python env
+- runs `geocoding.py` through the local pilot Python env
 - writes `bbmri-directory-pilot.geojson`
 - derives `bbmri-directory-members-pilot.geojson`
 - derives `bbmri-directory-covid-pilot.geojson` when extras are requested
