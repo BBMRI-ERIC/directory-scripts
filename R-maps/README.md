@@ -101,6 +101,9 @@ If you prefer working interactively in RStudio, open `R-maps/README.Rmd` and
 the scripts in `R-maps/examples/`. They show the same shared helpers that the
 production renderers use, but in smaller recipe-sized pieces.
 
+For the complete geocoder option list, shared caches, withdrawn scopes and
+AI-resolution workflow, see the [geocoding operator guide](../docs/maps.md#directory-geojson).
+
 Shared inputs:
 
 1. `geocoding.py` writes the full pilot GeoJSON

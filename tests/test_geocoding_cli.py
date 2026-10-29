@@ -193,6 +193,40 @@ def test_cli_aliases_and_help():
     assert help_text.index("--verbose") < help_text.index("--output-prefix")
 
 
+def test_every_geocoding_option_is_documented_in_operator_guide():
+    """Keep canonical flags and accepted legacy aliases visible in the Markdown guide.
+
+    Returns:
+        None. Every parser option has an explicit documented token, including hidden aliases.
+    """
+    import re
+    guide = (Path(__file__).resolve().parents[1] / "docs/maps.md").read_text()
+    documented = set(re.findall(r"(?<![A-Za-z0-9_-])--?[A-Za-z][A-Za-z0-9-]*", guide))
+    options = {flag for action in geocoding.build_cli_parser()._actions for flag in action.option_strings}
+    assert not options - documented, f"Undocumented geocoding options: {sorted(options - documented)}"
+    assert "config_file" in guide
+
+
+def test_documented_geocoding_commands_parse_without_io():
+    """Check every geocoding shell example against the actual argument parser.
+
+    Returns:
+        None. Documented workflows remain valid without reading inputs or contacting services.
+    """
+    import re
+    import shlex
+    guide = (Path(__file__).resolve().parents[1] / "docs/maps.md").read_text()
+    parser = geocoding.build_cli_parser()
+    commands = []
+    for block in re.findall(r"```(?:sh|bash)\n(.*?)\n```", guide, re.S):
+        for line in block.replace("\\\n", " ").splitlines():
+            if line.strip().startswith("python3 geocoding.py "):
+                arguments = shlex.split(line, comments=True)[2:]
+                assert parser.parse_args(arguments).config_file == "geocoding.config"
+                commands.append(arguments)
+    assert len(commands) >= 8
+
+
 def test_cli_research_round_trip_and_ini_overrides_scope(tmp_path, monkeypatch, caplog):
     """Ingest research through cold/warm runs without bypassing an INI exclusion.
 

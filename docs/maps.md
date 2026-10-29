@@ -9,8 +9,11 @@ by the map-rendering workflow:
 python3 geocoding.py geocoding.config -o bbmri-directory-geojson
 ```
 
-Use `python3 geocoding.py --help` for output, cache, schema, and withdrawn
-scope options. The geocoding cache is separate from the Directory cache.
+Use the [CLI reference](#geocoding-cli-reference) for every option and the
+[institution research workflow](#institution-research-workflow) for the
+Markdown-to-AI-to-JSON round trip. The geocoding cache is separate from the
+Directory cache. For the feature branch, run these commands from its checkout
+(currently `.worktrees/geocoding-cleanup`), where `geocoding.py` is present.
 
 Withdrawn biobanks are excluded by default. Use `-w`/`--include-withdrawn` to
 include them, or `--only-withdrawn` for withdrawn biobanks only. Shared Directory
@@ -32,6 +35,60 @@ python3 geocoding.py -v geocoding.config -o biobank-points
 ```
 
 Do not point unit-test caches at a real shared production cache.
+Alternatively set `DIRECTORY_CACHE_ROOT` directly to the absolute main-checkout
+path; this avoids relying on Git discovery where ownership checks prevent it.
+
+### Geocoding CLI Reference
+
+```text
+python3 geocoding.py [OPTIONS] config_file
+```
+
+All relative paths are interpreted from the invocation's working directory.
+The positional `config_file` is required and contains the INI selection,
+exclusion and feature-property rules, normally `geocoding.config`.
+
+| Option | Meaning / default |
+|---|---|
+| `-h`, `--help` | Print usage and exit without loading Directory data. |
+| `-v`, `--verbose` | INFO progress and final coordinate-source, query-specificity and unresolved statistics. |
+| `-d`, `--debug` | DEBUG diagnostics, including winning source, channel, query fields and reason; also includes the final summary. Takes precedence over verbose. |
+| `-u USERNAME`, `--username USERNAME` | Directory account; defaults to the shared environment/`.env` value when configured. |
+| `-p PASSWORD`, `--password PASSWORD` | Directory account password; prefer protected environment/`.env` settings over shell-history exposure. |
+| `-t TOKEN`, `--token TOKEN` | Access token as an alternative to username/password. |
+| `-P SCHEMA`, `--schema SCHEMA` | Directory schema/staging area; default `ERIC`. Non-public schemas require appropriate credentials. |
+| `--emergency-skip-dag-checks` | Skip hierarchy acyclicity checks explicitly at the operator's risk; other graph diagnostics remain active. Not a normal-run requirement. |
+| `-w`, `--include-withdrawn` | Include active and withdrawn biobanks; default is active only. |
+| `--only-withdrawn` | Restrict the Directory scope to withdrawn biobanks; implies inclusion of withdrawn data. |
+| `--purge-all-caches` | Clear both configured Directory and geocoding caches for this invocation. Avoid during ordinary reruns. |
+| `--purge-cache NAME [NAME ...]` | Clear only specified caches: `directory`, `geocoding`, or both. Put `config_file` before this multi-value option so it is not consumed as a cache name. |
+| `-o PREFIX`, `--output-prefix PREFIX` | Output filename prefix; default `bbmri-directory-5-0`. Appends `.geojson`; supply a prefix, not the final extension. |
+| `--print-filtered-dataframe` | Print selected flattened source data to stdout, before coordinate resolution. Appearing here does not mean a biobank was successfully positioned. |
+| `--manual-overrides FILE` | Read the complete authoritative manual-override JSON. Omit the flag to disable that source. |
+| `--institution-resolutions FILE` | Read the complete authoritative AI-researched institution JSON. Omit the flag to disable it, including its cached positions. |
+| `--output-institution-review FILE` | Write Markdown research instructions, remaining eligible targets, complete carry-forward catalogue and JSON schema. Without this option, no Markdown file is generated. |
+
+Accepted compatibility aliases are `--package SCHEMA` for `--schema`,
+`--out-name PREFIX` / `--outName PREFIX` for `--output-prefix`, and
+`--print-filtered-df` for `--print-filtered-dataframe`. They are hidden from help;
+use canonical spellings in new jobs. See [shared authentication](setup.md#authentication)
+for credentials; never commit secrets or real research data.
+
+Explicitly supplied config/JSON inputs must exist and validate. Omit an optional
+input flag rather than supplying a nonexistent placeholder. Output parent
+directories must exist, and all output paths must be distinct from inputs and
+each other, including symlink/hardlink aliases. Successful reruns replace the
+requested output files; failures use the staged-publication/recovery behavior
+described below. Normal progress, warnings and summaries go to stderr; the
+optional dataframe goes to stdout, and GeoJSON/Markdown go to their files.
+
+Example of an **intentional geocoder-only refresh**, not required for normal
+AI-result ingestion or the city-level precision upgrade:
+
+```sh
+python3 geocoding.py -v geocoding.config -o biobank-points-refreshed \
+  --purge-cache geocoding
+```
 
 ### Location Sources And Overrides
 
@@ -78,6 +135,8 @@ These examples are not real locations.
 
 Run from the clone root, omitting optional flags whose files do not exist:
 
+#### Prepare Research
+
 ```sh
 python3 geocoding.py -v geocoding.config -o biobank-points \
   --output-institution-review geocoding-institutions-review.md
@@ -90,6 +149,11 @@ research are not re-researched. Give the packet to Codex, ChatGPT or another
 interface and save its **complete JSON catalogue** as
 `geocoding-institutions.local.json`. The geocoder never calls an AI model itself.
 
+#### Import Results
+
+After reviewing the AI-generated JSON, rerun the geocoder with that file. No
+Markdown generation option is needed unless another research packet is wanted:
+
 ```sh
 python3 geocoding.py -v geocoding.config -o biobank-points \
   --institution-resolutions geocoding-institutions.local.json
@@ -100,6 +164,8 @@ If an institution/site cannot be identified unambiguously, use `ambiguous` or
 `unresolved` and explain why; those statuses need no invented coordinates.
 Confidence is not proof of accuracy. Review results before using/sharing maps:
 institution positions are approximate, not confirmed biobank premises.
+
+#### Continue Research
 
 For another batch, include the current file when generating the next packet:
 
@@ -114,6 +180,24 @@ and requests only remaining eligible targets. The returned JSON must preserve
 unchanged entries without re-research and replace the full current catalogue.
 Add `--manual-overrides geocoding-manual.local.json` on each run if used; never
 combine that file with the researched catalogue.
+
+#### Combined Run
+
+This complete example shares caches, includes withdrawn biobanks, applies the
+separate manual and AI files, and emits another packet for remaining targets:
+
+```sh
+export DIRECTORY_CACHE_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+python3 geocoding.py -v -w geocoding.config -o biobank-points \
+  --manual-overrides geocoding-manual.local.json \
+  --institution-resolutions geocoding-institutions.local.json \
+  --output-institution-review geocoding-institutions-review.md
+```
+
+Use `--only-withdrawn` instead of `-w` for withdrawn-only output, or omit both for
+active-only output. Keep the same intended INI, schema and scope across research
+batches; carried entries outside a selection stay in the catalogue but are not
+positioned by that run. Never replace the manual JSON with AI output.
 
 ### Statistics And Cache Behavior
 
