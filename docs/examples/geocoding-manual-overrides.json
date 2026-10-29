@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "kind": "manual_overrides",
+  "entries": [{
+    "biobank_id": "bbmri-eric:ID:ZZ_EXAMPLE",
+    "policy": "missing-coordinates",
+    "status": "resolved",
+    "longitude": 12.0,
+    "latitude": 48.0,
+    "explanation": "Invented example only; replace with reviewed coordinates and a real biobank ID."
+  }]
+}

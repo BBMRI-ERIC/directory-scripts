@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "kind": "institution_resolutions",
+  "entries": [{
+    "biobank_id": "bbmri-eric:ID:ZZ_EXAMPLE",
+    "policy": "missing-location",
+    "status": "unresolved",
+    "request_id": "copy-request-id-from-generated-packet",
+    "context_fingerprint": "copy-context-fingerprint-from-generated-packet",
+    "institution": "Example University",
+    "country": "ZZ",
+    "explanation": "Invented example: no supported address identified. Return unresolved rather than invent coordinates."
+  }]
+}

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Authoritative geocoding locations v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "entries"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "kind": {"enum": ["manual_overrides", "institution_resolutions"]},
+    "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "manual_overrides"}}},
+      "then": {"properties": {"entries": {"items": {
+        "properties": {"status": {"const": "resolved"}},
+        "not": {"anyOf": [
+          {"required": ["request_id"]}, {"required": ["context_fingerprint"]},
+          {"required": ["institution"]}, {"required": ["country"]},
+          {"required": ["evidence"]}, {"required": ["confidence"]}, {"required": ["qualifier"]}
+        ]}
+      }}}}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "institution_resolutions"}}},
+      "then": {"properties": {"entries": {"items": {
+        "required": ["request_id", "context_fingerprint", "institution", "country"],
+        "properties": {"policy": {"const": "missing-location"}},
+        "allOf": [{
+          "if": {"properties": {"status": {"const": "resolved"}}},
+          "then": {
+            "required": ["address", "evidence", "confidence"],
+            "properties": {
+              "address": {"required": ["address"], "properties": {"address": {"$ref": "#/$defs/text"}}},
+              "evidence": {"minItems": 1}
+            }
+          }
+        }]
+      }}}}
+    }
+  ],
+  "$defs": {
+    "text": {"type": "string", "pattern": "\\S"},
+    "entry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["biobank_id", "policy", "status", "explanation"],
+      "properties": {
+        "biobank_id": {"type": "string", "pattern": "^bbmri-eric:ID:\\S+$"},
+        "policy": {"enum": ["missing-location", "missing-coordinates", "always"]},
+        "status": {"enum": ["resolved", "ambiguous", "unresolved"]},
+        "explanation": {"$ref": "#/$defs/text"},
+        "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+        "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+        "address": {
+          "type": "object", "additionalProperties": false,
+          "properties": {"address": {"type": "string"}, "zip": {"type": "string"}, "city": {"type": "string"}, "country": {"type": "string"}}
+        },
+        "request_id": {"$ref": "#/$defs/text"},
+        "context_fingerprint": {"$ref": "#/$defs/text"},
+        "institution": {"$ref": "#/$defs/text"},
+        "country": {"$ref": "#/$defs/text"},
+        "evidence": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false, "required": ["source"],
+            "properties": {"source": {"$ref": "#/$defs/text"}, "note": {"type": "string"}}
+          }
+        },
+        "confidence": {"enum": ["high", "medium", "low"]},
+        "qualifier": {"type": "string"}
+      },
+      "allOf": [{
+        "if": {"anyOf": [{"properties": {"status": {"const": "resolved"}}}, {"required": ["longitude"]}, {"required": ["latitude"]}]},
+        "then": {"required": ["longitude", "latitude"]}
+      }]
+    }
+  }
+}
