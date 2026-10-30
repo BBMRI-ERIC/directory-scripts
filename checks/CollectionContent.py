@@ -11,6 +11,10 @@ from customwarnings import DataCheckWarningLevel, DataCheckWarning, DataCheckEnt
 
 from directory import Directory
 
+BIOLOGICAL_SAMPLES = 'Biological samples'
+CLINICAL_DATASET = 'Clinical dataset'
+IMAGING_DATA_CATEGORIES = {'Body image', 'Whole slide image', 'Photo image', 'IMAGING_DATA'}
+
 # Machine-readable check documentation for the manual generator and other tooling.
 # Keep severity/entity/fields aligned with the emitted DataCheckWarning(...) calls.
 CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
@@ -60,7 +64,7 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                   'severity': 'WARNING',
                                                   'summary': 'No diagnoses provide for '
                                                              'a collection with '
-                                                             'MEDICAL_RECORDS among '
+                                                             'Clinical dataset among '
                                                              'its data categories'},
  'CC:DiagMissingDisease': {'entity': 'COLLECTION',
                                                        'fields': ['type'],
@@ -75,7 +79,7 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                        'severity': 'WARNING',
                                                        'summary': 'Diagnoses provided '
                                                                   'but no '
-                                                                  'MEDICAL_RECORDS '
+                                                                  'Clinical dataset '
                                                                   'among its data '
                                                                   'categories'},
  'CC:DiagTypeMismatch': {'entity': 'COLLECTION',
@@ -105,8 +109,10 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                      'severity': 'ERROR',
                                                      'summary': 'Imaging modalities or '
                                                                 'image data set found, '
-                                                                'but IMAGING_DATA is '
-                                                                'not among data '
+                                                                'but no image data '
+                                                                'category (Body image, '
+                                                                'Whole slide image, '
+                                                                'Photo image) among data '
                                                                 'categories: '
                                                                 'image_modality = %s, '
                                                                 'image_dataset_type = '
@@ -187,7 +193,7 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                        'severity': 'ERROR',
                                                        'summary': 'Sample types '
                                                                   'advertised but '
-                                                                  'BIOLOGICAL_SAMPLES '
+                                                                  'Biological samples '
                                                                   'missing among its '
                                                                   'data categories'},
  'CC:DiagRange': {'entity': 'COLLECTION',
@@ -524,17 +530,17 @@ class CollectionContent(IPlugin):
 			if len(diags) > 0 and not any(x in types for x in ['HOSPITAL', 'DISEASE_SPECIFIC', 'RD']):
 				warnings.append(DataCheckWarning(make_check_id(self, "DiagTypeMismatch"), "", collection_nn, DataCheckWarningLevel.INFO, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Diagnoses provided but none of HOSPITAL, DISEASE_SPECIFIC, RD is specified as collection type (this may be easily false positive check)"))
 
-			if 'BIOLOGICAL_SAMPLES' in data_categories and len(materials) == 0:
+			if BIOLOGICAL_SAMPLES in data_categories and len(materials) == 0:
 				warnings.append(DataCheckWarning(make_check_id(self, "MaterialsMissing"), "", collection_nn, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No material types are provided while biological samples are collected"))
 
-			if len(materials) > 0 and 'BIOLOGICAL_SAMPLES' not in data_categories:
-				warnings.append(DataCheckWarning(make_check_id(self, "SampleCatMismatch"), "", collection_nn, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Sample types advertised but BIOLOGICAL_SAMPLES missing among its data categories"))
+			if len(materials) > 0 and BIOLOGICAL_SAMPLES not in data_categories:
+				warnings.append(DataCheckWarning(make_check_id(self, "SampleCatMismatch"), "", collection_nn, DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Sample types advertised but Biological samples missing among its data categories"))
 
-			if 'MEDICAL_RECORDS' in data_categories and len(diags) < 1:
-				warnings.append(DataCheckWarning(make_check_id(self, "MedRecDiagGap"), "", collection_nn, DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No diagnoses provide for a collection with MEDICAL_RECORDS among its data categories"))
+			if CLINICAL_DATASET in data_categories and len(diags) < 1:
+				warnings.append(DataCheckWarning(make_check_id(self, "MedRecDiagGap"), "", collection_nn, DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No diagnoses provide for a collection with Clinical dataset among its data categories"))
 
-			if len(diags) > 0 and 'MEDICAL_RECORDS' not in data_categories:
-				warnings.append(DataCheckWarning(make_check_id(self, "DiagCatMismatch"), "", collection_nn, DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Diagnoses provided but no MEDICAL_RECORDS among its data categories"))
+			if len(diags) > 0 and CLINICAL_DATASET not in data_categories:
+				warnings.append(DataCheckWarning(make_check_id(self, "DiagCatMismatch"), "", collection_nn, DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Diagnoses provided but no Clinical dataset among its data categories"))
 
 			has_crosswalk_orpha_fix = False
 			crosswalk_handled_orpha_sources = set()
@@ -614,15 +620,15 @@ class CollectionContent(IPlugin):
 					#image_dataset_types.append(idt['id']) # EMX2 image_dataset_type does not have id, then:
 					image_dataset_types.append(idt) # TODO: Check if this is OK!!
 
-			if 'IMAGING_DATA' in data_categories:
+			if IMAGING_DATA_CATEGORIES & set(data_categories):
 				if len(modalities) < 1:
 					warnings.append(DataCheckWarning(make_check_id(self, "ImgModMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No image modalities provided for image collection"))
 
 				if len(image_dataset_types) < 1:
 					warnings.append(DataCheckWarning(make_check_id(self, "ImgDataMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.WARNING, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "No image dataset types provided for image collection"))
 
-			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGING_DATA' not in data_categories:
-				warnings.append(DataCheckWarning(make_check_id(self, "ImageCatMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but IMAGING_DATA is not among data categories: image_modality = %s, image_dataset_type = %s"%(modalities,image_dataset_types)))
+			if (len(modalities) > 0 or len(image_dataset_types) > 0) and not IMAGING_DATA_CATEGORIES & set(data_categories):
+				warnings.append(DataCheckWarning(make_check_id(self, "ImageCatMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but no image data category (Body image, Whole slide image, Photo image) among data categories: image_modality = %s, image_dataset_type = %s"%(modalities,image_dataset_types)))
 			if (len(modalities) > 0 or len(image_dataset_types) > 0) and 'IMAGE' not in types:
 				warnings.append(DataCheckWarning(make_check_id(self, "ImageTypeMissing"), "", dir.getCollectionNN(collection['id']), DataCheckWarningLevel.ERROR, collection['id'], DataCheckEntityType.COLLECTION, str(collection['withdrawn']), "Imaging modalities or image data set found, but collection type does not include IMAGE", fix_proposals=[
 					make_collection_multi_value_fix(

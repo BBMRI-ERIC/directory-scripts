@@ -274,3 +274,92 @@ def test_collection_content_adds_icd_fix_from_orpha_and_suppresses_legacy_orpha_
     assert suggest_warning.fix_proposals[0].mode == "append"
     assert suggest_warning.fix_proposals[0].proposed_value == ["urn:miriam:icd:E75.2"]
     assert suggest_warning.fix_proposals[0].confidence == "certain"
+
+
+def _category_warning_ids(data_categories, **fields):
+    """Run the check over one collection with the given data categories.
+
+    Args:
+        data_categories: Data category names stored on the synthetic collection.
+        **fields: Further collection attributes (materials, diagnoses, imaging).
+
+    Returns:
+        The set of emitted check IDs.
+    """
+    collection = {
+        "id": "col-cat",
+        "withdrawn": False,
+        "type": ["SAMPLE"],
+        "data_categories": data_categories,
+        **fields,
+    }
+    warnings = CollectionContent().check(
+        CollectionContentCrosswalkDirectoryStub(collection, OrphaCodesMapperStub()), args=None
+    )
+    return {warning.dataCheckID for warning in warnings}
+
+
+CATEGORY_FIELDS = {
+    "materials": ["SERUM"],
+    "diagnosis_available": [{"name": "urn:miriam:icd:C50"}],
+    "imaging_modality": ["MRI"],
+    "image_dataset_type": ["RAW"],
+}
+CATEGORY_CHECKS = {"CC:SampleCatMismatch", "CC:DiagCatMismatch", "CC:ImageCatMissing"}
+
+
+def test_collection_content_accepts_the_current_data_category_names():
+    """Verify the renamed DataCategories ontology satisfies the category checks.
+
+    Returns:
+        None. Verifies "Biological samples", "Clinical dataset" and an image type count.
+    """
+    warning_ids = _category_warning_ids(
+        ["Biological samples", "Clinical dataset", "Body image"], **CATEGORY_FIELDS
+    )
+
+    assert not warning_ids & CATEGORY_CHECKS
+
+
+def test_collection_content_still_accepts_the_deprecated_imaging_category():
+    """Verify IMAGING_DATA, deprecated but still in the ontology, counts as image data.
+
+    Returns:
+        None. Verifies ImageCatMissing stays silent for IMAGING_DATA.
+    """
+    warning_ids = _category_warning_ids(["IMAGING_DATA"], imaging_modality=["MRI"], image_dataset_type=["RAW"])
+
+    assert "CC:ImageCatMissing" not in warning_ids
+
+
+def test_collection_content_rejects_the_retired_data_category_codes():
+    """Verify the removed BIOLOGICAL_SAMPLES / MEDICAL_RECORDS codes no longer count.
+
+    Returns:
+        None. Verifies both mismatch checks fire for the retired codes.
+    """
+    warning_ids = _category_warning_ids(["BIOLOGICAL_SAMPLES", "MEDICAL_RECORDS"], **CATEGORY_FIELDS)
+
+    assert {"CC:SampleCatMismatch", "CC:DiagCatMismatch"} <= warning_ids
+
+
+def test_collection_content_reports_missing_data_categories():
+    """Verify content without its data category is still reported.
+
+    Returns:
+        None. Verifies all three category checks fire for an unrelated category.
+    """
+    warning_ids = _category_warning_ids(["Genomic dataset"], **CATEGORY_FIELDS)
+
+    assert CATEGORY_CHECKS <= warning_ids
+
+
+def test_collection_content_reports_current_categories_without_their_content():
+    """Verify the reverse checks fire for the current names too.
+
+    Returns:
+        None. Verifies MaterialsMissing, MedRecDiagGap and ImgModMissing for empty content.
+    """
+    warning_ids = _category_warning_ids(["Biological samples", "Clinical dataset", "Whole slide image"])
+
+    assert {"CC:MaterialsMissing", "CC:MedRecDiagGap", "CC:ImgModMissing"} <= warning_ids
