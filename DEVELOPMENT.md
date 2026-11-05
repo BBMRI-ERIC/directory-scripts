@@ -33,6 +33,15 @@ Start from [README.md](README.md) for the documentation index and from
 [`docs/setup.md`](docs/setup.md) for user-facing installation and common CLI
 operation.
 
+## Certificate Bundle Security
+
+Runtime requirements must require `certifi>=2026.10.19` for
+GHSA-6q48-6c7w-9gw2. Do not restore a year-limited compatible-release pin that
+admits the affected CA bundle or prevents future trust-store security updates.
+Deployment remediation also requires upgrading each installed environment or
+rebuilding its image; changing the requirements file alone does not replace an
+already installed bundle. Keep TLS verification enabled.
+
 ## Architecture
 
 ### Repository structure

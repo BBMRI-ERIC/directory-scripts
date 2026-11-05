@@ -29,9 +29,17 @@ pip3 install --upgrade molgenis-emx2-pyclient
 Refresh root certificates when HTTPS certificate verification fails:
 
 ```bash
-pip3 install --upgrade certifi
+python3 -m pip install --upgrade 'certifi>=2026.10.19'
 python3 install_certifi.py
 ```
+
+The minimum `certifi` version also addresses
+[GHSA-6q48-6c7w-9gw2](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2),
+which concerns compromised emSign intermediate CA keys. Upgrade existing Python
+environments as well as repository requirements; rebuild images that bundle the
+old certificate store. Run the upgrade with each environment's Python interpreter.
+Restart long-running Python processes after upgrading so existing TLS contexts
+do not retain the old trust store. Do not disable TLS verification as a workaround.
 
 DNS-dependent checks require a working resolver configuration, normally
 `/etc/resolv.conf`. Do not replace a working system-managed configuration. On
