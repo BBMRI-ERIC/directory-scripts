@@ -34,6 +34,33 @@ editors, the
 is used to maintain and synchronize the manual sources; access is restricted to
 authorized collaborators.
 
+### Regenerating The Manual
+
+With both repositories cloned side by side, run from the manual repository:
+
+```bash
+python3 scripts/lint_check_ids.py --write-report
+python3 scripts/generate_checks_docs.py --checks-dir ../directory-scripts/checks
+latexmk -pdf -xelatex BBMRI-ERIC-Directory-Data-Manager-Manual.tex
+```
+
+The first command only reports IDs; inspect its diagnostics rather than using
+`--fix` blindly. It writes `checks-id-map.json`; that report is not produced by
+the documentation generator itself.
+
+Review `checks-cache.json`, `checks-merged.json`, `checks-id-map.json`,
+`CHECKS.md`, `checks-doc.tex`, and the attribute-to-check references in the main
+TeX source. Preserve reviewed overrides, but check that they do not mask changed
+implementation semantics. Inspect the rebuilt PDF and commit the manual sources
+separately from any changes here. Regeneration does not publish a new PDF to
+Zenodo or synchronize Overleaf automatically.
+
+The current collection-category checks use the Directory ontology names
+`Biological samples` and `Clinical dataset`, and recognize `Body image`,
+`Whole slide image`, `Photo image`, and the deprecated `IMAGING_DATA` category
+for imaging. Retired `BIOLOGICAL_SAMPLES` and `MEDICAL_RECORDS` codes no longer
+satisfy those checks; warning identifiers remain unchanged.
+
 ## Running checks
 
 Run the default suite:

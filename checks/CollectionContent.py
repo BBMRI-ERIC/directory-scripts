@@ -108,15 +108,21 @@ CHECK_DOCS = {'CC:AgeHighBelowMin': {'entity': 'COLLECTION',
                                                      'fields': ['data_categories'],
                                                      'severity': 'ERROR',
                                                      'summary': 'Imaging modalities or '
-                                                                'image data set found, '
-                                                                'but no image data '
-                                                                'category (Body image, '
-                                                                'Whole slide image, '
-                                                                'Photo image) among data '
-                                                                'categories: '
-                                                                'image_modality = %s, '
-                                                                'image_dataset_type = '
-                                                                '%s'},
+                                                                'image dataset types are '
+                                                                'provided, but none of '
+                                                                'Body image, Whole slide '
+                                                                'image, Photo image or '
+                                                                'the deprecated '
+                                                                'IMAGING_DATA category '
+                                                                'is selected.',
+                                                     'fix': 'Select the appropriate '
+                                                            'current image data category '
+                                                            'for the advertised imaging '
+                                                            'content, or correct imaging '
+                                                            'metadata entered in error. '
+                                                            'The deprecated IMAGING_DATA '
+                                                            'category remains accepted '
+                                                            'for compatibility.'},
  'CC:ImageTypeMissing': {'entity': 'COLLECTION',
                                                       'fields': ['type'],
                                                       'severity': 'ERROR',

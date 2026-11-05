@@ -284,6 +284,20 @@ Use `CHECK_DOCS` for:
 
 Keep `CHECK_DOCS` aligned with the emitted `DataCheckWarning(...)` calls.
 
+Manual-facing summaries must state the actual accepted ontology categories,
+including any deprecated terms still accepted by the implementation, without
+runtime interpolation placeholders. Regenerate the sibling Data Manager Manual
+from these definitions after changes; review merged overrides, all check IDs,
+attribute references and the compiled PDF. The read-only ID linter writes
+`checks-id-map.json` with `--write-report`; the documentation generator writes
+the check caches, Markdown and TeX but does not refresh that ID report itself.
+See [the synchronization workflow](docs/data-quality.md#regenerating-the-manual).
+Multiple implementation branches may emit the same check ID. The manual's
+Markdown and TeX renderers group identical effective documentation into one
+entry and one anchor, retaining every implementation link. Raw extraction
+records remain separate. Conflicting effective metadata for a repeated ID
+must fail generation rather than silently discard one variant.
+
 ### Warning suppressions
 
 - `warning-suppressions.json`
