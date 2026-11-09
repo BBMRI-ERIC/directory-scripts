@@ -301,6 +301,9 @@ Python registry: member/observer-country biobanks are magenta unless managed in
 the `EXT` staging area. EXT biobanks and biobanks outside member/observer
 countries are green. Both colors share the same circle-size rules.
 
+OEC island insets remain visible even without Node markers or biobank records;
+empty point layers do not require placeholder coordinates.
+
 The `bbmri-members-nolabelcountry` and `global-nolabelcountry` variants omit
 country names as well as biobank names. Generate them with:
 

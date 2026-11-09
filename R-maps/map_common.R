@@ -2132,6 +2132,12 @@ bbmri_filter_valid_lonlat_points <- function(points, label = "points", max_abs_l
 bbmri_biobank_points_df <- function(points, crs, label = "points") {
   filtered <- bbmri_filter_valid_lonlat_points(points, label = label)
   projected <- sf::st_transform(filtered, crs)
+  if (nrow(projected) == 0L) {
+    out <- sf::st_drop_geometry(projected)
+    out$x <- numeric(0)
+    out$y <- numeric(0)
+    return(out)
+  }
   coords <- sf::st_coordinates(projected)
   out <- data.frame(
     sf::st_drop_geometry(projected),

@@ -177,7 +177,9 @@ already installed bundle. Keep TLS verification enabled.
     those island regions leave the main layer. Country-wide insets such as QA
     keep their existing whole-country removal and HQ connector. Regional panels
     require neither node nor biobank records and use `draw_connector = FALSE`;
-    they have text labels independent of node positions. Mainland PT, its node,
+    point-frame conversion must preserve empty attribute columns and return
+    zero-length numeric `x`/`y` columns for these valid empty layers.
+    They have text labels independent of node positions. Mainland PT, its node,
     actual point coordinates, output aspect ratios and membership colours remain
     unchanged. Test region routing separately from country-wide inset routing.
 - `checks/CollectionContent.py` now owns conservative ORPHA/ICD diagnosis crosswalk completion too when an `OrphaCodes` mapper is loaded: keep exact mappings highest-confidence, allow narrower-to-broader crosswalk fixes only in the accepted direction, and suppress duplicate legacy informational warnings when a newer concrete append fix already covers the same source diagnosis.

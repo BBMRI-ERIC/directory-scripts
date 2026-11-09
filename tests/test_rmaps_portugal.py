@@ -85,6 +85,11 @@ stopifnot(nrow(bbmri_portugal_region_labels(mainland, cfg, cfg$standard_crs, "PT
 cfg$oec_insets <- Filter(function(x) x$id != "qa", cfg$oec_insets)
 empty <- bbmri_oec_resolve_insets(cfg, countries, points[0,], nodes[0,], lines)
 stopifnot(length(empty) == 2)
+empty_nodes <- bbmri_biobank_points_df(resolved$azores$node_points, cfg$oec_crs)
+stopifnot(nrow(empty_nodes) == 0, all(c("id", "nodeType", "name", "x", "y") %in% names(empty_nodes)),
+          is.double(empty_nodes$x), is.double(empty_nodes$y))
+node_df <- bbmri_biobank_points_df(nodes, cfg$oec_crs)
+stopifnot(nrow(node_df) == 2, all(is.finite(node_df$x)), all(is.finite(node_df$y)))
 '''], check=False)
     if result.returncode == 77:
         pytest.skip("sf unavailable: geometry and label integration not executed")
