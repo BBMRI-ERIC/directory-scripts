@@ -165,6 +165,10 @@ review should prefer tighter and better-balanced whitespace.
 - The current OEC sheet is also deliberately wider than the old portrait
   experiments: `med` is now `4800 x 2800`, with proportional `small` / `big`
   and vector sizes.
+- OEC medium symbols/strokes now interpolate small and big at equal displayed
+  width. Polygon outlines scale from big's weight by export width, making
+  small, medium and unsuffixed coasts/borders thinner without changing geography.
+  Layout measurement and PNG/PDF/SVG exports share a 300 dpi size conversion.
 - The current OEC mainland frame has two explicit high-north controls:
   - `oec_main_north_cap_lat` caps the top around Mageroya rather than farther
     north

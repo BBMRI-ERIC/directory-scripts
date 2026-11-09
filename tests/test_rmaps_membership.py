@@ -226,3 +226,57 @@ stopifnot(all(fill[3:7] == cfg$fedplat_colors$observer))
     root = Path(__file__).resolve().parents[1]
     script = f"setwd({json.dumps(str(root))})\n" + script
     subprocess.run(r_command + ["-e", script], cwd=root, check=True)
+
+
+@pytest.mark.parametrize("membership", ["non_member", "member", "observer"])
+def test_oec_kosovo_colour_and_membership_precedence(r_command, membership):
+    """Colour Kosovo despite missing ISO codes, respecting later status changes.
+
+    Args:
+        r_command: Existing native or Debian proot R command prefix.
+        membership: Simulated Kosovo status; the default must be grey while a
+            future explicit member or observer classification takes precedence.
+
+    Returns:
+        None. Checks the actual country-fill helper for the pinned basemap's
+        KOS/-99 identifiers, XK-coded inputs, and unrelated control countries.
+    """
+    script = r'''
+source("R-maps/map_config.R")
+source("R-maps/map_common.R")
+cfg <- bbmri_map_config()
+countries <- data.frame(
+  iso_a2 = c("-99", "XK", NA, "FR", "RS", "AT", "QA", "-99", "-99"),
+  adm0_a3 = c("KOS", "KOS", "KOS", "FRA", "SRB", "AUT", "QAT", "CYN", "XXX")
+)
+original_codes <- countries$iso_a2
+expected <- cfg$oec_colors$gray_country
+if (membership != "non_member") {
+  cfg$oec_country_groups[[membership]] <- c(cfg$oec_country_groups[[membership]], "XK")
+  expected <- cfg$oec_colors[[membership]]
+}
+filled <- bbmri_assign_oec_country_fill(countries, cfg)
+stopifnot(
+  all(filled$fill_group[1:3] == expected),
+  all(filled$fill_group[4:5] == cfg$oec_colors$gray_country),
+  filled$fill_group[6] == cfg$oec_colors$member,
+  filled$fill_group[7] == cfg$oec_colors$observer,
+  filled$fill_group[8] == cfg$oec_colors$gray_country,
+  filled$fill_group[9] == cfg$oec_colors$default_country,
+  identical(filled$iso_a2, original_codes)
+)
+# Plain two-letter-code inputs need no Natural Earth identifier column.
+stopifnot(bbmri_assign_oec_country_fill(data.frame(iso_a2 = "XK"), cfg)$fill_group == expected)
+# The visible-land selector must retain Kosovo, not only assign it a colour.
+main <- bbmri_oec_main_countries(filled, cfg, inset_country_codes = "QA")
+stopifnot(
+  identical(as.character(main$adm0_a3), c("KOS", "KOS", "KOS", "FRA", "SRB", "AUT")),
+  all(main$fill_group[1:3] == expected)
+)
+'''
+    root = Path(__file__).resolve().parents[1]
+    script = (
+        f"setwd({json.dumps(str(root))})\n"
+        f"membership <- {json.dumps(membership)}\n" + script
+    )
+    subprocess.run(r_command + ["-e", script], cwd=root, check=True)

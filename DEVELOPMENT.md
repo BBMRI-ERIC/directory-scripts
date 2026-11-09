@@ -149,6 +149,10 @@ already installed bundle. Keep TLS verification enabled.
     as observers; retain other classifications. Federated Platform participation
     remains a separate colour overlay, including CY. Keep country-label lists
     current without inventing Directory records or node-marker locations.
+    OEC colour lookup and visible-land selection share the mapping of Natural
+    Earth's `adm0_a3=KOS` to `XK` without changing source identifiers; Kosovo is
+    in the gray group, with explicit member or
+    observer status taking precedence over that fallback in every size variant.
   - Python rare-disease preparation uses `nncontacts.py` member/observer Node
     classification and staging-area parsing. Keep its country set equal to the
     union of the R member and observer lists. EXT-managed biobanks are green
@@ -157,6 +161,25 @@ already installed bundle. Keep TLS verification enabled.
   - `bbmri-members-nolabelcountry` and `global-nolabelcountry` reuse their
     `-nolabels` builders with `include_country_labels = FALSE`; keep the default
     enabled for existing callers and include both variants in common exports.
+  - OEC size-dependent styling belongs in `bbmri_oec_scales_for_output(...)`.
+    Normalize symbol/stroke scales by configured export width before blending
+    small and big for medium (`oec_medium_style_blend = 0.5`); keep the endpoint
+    and unsuffixed symbol styles and other map families unchanged. Country
+    polygon outlines, including coasts and inset borders, use big's line scale
+    multiplied by output-width/big-width for every variant. Geography and
+    export dimensions remain independent of this styling. Resolve device-aware
+    anchors at the actual PNG/PDF/SVG physical dimensions (300 dpi conversion),
+    not on a differently sized measurement canvas.
+  - Portuguese archipelagos use shared `portugal_regions` bounds/label anchors
+    in `map_config.R`. Non-OEC country-label generation appends Azores/Madeira
+    labels only when PT labels are enabled and relevant land geometry exists.
+    OEC regional insets clip PT land and biobank points to `mask_bbox`; only
+    those island regions leave the main layer. Country-wide insets such as QA
+    keep their existing whole-country removal and HQ connector. Regional panels
+    require neither node nor biobank records and use `draw_connector = FALSE`;
+    they have text labels independent of node positions. Mainland PT, its node,
+    actual point coordinates, output aspect ratios and membership colours remain
+    unchanged. Test region routing separately from country-wide inset routing.
 - `checks/CollectionContent.py` now owns conservative ORPHA/ICD diagnosis crosswalk completion too when an `OrphaCodes` mapper is loaded: keep exact mappings highest-confidence, allow narrower-to-broader crosswalk fixes only in the accepted direction, and suppress duplicate legacy informational warnings when a newer concrete append fix already covers the same source diagnosis.
 - `warningscontainer.py` should write XLSX cells by actual value type; withdrawn flags may be real booleans in warning/entity listings and must not be forced through string-only worksheet APIs.
   - own reusable logic that can be consumed by multiple scripts or plugins

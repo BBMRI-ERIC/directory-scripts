@@ -419,7 +419,9 @@ bbmri_autofit_oec_basemap_bbox <- function(initial_bbox, countries, cfg, target_
 
 
 bbmri_oec_validate_inset_cfg <- function(inset_cfg, countries) {
-  required_top <- c("id", "label", "mask_country_codes", "bbox", "placement", "connector", "frame")
+  draw_connector <- !identical(inset_cfg$draw_connector, FALSE)
+  required_top <- c("id", "label", "mask_country_codes", "bbox", "placement", "frame")
+  if (draw_connector) required_top <- c(required_top, "connector")
   missing_top <- setdiff(required_top, names(inset_cfg))
   if (length(missing_top) > 0) {
     stop(
@@ -430,6 +432,9 @@ bbmri_oec_validate_inset_cfg <- function(inset_cfg, countries) {
   }
 
   bbmri_require_bbox(inset_cfg$bbox, paste0("OEC inset bbox '", inset_cfg$id, "'"))
+  if (!is.null(inset_cfg$mask_bbox)) {
+    bbmri_require_bbox(inset_cfg$mask_bbox, paste0("OEC inset mask '", inset_cfg$id, "'"))
+  }
 
   placement_required <- c("x", "y", "width", "height")
   placement_missing <- setdiff(placement_required, names(inset_cfg$placement))
@@ -441,7 +446,7 @@ bbmri_oec_validate_inset_cfg <- function(inset_cfg, countries) {
     )
   }
 
-  connector_required <- c("source_node_type", "target_x", "target_y", "linewidth")
+  connector_required <- if (draw_connector) c("source_node_type", "target_x", "target_y", "linewidth") else character()
   connector_missing <- setdiff(connector_required, names(inset_cfg$connector))
   if (length(connector_missing) > 0) {
     stop(
@@ -477,20 +482,20 @@ bbmri_oec_validate_inset_cfg <- function(inset_cfg, countries) {
     stop("OEC inset placement for '", inset_cfg$id, "' must stay within the canvas.", call. = FALSE)
   }
 
-  if (!is.character(inset_cfg$connector$source_node_type) || length(inset_cfg$connector$source_node_type) != 1) {
+  if (draw_connector && (!is.character(inset_cfg$connector$source_node_type) || length(inset_cfg$connector$source_node_type) != 1)) {
     stop("OEC inset connector source_node_type for '", inset_cfg$id, "' must be a single string.", call. = FALSE)
   }
-  numeric_connector_fields <- c("target_x", "target_y", "linewidth")
+  numeric_connector_fields <- if (draw_connector) c("target_x", "target_y", "linewidth") else character()
   numeric_connector_values <- unlist(inset_cfg$connector[numeric_connector_fields], use.names = FALSE)
   if (!all(is.finite(numeric_connector_values))) {
     stop("OEC inset numeric connector values for '", inset_cfg$id, "' must be finite.", call. = FALSE)
   }
-  if (
+  if (draw_connector && (
     inset_cfg$connector$target_x < 0 ||
     inset_cfg$connector$target_x > 1 ||
     inset_cfg$connector$target_y < 0 ||
     inset_cfg$connector$target_y > 1
-  ) {
+  )) {
     stop("OEC inset connector target for '", inset_cfg$id, "' must stay within the inset frame.", call. = FALSE)
   }
 
@@ -515,6 +520,9 @@ bbmri_oec_resolve_insets <- function(cfg, countries, points, node_points, node_l
     function(inset_cfg) {
       bbmri_oec_validate_inset_cfg(inset_cfg, countries)
       inset_cfg$mask <- countries[countries$iso_a2 %in% inset_cfg$mask_country_codes, , drop = FALSE]
+      if (!is.null(inset_cfg$mask_bbox)) {
+        inset_cfg$mask <- bbmri_clip_to_bbox(inset_cfg$mask, inset_cfg$mask_bbox)
+      }
       if (nrow(inset_cfg$mask) == 0) {
         stop("OEC inset '", inset_cfg$id, "' resolved to an empty country mask.", call. = FALSE)
       }
@@ -537,6 +545,41 @@ bbmri_oec_resolve_insets <- function(cfg, countries, points, node_points, node_l
   )
 }
 
+#' Subtract regional inset land while retaining the parent country's mainland.
+#' @param countries Main-map sf country layer after country-wide inset removal.
+#' @param insets Resolved inset list containing mask geometry and optional mask_bbox.
+#' @return Main-map sf layer with only regional inset geometry removed. Records
+#'   whose geometry becomes empty are omitted; other attributes are retained.
+bbmri_oec_remove_inset_regions <- function(countries, insets) {
+  for (inset in insets) {
+    if (is.null(inset$mask_bbox)) next
+    mask <- sf::st_transform(sf::st_geometry(inset$mask), sf::st_crs(countries))
+    countries <- suppressWarnings(sf::st_difference(sf::st_make_valid(countries),
+                                                    sf::st_union(mask)))
+    countries <- countries[!sf::st_is_empty(countries), , drop = FALSE]
+  }
+  countries
+}
+
+#' Build the final OEC panel theme without covering geography with frame fill.
+#' @param cfg Map configuration containing the default OEC background colour.
+#' @param frame Optional frame colours and border_linewidth; NULL for no frame.
+#' @param line_scale Positive scale applied to the frame's border stroke.
+#' @return ggplot theme with background and, when requested, a transparent-filled
+#'   border applied after theme_void so that the frame remains visible.
+bbmri_oec_panel_theme <- function(cfg, frame = NULL, line_scale = 1) {
+  theme <- bbmri_void_theme(cfg$oec_colors$background) +
+    ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
+  if (!is.null(frame)) {
+    theme <- theme + ggplot2::theme(
+      panel.background = ggplot2::element_rect(fill = frame$background_fill, colour = NA),
+      panel.border = ggplot2::element_rect(fill = NA, colour = frame$border_colour,
+                                          linewidth = frame$border_linewidth * line_scale)
+    )
+  }
+  theme
+}
+
 bbmri_oec_panel_plot <- function(
   countries,
   point_sf,
@@ -550,7 +593,8 @@ bbmri_oec_panel_plot <- function(
   frame = NULL,
   draw_node_lines = TRUE,
   symbol_scale = 1.0,
-  line_scale = 1.0
+  line_scale = 1.0,
+  country_line_scale = line_scale
 ) {
   iarc_symbol <- cfg$oec_iarc_symbol
 
@@ -559,7 +603,7 @@ bbmri_oec_panel_plot <- function(
       data = countries,
       ggplot2::aes(fill = fill_group),
       colour = cfg$oec_colors$country_line,
-      linewidth = 0.45 * line_scale
+      linewidth = 0.45 * country_line_scale
     ) +
     ggplot2::scale_fill_identity()
 
@@ -681,21 +725,9 @@ bbmri_oec_panel_plot <- function(
     }
   }
 
-  if (!is.null(frame)) {
-        plot <- plot + ggplot2::theme(
-      panel.border = ggplot2::element_rect(
-        fill = frame$background_fill,
-        colour = frame$border_colour,
-        linewidth = frame$border_linewidth * line_scale
-      ),
-      plot.margin = ggplot2::margin(0, 0, 0, 0)
-    )
-  }
-
   plot +
     bbmri_coord_sf(bbox, cfg$oec_crs, projected_bbox = projected_bbox) +
-    bbmri_void_theme(cfg$oec_colors$background) +
-    ggplot2::theme(plot.margin = ggplot2::margin(0, 0, 0, 0))
+    bbmri_oec_panel_theme(cfg, frame, line_scale)
 }
 
 build_members_oec_all_map <- function(
@@ -710,8 +742,9 @@ build_members_oec_all_map <- function(
   bbmri_require_packages(c("ggplot2", "sf", "cowplot"))
 
   cfg <- bbmri_map_config()
-  symbol_scale <- bbmri_symbol_scale_for_output(cfg, output_variant)
-  line_scale <- bbmri_line_scale_for_output(cfg, output_variant)
+  output_scales <- bbmri_oec_scales_for_output(cfg, output_variant)
+  symbol_scale <- output_scales$symbol_scale
+  line_scale <- output_scales$line_scale
   countries_all <- bbmri_assign_oec_country_fill(bbmri_load_countries(), cfg)
   points <- bbmri_read_sf(points_path, "Member biobank GeoJSON")
   iarc <- bbmri_read_sf(iarc_path, "IARC overlay")
@@ -720,20 +753,14 @@ build_members_oec_all_map <- function(
 
   points <- points[points$biobankID != "bbmri-eric:ID:EXT_NASBIO", ]
   resolved_insets <- bbmri_oec_resolve_insets(cfg, countries_all, points, node_points, node_lines)
-  inset_country_codes <- unique(unlist(lapply(resolved_insets, function(inset_cfg) inset_cfg$mask_country_codes)))
-  inset_mask <- countries_all[countries_all$iso_a2 %in% inset_country_codes, , drop = FALSE]
+  whole_country_insets <- Filter(function(inset) is.null(inset$mask_bbox), resolved_insets)
+  inset_country_codes <- unique(unlist(lapply(whole_country_insets, function(inset) inset$mask_country_codes)))
+  inset_mask <- if (length(resolved_insets)) {
+    do.call(rbind, lapply(resolved_insets, function(inset) inset$mask))
+  } else countries_all[0, , drop = FALSE]
 
-  visible_country_codes <- unique(c(
-    cfg$oec_country_groups$member,
-    cfg$oec_country_groups$observer,
-    cfg$oec_country_groups$gray
-  ))
-  main_countries <- countries_all[
-    countries_all$iso_a2 %in% visible_country_codes &
-      !countries_all$iso_a2 %in% inset_country_codes,
-    ,
-    drop = FALSE
-  ]
+  main_countries <- bbmri_oec_main_countries(countries_all, cfg, inset_country_codes)
+  main_countries <- bbmri_oec_remove_inset_regions(main_countries, resolved_insets)
   for (exclusion_bbox in cfg$oec_geographic_exclusions) {
     main_countries <- bbmri_exclude_bbox(main_countries, exclusion_bbox)
   }
@@ -770,7 +797,8 @@ build_members_oec_all_map <- function(
     iarc_sf = iarc_sf,
     draw_iarc_label = TRUE,
     symbol_scale = symbol_scale,
-    line_scale = line_scale
+    line_scale = line_scale,
+    country_line_scale = output_scales$country_line_scale
   )
 
   main_plot_aspect <- {
@@ -833,7 +861,8 @@ build_members_oec_all_map <- function(
       frame = inset_cfg$frame,
       draw_node_lines = FALSE,
       symbol_scale = symbol_scale,
-      line_scale = line_scale
+      line_scale = line_scale,
+      country_line_scale = output_scales$country_line_scale
     )
     if (nrow(inset_cfg$node_points) > 0) {
       inset_label_sf <- bbmri_shift_sf_points(
@@ -882,6 +911,17 @@ build_members_oec_all_map <- function(
       aspect = inset_plot_aspect,
       page_aspect = device_width_in / device_height_in
     )
+    if (identical(inset_cfg$draw_connector, FALSE)) {
+      composed <- composed + cowplot::draw_plot(
+        inset_plot, x = inset_box$x, y = inset_box$y,
+        width = inset_box$width, height = inset_box$height
+      ) + cowplot::draw_label(
+        inset_cfg$label, x = inset_box$x, y = inset_box$y + inset_box$height,
+        hjust = 0, vjust = -0.2, fontfamily = bbmri_font_family(),
+        size = 7 * symbol_scale
+      )
+      next
+    }
     connector_npc <- if (identical(inset_cfg$connector$source_node_type, "HQ")) {
       hq_overlay_npc
     } else {
@@ -967,16 +1007,16 @@ build_members_oec_all_map <- function(
 bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
   dir.create(args$output_dir, recursive = TRUE, showWarnings = FALSE)
   raster_sizes <- export_sizes$png
-  raster_dpi <- 600
-  pdf_dpi <- 300
+  # Measure anchors on the same physical canvas used by every output device.
+  export_dpi <- 300
   vector_size <- export_sizes$vector
-  vector_width_in <- unname(vector_size[["width"]]) / pdf_dpi
-  vector_height_in <- unname(vector_size[["height"]]) / pdf_dpi
+  vector_width_in <- unname(vector_size[["width"]]) / export_dpi
+  vector_height_in <- unname(vector_size[["height"]]) / export_dpi
 
   for (name in names(raster_sizes)) {
     size <- raster_sizes[[name]]
-    width_in <- unname(size[["width"]]) / raster_dpi
-    height_in <- unname(size[["height"]]) / raster_dpi
+    width_in <- unname(size[["width"]]) / export_dpi
+    height_in <- unname(size[["height"]]) / export_dpi
     plot <- build_members_oec_all_map(
       points_path = args$input,
       iarc_path = args$iarc,
@@ -993,14 +1033,15 @@ bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
       width = unname(size[["width"]]),
       height = unname(size[["height"]]),
       units = "px",
+      dpi = export_dpi,
       bg = "white",
       limitsize = FALSE
     )
     ggplot2::ggsave(
       filename = file.path(args$output_dir, paste0(args$output_prefix, "-", name, ".pdf")),
       plot = plot,
-      width = unname(size[["width"]]) / pdf_dpi,
-      height = unname(size[["height"]]) / pdf_dpi,
+      width = width_in,
+      height = height_in,
       units = "in",
       bg = "white",
       limitsize = FALSE
@@ -1009,7 +1050,7 @@ bbmri_save_members_oec_all_formats <- function(args, export_sizes) {
       plot = plot,
       path = file.path(args$output_dir, paste0(args$output_prefix, "-", name, ".svg")),
       size = size,
-      raster_dpi = pdf_dpi
+      raster_dpi = export_dpi
     )
   }
 

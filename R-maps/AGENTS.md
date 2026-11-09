@@ -574,7 +574,9 @@ blocked on the answer; that part was faster locally.
   - default `<prefix>.svg` when `svglite` is available
 - Raster exports are generated with fixed physical size plus varying DPI, not
   by changing the physical page size. This is intentional so dots/text stay
-  visually proportional across `small`/`med`/`big`.
+  visually proportional across `small`/`med`/`big`. OEC is the exception: its
+  dedicated saver varies physical page size at 300 dpi. Follow the OEC scaling
+  contract in `../DEVELOPMENT.md` and measure anchors on the actual export canvas.
 - Because raster device math rounds at the pixel level, a configured size can
   occasionally land one pixel off in height on a specific output. Treat that as
   a rendering-device artifact unless it becomes materially visible.

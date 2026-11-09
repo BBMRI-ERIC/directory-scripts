@@ -49,7 +49,19 @@ bbmri_map_config <- function() {
     MT = c(lon = 14.404172, lat = 35.920902)
   )
 
+  portugal_regions <- list(
+    azores = list(label = "Azores (PT)",
+      bbox = c(xmin = -31.6, ymin = 36.5, xmax = -24.5, ymax = 40.1),
+      label_lon = -27.8, label_lat = 40.3,
+      placement = list(x = 0.025, y = 0.165, width = 0.130, height = 0.080)),
+    madeira = list(label = "Madeira (PT)",
+      bbox = c(xmin = -17.5, ymin = 29.8, xmax = -15.6, ymax = 33.4),
+      label_lon = -17.0, label_lat = 34.0,
+      placement = list(x = 0.075, y = 0.065, width = 0.065, height = 0.075))
+  )
+
   list(
+    portugal_regions = portugal_regions,
     render_scale = 2,
     marker_width_scale = 8.7,
     standard_bbox = c(
@@ -128,6 +140,7 @@ bbmri_map_config <- function() {
       big = c(12840, 7490),
       vector = c(2400, 1400)
     ),
+    oec_medium_style_blend = 0.5,
     global_export_sizes = scale_export_sizes(
       small = c(918, 509),
       med = c(2300, 1272),
@@ -247,7 +260,7 @@ bbmri_map_config <- function() {
       observer = c("DK", "ME", "QA", "TR", "UA"),
       gray = c(
         "AL", "BA", "BY", "FR", "GB", "HR", "IE", "IL", "IS", "LU",
-        "MD", "MK", "RO", "RS"
+        "MD", "MK", "RO", "RS", "XK"
       )
     ),
     standard_colors = list(
@@ -397,7 +410,7 @@ bbmri_map_config <- function() {
       biobank_dx = 10000,
       biobank_dy = -8000
     ),
-    oec_insets = list(
+    oec_insets = c(list(
       list(
         id = "qa",
         label = "Qatar",
@@ -430,7 +443,14 @@ bbmri_map_config <- function() {
           background_fill = "#fbfdff"
         )
       )
-    ),
+    ), lapply(names(portugal_regions), function(id) {
+      region <- portugal_regions[[id]]
+      list(id = id, label = region$label, mask_country_codes = "PT",
+        mask_bbox = region$bbox, bbox = region$bbox, placement = region$placement,
+        require_node = FALSE, draw_connector = FALSE,
+        frame = list(border_colour = "#d5d5d5", border_linewidth = 0.3,
+                     background_fill = "#ffffff"))
+    })),
     biobank_size_widths = c(
       "0" = 5,
       "1" = 6,

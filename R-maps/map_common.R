@@ -555,6 +555,59 @@ bbmri_line_scale_for_output <- function(cfg, output_variant) {
   scale_value
 }
 
+#' Resolve OEC styles after normalizing the maps to equal displayed width.
+#'
+#' @param cfg Map configuration containing OEC export dimensions, the medium
+#'   blend weight (0 = small appearance, 1 = big appearance), and shared symbol
+#'   and line scales. All export dimensions must be positive and finite.
+#' @param output_variant One of "small", "med", "big", or "vector"; "vector"
+#'   denotes the unsuffixed PDF/SVG output, not all vector file formats.
+#' @return A list with symbol_scale for marker sizes, line_scale for marker
+#'   strokes and node connectors, and country_line_scale for polygon outlines.
+#'   Medium markers/strokes interpolate page-relative small/big sizes. Outlines
+#'   always have the same page-relative thickness as big. Other map families
+#'   continue to use the unmodified shared scale helpers.
+bbmri_oec_scales_for_output <- function(cfg, output_variant) {
+  sizes <- c(cfg$oec_export_sizes$png, list(vector = cfg$oec_export_sizes$vector))
+  variants <- c("small", "med", "big", "vector")
+  if (!is.character(output_variant) || length(output_variant) != 1 ||
+      is.na(output_variant) || !output_variant %in% variants) {
+    stop("Unknown OEC output variant; expected small, med, big, or vector.", call. = FALSE)
+  }
+  for (variant in variants) {
+    size <- sizes[[variant]]
+    if (!is.numeric(size) || !all(c("width", "height") %in% names(size)) ||
+        any(!is.finite(size)) || any(size <= 0)) {
+      stop("OEC export dimensions must be positive and finite: ", variant, call. = FALSE)
+    }
+  }
+  blend <- cfg$oec_medium_style_blend
+  if (!is.numeric(blend) || length(blend) != 1 || !is.finite(blend) ||
+      blend < 0 || blend > 1) {
+    stop("OEC medium style blend must be between 0 and 1.", call. = FALSE)
+  }
+  width <- unname(sizes[[output_variant]][["width"]])
+  small_width <- unname(sizes$small[["width"]])
+  big_width <- unname(sizes$big[["width"]])
+  symbol_scale <- bbmri_symbol_scale_for_output(cfg, output_variant)
+  line_scale <- bbmri_line_scale_for_output(cfg, output_variant)
+  if (output_variant == "med") {
+    symbol_scale <- width * (
+      (1 - blend) * bbmri_symbol_scale_for_output(cfg, "small") / small_width +
+        blend * bbmri_symbol_scale_for_output(cfg, "big") / big_width
+    )
+    line_scale <- width * (
+      (1 - blend) * bbmri_line_scale_for_output(cfg, "small") / small_width +
+        blend * bbmri_line_scale_for_output(cfg, "big") / big_width
+    )
+  }
+  list(
+    symbol_scale = symbol_scale,
+    line_scale = line_scale,
+    country_line_scale = bbmri_line_scale_for_output(cfg, "big") * width / big_width
+  )
+}
+
 bbmri_scaled_symbol_size <- function(value, cfg, output_variant) {
   value * bbmri_symbol_scale_for_output(cfg, output_variant)
 }
@@ -1364,13 +1417,71 @@ bbmri_assign_fedplat_country_fill <- function(countries, cfg) {
   countries
 }
 
+#' Resolve country codes consistently for OEC colouring and land selection.
+#'
+#' @param countries Data frame or sf layer with iso_a2 and optional adm0_a3.
+#' @return Character vector of lookup codes, mapping Natural Earth's KOS to XK
+#'   without modifying the original identifiers or geometry.
+bbmri_oec_country_codes <- function(countries) {
+  country_codes <- as.character(countries$iso_a2)
+  country_codes[countries$adm0_a3 %in% "KOS"] <- "XK"
+  country_codes
+}
+
+#' Select configured OEC main-map countries without losing missing-ISO areas.
+#'
+#' @param countries Country data frame or sf layer, optionally already coloured.
+#' @param cfg Map configuration containing OEC member, observer and gray groups.
+#' @param inset_country_codes Character vector of countries rendered in insets
+#'   instead of the main map; defaults to no exclusions.
+#' @return Country records in original order whose normalized codes belong to
+#'   a visible group and are not assigned to an inset. Geometry is unchanged.
+bbmri_oec_main_countries <- function(countries, cfg, inset_country_codes = character()) {
+  country_codes <- bbmri_oec_country_codes(countries)
+  visible_codes <- unique(unlist(cfg$oec_country_groups[c("member", "observer", "gray")]))
+  countries[country_codes %in% visible_codes & !country_codes %in% inset_country_codes, , drop = FALSE]
+}
+
+#' Assign OEC country colours, including Kosovo's Natural Earth identifier.
+#'
+#' @param countries Data frame or sf layer with iso_a2 and optional adm0_a3
+#'   identifiers. The pinned basemap identifies Kosovo as KOS with iso_a2=-99.
+#' @param cfg Map configuration containing OEC palettes and country groups;
+#'   explicit member/observer membership takes precedence over the gray group.
+#' @return The input records with a fill_group colour column. Original country
+#'   identifiers and geometry remain unchanged; KOS maps to XK only for lookup.
 bbmri_assign_oec_country_fill <- function(countries, cfg) {
+  country_codes <- bbmri_oec_country_codes(countries)
   countries$fill_group <- cfg$oec_colors$default_country
-  countries$fill_group[countries$iso_a2 %in% cfg$oec_country_groups$member] <- cfg$oec_colors$member
-  countries$fill_group[countries$iso_a2 %in% cfg$oec_country_groups$observer] <- cfg$oec_colors$observer
-  countries$fill_group[countries$iso_a2 %in% cfg$oec_country_groups$gray] <- cfg$oec_colors$gray_country
+  countries$fill_group[country_codes %in% cfg$oec_country_groups$gray] <- cfg$oec_colors$gray_country
+  countries$fill_group[country_codes %in% cfg$oec_country_groups$member] <- cfg$oec_colors$member
+  countries$fill_group[country_codes %in% cfg$oec_country_groups$observer] <- cfg$oec_colors$observer
   countries$fill_group[countries$adm0_a3 %in% c("CYN", "CNM", "KAS", "KNM")] <- cfg$oec_colors$gray_country
   countries
+}
+
+#' Build supplementary labels for Portuguese archipelagos present in the map.
+#' @param countries Country sf layer; only PT geometry is considered.
+#' @param cfg Map configuration containing portugal_regions and label anchors.
+#' @param crs Target projected coordinate reference system for text positions.
+#' @param label_codes Country codes whose labels are enabled; PT must be present.
+#' @return Data frame with iso_a2, label, x, y, dx and dy, empty when disabled
+#'   or when no island geometry is present. Coordinates use the target CRS.
+bbmri_portugal_region_labels <- function(countries, cfg, crs, label_codes) {
+  labels <- data.frame(iso_a2 = character(), label = character(), x = numeric(),
+                       y = numeric(), dx = numeric(), dy = numeric())
+  if (!"PT" %in% label_codes) return(labels)
+  portugal <- countries[countries$iso_a2 %in% "PT", , drop = FALSE]
+  if (nrow(portugal) == 0) return(labels)
+  for (region in cfg$portugal_regions) {
+    if (nrow(bbmri_clip_to_bbox(portugal, region$bbox)) == 0) next
+    anchor <- sf::st_as_sf(data.frame(lon = region$label_lon, lat = region$label_lat),
+                           coords = c("lon", "lat"), crs = 4326)
+    xy <- sf::st_coordinates(sf::st_transform(anchor, crs))
+    labels <- rbind(labels, data.frame(iso_a2 = "PT", label = region$label,
+                      x = xy[1,1], y = xy[1,2], dx = 0, dy = 0))
+  }
+  labels
 }
 
 bbmri_country_label_df <- function(countries, cfg, crs, label_codes = cfg$standard_country_labels, label_offsets = cfg$standard_label_offsets) {
@@ -1398,7 +1509,7 @@ bbmri_country_label_df <- function(countries, cfg, crs, label_codes = cfg$standa
   labels$dy[is.na(labels$dy)] <- 0
   labels$x <- labels$x + labels$dx
   labels$y <- labels$y + labels$dy
-  labels
+  rbind(labels, bbmri_portugal_region_labels(countries, cfg, crs, label_codes))
 }
 
 bbmri_country_anchor_df <- function(countries, crs, label_codes = NULL) {

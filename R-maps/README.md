@@ -110,10 +110,53 @@ Shared inputs:
 2. helper prep scripts derive map-specific GeoJSONs when needed
 3. renderer scripts write `small` / `med` / `big` PNG, PDF, and SVG outputs
 
-`bbmri-members-OEC-all` uses a dedicated page size instead of the standard
-landscape exporter sheet. The current target `med` page is approximately
-`20.3 x 11.9 cm` (`2400 x 1400 px` at `300 dpi`, `4800 x 2800 px` at
-`600 dpi` raster), with proportional `small` and `big` variants.
+`bbmri-members-OEC-all` uses dedicated page sizes: `small` is `1920 x 1120`,
+`med` is `4800 x 2800`, and `big` is `12840 x 7490` pixels. PNG exports use
+`300 dpi`; matching PDF/SVG pages use those pixel dimensions divided by 300
+in inches. Unsuffixed PDF/SVG maps use `2400 x 1400` at the same conversion.
+Thus the medium page is approximately `40.6 x 23.7 cm`, and the unsuffixed
+page is approximately `20.3 x 11.9 cm`.
+
+### OEC Display Scaling
+
+Compare size variants fitted to the same display width, rather than at 100%
+pixel zoom. Medium node/biobank symbols and connector strokes sit halfway
+between the small and big appearances. Adjust `oec_medium_style_blend` in
+`map_config.R` to tune that balance: `0` matches small, `1` matches big,
+and the default `0.5` is halfway. Export dimensions and geographic framing
+are independent of that setting.
+
+Coastlines and country borders share a polygon-outline layer. Their widths
+scale with the output width to match a downscaled big map, including the
+Qatar inset and the unsuffixed PDF/SVG files. Big's outline weight is retained;
+other map families keep their existing styling.
+
+Kosovo uses `XK` in the OEC colour configuration and is grey while it is outside
+the member/observer groups. The renderer also recognises Natural Earth's `KOS`
+identifier when the basemap lacks a two-letter code. An explicit member or
+observer classification takes precedence over the grey fallback.
+
+Regenerate just this map using the existing [OEC rendering recipe](SKILLS.md#oec-all)
+or `sh R-maps/export.sh bbmri-members-OEC-all`.
+
+### Portugal's Archipelagos
+
+Non-OEC country-label maps include `Azores (PT)` and `Madeira (PT)` labels
+when Portuguese island geometry is present. Maps with country labels disabled
+remain unlabelled. Existing geographic bounds and page aspect ratios are retained.
+
+OEC maps place the archipelagos in two framed regional panels west of mainland
+Portugal, labelled `Azores (PT)` and `Madeira (PT)`. The panels retain Portugal's
+membership colour and show registered biobanks at their actual island positions;
+they remain visible without registered biobanks. Unlike Qatar, these geographic
+insets have no HQ connector or artificial node. Mainland Portugal and its node
+remain in the main map.
+
+Bounds, label anchors and panel placement are maintained together in
+`portugal_regions` in `map_config.R`. OEC uses each region's `mask_bbox` rather
+than removing the whole country. Qatar keeps its existing whole-country inset.
+Panel positions should be visually checked at small, medium and big sizes after
+adjustments. Rendering requires `sf`, `ggplot2`, `cowplot` and `svglite` for SVG.
 
 `geocoding.py` is expected to be cache-backed for both Directory data and
 live geocoding. Only entities still missing usable coordinates should trigger a
