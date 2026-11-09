@@ -33,6 +33,10 @@ Run this workflow before creating a commit in this repository.
 - Run targeted `pytest -q` subsets first.
 - Run broader tests when the risk justifies it.
 - Do not commit until the relevant unit tests pass.
+- If Node membership, observer status, or contact configuration changes, complete
+  the Node Membership Synchronization checklist in `DEVELOPMENT.md` before
+  commit. Require non-skipped Python/R consistency checks, review missing
+  representative emails explicitly, and ask the user for unknown details.
 
 5. Check documentation consistency.
 - Update `README.md` for user-facing behavior changes.

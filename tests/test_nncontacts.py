@@ -3,6 +3,28 @@
 from nncontacts import NNContacts
 
 
+def test_active_operational_contacts_exclude_governance_only_contacts():
+    """Route operational contacts without former, external, or AoM/FC-only ones.
+
+    Returns:
+        None. Six Nodes use each eligible active MC or Work Programme email
+        exactly once, excluding governance-only, former and external records.
+    """
+    expected = {
+        "DK": {"kms@ssi.dk"},
+        "ME": {"masaz@ucg.ac.me"},
+        "PT": {"ana.reis@gimm.pt", "sergio.dias@gimm.pt"},
+        "QA": {"fqafoud@qf.org.qa", "efthenou@qf.org.qa"},
+        "SI": {"urban.bren@um.si"},
+        "UA": {"h.chytaieva@audubonbio.com", "b.shkurupii@audubonbio.com"},
+    }
+    for code, emails in expected.items():
+        assert set(NNContacts.get_contacts(code).split(", ")) == emails
+        assert len(NNContacts.get_contacts(code).split(", ")) == len(emails)
+        assert NNContacts.NNtoEmails[code] == NNContacts.NODE_TO_EMAILS[code]
+        assert NNContacts.is_member_node(code)
+
+
 def test_member_country_classification_is_not_limited_to_contact_directory():
     """Countries remain members/observers without inventing missing contact emails.
 

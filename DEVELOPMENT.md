@@ -751,6 +751,57 @@ target creation, fact-sheet generation, or source-ID redirect MUST be
 implemented as a separately approved workflow with its own validation and
 human sign-off.
 
+## Node Membership Synchronization
+
+Any edit to Node membership, observer status, or contact configuration in Python
+or R must trigger a cross-language review in the same change, before commit:
+
+1. Inspect `NNContacts.MEMBER_NODE_CODES` and `NODE_TO_EMAILS` in `nncontacts.py`,
+   and `standard_country_groups`, `oec_country_groups`, `fedplat_country_groups`
+   and country-label settings in `R-maps/map_config.R`. `map_common.R` consumes
+   configuration; it is not the country-list definition.
+2. Require exact equality between Python's combined member/observer country set
+   and the union of the standard R member and observer lists. Require standard
+   and OEC lists to agree separately for each status, with disjoint statuses and
+   no member/observer in OEC `gray`. Normalize Montenegro to `ME`, not `MNE`.
+   Keep `EXT`, `EU`, and `IARC` outside country membership.
+3. Review federated-platform overlays without erasing their separate meaning:
+   participating countries may be in `fedplat` instead of the base member color.
+   Review country-name visibility without overriding deliberate label-free
+   variants. Membership changes must not invent Directory records.
+4. Compare membership against `NODE_TO_EMAILS` explicitly. Missing contacts are
+   not missing membership: ask the user for representative email lists, retain
+   the existing escalation fallback until supplied, and report the unresolved
+   coverage. Never guess emails, silently copy another Node's contacts, or
+   remove a legitimate Node to make coverage appear complete. Likewise ask for
+   missing OEC Node coordinates; update both point and HQ-line overlays only
+   with supplied or confirmed information. Do not block correct classification
+   on unavailable contact or coordinate data.
+   Governance-table imports must distinguish active operational/Node records
+   from former and external contacts; concatenate approved active emails and
+   do not infer a Node-routing role for external contacts from country alone.
+   Exclude AoM/FC-only contacts; active MC contacts remain eligible even with
+   additional AoM/FC membership. Do not infer groups for unreviewed legacy
+   contacts. A Node left without operational contacts retains its membership
+   and existing escalation fallback while confirmed contacts are requested.
+   Active Work Programme records also qualify. Evaluate eligibility per record
+   before deduplicating emails: an excluded AoM/FC-only record must not veto a
+   separate eligible active MC record for the same email. Store each eligible
+   email once per country, trimming incidental whitespace.
+5. Run the following from the repository root before committing any affected
+   configuration change. R and `sf` must be available; skipped consistency tests
+   are not a successful gate. Fix discrepancies, rerun, and record results in
+   the commit review. If the runtime is unavailable, report the blocker rather
+   than declaring consistency verified.
+
+```bash
+python3 -m pytest -q tests/test_rmaps_membership.py tests/test_nncontacts.py
+Rscript -e 'source("R-maps/map_config.R"); cfg <- bbmri_map_config(); a <- cfg$standard_country_groups; b <- cfg$oec_country_groups; stopifnot(setequal(a$member, b$member), setequal(a$observer, b$observer), length(intersect(a$member, a$observer)) == 0L, length(intersect(c(a$member, a$observer), b$gray)) == 0L)'
+```
+
+This is a required AI editing/review procedure, not an installed Git hook.
+Operator instructions are in [the map guide](docs/maps.md#updating-node-membership-and-contacts).
+
 ## Coding Style
 
 - Python 3, 4-space indentation, keep existing vim modelines intact.

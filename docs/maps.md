@@ -280,6 +280,28 @@ and the membership configuration used by the maps.
 
 ## Member And Observer Countries
 
+### Updating Node Membership And Contacts
+
+When changing a country's status, update the R groups and Python Node registry
+together using the [synchronization checklist](../DEVELOPMENT.md#node-membership-synchronization).
+Run its checks before commit. `NNContacts.MEMBER_NODE_CODES` includes both
+members and observers; `NODE_TO_EMAILS` is a separate routing table and may
+legitimately lack a confirmed representative. Supply missing representative
+emails when asked; until then the existing escalation fallback remains active.
+New OEC Node locations also need confirmed coordinates and matching HQ lines.
+When using governance-table exports for contacts, use active operational/Node
+records, concatenate multiple confirmed emails per country, and exclude former
+or external contacts unless their Node-routing role is explicitly confirmed.
+Exclude contacts whose groups consist only of AoM and/or FC; retain active MC
+contacts even when they also belong to AoM or FC. Active Work Programme contacts
+are also eligible. Deduplicate emails across eligible records; an AoM/FC-only
+record does not disqualify a separate active operational record for that email.
+The supplied records populate PT, ME, QA, UA, DK and SI.
+Former delegates remain excluded even in repeated source selections. Do not
+infer group membership for older contacts absent from the supplied records.
+
+### Configuration Locations
+
 Edit `R-maps/map_config.R`: `standard_country_groups` controls standard maps
 and OEC point selection; `oec_country_groups` controls OEC country colours.
 Keep their member/observer lists aligned and remove newly admitted countries

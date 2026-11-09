@@ -227,6 +227,11 @@ document.
     renderer-local membership palette.
 - Do not hardcode machine-specific legacy output paths into the renderers.
   External Tilemill-era overlays are passed as explicit inputs.
+- Membership edits must also reconcile `../nncontacts.py` classification and
+  review Node contact coverage. Follow the [Node synchronization contract](../DEVELOPMENT.md#node-membership-synchronization)
+  and pass its checks before commit; ask for unknown emails or Node locations
+  rather than inventing them. Country lists live in `map_config.R`, not
+  `map_common.R`.
 - Rivers must not be rendered in any map variant.
   - This is a shared framework rule, not a renderer-by-renderer preference.
   - Keep the classic/shared base helpers river-free so the omission propagates

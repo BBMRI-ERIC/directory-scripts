@@ -70,6 +70,11 @@ When files in `checks/` are modified, enforce all of the following:
 
 ## Step 7: Execute verification commands
 
+For Node membership, observer status, or contact configuration changes, enforce
+the Node Membership Synchronization checklist in `DEVELOPMENT.md`. Do not treat
+skipped Python/R consistency checks as passing; report missing representative
+emails and request them rather than inventing contacts or changing membership.
+
 Run a representative verification set from repo root:
 
 ```bash
