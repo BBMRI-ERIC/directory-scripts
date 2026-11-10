@@ -14,6 +14,14 @@ separate software/model/ontology expectations, migration advice, MIABIS bindings
 structural changes and stable Manual references. Validate it using the versioned
 JSON schema and `vocabulary_guidance.py`. It is neither a vocabulary mirror nor a
 runtime log. Reviewed advice is not automatically official semantic equivalence.
+Expected software release/commit and model/ontology source commits identify the
+development baselines for the QC rules and Manual guidance. Production observations
+are separate evidence, not their authority. Optional software `revision` values
+must be full immutable Git SHAs; legacy guidance may omit them explicitly.
+Changing a production observation must not silently retarget the development
+baseline. Manual edition history records reference commits where recoverable,
+leaving missing historical software/model baselines unrecorded rather than
+inferring them from publication or deployment dates.
 
 `directory.get_directory_metadata_snapshot(...)` must not construct Directory or
 read entity records. The allowlist covers schema/manifest metadata and selected
@@ -56,6 +64,62 @@ to flag changed advice/sources or missing labels, not certify prose semantics.
 Public links must not imply unpublished sections are available. On Python without
 `imp`, a narrow compatible plugin manager preserves file discovery and IPlugin
 activation without changing Yapsy installations.
+
+## Directory Version API
+
+`directory.get_directory_versions(...)` and
+`directory.compare_directory_versions(expected_software_commit,
+expected_model_commit, ...)` provide metadata-only inspection/comparison.
+`Directory.getVersions(...)` and `Directory.compareVersions(...)` are thin
+conveniences bound to an existing instance's target/schema. Neither constructs
+another Directory nor retains credentials. Private refresh authentication is
+explicit. Transport stays in `directory.py`; generic source/history computation
+lives in `directory_versions.py`, sharing verified source bytes and CSV parsing
+with `vocabulary_sources.py`. Existing QC compatibility reporting is unchanged.
+
+The JSON-compatible result separates software, schema, vocabulary contents,
+observation times/channels, scope, completeness and diagnostics. It never invents
+a model deployment SHA from a content match. Software uses the reported manifest
+commit, resolving short IDs against the fixed upstream repository for comparison.
+Caller expectations are hexadecimal immutable IDs, not branches. Software ancestry
+uses validated GitHub base/head response identity, never dates or SHA ordering.
+
+Model and vocabulary migrations are independent of binary releases. A separate
+model source SHA selects the ERIC/staging model CSV and vocabulary CSVs. All
+business vocabulary properties participate except runtime fields, display order
+and derived inverse references. Normalize references using their declared types
+and EMX2 CSV array quoting; scalar JSON-looking strings remain scalar text.
+Reject duplicate identities and ambiguous populated CSV fields, while permitting
+empty trailing padding. Expected CSV defaults are distinct from unavailable
+observed model flags: missing assessed properties produce unknown, not equality.
+Unexposed model properties and software-generated ontology definitions are
+explicitly unverified. The existing QC fingerprint projection is not broadened
+or reinterpreted by this stricter public comparison API.
+
+The default `ontology_tables=None` discovers model-linked and transitively linked
+reference tables from DirectoryOntologies metadata. Explicit subsets, including
+an empty tuple, cannot establish whole-model equality. Metadata discovery must
+never read entity tables, even if malformed reference metadata names one. Existing
+explicit three-vocabulary metadata callers retain their cache identity. Complete
+discovery caches must include every resolved reference, and incomplete refreshes
+(including failure of a newly added reference) must retain prior complete evidence
+and its original observation time. Manifest freshness is tracked independently.
+
+Comparison statuses are older/equal/newer/diverged/unknown; opposing known model
+directions aggregate as mixed. Unknown components prevent a whole-model direction.
+Narrowed scope exposes only `model_overall.scoped_status`. Direct equality means
+equal assessed contents, not proof of a deployed migration revision. For unequal
+contents, search bounded complete file history, following renames and pagination,
+using an independent immutable history tip (default resolves upstream master only
+when needed). Multiple matching revisions pointing in different directions,
+truncation, missing sources and rate limits remain unknown. Default history cap
+is 100 versions per file; the running binary never bounds model history.
+
+Directory metadata and source bytes have separate integrity-checked caches.
+`offline=True` means zero HTTP calls, even with refresh requested, and preserves
+original observation timestamps. No credentials enter source requests or cache
+payloads. The APIs emit no entity findings; callers own presentation/policy.
+Operator examples and cache/source limitations belong in `docs/libraries.md`.
 
 ## Documentation ownership
 

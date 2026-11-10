@@ -238,7 +238,7 @@ def print_vocabulary_context(context: dict, *, stream=None) -> None:
     snapshot, guidance = context.get("snapshot"), context.get("guidance")
     if snapshot:
         manifest = snapshot.get("server_manifest", {})
-        print(f"Directory reference: {snapshot['target']}/{snapshot['schema']}; "
+        print(f"Directory observation: {snapshot['target']}/{snapshot['schema']}; "
               f"software {manifest.get('SpecificationVersion', 'unknown')} "
               f"({manifest.get('ImplementationVersion', 'unknown')}); "
               f"software observed {snapshot.get('manifest_retrieved_at', snapshot['retrieved_at'])}; "
@@ -248,18 +248,22 @@ def print_vocabulary_context(context: dict, *, stream=None) -> None:
         checks = guidance.get("production_checks", {})
         dates = ", ".join(sorted({value["checked_at"] for value in checks.values()})) or "not recorded"
         print(f"QC guidance: contract {guidance['schema_version']}, sha256 {content_hash(guidance)[:12]}; "
-              f"reviewed production checks: {dates}; MIABIS comparison is a separate tool.", file=target)
+              f"recorded production observations: {dates}; MIABIS comparison is a separate tool.", file=target)
         components = {"model": guidance.get("expectations", {}).get("model")}
         components.update(guidance.get("expectations", {}).get("ontologies", {}))
         references = []
+        software = guidance.get("expectations", {}).get("software")
+        if software:
+            revision = software.get("revision")
+            references.append(f"software {software['release']} ({revision[:12] if revision else 'commit not recorded'})")
         for name, expected in components.items():
             if expected:
                 source_id = expected["expected_reference_id"]
                 revision = guidance["sources"][source_id]["revision"]
                 references.append(f"{name} {revision[:12]}")
         if references:
-            print("Reviewed model/ontology references: " + "; ".join(references)
-                  + ". See the Manual's Versions and production verification section "
+            print("QC development baseline: " + "; ".join(references)
+                  + ". See the Manual's Development baselines and production checks section "
                   "(https://zenodo.org/doi/10.5281/zenodo.2583446; updated section may not yet be published).", file=target)
     if snapshot and guidance:
         message = compatibility_message(snapshot, guidance)

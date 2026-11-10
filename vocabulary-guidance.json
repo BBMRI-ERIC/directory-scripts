@@ -239,7 +239,8 @@
   "expectations": {
     "software": {
       "release": "v13.209.1",
-      "basis": "Reviewed production observation, not a minimum required software version."
+      "revision": "573baa460ebed8ac8d3af37b22124ff7f7be96de",
+      "basis": "Software development baseline for Manual migration guidance and QC rules, not a claim about deployment or a minimum required software version."
     },
     "model": {
       "expected_reference_id": "model-current",

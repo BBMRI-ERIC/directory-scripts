@@ -49,6 +49,24 @@ def document():
     }
 
 
+@pytest.mark.parametrize("revision", ["master", "573baa460", "z" * 40, None])
+def test_software_development_revision_must_be_immutable(revision):
+    """Reject branch names and incomplete or malformed software commit references.
+
+    Args:
+        revision: Invalid explicitly supplied software baseline revision.
+
+    Returns:
+        None. Absence remains backward-compatible, but a supplied revision must
+        identify one full immutable Git commit.
+    """
+    from vocabulary_guidance import validate_guidance
+    payload = document()
+    payload["expectations"]["software"] = {"release": "v13.209.1", "revision": revision}
+    with pytest.raises(ValueError):
+        validate_guidance(payload)
+
+
 def test_valid_conditional_advice_is_preserved():
     """Keep a narrower alternative conditional rather than an executable update.
 

@@ -110,7 +110,30 @@ def test_context_is_printed_once_with_visible_newer_info():
     print_vocabulary_context(context, stream=output)
     print_vocabulary_context(context, stream=output)
     text = output.getvalue()
-    assert text.count("Directory reference:") == 1
+    assert text.count("Directory observation:") == 1
     assert text.count("INFO: Directory compatibility:") == 1
     assert "cache" in text
     assert "QC tool:" in text
+
+
+def test_development_baseline_is_available_without_production_observations():
+    """Keep the authoritative software/model references independent of deployment.
+
+    Returns:
+        None. The once-only summary names bundled development commits even when
+        no Directory instance or historical production observation is available.
+    """
+    import io
+    from vocabulary_guidance import load_guidance
+    from vocabulary_status import print_vocabulary_context
+    guidance = load_guidance()
+    guidance["production_checks"] = {}
+    context = {"guidance": guidance, "snapshot": None}
+    output = io.StringIO()
+    print_vocabulary_context(context, stream=output)
+    print_vocabulary_context(context, stream=output)
+    text = output.getvalue()
+    assert text.count("QC development baseline:") == 1
+    assert "software v13.209.1 (573baa460ebe)" in text
+    assert "model eb0d0c4f3eb5" in text
+    assert "Directory observation:" not in text

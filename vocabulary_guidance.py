@@ -150,6 +150,11 @@ def validate_guidance(document: dict) -> dict:
         software = _object(expectations["software"], ("release",), "expectations.software")
         if not isinstance(software["release"], str) or not re.fullmatch(r"v?\d+\.\d+\.\d+", software["release"]):
             raise ValueError("Expected software baseline must be an explicit release")
+        if "revision" in software and (
+            not isinstance(software["revision"], str)
+            or not re.fullmatch(r"[0-9a-f]{40}", software["revision"])
+        ):
+            raise ValueError("Software development baseline revision must be a full Git SHA")
     components = list(_object(expectations.get("ontologies", {}), (), "expectations.ontologies").values())
     if "model" in expectations:
         components.append(expectations["model"])

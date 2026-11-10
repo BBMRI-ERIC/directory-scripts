@@ -81,7 +81,13 @@ does not purge entity caches. References are cached separately by target/schema/
 tables. `--vocabulary-guidance path/to/guidance.json` selects other reviewed advice.
 
 QC prints code/guidance revisions, reference revisions and available instance
-metadata once. One combined compatibility message is WARNING if any known
+metadata once. The **QC development baseline** names the software commit and
+model/vocabulary commits used to develop the rules and Manual guidance. These
+references are authoritative for that edition, not claims about the version
+installed on a particular server. The separately labelled **Directory observation**
+describes the instance or cached snapshot being checked. Older guidance without
+a recorded software commit reports that omission explicitly.
+One combined compatibility message is WARNING if any known
 component is older, INFO if differences are newer only, and absent if equal.
 Unknown/divergent versions are unverified. Newer software plus an older model is
 one WARNING. INFO is visible without `-v`. Nothing is repeated per finding or

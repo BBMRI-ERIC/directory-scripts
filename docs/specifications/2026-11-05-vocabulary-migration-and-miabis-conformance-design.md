@@ -296,6 +296,16 @@ production target/schema. Describe this as an observation, not a deployment date
 Keep detailed fingerprints and software-build metadata in supporting evidence
 rather than repeating them throughout the human-facing guidance.
 
+The software commit and model/ontology commits against which the Manual guidance
+and QC rules are developed are their authoritative development baselines. Record
+those separately from production observations, including in the Manual revision
+history. A newer production observation alone must not retarget a rule's baseline.
+The software expectation may include an immutable full `revision` alongside its
+release; older guidance without that field reports the commit as unrecorded.
+Recover historical edition baselines only from supporting evidence. A related
+change that postdates an edition is not its development baseline; document the
+date conflict rather than inferring a baseline from a release or publication date.
+
 Both QC and the Manual must have one clearly identified version-context summary.
 Include the directory-scripts release/commit (and modified state when known),
 guidance contract version and content revision/hash, Directory target/schema,

@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import os.path
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -179,28 +180,47 @@ def _metadata_graphql(session: Client, endpoint: str, query: str) -> dict:
     return payload["data"]
 
 
+def _metadata_reference_scope(model: dict, ontology_model: dict) -> tuple[str, ...]:
+    """Find referenced vocabularies and their transitive local ontology parents.
+
+    Args:
+        model: Entity schema metadata; only DirectoryOntologies links are roots.
+        ontology_model: Reference-schema metadata providing the allowed tables.
+
+    Returns:
+        Sorted reachable table names, including missing declarations so that
+        callers can report incomplete coverage instead of silently skipping them.
+    """
+    from directory_versions import reference_scope
+    return reference_scope(model, ontology_model)
+
+
 def get_directory_metadata_snapshot(
     *,
     directory_url: Optional[str] = None,
     schema: str = "ERIC",
-    ontology_tables: tuple[str, ...] = (),
+    ontology_tables: Optional[tuple[str, ...]] = (),
     refresh: bool = False,
     offline: bool = False,
     username: Optional[str] = None,
     password: Optional[str] = None,
     token: Optional[str] = None,
+    include_ontology_metadata: bool = False,
 ) -> dict:
     """Read schema/reference metadata without loading Directory entity records.
 
     Args:
         directory_url: Base URL, defaulting to public production; part of cache identity.
         schema: Entity schema whose model metadata is inspected, not its records.
-        ontology_tables: Explicit allowlisted DirectoryOntologies reference tables.
+        ontology_tables: Explicit reference tables, or None to discover all reachable
+            vocabularies and transitive parents from reference-schema metadata.
         refresh: Attempt a live replacement even when a valid cached envelope exists.
         offline: Forbid all network activity, even with refresh requested.
         username: Optional account name used with password before schema selection.
         password: Optional credential paired with username; never stored in cache.
         token: Optional EMX2 session token; never stored in cache.
+        include_ontology_metadata: Include reference-schema declarations even for
+            explicit subsets; false preserves existing callers' cache identity.
 
     Returns:
         Independently owned JSON-compatible envelope with observed model, reference
@@ -217,13 +237,22 @@ def get_directory_metadata_snapshot(
     from molgenis_emx2_pyclient import graphql_queries
 
     allowed = {"DataCategories", "ServiceTypes", "ServiceCategories"}
-    if any(table not in allowed for table in ontology_tables):
-        raise ValueError("Metadata reads permit only supported reference ontology tables")
+    blocked = {"Biobanks", "Collections", "Services", "Studies", "Persons", "Contacts", "Networks", "CollectionFacts"}
+    if ontology_tables is not None and (
+        not isinstance(ontology_tables, (tuple, list)) or any(
+            not isinstance(table, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", table)
+            or table in blocked for table in ontology_tables
+        )
+    ):
+        raise ValueError("Metadata reads permit only reference ontology table names")
     if not token and bool(username) != bool(password):
         raise ValueError("Metadata credentials require both username and password")
     base_url = (directory_url or "https://directory.bbmri-eric.eu").rstrip("/")
-    tables = tuple(sorted(set(ontology_tables)))
-    key = content_hash({"target": base_url, "schema": schema, "tables": tables})
+    tables = None if ontology_tables is None else tuple(sorted(set(ontology_tables)))
+    identity = {"target": base_url, "schema": schema, "tables": tables}
+    if include_ontology_metadata:
+        identity["ontology_metadata"] = True
+    key = content_hash(identity)
     with Cache(_repo_cache_dir("data-check-cache", "directory-metadata-v1")) as cache:
         cached = cache.get(key)
         if cached is not None and not _valid_metadata_cache(cached, base_url, schema, tables):
@@ -263,9 +292,26 @@ def get_directory_metadata_snapshot(
                     schema_error = str(exc)
                 ontologies = {}
                 reference_errors = {}
-                if tables:
-                    for table in tables:
+                ontology_model = None
+                resolved_tables = tables
+                if tables is None or include_ontology_metadata or set(tables) - allowed:
+                    try:
+                        ontology_model = _metadata_graphql(session, f"{base_url}/DirectoryOntologies/api/graphql",
+                                                          graphql_queries.list_schema_meta()).get("_schema")
+                        if not isinstance(ontology_model, dict) or not ontology_model.get("tables"):
+                            raise RuntimeError("Reference schema metadata is unavailable or empty")
+                        allowed = {table["name"] for table in ontology_model["tables"]}
+                    except Exception as exc:
+                        ontology_model = {"tables": []}
+                        allowed = set()
+                        reference_errors["__discovery__"] = str(exc)
+                    if tables is None:
+                        resolved_tables = _metadata_reference_scope(model, ontology_model)
+                if resolved_tables:
+                    for table in resolved_tables:
                         try:
+                            if table not in allowed or table in blocked or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", table):
+                                raise RuntimeError(f"Reference table {table} is not declared in DirectoryOntologies metadata")
                             session.set_schema("DirectoryOntologies")
                             frame = session.get(table=table, as_df=True)
                             if not isinstance(frame, pd.DataFrame) or "name" not in frame.columns:
@@ -279,6 +325,8 @@ def get_directory_metadata_snapshot(
                 missing_previous = cached is not None and (
                     (schema_error and cached.get("schema_metadata", {}).get("tables"))
                     or any(table in cached.get("ontologies", {}) for table in reference_errors)
+                    or ("__discovery__" in reference_errors and cached.get("complete"))
+                    or (cached.get("complete") and bool(reference_errors))
                 )
                 if missing_previous:
                     result = _metadata_cached_result(cached, cache.get(f"manifest:{base_url}"), "cache_fallback")
@@ -298,6 +346,10 @@ def get_directory_metadata_snapshot(
                 }
                 if manifest_error:
                     result["manifest_error"] = manifest_error
+                if ontology_model is not None:
+                    result["ontology_schema_metadata"] = ontology_model
+                    result["resolved_ontology_tables"] = list(resolved_tables or ())
+                    result["content_hashes"]["ontology_schema"] = content_hash(ontology_model)
                 if schema_error:
                     result["schema_error"] = schema_error
                 if manifest:
@@ -334,14 +386,15 @@ def _metadata_cached_result(cached: dict, manifest_record: Optional[dict], chann
     return result
 
 
-def _valid_metadata_cache(record: Any, target: str, schema: str, tables: tuple[str, ...]) -> bool:
+def _valid_metadata_cache(record: Any, target: str, schema: str, tables: Optional[tuple[str, ...]]) -> bool:
     """Validate the local cache envelope and its observed-content fingerprints.
 
     Args:
         record: Trusted-local-cache value whose structure may be stale or corrupted.
         target: Normalized Directory URL required by the current request.
         schema: Schema identity required by the current request.
-        tables: Requested allowlisted references; entity payloads are never validated here.
+        tables: Requested references or None for metadata-driven discovery;
+            entity payloads are never validated here.
 
     Returns:
         True only for a supported, identity-matching envelope with intact hashes.
@@ -354,7 +407,18 @@ def _valid_metadata_cache(record: Any, target: str, schema: str, tables: tuple[s
                 or not isinstance(record.get("schema_metadata"), dict)
                 or not isinstance(record["schema_metadata"].get("tables"), list)
                 or not isinstance(record.get("ontologies"), dict)
-                or not set(record["ontologies"]).issubset(tables)):
+                or (tables is not None and not set(record["ontologies"]).issubset(tables))):
+            return False
+        if tables is None or "ontology_schema_metadata" in record:
+            ontology_model = record["ontology_schema_metadata"]
+            if record["content_hashes"]["ontology_schema"] != content_hash(ontology_model):
+                return False
+            scope = _metadata_reference_scope(record["schema_metadata"], ontology_model) if tables is None else tables
+            if tuple(record["resolved_ontology_tables"]) != tuple(scope) or not set(record["ontologies"]).issubset(scope):
+                return False
+            if record.get("complete") and set(record["ontologies"]) != set(scope):
+                return False
+        elif record.get("complete") and set(record["ontologies"]) != set(tables):
             return False
         if datetime.fromisoformat(record["retrieved_at"]).tzinfo is None:
             return False
@@ -366,6 +430,90 @@ def _valid_metadata_cache(record: Any, target: str, schema: str, tables: tuple[s
         return True
     except (KeyError, TypeError, ValueError, AttributeError):
         return False
+
+def get_directory_versions(
+    *, directory_url: Optional[str] = None, schema: str = "ERIC",
+    ontology_tables: Optional[tuple[str, ...]] = None, refresh: bool = True,
+    offline: bool = False, username: Optional[str] = None,
+    password: Optional[str] = None, token: Optional[str] = None,
+) -> dict:
+    """Inspect independently evidenced software, schema and vocabulary versions.
+
+    Args:
+        directory_url: Directory base URL, defaulting to public production.
+        schema: Entity schema whose reference/model metadata is inspected.
+        ontology_tables: None for reachable vocabulary discovery, a tuple for
+            an explicitly limited scope, or an empty tuple for schema only.
+        refresh: Attempt live inspection; retain usable cached evidence on failure.
+        offline: Forbid all HTTP requests and preserve original observation times.
+        username: Optional account used before private schema selection.
+        password: Optional password paired with username; never cached.
+        token: Optional session token; never cached or forwarded to GitHub.
+
+    Returns:
+        Independent structured version evidence with provenance, fingerprints and
+        scope. A model content fingerprint is not an installed model commit.
+
+    Raises:
+        ValueError: If reference names or credentials are invalid.
+        RuntimeError: If neither live nor cached metadata is available.
+    """
+    from directory_versions import version_report
+    snapshot = get_directory_metadata_snapshot(directory_url=directory_url, schema=schema,
+        ontology_tables=ontology_tables, refresh=refresh, offline=offline,
+        username=username, password=password, token=token, include_ontology_metadata=True)
+    return version_report(snapshot, scope_complete=ontology_tables is None)
+
+
+def compare_directory_versions(
+    expected_software_commit: str, expected_model_commit: str, *,
+    directory_url: Optional[str] = None, schema: str = "ERIC",
+    ontology_tables: Optional[tuple[str, ...]] = None, refresh: bool = True,
+    offline: bool = False, username: Optional[str] = None,
+    password: Optional[str] = None, token: Optional[str] = None,
+    source_cache_dir: Optional[Path] = None, history_tip: Optional[str] = None,
+    max_history_versions: int = 100,
+) -> dict:
+    """Compare software ancestry and independent schema/vocabulary source contents.
+
+    Args:
+        expected_software_commit: Full/short hexadecimal software baseline commit.
+        expected_model_commit: Separate model/vocabulary source commit to assess.
+        directory_url: Directory base URL; defaults to public production.
+        schema: Entity schema whose metadata is read, never its entity records.
+        ontology_tables: None for all reachable vocabularies; a tuple explicitly
+            narrows coverage and cannot establish whole-model equality.
+        refresh: Refresh Directory metadata and any required moving history tip.
+        offline: Forbid Directory and GitHub requests; require existing caches.
+        username: Optional account used only for Directory authentication.
+        password: Optional paired Directory password; never cached.
+        token: Optional Directory session token; never sent to GitHub.
+        source_cache_dir: Upstream source-response cache, separate from entity data.
+        history_tip: Optional fixed source-history bound, independent of software;
+            default resolves upstream master only if historical inference is needed.
+        max_history_versions: Positive per-file history cap; truncated scans yield
+            unknown rather than an unsupported older/newer conclusion.
+
+    Returns:
+        Structured software, schema and per-vocabulary comparisons with older,
+        equal, newer, diverged or unknown states and a conservative model aggregate.
+        Mixed schema/vocabulary directions are explicit; no warnings are printed.
+
+    Raises:
+        ValueError: If commit inputs, limits, reference names or credentials are invalid.
+        RuntimeError: If live/cached Directory metadata is unavailable; unavailable
+            GitHub/source evidence instead produces unknown component comparisons.
+    """
+    from directory_versions import compare_version_report, validate_comparison_request
+    validate_comparison_request(expected_software_commit, expected_model_commit, history_tip, max_history_versions)
+    snapshot = get_directory_metadata_snapshot(directory_url=directory_url, schema=schema,
+        ontology_tables=ontology_tables, refresh=refresh, offline=offline,
+        username=username, password=password, token=token, include_ontology_metadata=True)
+    return compare_version_report(snapshot, expected_software_commit, expected_model_commit,
+        source_cache_dir=source_cache_dir or Path(_repo_cache_dir("data-check-cache", "directory-version-sources")),
+        refresh=refresh, offline=offline, history_tip=history_tip,
+        max_history_versions=max_history_versions, scope_complete=ontology_tables is None)
+
 
 class Directory:
     """Provide a cache-first, read-only Directory snapshot and its relationship graphs.
@@ -1241,6 +1389,52 @@ class Directory:
             The base URL selected during construction.
         """
         return self.__directoryURL
+
+    def _version_options(self, options: dict) -> dict:
+        """Bind metadata options to this instance without retaining credentials.
+
+        Args:
+            options: Caller-provided version API options, copied before modification.
+
+        Returns:
+            Options with the configured target/schema, preserving explicit auth.
+
+        Raises:
+            ValueError: If an override conflicts with the configured target/schema.
+        """
+        result = dict(options)
+        for name, expected in (("directory_url", self.getDirectoryUrl()), ("schema", self.getSchema())):
+            if result.get(name) is not None and result[name] != expected:
+                raise ValueError(f"Version inspection must use the configured {name}")
+            result[name] = expected
+        return result
+
+    def getVersions(self, **options) -> dict:
+        """Inspect versions on this instance's configured Directory target/schema.
+
+        Args:
+            **options: get_directory_versions options excluding conflicting context;
+                private live refresh credentials must be supplied explicitly.
+
+        Returns:
+            Standalone inspection report; no new entity reads or retained credentials.
+        """
+        return get_directory_versions(**self._version_options(options))
+
+    def compareVersions(self, expected_software_commit: str, expected_model_commit: str, **options) -> dict:
+        """Compare this instance's metadata against independent source commits.
+
+        Args:
+            expected_software_commit: Full/short software baseline SHA.
+            expected_model_commit: Separate model/vocabulary baseline SHA.
+            **options: compare_directory_versions options; context must agree with
+                the instance, and live private refresh authentication is explicit.
+
+        Returns:
+            Structured component comparisons without printing or mutating Directory.
+        """
+        return compare_directory_versions(expected_software_commit, expected_model_commit,
+                                          **self._version_options(options))
 
     @staticmethod
     def _is_explicitly_withdrawn(entity: Optional[dict[str, Any]]) -> bool:

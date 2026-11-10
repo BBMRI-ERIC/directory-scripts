@@ -32,7 +32,8 @@ def parse_vocabulary_csv(text: str) -> list[dict]:
         Ordered term mappings; blank values are omitted, names remain exact.
 
     Raises:
-        ValueError: If headers, names or row widths make identities ambiguous.
+        ValueError: If headers, names or populated extra fields make identities
+            ambiguous. Empty trailing CSV cells carry no additional information.
     """
     reader = csv.DictReader(io.StringIO(text.lstrip("\ufeff")))
     if not reader.fieldnames or "name" not in reader.fieldnames:
@@ -40,7 +41,8 @@ def parse_vocabulary_csv(text: str) -> list[dict]:
     result, seen = [], set()
     for row in reader:
         name = row.get("name")
-        if None in row or not name or name in seen:
+        padding = row.pop(None, [])
+        if any(value != "" for value in padding) or not name or name in seen:
             raise ValueError("Invalid vocabulary CSV: missing/duplicate name or extra columns")
         seen.add(name)
         result.append({key: value for key, value in row.items() if value not in (None, "")})
@@ -250,13 +252,14 @@ def _immutable(revision: str) -> None:
         raise ValueError("Reference revision must be a full immutable GitHub commit SHA")
 
 
-def _read_source(url: str, cache_dir: Path, *, offline: bool) -> bytes:
+def _read_source(url: str, cache_dir: Path, *, offline: bool, refresh: bool = False) -> bytes:
     """Retrieve immutable bytes or reuse their verified local cache.
 
     Args:
         url: Exact source URL, including pinned revision when serving Git files.
         cache_dir: Local source cache directory, separate from entity caches.
         offline: Forbid remote retrieval when the entry is not already cached.
+        refresh: Refresh a moving-reference lookup; offline takes precedence.
 
     Returns:
         Raw response bytes, validated against the cached digest on reuse.
@@ -265,7 +268,7 @@ def _read_source(url: str, cache_dir: Path, *, offline: bool) -> bytes:
         RuntimeError: If cache integrity, availability or HTTP access fails.
     """
     path = Path(cache_dir) / (hashlib.sha256(url.encode()).hexdigest() + ".json")
-    if path.exists():
+    if path.exists() and (offline or not refresh):
         record = json.loads(path.read_text(encoding="utf-8"))
         data = record["text"].encode("utf-8")
         if record["url"] != url or record["sha256"] != hashlib.sha256(data).hexdigest():
@@ -278,7 +281,9 @@ def _read_source(url: str, cache_dir: Path, *, offline: bool) -> bytes:
         response.raise_for_status()
         data = response.content
         text = data.decode("utf-8")
-        record = {"url": url, "text": text, "sha256": hashlib.sha256(data).hexdigest()}
+        from datetime import datetime, timezone
+        record = {"url": url, "text": text, "sha256": hashlib.sha256(data).hexdigest(),
+                  "retrieved_at": datetime.now(timezone.utc).isoformat()}
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".tmp")
         temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
