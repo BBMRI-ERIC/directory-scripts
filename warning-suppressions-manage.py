@@ -57,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument(
         "--entity-type",
         default="",
-        help="Optional entity type: BIOBANK, COLLECTION, CONTACT, NETWORK.",
+        help="Optional entity type: BIOBANK, COLLECTION, CONTACT, NETWORK, SERVICE.",
     )
     add_parser.add_argument("--reason", default="", help="Reason for suppression.")
     add_parser.add_argument("--added-by", default="", help="Who approved/added the suppression.")

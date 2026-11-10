@@ -1,0 +1,7 @@
+[Core]
+Name = Check deprecated dataset and service types
+Module = VocabularyStatus
+
+[Documentation]
+Version = 1.0
+Description = Report explicitly deprecated collection and service vocabulary values with reviewed migration guidance.

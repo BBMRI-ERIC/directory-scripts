@@ -61,6 +61,61 @@ The current collection-category checks use the Directory ontology names
 for imaging. Retired `BIOLOGICAL_SAMPLES` and `MEDICAL_RECORDS` codes no longer
 satisfy those checks; warning identifiers remain unchanged.
 
+## Dataset And Service Vocabulary Changes
+
+`VOC:DeprecatedValue` reports **ERROR** for explicitly deprecated values in
+`Collections.data_categories` and `Services.serviceTypes`. The API may still
+accept them. Services retain their own entity identity, owning Node and owner
+withdrawal scope. This check generates no automatic fixes.
+
+```bash
+python3 data-check.py -v -X qc.xlsx
+python3 data-check.py -v --refresh-vocabulary-reference -X qc.xlsx
+python3 data-check.py --offline-reference -r -X qc.xlsx
+```
+
+`--offline-reference` prohibits network reads for schema/vocabulary references
+only. Entity loading and other remote plugins retain their existing options;
+`-r` disables normal remote-check plugins, not entity retrieval. Reference refresh
+does not purge entity caches. References are cached separately by target/schema/
+tables. `--vocabulary-guidance path/to/guidance.json` selects other reviewed advice.
+
+QC prints code/guidance revisions, reference revisions and available instance
+metadata once. One combined compatibility message is WARNING if any known
+component is older, INFO if differences are newer only, and absent if equal.
+Unknown/divergent versions are unverified. Newer software plus an older model is
+one WARNING. INFO is visible without `-v`. Nothing is repeated per finding or
+in XLSX; unsupported paths have separate reduced-coverage diagnostics, while
+other checks continue.
+
+Master updates produce installable software releases, not automatic installation.
+Data managers apply model/ontology migrations separately; software commit alone
+does not identify live vocabularies. Cached dates are not fresh production checks
+or deployment dates. Guidance is used only when relevant definitions match its
+reviewed fingerprints. Unrelated new terms do not invalidate advice. IMAGING_DATA
+does not justify every image type, and Other does not automatically mean Other
+sample-derived dataset. Absent retired names in old snapshots are reported as
+reference/snapshot uncertainty, not invented deprecation errors. Invalid optional
+guidance suppresses unsupported advice, not independently supported checks.
+Local diagnostics support `--suppress-validation-warnings`.
+
+Details belong in the Manual's **Recent changes and migration guidance** section.
+Use the [public Manual DOI](https://zenodo.org/doi/10.5281/zenodo.2583446); new
+sections are unavailable publicly until the revised edition is published. Normal
+QC does not run the separate
+[MIABIS implementation comparison](auxiliary-tools.md#directory-and-miabis-comparison).
+
+For Manual maintenance, run this from directory-scripts as well as regenerating
+the check catalogue:
+
+```bash
+python3 scripts/validate_manual_guidance.py \
+  --manual-root ../BBMRI-ERIC-Directory-Data-Manager-Manual
+```
+
+It checks labels, advice fingerprints and overall source/version context. Changed
+fingerprints require prose review; passing does not certify scientific meaning.
+
 ## Running checks
 
 Run the default suite:

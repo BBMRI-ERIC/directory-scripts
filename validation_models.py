@@ -501,11 +501,11 @@ class WarningSuppressionEntryModel(_BaseModel):
 
         entity_type = payload.get("entity_type")
         normalized_entity_type = "" if entity_type is None else str(entity_type).strip().upper()
-        if normalized_entity_type and normalized_entity_type not in {"BIOBANK", "COLLECTION", "CONTACT", "NETWORK"}:
+        if normalized_entity_type and normalized_entity_type not in {"BIOBANK", "COLLECTION", "CONTACT", "NETWORK", "SERVICE"}:
             errors.append(
                 _make_error(
                     ("entity_type",),
-                    "must be one of: BIOBANK, COLLECTION, CONTACT, NETWORK",
+                    "must be one of: BIOBANK, COLLECTION, CONTACT, NETWORK, SERVICE",
                 )
             )
 

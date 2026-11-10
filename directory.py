@@ -3,11 +3,13 @@
 """Provide cache-backed access and graph traversal for Directory entities."""
 
 import copy
+import json
 import logging
 import os
 import os.path
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -17,6 +19,7 @@ from diskcache import Cache
 from molgenis_emx2_pyclient import Client
 from molgenis_emx2_pyclient.exceptions import NoSuchTableException
 from nncontacts import NNContacts
+from vocabulary_guidance import content_hash
 
 #logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("BBMRI Directory")
@@ -152,6 +155,217 @@ def get_directory_ontology_table(
         ) from exc
     finally:
         cache.close()
+
+
+def _metadata_graphql(session: Client, endpoint: str, query: str) -> dict:
+    """Execute one internal metadata query with explicit transport validation.
+
+    Args:
+        session: Open shared EMX2 client whose authentication is already set up.
+        endpoint: Metadata GraphQL endpoint on the selected Directory target.
+        query: Internally constructed schema or manifest query, never user input.
+
+    Returns:
+        The GraphQL data mapping with omitted properties preserved as absent.
+
+    Raises:
+        RuntimeError: If GraphQL errors or malformed data prevent safe use.
+    """
+    response = session.session.post(endpoint, json={"query": query}, timeout=60)
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("errors") or not isinstance(payload.get("data"), dict):
+        raise RuntimeError(f"Directory metadata query failed: {payload.get('errors', 'missing data')}")
+    return payload["data"]
+
+
+def get_directory_metadata_snapshot(
+    *,
+    directory_url: Optional[str] = None,
+    schema: str = "ERIC",
+    ontology_tables: tuple[str, ...] = (),
+    refresh: bool = False,
+    offline: bool = False,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    token: Optional[str] = None,
+) -> dict:
+    """Read schema/reference metadata without loading Directory entity records.
+
+    Args:
+        directory_url: Base URL, defaulting to public production; part of cache identity.
+        schema: Entity schema whose model metadata is inspected, not its records.
+        ontology_tables: Explicit allowlisted DirectoryOntologies reference tables.
+        refresh: Attempt a live replacement even when a valid cached envelope exists.
+        offline: Forbid all network activity, even with refresh requested.
+        username: Optional account name used with password before schema selection.
+        password: Optional credential paired with username; never stored in cache.
+        token: Optional EMX2 session token; never stored in cache.
+
+    Returns:
+        Independently owned JSON-compatible envelope with observed model, reference
+        rows, manifest, original retrieval time, current channel and content hashes.
+        A failed refresh may return cache_fallback with its diagnostic.
+        Partial inputs are explicit in schema_error/reference_errors and complete;
+        manifest_retrieved_at can differ from the model/reference retrieved_at.
+        A partial refresh does not discard previously usable cached references.
+
+    Raises:
+        ValueError: If non-reference reads or incomplete credentials are requested.
+        RuntimeError: If neither a safe cached envelope nor live metadata is available.
+    """
+    from molgenis_emx2_pyclient import graphql_queries
+
+    allowed = {"DataCategories", "ServiceTypes", "ServiceCategories"}
+    if any(table not in allowed for table in ontology_tables):
+        raise ValueError("Metadata reads permit only supported reference ontology tables")
+    if not token and bool(username) != bool(password):
+        raise ValueError("Metadata credentials require both username and password")
+    base_url = (directory_url or "https://directory.bbmri-eric.eu").rstrip("/")
+    tables = tuple(sorted(set(ontology_tables)))
+    key = content_hash({"target": base_url, "schema": schema, "tables": tables})
+    with Cache(_repo_cache_dir("data-check-cache", "directory-metadata-v1")) as cache:
+        cached = cache.get(key)
+        if cached is not None and not _valid_metadata_cache(cached, base_url, schema, tables):
+            log.warning("Ignoring invalid cached Directory metadata; reference fingerprints or identity do not agree.")
+            cached = None
+        if cached is not None and (offline or not refresh):
+            return _metadata_cached_result(cached, cache.get(f"manifest:{base_url}"), "cache")
+        if offline:
+            raise RuntimeError(f"No cached metadata for {base_url}/{schema}; offline mode forbids a live read")
+        if schema != "ERIC" and not (token or (username and password)):
+            raise ValueError("Private schema metadata requires credentials or a token")
+        try:
+            kwargs = {"token": token} if token else {}
+            with Client(base_url, **kwargs) as session:
+                if username and password:
+                    session.signin(username, password)
+                session.set_schema(schema)
+                manifest_error = None
+                try:
+                    manifest = _metadata_graphql(session, f"{base_url}/api/graphql",
+                                                 graphql_queries.version_number()).get("_manifest", {})
+                    if not isinstance(manifest, dict):
+                        raise RuntimeError("Server manifest is not a metadata object")
+                    cache[f"manifest:{base_url}"] = {"server_manifest": manifest,
+                        "retrieved_at": datetime.now(timezone.utc).isoformat()}
+                except Exception as exc:
+                    manifest = {}
+                    manifest_error = str(exc)
+                schema_error = None
+                try:
+                    model = _metadata_graphql(session, f"{base_url}/{schema}/api/graphql",
+                                              graphql_queries.list_schema_meta()).get("_schema")
+                    if not isinstance(model, dict) or not isinstance(model.get("tables"), list):
+                        raise RuntimeError("Directory schema metadata is missing its tables")
+                except Exception as exc:
+                    model = {"tables": []}
+                    schema_error = str(exc)
+                ontologies = {}
+                reference_errors = {}
+                if tables:
+                    for table in tables:
+                        try:
+                            session.set_schema("DirectoryOntologies")
+                            frame = session.get(table=table, as_df=True)
+                            if not isinstance(frame, pd.DataFrame) or "name" not in frame.columns:
+                                raise RuntimeError(f"Reference table {table} has no term names")
+                            names = frame["name"].tolist()
+                            if any(not isinstance(name, str) or not name for name in names) or len(names) != len(set(names)):
+                                raise RuntimeError(f"Reference table {table} has missing or duplicate term names")
+                            ontologies[table] = json.loads(frame.to_json(orient="records"))
+                        except Exception as exc:
+                            reference_errors[table] = str(exc)
+                missing_previous = cached is not None and (
+                    (schema_error and cached.get("schema_metadata", {}).get("tables"))
+                    or any(table in cached.get("ontologies", {}) for table in reference_errors)
+                )
+                if missing_previous:
+                    result = _metadata_cached_result(cached, cache.get(f"manifest:{base_url}"), "cache_fallback")
+                    result["refresh_error"] = "; ".join(filter(None, [schema_error, *reference_errors.values()]))
+                    log.warning("Partial metadata refresh; retaining the previous usable references: %s", result["refresh_error"])
+                    return result
+                result = {
+                    "format_version": 1, "target": base_url, "schema": schema,
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(), "channel": "live",
+                    "server_manifest": manifest, "schema_metadata": model, "ontologies": ontologies,
+                    "reference_errors": reference_errors,
+                    "complete": not schema_error and not reference_errors,
+                    "content_hashes": {"schema": content_hash(model), **{
+                        table: content_hash(sorted(rows, key=lambda row: row["name"]))
+                        for table, rows in ontologies.items()
+                    }},
+                }
+                if manifest_error:
+                    result["manifest_error"] = manifest_error
+                if schema_error:
+                    result["schema_error"] = schema_error
+                if manifest:
+                    result["manifest_retrieved_at"] = cache[f"manifest:{base_url}"]["retrieved_at"]
+                cache[key] = result
+                return copy.deepcopy(result)
+        except Exception as exc:
+            if cached is not None:
+                result = _metadata_cached_result(cached, cache.get(f"manifest:{base_url}"), "cache_fallback")
+                result.update(channel="cache_fallback", refresh_error=str(exc))
+                log.warning("Metadata refresh failed; reusing cached reference: %s", exc)
+                return result
+            raise RuntimeError(f"Unable to read metadata for {base_url}/{schema}; no cached copy: {exc}") from exc
+
+
+def _metadata_cached_result(cached: dict, manifest_record: Optional[dict], channel: str) -> dict:
+    """Return prior usable references with independently observed software identity.
+
+    Args:
+        cached: Earlier metadata envelope; its reference retrieval time is preserved.
+        manifest_record: Optional newer server manifest with its own observation time.
+        channel: Current reference access channel, cache or cache_fallback.
+
+    Returns:
+        Independent envelope retaining reference evidence and any available separately
+        timestamped software observation. Does not modify or overwrite the cache.
+    """
+    result = copy.deepcopy(cached)
+    result["channel"] = channel
+    if (isinstance(manifest_record, dict) and isinstance(manifest_record.get("server_manifest"), dict)
+            and isinstance(manifest_record.get("retrieved_at"), str)):
+        result["server_manifest"] = copy.deepcopy(manifest_record["server_manifest"])
+        result["manifest_retrieved_at"] = manifest_record["retrieved_at"]
+    return result
+
+
+def _valid_metadata_cache(record: Any, target: str, schema: str, tables: tuple[str, ...]) -> bool:
+    """Validate the local cache envelope and its observed-content fingerprints.
+
+    Args:
+        record: Trusted-local-cache value whose structure may be stale or corrupted.
+        target: Normalized Directory URL required by the current request.
+        schema: Schema identity required by the current request.
+        tables: Requested allowlisted references; entity payloads are never validated here.
+
+    Returns:
+        True only for a supported, identity-matching envelope with intact hashes.
+        This is cache-integrity validation, not strict validation of live entity data.
+    """
+    try:
+        if (not isinstance(record, dict) or record.get("format_version") != 1
+                or record.get("target") != target or record.get("schema") != schema
+                or not isinstance(record.get("server_manifest"), dict)
+                or not isinstance(record.get("schema_metadata"), dict)
+                or not isinstance(record["schema_metadata"].get("tables"), list)
+                or not isinstance(record.get("ontologies"), dict)
+                or not set(record["ontologies"]).issubset(tables)):
+            return False
+        if datetime.fromisoformat(record["retrieved_at"]).tzinfo is None:
+            return False
+        if record["content_hashes"]["schema"] != content_hash(record["schema_metadata"]):
+            return False
+        for table, rows in record["ontologies"].items():
+            if not isinstance(rows, list) or record["content_hashes"][table] != content_hash(sorted(rows, key=lambda row: row["name"])):
+                return False
+        return True
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
 
 class Directory:
     """Provide a cache-first, read-only Directory snapshot and its relationship graphs.

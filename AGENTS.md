@@ -35,6 +35,7 @@
 
 ## Design Principles
 - `directory.py` is the single abstraction for Directory API access. Keep it lean, well documented, and the sole location for shared API calls.
+- Implementation conformance tools must use the metadata-only Directory API, never construct `Directory` or fetch entity records. Software releases and model/ontology migrations are independent; preserve separate observations and usable caches. QC compatibility is one non-blocking text message per run (WARNING for known older components, INFO for newer-only differences), never a repeated entity/XLSX finding. See the vocabulary contracts in `DEVELOPMENT.md`.
 - Modularize cross-cutting concerns into focused helpers (for example `warningscontainer.py`, `customwarnings.py`, `nncontacts.py`, `orphacodes.py`).
 - Avoid duplicating API logic in scripts; import and reuse the shared modules instead.
 - Use assertive runtime validation for assumptions that depend on input/data/configuration; raise clear exceptions instead of relying on `assert` for runtime safety.

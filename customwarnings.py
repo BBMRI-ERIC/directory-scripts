@@ -18,6 +18,7 @@ class DataCheckEntityType(Enum):
     COLLECTION = 'Collection'
     CONTACT = 'Contact'
     NETWORK = 'Network'
+    SERVICE = 'Service'
 
 class DataCheckWarning:
     """Store one data-quality warning and its optional machine-readable fixes.

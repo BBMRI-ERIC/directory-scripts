@@ -28,7 +28,7 @@ from cli_common import (
     configure_logging,
 )
 from validation_helpers import build_validation_warning_handler
-from yapsy.PluginManager import PluginManager
+from plugin_manager_compat import PluginManager
 from yapsy.IPlugin import IPlugin
 import inspect
 
@@ -37,6 +37,7 @@ from fix_proposals import write_fix_plan
 from warningscontainer import WarningsContainer
 from nncontacts import NNContacts
 from directory import Directory
+from vocabulary_status import prepare_vocabulary_context, print_vocabulary_context
 from warning_suppressions import (
     DEFAULT_WARNING_SUPPRESSIONS_PATH,
     load_warning_suppressions_detailed,
@@ -111,6 +112,18 @@ add_purge_cache_arguments(parser, cachesList)
 parser.add_argument('-O', '--orphacodes-mapfile', dest='orphacodesfile', nargs=1,
                     help='file name of Orpha code mappings from http://www.orphadata.org/cgi-bin/ORPHAnomenclature.html')
 parser.add_argument(
+    '--vocabulary-guidance', default=None,
+    help='reviewed vocabulary migration JSON (default: bundled guidance)',
+)
+parser.add_argument(
+    '--refresh-vocabulary-reference', action='store_true',
+    help='refresh schema and vocabulary references without purging entity caches',
+)
+parser.add_argument(
+    '--offline-reference', action='store_true',
+    help='use only cached schema/vocabulary references; unavailable paths are skipped',
+)
+parser.add_argument(
     '--warning-suppressions',
     dest='warning_suppressions',
     default=str(DEFAULT_WARNING_SUPPRESSIONS_PATH),
@@ -180,6 +193,8 @@ def main() -> int:
 
     try:
         dir = Directory(**build_directory_kwargs(args, pp=pp))
+        vocabulary_context = prepare_vocabulary_context(dir, args)
+        print_vocabulary_context(vocabulary_context)
         dir.prepare_ai_cache_checksum_state()
         validation_warn = build_validation_warning_handler(
             enabled=not getattr(args, "suppress_validation_warnings", False),
@@ -192,6 +207,7 @@ def main() -> int:
             "COLLECTION": {entity["id"] for entity in dir.getCollections()},
             "CONTACT": {entity["id"] for entity in dir.getContacts()},
             "NETWORK": {entity["id"] for entity in dir.getNetworks()},
+            "SERVICE": {entity["id"] for entity in dir.getServices()},
         }
         for diagnostic in summarize_suppression_diagnostics(
             suppression_result.entries,
@@ -237,6 +253,9 @@ def main() -> int:
 
         if args.debug:
             warningContainer.dumpSuppressedWarningsDebug()
+
+        for diagnostic in sorted(set(vocabulary_context["diagnostics"])):
+            validation_warn(diagnostic)
 
         if not args.nostdout:
             log.info("Outputting warnings on stdout")

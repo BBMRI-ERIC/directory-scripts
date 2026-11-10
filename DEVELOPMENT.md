@@ -5,6 +5,58 @@ functionality specifications, invariants, code organization, and testing. It
 also serves as the project's functionality-specification mechanism until a
 dedicated specification system replaces it.
 
+## Vocabulary Guidance And Implementation Comparison
+
+The detailed contract is in
+`docs/specifications/2026-11-05-vocabulary-migration-and-miabis-conformance-design.md`.
+`vocabulary-guidance.json` contains immutable evidence, production observations,
+separate software/model/ontology expectations, migration advice, MIABIS bindings,
+structural changes and stable Manual references. Validate it using the versioned
+JSON schema and `vocabulary_guidance.py`. It is neither a vocabulary mirror nor a
+runtime log. Reviewed advice is not automatically official semantic equivalence.
+
+`directory.get_directory_metadata_snapshot(...)` must not construct Directory or
+read entity records. The allowlist covers schema/manifest metadata and selected
+references. Caches preserve target/schema identity, retrieval time and channel;
+offline means zero requests. Authentication precedes private schema selection.
+Manifest reads are independent of schema compatibility. Partial refreshes retain
+prior usable references and their original times; software observations have
+their own timestamp and must not imply that cached model/terms were read live.
+Omitted read-only properties remain unknown. Fingerprints compare business
+structure without target-specific runtime IDs or display headings.
+
+`VOC:DeprecatedValue` is an ERROR, read-only for collections and services, with no
+update proposals. Explicit declarations establish deprecation, not an absent name
+or historical mention. Relevant meaning fingerprints gate advice. Unsupported
+paths produce reduced-coverage diagnostics without disabling unrelated checks.
+SERVICE reporting/suppressions do not add service mutation support to the updater.
+
+Print version context once in text, never as repeated entity/XLSX findings.
+Combine differences into WARNING if any known component is older, otherwise INFO
+for newer-only differences; equal versions need no mismatch message. Unknown
+ordering remains unverified. Master release creation, server installation and
+model/ontology migration are separate events. Expected baselines are not minimum
+capability requirements; mismatch alone does not abort QC.
+
+The separate metadata-only conformance command compares complete supported lists,
+including unresolved concepts and extensions. No fuzzy string match proves equal
+meaning, and no ordinary QC plugin audits MIABIS implementation conformance.
+Implementation differences belong in reviewed Manual guidance. Additional data
+rules and network-policy changes need separate approval.
+Linked component attribute lists/cardinalities and scope overviews must actually
+be assessed, not merely downloaded. Preserve reference-source conflicts separately
+from implementation differences. Match observed contents against complete pinned
+source history and unchanged intervals, reporting multiple compatible revisions
+or explicit no-match differences. A structural model match excludes unassessed
+properties and never identifies a deployment commit/date.
+
+The Manual expands advice in `vocabulary-migration-guidance.tex`. Per-entry and
+whole-document fingerprint comments allow `scripts/validate_manual_guidance.py`
+to flag changed advice/sources or missing labels, not certify prose semantics.
+Public links must not imply unpublished sections are available. On Python without
+`imp`, a narrow compatible plugin manager preserves file discovery and IPlugin
+activation without changing Yapsy installations.
+
 ## Documentation ownership
 
 Tracked Markdown is shared project documentation, not a personal notebook. Use

@@ -25,6 +25,7 @@ line options, see [Setup and common operation](docs/setup.md).
 | Family | Main entry points | Documentation |
 |---|---|---|
 | Data quality | `data-check.py`, `checks/`, `qcheck-updater.py` | [Data quality](docs/data-quality.md) |
+| Schema and vocabulary comparison | `directory-miabis-conformance.py` (metadata only) | [MIABIS comparison](docs/auxiliary-tools.md#directory-and-miabis-comparison) |
 | Exports and reports | `exporter-*.py` | [Exporters](docs/exporters.md) |
 | Maps and geospatial output | `geocoding.py`, `R-maps/` | [Maps](docs/maps.md) |
 | Data maintenance and synchronization | `directory-tables-modifier.py`, updater/importer/sync tools | [Maintenance tools](docs/maintenance-tools.md) |
