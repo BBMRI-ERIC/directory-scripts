@@ -897,13 +897,30 @@ or R must trigger a cross-language review in the same change, before commit:
    from former and external contacts; concatenate approved active emails and
    do not infer a Node-routing role for external contacts from country alone.
    Exclude AoM/FC-only contacts; active MC contacts remain eligible even with
-   additional AoM/FC membership. Do not infer groups for unreviewed legacy
+   additional AoM/FC membership. Steering Committee (SC) membership is an AoM
+   subset, not an independent operational qualification. Exclude strategic-only
+   contacts, including existing mappings identified as strategic-only during
+   review. Do not infer groups for unreviewed legacy
    contacts. A Node left without operational contacts retains its membership
    and existing escalation fallback while confirmed contacts are requested.
    Active Work Programme records also qualify. Evaluate eligibility per record
    before deduplicating emails: an excluded AoM/FC-only record must not veto a
    separate eligible active MC record for the same email. Store each eligible
    email once per country, trimming incidental whitespace.
+   For known aliases reviewed for single-recipient routing, retain an existing
+   address if it is still eligible in the source instead of adding a second
+   address for the same person; otherwise replace it with the approved current
+   address. Multiple addresses for one person require explicit approval.
+   Preserve approved legacy contacts that lack new source evidence rather than
+   treating absence as retirement. Correct malformed email text only after
+   confirmation. Keep bare comma-separated email storage for compatibility;
+   display names are not required to identify a confirmed contact.
+   The November 2026 approved review retains the existing HU/LV aliases,
+   preserves both Slovak contacts, and leaves Sweden in membership with no
+   operational contact mapping. Sweden therefore uses escalation routing until
+   a new operational contact is confirmed; never retain former contacts just
+   to keep contact coverage complete. EU/EXT routing and global escalation
+   recipients are independent of this country-contact refresh.
 5. Run the following from the repository root before committing any affected
    configuration change. R and `sf` must be available; skipped consistency tests
    are not a successful gate. Fix discrepancies, rerun, and record results in

@@ -294,11 +294,22 @@ records, concatenate multiple confirmed emails per country, and exclude former
 or external contacts unless their Node-routing role is explicitly confirmed.
 Exclude contacts whose groups consist only of AoM and/or FC; retain active MC
 contacts even when they also belong to AoM or FC. Active Work Programme contacts
-are also eligible. Deduplicate emails across eligible records; an AoM/FC-only
+are also eligible. Steering Committee membership alone does not qualify: it is
+an AoM subset. Strategic-only contacts are not operational recipients.
+Deduplicate emails across eligible records; an AoM/FC-only
 record does not disqualify a separate active operational record for that email.
 The supplied records populate PT, ME, QA, UA, DK and SI.
 Former delegates remain excluded even in repeated source selections. Do not
 infer group membership for older contacts absent from the supplied records.
+For known aliases, retain an already-configured eligible address rather than
+adding another address for the same person unless explicitly approved. This
+keeps the existing HU/LV addresses. Approved legacy contacts may remain without
+a matching new record; absence alone is not evidence of retirement.
+
+After the November 2026 contact review, Sweden has no confirmed operational
+contact and uses the existing escalation recipients. Its membership and map
+classification are unchanged. Supply a confirmed replacement to restore direct
+Swedish Node routing; do not re-add the former delegates to bypass the fallback.
 
 ### Configuration Locations
 
