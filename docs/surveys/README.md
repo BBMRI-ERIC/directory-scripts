@@ -34,6 +34,8 @@ not stage them or assume the public survey branch makes reports safe to share.
   provenance, collection scope, quantities and report interpretation.
 - [External UpSet charts](upsets.md): R generation, native and Termux/proot
   execution, validation and embedding.
+- [Participation maps](maps.md): both layouts, source-bound country counts,
+  automatic runtime helpers and validated SO2/MuCP PDF inclusion.
 - [Survey specifications](DEVELOPMENT.md): normative functionality contracts.
 - [Survey agent instructions](AGENTS.md): implementation guardrails.
 - [Separation design](branch-separation-design.md) and

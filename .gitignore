@@ -45,3 +45,7 @@ __pycache__/
 # agent plans and isolated local workspaces are not publication artifacts
 /superpowers/
 /.codex-worktrees/
+# private survey participation counts, reviewed identities and rendered map bundles
+/*participation-maps/
+/map-assets-*/
+/survey-mappings/survey_participation_identities.json

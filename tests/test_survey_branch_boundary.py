@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMMANDS = (
     "analyze", "describe", "render-report", "render-descriptive-report",
     "export-update-plan", "export-eus-form-json", "export-descriptive-upset-r",
-    "merge-mucp",
+    "merge-mucp", "export-so2-map-r", "export-mucp-map-r",
 )
 
 

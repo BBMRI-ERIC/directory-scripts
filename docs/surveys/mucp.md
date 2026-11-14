@@ -1,6 +1,8 @@
 # Combined MuCP And SO2 Workflows
 
 Run examples from the repository root. See [UpSet rendering](upsets.md#combined-report-assets) for external charts.
+The [participation-map workflow](maps.md) adds full-survey country comparisons
+independently of the report's selected join.
 
 ## Combined SO2 and Multi-Country Project evidence
 

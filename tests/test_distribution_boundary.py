@@ -42,6 +42,9 @@ def validate_distribution(paths: set[str]) -> None:
         or ("/" not in p and p.startswith(("so2_", "survey_")) and p.endswith(".py"))
         or p.startswith(("survey-mappings/", "tests/fixtures/so2_mucp/", "docs/surveys/"))
         or p.startswith(("tests/test_so2_", "tests/test_survey_", "tests/test_mucp_"))
+        or p.startswith("tests/r/test_survey_")
+        or p in {"R-maps/render_survey_participation.R", "R-maps/survey_participation_common.R",
+                 "scripts/render-so2-maps.sh", "scripts/render-mucp-maps.sh", "scripts/survey-map-runtime.sh"}
         or p in {"tests/test_quantity_reporting_audit.py", "docs/so2-descriptive-upsets.md", "requirements-surveys.txt"}
     }
     assert not unexpected, f"Survey files remain in core distribution: {sorted(unexpected)}"
@@ -76,6 +79,9 @@ def test_distribution_contract_accepts_both_supported_layouts():
     validate_distribution(CORE_PATHS | SURVEY_REQUIRED)
     with pytest.raises(AssertionError, match="Survey files remain"):
         validate_distribution(CORE_PATHS | {"tests/test_quantity_reporting_audit.py"})
+    for survey_map in ("R-maps/render_survey_participation.R", "scripts/render-so2-maps.sh"):
+        with pytest.raises(AssertionError, match="Survey files remain"):
+            validate_distribution(CORE_PATHS | {survey_map})
     with pytest.raises(AssertionError, match="Missing survey files"):
         validate_distribution(CORE_PATHS | {"docs/surveys/README.md"})
     with pytest.raises(AssertionError, match="Missing shared files"):

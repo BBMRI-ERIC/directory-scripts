@@ -705,7 +705,7 @@ def execute_merge(args: Any, directory_factory: Any) -> dict[str, Any]:
     from survey_mucp_aggregation import aggregate_modality_quantities
     input_names = ("survey_file", "descriptive_schema", "form_json", "so2_findings", "mucp_json", "mucp_schema",
                    "mucp_reporting_policy",
-                   "match_overrides", "crosswalk", "visualization_registry", "upset_assets_dir")
+                   "match_overrides", "crosswalk", "visualization_registry", "upset_assets_dir", "map_assets_dir")
     output_names = ("output_json", "output_tex", "output_pdf", "output_chart_dir", "output_biobank_pdf_dir",
                     "output_match_review", "output_upset_r_dir")
     input_paths = [Path(getattr(args, name)).resolve() for name in input_names if getattr(args, name, None)]
@@ -721,6 +721,9 @@ def execute_merge(args: Any, directory_factory: Any) -> dict[str, Any]:
     render_requested = any(targets[name] for name in ("output_tex", "output_pdf", "output_chart_dir", "output_biobank_pdf_dir"))
     if render_requested and not targets["output_tex"]:
         targets["output_tex"] = str(Path(args.output_json).with_suffix(".tex"))
+    if getattr(args, "map_assets_dir", None):
+        from survey_map_report import validate_report_map_paths
+        validate_report_map_paths(args.map_assets_dir, targets.values(), targets.get("output_tex"))
     output_paths = [Path(value).resolve() for value in targets.values() if value]
     all_paths = input_paths + output_paths
     if len(output_paths) != len(set(output_paths)):
@@ -822,6 +825,10 @@ def execute_merge(args: Any, directory_factory: Any) -> dict[str, Any]:
     payload["upset_canonical_material"] = asset_material
     validate_combined_payload(payload)
     assets = validate_matrix_upset_bundle(matrices, asset_material, Path(args.upset_assets_dir)) if args.upset_assets_dir else None
+    map_assets = None
+    if getattr(args, "map_assets_dir", None):
+        from survey_map_report import load_report_map_assets
+        map_assets = load_report_map_assets(payload, args.map_assets_dir, "mucp")
     numerator, denominator = (float(value) for value in args.max_piechart_ratio.split(":"))
     if not math.isfinite(numerator) or not math.isfinite(denominator) or numerator <= 0 or denominator <= 0:
         raise ValueError("Piechart ratio must contain two positive values")
@@ -833,7 +840,10 @@ def execute_merge(args: Any, directory_factory: Any) -> dict[str, Any]:
                "include_upset_deviations": getattr(args, "include_upset_deviations", False),
                "table_biobank_repeated_entries": getattr(args, "table_biobank_repeated_entries", "empty"),
                "chart_dir": args.output_chart_dir, "report_path": targets["output_tex"], "upset_matrices": matrices}
-    rendered = render_combined_tex(payload, options, assets) if render_requested else None
+    if map_assets is not None:
+        rendered = render_combined_tex(payload, options, assets, map_assets=map_assets) if render_requested else None
+    else:
+        rendered = render_combined_tex(payload, options, assets) if render_requested else None
     dossiers = render_individual_biobank_documents(payload, options) if args.output_biobank_pdf_dir else {}
     if args.output_upset_r_dir:
         import tempfile

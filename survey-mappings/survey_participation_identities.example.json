@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "inputs": {
+    "so2": "REPLACE_WITH_SO2_WORKBOOK_SHA256",
+    "mucp": "REPLACE_WITH_MUCP_JSON_SHA256"
+  },
+  "groups": []
+}

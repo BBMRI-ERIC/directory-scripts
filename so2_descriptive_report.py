@@ -1765,6 +1765,7 @@ class RenderedDescriptiveReport:
         chart_documents: Complete TeX chart documents keyed by chart name.
         chart_paths: Relative PDF paths associated with rendered chart names.
         diagnostics: Explicit generic-renderer notices, empty for legacy reports.
+        external_figures: Relative binary PDF assets copied into portable report staging.
     """
 
     tex: str
@@ -1772,6 +1773,7 @@ class RenderedDescriptiveReport:
     chart_documents: Mapping[str, str]
     chart_paths: Mapping[str, str]
     diagnostics: tuple[str, ...] = ()
+    external_figures: Mapping[str, bytes] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -3549,6 +3551,7 @@ def render_descriptive_tex(
     include_exploratory_association_heatmaps: bool = False,
     max_piechart_ratio: float = 4 / 3,
     upset_assets: Any | None = None,
+    map_assets: Any | None = None,
 ) -> RenderedDescriptiveReport:
     """Render a self-contained report and reusable standalone chart documents.
 
@@ -3565,6 +3568,7 @@ def render_descriptive_tex(
             a registry file.
         max_piechart_ratio: Maximum permitted horizontal-to-vertical pie ratio.
         upset_assets: Optional prevalidated external UpSet asset state.
+        map_assets: Optional source-bound participation maps to place after Responses Summary.
 
     Returns:
         Report TeX, shared chart fragments, standalone documents, and chart paths.
@@ -3681,6 +3685,10 @@ def render_descriptive_tex(
             report.append(rf"\noindent {_tex(group['country'])}: {_tex('; '.join(group['institutions']))}; source rows {_tex(', '.join(map(str, group['source_rows'])))}.\par")
         report.append(rf"Question-level differences flagged: {len(summary['conflicts'])}. Unresolved identity submissions retained separately: {len(summary['unresolved_identity_rows'])}.\par")
         report.append(r"\clearpage")
+    from survey_map_report import map_report_fragment
+    map_fragment, external_figures = map_report_fragment(map_assets)
+    if map_fragment:
+        report.append(map_fragment)
     active_matrix_parent: str | None = None
 
     def append_upset_pair(
@@ -3866,6 +3874,8 @@ def render_descriptive_tex(
     if chart_dir is not None and isinstance(payload, dict):
         payload["chart_paths"] = dict(chart_paths)
     report_tex = "\n".join(report)
+    if external_figures:
+        report_tex = report_tex.replace(r"\begin{document}", r"\usepackage{pdflscape}" + "\n" + r"\begin{document}", 1)
     if summary is not None:
         report_tex = report_tex.replace("N: included response rows; A: rows with a nonblank answer", "N: analytical observations; A: observations with a nonblank answer")
         report_tex = report_tex.replace("percentage of answering rows", "percentage of answering observations").replace("percentage of included response rows", "percentage of included observations")
@@ -3875,6 +3885,7 @@ def render_descriptive_tex(
         chart_fragments=MappingProxyType(fragments),
         chart_documents=MappingProxyType(chart_documents),
         chart_paths=MappingProxyType(chart_paths),
+        external_figures=external_figures,
     )
 
 
@@ -4020,6 +4031,9 @@ def render_descriptive_pdf(
             publication cannot complete without partial output.
     """
     target_tex = Path(tex_path)
+    from survey_map_report import bind_external_figures, write_external_figures
+    rendered, map_directory_name = bind_external_figures(rendered, target_tex)
+    target_maps = target_tex.parent / map_directory_name if map_directory_name else None
     target_pdf = Path(pdf_path) if pdf_path is not None else None
     target_charts = Path(chart_dir) if chart_dir is not None else None
     extra_text_outputs = dict(additional_text_outputs or {})
@@ -4035,15 +4049,26 @@ def render_descriptive_pdf(
         target_tex,
         *(path for path in (target_pdf, target_charts) if path is not None),
         *extra_text_outputs,
+        *([target_maps] if target_maps is not None else []),
     ]
     if any(not target.parent.exists() for target in targets):
         raise InputError("Output parent directory does not exist.")
+    resolved_targets = [target.resolve() for target in targets]
+    for i, target in enumerate(resolved_targets):
+        if any(target == other or target in other.parents or other in target.parents
+               for other in resolved_targets[:i]):
+            raise InputError("Report output targets overlap")
+    if target_maps is not None:
+        _require_new_or_empty_chart_dir(target_maps, overwrite)
     with tempfile.TemporaryDirectory(prefix="so2-report-") as report_temporary, \
             tempfile.TemporaryDirectory(prefix="so2-charts-") as chart_temporary:
         report_stage = Path(report_temporary)
         chart_stage = Path(chart_temporary)
+        write_external_figures(report_stage, rendered.external_figures)
 
         chart_pdfs: dict[str, Path] = {}
+        if target_charts is not None:
+            chart_pdfs.update({"map-" + Path(name).stem: report_stage / name for name in rendered.external_figures})
         if target_charts is not None:
             for key, document in rendered.chart_documents.items():
                 source = chart_stage / f"{key}.tex"
@@ -4073,6 +4098,16 @@ def render_descriptive_pdf(
             raise InputError(f"Could not stage descriptive report outputs: {exc}") from exc
 
         publish_charts = None
+        publish_maps = None
+        if target_maps is not None:
+            publish_maps = Path(tempfile.mkdtemp(prefix=".so2-maps-", dir=target_maps.parent))
+            try:
+                for name, content in rendered.external_figures.items():
+                    (publish_maps / Path(name).name).write_bytes(content)
+            except OSError:
+                shutil.rmtree(publish_maps, ignore_errors=True)
+                _discard_publication_stages(publication_stages)
+                raise
         if target_charts is not None:
             _require_new_or_empty_chart_dir(target_charts, overwrite)
             publish_charts = Path(tempfile.mkdtemp(prefix=".so2-charts-", dir=target_charts.parent))
@@ -4081,6 +4116,8 @@ def render_descriptive_pdf(
                     shutil.copy2(source_pdf, publish_charts / f"{key}.pdf")
             except OSError as exc:
                 shutil.rmtree(publish_charts, ignore_errors=True)
+                if publish_maps is not None:
+                    shutil.rmtree(publish_maps, ignore_errors=True)
                 _discard_publication_stages(publication_stages)
                 raise InputError(f"Could not stage chart PDFs for publication: {exc}") from exc
 
@@ -4139,6 +4176,8 @@ def render_descriptive_pdf(
                 replace_file(staged_pdf, target_pdf)
             if target_charts is not None and publish_charts is not None:
                 replace_directory(publish_charts, target_charts)
+            if target_maps is not None and publish_maps is not None:
+                replace_directory(publish_maps, target_maps)
             for target, source in staged_extra_text.items():
                 replace_file(source, target)
         except OSError as exc:
@@ -4170,6 +4209,8 @@ def render_descriptive_pdf(
                         shutil.rmtree(publish_charts)
                 except OSError as rollback_exc:
                     rollback_failures.append(rollback_exc)
+            if publish_maps is not None and publish_maps.exists():
+                shutil.rmtree(publish_maps, ignore_errors=True)
             _discard_publication_stages(publication_stages)
             if rollback_failures:
                 details = "; ".join(str(rollback_exc) for rollback_exc in rollback_failures)

@@ -4,6 +4,81 @@ These contracts supplement [shared architecture](../../DEVELOPMENT.md).
 Operator workflows live in [SO2](so2.md), [MuCP](mucp.md) and [UpSet](upsets.md).
 Shared cache and quality contracts remain in [Directory cache scope](../../DEVELOPMENT.md#directory-cache-scope).
 
+### Participation maps
+
+`survey_participation.py` owns source-bound participation identity/counting, not
+questionnaire statistics. Use SO2 observation_sources and the full combined
+matching inventory independently of --join. Unresolved individuals count
+provisionally; national summaries count zero unless decomposed into identifiable
+owned constituent biobanks, deduplicated against all other responses. No name-only
+merging, collection-as-biobank counting or extra residual national unit is allowed.
+Known Directory IDs remain canonical through explicit review. Additional review
+files bind both original survey hashes; contradictory or missing source ownership
+fails safely. Country uses actual country, not staging prefix. Frozen inventory
+scope affects only D, never respondents. Preserve S>D, percentages above 100 and
+undefined D=0 ratios. Shared B is confirmed linkage, with 0<=B<=min(S,M).
+Require explicit complete MuCP input-record coverage metadata, not just a source
+hash. Roots replaced by scope projections and rejected/unassigned projections
+remain diagnostic evidence, not additional biobanks. Whole-source and scoped
+review ownership of the same source cannot coexist. Preserve country evidence
+per survey; a cross-survey disagreement cannot alter the frozen SO2 binding.
+Directory country/review overrides resolve placement; otherwise count S and M
+in their own reported countries and retain differing shared placements in
+`shared_country_conflicts`, separately from all count rows. B<=min(S,M) still
+holds for every country and the unknown-country count row.
+Country overrides apply only to the surveys explicitly represented by their
+review references. Rejected-only collection identity projections leave their
+original individual respondent count intact; they never make a national summary
+countable. An accepted scoped individual owner replaces the unresolved root.
+
+`export-so2-map-r` and `export-mucp-map-r` are peer preparation commands. The latter
+requires the same complete SO2 descriptive grouping as the standalone export.
+`survey_map_assets.py` freezes inventory/count CSVs and verified source manifests,
+with sibling-directory staging and explicit overwrite. Reuse source/config
+hashes, not Python/R JSON reserialization equality. Invalid, partial or stale
+rendered bundles cannot be used as if they were ready; genuine unrendered bundles
+have an explicit empty state. Runtime/config and basemap versions are evidence,
+not claims about which source questionnaire answers are correct.
+
+R renders both configured layouts using country geometry and physical device
+measurements, with one common linear height scale per figure. Atomic bar/label
+groups include their count labels and CC. Device-sized bounds, reserved regions,
+leader lines and off-map callouts must prevent between-country overlaps without
+shrinking labels below the configured minimum or dropping countries. The output
+manifest records complete country lists and recomputable collision boxes.
+Validate separate PDF and PNG device audits, including internal label/bar
+separation. R output backups live outside the render stage and remain recoverable
+if restoration fails. Existing OEC geometry exclusions, clipping, north cap,
+content framing and inset frames are reused without fake points or HQ overlays.
+Close malformed legacy polygon rings and make survey geometries valid in memory
+before GEOS clipping/anchor operations, preserving holes, islands and source files.
+Use configured standard-layout label seeds; OEC uses its already-clipped geometry.
+Pack off-map country groups deterministically from the panel edge, not around one
+shared anchor, and reserve a visible outside-extent heading. Serialize output
+counts at round-trip numeric precision; rounded percentages must never weaken
+the strict input/output count audit.
+Translucent label backings participate in internal bar/label clearance and stay
+within the measured group bounds. Keep map/caption pairs on one KOMA landscape
+page at full 240x135 mm figure size; source-specific concise captions and local
+zero paragraph spacing are checked by actual PDF page-count regressions.
+SO2 displays D outlines and S fill plus a separate green S/D map. MuCP displays
+M and S totals with a shared base B in both; B is not added to totals.
+
+Separate shell helpers choose Debian proot in Termux, Windows Rscript.exe in
+Cygwin and native Rscript elsewhere. Preserve argv boundaries, convert Windows
+argument paths, validate kind, propagate failures and never install dependencies
+or launch an IDE automatically. Real Cygwin verification is distinct from mocked
+dispatch; real geospatial rendering is distinct from pure R/grid layout tests.
+
+`--map-assets-dir` remains optional and Directory/R-free during report rendering.
+`survey_map_report.py` replays retained sources and explicit map review, composes
+landscape pages and owns safe portable map names. Both publication paths stage
+external binary figures before compilation/promotion and roll back their companion
+directories with the other outputs. No temporary or original-bundle path may be
+required by published TeX. Default-empty RenderedDescriptiveReport.external_figures
+keeps legacy callers compatible. Maps and input-bound identities stay local;
+operator commands belong in [maps.md](maps.md), not master-facing documentation.
+
 ### SO2 survey analysis tool
 
 - `survey-so2-directory.py` is a one-off survey-analysis CLI that still follows the repository's shared infrastructure rules:

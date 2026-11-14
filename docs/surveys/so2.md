@@ -1,6 +1,8 @@
 # SO2 Survey Workflows
 
 Run examples from the repository root. See [UpSet rendering](upsets.md) for the canonical R workflow.
+For optional country participation figures, use the separate
+[map preparation, runtime helpers and inclusion workflow](maps.md).
 
 ## SO2 survey analysis
 

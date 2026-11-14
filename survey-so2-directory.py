@@ -373,6 +373,21 @@ def build_cli() -> argparse.ArgumentParser:
     export_upset.add_argument("--upset-registry", default=str(DEFAULT_UPSET_REGISTRY), help="Approved UpSet-definition registry JSON.")
     export_upset.add_argument("--overwrite", action="store_true", help="Replace an existing output bundle after successful regeneration.")
 
+    for map_kind in ("so2", "mucp"):
+        export_map = subparsers.add_parser(f"export-{map_kind}-map-r", help="Prepare externally rendered survey participation maps.")
+        _add_common_cli(export_map)
+        from cli_common import add_withdrawn_scope_arguments, add_purge_cache_arguments
+        add_withdrawn_scope_arguments(export_map)
+        add_purge_cache_arguments(export_map, ["directory"])
+        export_map.add_argument("-i", "--input-json", required=True, help="Descriptive SO2 or combined MuCP JSON.")
+        if map_kind == "mucp":
+            export_map.add_argument("--so2-json", required=True, help="Full SO2 descriptive JSON from the same workbook.")
+        export_map.add_argument("--output-dir", required=True, help="Destination for frozen map inputs.")
+        export_map.add_argument("--map-layout", choices=("bbmri-members", "oec", "both"), default="both")
+        export_map.add_argument("--directory-inventory", help="Reuse a frozen Directory inventory instead of connecting.")
+        export_map.add_argument("--participation-identities", help="Source-bound reviewed map identity groups.")
+        export_map.add_argument("--overwrite", action="store_true", help="Replace a prepared map bundle after successful staging.")
+
     render_descriptive = subparsers.add_parser("render-descriptive-report", help="Render TeX/PDF from a descriptive-statistics payload.")
     add_logging_arguments(render_descriptive)
     render_descriptive.add_argument("-i", "--input-json", required=True, help="Descriptive-statistics payload JSON produced by describe.")
@@ -439,6 +454,8 @@ def build_cli() -> argparse.ArgumentParser:
                        help="In combined-report tables, leave repeated biobank cells empty (default) or show dtto.")
     merge.add_argument("--max-piechart-ratio", default="4:3", help="Maximum piechart width:height ratio.")
     merge.add_argument("--overwrite", action="store_true", help="Replace outputs only after successful regeneration.")
+    for command in ("describe", "render-descriptive-report", "merge-mucp"):
+        subparsers.choices[command].add_argument("--map-assets-dir", help="Validated external participation-map bundle to include.")
     return parser
 
 
@@ -534,7 +551,7 @@ def build_directory(args: argparse.Namespace) -> Any:
         "directory_url": args.directory_target,
         "include_withdrawn_entities": False,
     }
-    if getattr(args, "command", None) == "merge-mucp":
+    if getattr(args, "command", None) in {"merge-mucp", "export-so2-map-r", "export-mucp-map-r"}:
         from cli_common import build_directory_kwargs
         kwargs.update(build_directory_kwargs(args))
     if args.token:
@@ -3991,10 +4008,25 @@ def _render_descriptive_payload(
     if not (args.output_tex or args.output_pdf or args.output_chart_dir):
         raise InputError("render-descriptive-report requires at least one of --output-tex, --output-pdf, or --output-chart-dir.")
     tex_path = args.output_tex or str(Path(args.input_json).with_suffix(".tex"))
+    if getattr(args, "map_assets_dir", None):
+        from survey_map_report import validate_report_map_paths
+        try:
+            validate_report_map_paths(args.map_assets_dir,
+                [tex_path, args.output_pdf, args.output_chart_dir, additional_json_output], tex_path)
+        except ValueError as exc:
+            raise InputError(str(exc)) from exc
     _require_distinct_descriptive_outputs(input_paths, [tex_path, args.output_pdf, args.output_chart_dir])
     _require_new_or_empty_chart_dir(args.output_chart_dir, getattr(args, "overwrite", False))
     _require_new_descriptive_file_outputs([tex_path, args.output_pdf], getattr(args, "overwrite", False))
     descriptive = _load_descriptive_report_module()
+    map_assets = None
+    map_directory = getattr(args, "map_assets_dir", None)
+    if map_directory:
+        try:
+            from survey_map_report import load_report_map_assets
+            map_assets = load_report_map_assets(payload, map_directory, "so2")
+        except (ValueError, OSError) as exc:
+            raise InputError(str(exc)) from exc
     upset_assets = None
     upset_assets_dir = getattr(args, "upset_assets_dir", None)
     if upset_assets_dir is not None:
@@ -4015,6 +4047,8 @@ def _render_descriptive_payload(
         }
         if upset_assets is not None:
             render_kwargs["upset_assets"] = upset_assets
+        if map_assets is not None:
+            render_kwargs["map_assets"] = map_assets
         rendered = descriptive.render_descriptive_tex(payload, args.output_chart_dir, **render_kwargs)
         additional_text_outputs = None
         if additional_json_output is not None:
@@ -4076,6 +4110,13 @@ def run_describe(args: argparse.Namespace) -> int:
         args.output_tex or str(Path(args.output_json).with_suffix(".tex"))
         if render_requested else None
     )
+    if getattr(args, "map_assets_dir", None):
+        from survey_map_report import validate_report_map_paths
+        try:
+            validate_report_map_paths(args.map_assets_dir,
+                [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir], derived_tex_path)
+        except ValueError as exc:
+            raise InputError(str(exc)) from exc
     _require_distinct_descriptive_outputs(
         [args.survey_file, args.descriptive_schema, args.form_json, args.association_heatmap_registry, str(identity_path), str(DEFAULT_MAPPING), str(DEFAULT_REFERENCE)],
         [args.output_json, derived_tex_path, args.output_pdf, args.output_chart_dir],
@@ -4165,6 +4206,7 @@ def run_describe(args: argparse.Namespace) -> int:
             ),
             max_piechart_ratio=args.max_piechart_ratio,
             upset_assets_dir=getattr(args, "upset_assets_dir", None),
+            map_assets_dir=getattr(args, "map_assets_dir", None),
             overwrite=args.overwrite,
         )
         _render_descriptive_payload(
@@ -4174,6 +4216,12 @@ def run_describe(args: argparse.Namespace) -> int:
             Path(args.output_json),
         )
     else:
+        if getattr(args, "map_assets_dir", None):
+            from survey_map_report import load_report_map_assets
+            try:
+                load_report_map_assets(payload, args.map_assets_dir, "so2")
+            except (ValueError, OSError) as exc:
+                raise InputError(str(exc)) from exc
         write_json(args.output_json, payload)
     return EXIT_OK
 
@@ -4338,6 +4386,13 @@ def main() -> int:
             return run_export_descriptive_upset_r(args)
         if args.command == "merge-mucp":
             return run_merge_mucp(args)
+        if args.command in {"export-so2-map-r", "export-mucp-map-r"}:
+            from survey_map_assets import export_map_inputs
+            try:
+                print(f"Map inputs: {export_map_inputs(args, build_directory)}")
+            except (ValueError, OSError) as exc:
+                raise InputError(str(exc)) from exc
+            return EXIT_OK
         raise InputError(f"Unsupported command {args.command!r}.")
     except InputError as exc:
         logging.error("%s", exc)

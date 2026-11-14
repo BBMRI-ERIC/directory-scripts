@@ -1248,6 +1248,7 @@ def render_matching_breakdown(
 
 def render_combined_tex(
     payload: Mapping[str, Any], options: Mapping[str, Any], upset_assets: Any = None,
+    map_assets: Any = None,
 ) -> descriptive.RenderedDescriptiveReport:
     """Render the coherent combined report and reusable chart documents.
 
@@ -1257,6 +1258,7 @@ def render_combined_tex(
         upset_assets: Optional ``ValidatedUpSetAssets`` from the existing asset
             validator, with ``state`` and figure objects; absent/incomplete assets
             are explicitly reported rather than guessed.
+        map_assets: Optional validated participation maps using both complete surveys.
 
     Returns:
         Complete report TeX, chart fragments/documents/paths and diagnostics.
@@ -1315,6 +1317,10 @@ def render_combined_tex(
         for key, value in sorted(matching.items()):
             body_lines.append(rf"\noindent {_tex(key.replace('_', ' '))}: {_tex(value)}\par")
 
+    from survey_map_report import map_report_fragment
+    map_fragment, external_figures = map_report_fragment(map_assets)
+    if map_fragment:
+        body_lines.append(map_fragment)
     diagnostics: list[str] = []
     for biobank in biobanks:
         if any(row["filename"] == "Filename not supplied" for row in dossier_source_rows(
@@ -1661,9 +1667,12 @@ def render_combined_tex(
         *body_lines, r"\end{document}", "",
     ])
     fragments = {**chart_fragments, **cross_fragments, **upset_fragments}
+    if external_figures:
+        tex = tex.replace(r"\begin{document}", r"\usepackage{pdflscape}" + "\n" + r"\begin{document}", 1)
     return descriptive.RenderedDescriptiveReport(
         tex=tex, chart_fragments=fragments, chart_documents=chart_documents,
         chart_paths=chart_paths, diagnostics=tuple(diagnostics),
+        external_figures=external_figures,
     )
 
 
@@ -2789,7 +2798,8 @@ def _target_path(value: Any, key: str) -> Path:
     return path
 
 
-def _compile_document(tex: str, label: str, passes: int = 2) -> Path:
+def _compile_document(tex: str, label: str, passes: int = 2,
+                      external_figures: Mapping[str, bytes] | None = None) -> Path:
     """Compile TeX in a temporary directory and return its complete PDF path.
 
     Args:
@@ -2797,6 +2807,7 @@ def _compile_document(tex: str, label: str, passes: int = 2) -> Path:
         label: Safe filename stem for temporary compilation files.
         passes: Minimum XeLaTeX passes (at least two). Reference files must
             stabilize; up to four additional passes handle TOC pagination changes.
+        external_figures: Optional safe relative PDF bytes needed during compilation.
 
     Returns:
         Path to the compiled PDF inside a live temporary directory.
@@ -2808,6 +2819,9 @@ def _compile_document(tex: str, label: str, passes: int = 2) -> Path:
     directory = Path(tempfile.mkdtemp(prefix="combined-compile-"))
     source = directory / f"{_slug(label) or 'document'}.tex"
     try:
+        if external_figures:
+            from survey_map_report import write_external_figures
+            write_external_figures(directory, external_figures)
         if not isinstance(passes, int) or isinstance(passes, bool) or passes < 1:
             raise descriptive.InputError("Combined compilation passes must be a positive integer")
         descriptive._write_compilation_source(source, tex, "combined report source")
@@ -2852,10 +2866,17 @@ def publish_combined_outputs(
             is disallowed, or publication cannot complete without rollback.
     """
     del upset_matrices  # The controller owns bundle generation and validation.
+    targets = dict(targets)
+    if rendered is not None and rendered.external_figures:
+        from survey_map_report import bind_external_figures
+        tex_target = targets.get("output_tex") or Path(targets["output_json"]).with_suffix(".tex")
+        rendered, maps_name = bind_external_figures(rendered, tex_target)
+        targets["output_map_assets_dir"] = Path(tex_target).parent / maps_name
     allowed = {
         "output_json", "output_tex", "output_pdf", "output_chart_dir",
         "output_biobank_pdf_dir", "output_match_review", "output_upset_r_dir",
         "upset_bundle_stage",
+        "output_map_assets_dir",
     }
     unknown = set(targets) - allowed
     if unknown:
@@ -2875,7 +2896,7 @@ def publish_combined_outputs(
                 continue
             if left == right or left in right.parents or right in left.parents:
                 raise CombinedPublicationError(f"Combined output targets overlap: {left_key} and {right_key}.")
-    directory_keys = {"output_chart_dir", "output_biobank_pdf_dir", "output_upset_r_dir"}
+    directory_keys = {"output_chart_dir", "output_biobank_pdf_dir", "output_upset_r_dir", "output_map_assets_dir"}
     for key, path in normalized.items():
         if key in directory_keys:
             if path.exists() and not path.is_dir():
@@ -2915,13 +2936,22 @@ def publish_combined_outputs(
     try:
         for target, content in file_content.items():
             file_stages[target] = descriptive._stage_publication_file(target, text=content)
+        if "output_map_assets_dir" in raw:
+            from survey_map_report import write_external_figures
+            stage = Path(tempfile.mkdtemp(prefix=".combined-maps-", dir=normalized["output_map_assets_dir"].parent))
+            temporary_roots.append(stage)
+            write_external_figures(stage, rendered.external_figures)
+            prepared_directories["output_map_assets_dir"] = stage / normalized["output_map_assets_dir"].name
         pdfs: dict[str, Path] = {}
         if "output_pdf" in raw and rendered is not None:
-            pdfs["output_pdf"] = _compile_document(rendered.tex, "combined-report", passes=2)
+            external = {"external_figures": rendered.external_figures} if rendered.external_figures else {}
+            pdfs["output_pdf"] = _compile_document(rendered.tex, "combined-report", passes=2, **external)
             temporary_roots.append(pdfs["output_pdf"].parent)
         if "output_chart_dir" in raw and rendered is not None:
             stage = Path(tempfile.mkdtemp(prefix=".combined-charts-", dir=normalized["output_chart_dir"].parent))
             prepared_directories["output_chart_dir"] = stage
+            for name, content in rendered.external_figures.items():
+                (stage / ("map-" + Path(name).name)).write_bytes(content)
             for key, document in rendered.chart_documents.items():
                 pdf = _compile_document(document, key, passes=1)
                 temporary_roots.append(pdf.parent)
